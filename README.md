@@ -4,6 +4,30 @@
 
 It collects public market metadata and orderbook snapshots, stores raw JSON locally for auditability, generates a baseline market-implied forecast, and produces calibration/evaluation reports after settlements are synced.
 
+## Current Next Phase: Phase 3AE Fast Market Harvester
+
+Status as of 2026-07-14: the next safe phase is to widen fast-settlement coverage before any paper trade creation. The latest bounded harvester run stayed paper-only/read-only and found:
+
+- `ranked_fast_settlement_candidates`: 0
+- `ranked_watch_candidates`: 108
+- `ranked_slow_settlement_avoids`: 54
+- `open_0_24h_markets_seen`: 500
+- `open_0_24h_markets_missing_current_ranking`: 500
+- `open_0_24h_markets_stale_or_missing_ranking`: 500
+- `paper_trade_creation_allowed`: false
+
+The immediate Phase 3AE queue is:
+
+```bash
+kalshi-bot phase3ay-health-refresh --cycles 1 --interval-seconds 0 --all-markets
+kalshi-bot forecast --model ensemble_v2
+kalshi-bot find-opportunities --model-name ensemble_v2
+kalshi-bot phase3ae-fast-market-harvester --model-name ensemble_v2
+kalshi-bot phase3ab-learning-governor --model-name ensemble_v2
+```
+
+Do not enable live trading, demo execution, autopilot, sports/news expansion, or learning acceleration until Phase 3AE produces ranked fast-settlement candidates and a human approves the next step.
+
 Phase 2 adds a paper trading ledger. It creates simulated orders and immediate simulated fills from stored forecasts/snapshots only. It still does not authenticate with Kalshi or place real orders.
 
 Phase 2.5 adds a feature store, manual external data ingestion scaffolding, a model registry, historical backtesting, and strategy comparison. It remains read-only and simulated.
