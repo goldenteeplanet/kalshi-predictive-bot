@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Market Memory{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>Market Memory</h1>
+    <p>Phase 3O point-in-time learning ledger status.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge {{ 'badge-good' if memory.status == 'READY' else 'badge-risk' }}">{{ memory.status }}</span>
+    <a class="button" href="{{ report_links.market_memory_report }}">Memory report</a>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Capture Status</h2>
+      <p class="muted">Counts across market, forecast, and trade memory stores.</p>
+    </div>
+  </div>
+  <div class="settings-grid">
+    <div><span>Enabled</span><strong>{{ memory.enabled }}</strong></div>
+    <div><span>Mode</span><strong>{{ memory.mode }}</strong></div>
+    <div><span>Schema</span><strong>{{ memory.schema_version }}</strong></div>
+    <div><span>Data Mode</span><strong>{{ memory.data_mode }}</strong></div>
+    <div><span>Market Memory</span><strong>{{ memory.counts.market_memory }}</strong></div>
+    <div><span>Forecast Memory</span><strong>{{ memory.counts.forecast_memory }}</strong></div>
+    <div><span>Trade Memory</span><strong>{{ memory.counts.trade_memory }}</strong></div>
+    <div><span>Quarantine</span><strong>{{ memory.counts.quarantine }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Source Reconciliation</h2>
+      <p class="muted">Existing source tables compared with Phase 3O capture counts.</p>
+    </div>
+  </div>
+  <div class="settings-grid">
+    <div><span>Market snapshots</span><strong>{{ memory.source_counts.market_snapshots }}</strong></div>
+    <div><span>Forecasts</span><strong>{{ memory.source_counts.forecasts }}</strong></div>
+    <div><span>Paper orders</span><strong>{{ memory.source_counts.paper_orders }}</strong></div>
+    <div><span>Paper fills</span><strong>{{ memory.source_counts.paper_fills }}</strong></div>
+    <div><span>Settlements</span><strong>{{ memory.source_counts.settlements }}</strong></div>
+    <div><span>Pending outcomes</span><strong>{{ memory.pending_outcomes }}</strong></div>
+  </div>
+</section>
+
+{% if memory.issues %}
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Issues</h2>
+      <p class="muted">Visible memory capture or reconciliation warnings.</p>
+    </div>
+  </div>
+  {% for issue in memory.issues %}
+  <div class="signal-callout health-risk">
+    <strong>Warning</strong>
+    <span>{{ issue }}</span>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Operator Commands</h2>
+      <p class="muted">Run from the terminal in the project environment.</p>
+    </div>
+  </div>
+  <div class="settings-grid">
+    <div><span>Status</span><strong>kalshi-bot memory-status</strong></div>
+    <div><span>Report</span><strong>kalshi-bot memory-report --output reports/market_memory_report.md</strong></div>
+    <div><span>Backfill</span><strong>kalshi-bot memory-backfill --dry-run</strong></div>
+    <div><span>Archive</span><strong>kalshi-bot memory-archive --output-dir data/memory_archive</strong></div>
+  </div>
+</section>
+{% endblock %}

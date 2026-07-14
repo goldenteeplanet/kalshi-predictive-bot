@@ -1,0 +1,69 @@
+{
+  "schema_version": "phase-3x-ui-preferences-v1",
+  "user_scope": "example-user",
+  "theme": "system",
+  "density": "compact",
+  "timezone": "America/Chicago",
+  "default_route": "/today",
+  "chart_table_preference": "remember_per_panel",
+  "tables": {
+    "opportunity_scanner": {
+      "visible_columns": [
+        "rank",
+        "market",
+        "side",
+        "best_price",
+        "market_probability",
+        "model_probability",
+        "edge",
+        "risk_adjusted_ev",
+        "confidence",
+        "liquidity",
+        "phase_3s",
+        "phase_3m",
+        "phase_3n",
+        "valid_until"
+      ],
+      "column_order": [
+        "rank",
+        "market",
+        "side",
+        "best_price",
+        "market_probability",
+        "model_probability",
+        "edge",
+        "risk_adjusted_ev",
+        "confidence",
+        "liquidity",
+        "phase_3s",
+        "phase_3m",
+        "phase_3n",
+        "valid_until"
+      ],
+      "page_size": 50
+    }
+  },
+  "saved_views": [
+    {
+      "view_id": "view-example-top-liquid",
+      "name": "Top liquid opportunities",
+      "route": "/opportunities",
+      "filters": {
+        "freshness_status": [
+          "FRESH"
+        ],
+        "liquidity_tier": [
+          "HIGH"
+        ],
+        "phase_3n_decision": [
+          "ALLOW",
+          "REDUCE"
+        ]
+      },
+      "visibility": "private",
+      "definition_version": "phase-3x-view-v1",
+      "updated_at": "2026-06-23T18:00:00Z"
+    }
+  ],
+  "updated_at": "2026-06-23T18:00:00Z"
+}

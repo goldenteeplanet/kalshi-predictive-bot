@@ -1,0 +1,38 @@
+{% macro status_pill(code, label, detail='') -%}
+<span class="status-pill status-{{ code }}" title="{{ detail }}">
+  <span aria-hidden="true">{{ code|upper }}</span>
+  <strong>{{ label }}</strong>
+</span>
+{%- endmacro %}
+
+{% macro probability_pair(market_probability, model_probability, as_of='unknown') -%}
+<div class="probability-pair">
+  <div>
+    <span>Market probability</span>
+    <strong class="numeric">{{ market_probability or 'unknown' }}</strong>
+  </div>
+  <div>
+    <span>Model probability</span>
+    <strong class="numeric">{{ model_probability or 'unknown' }}</strong>
+  </div>
+  <small>As of {{ as_of }}</small>
+</div>
+{%- endmacro %}
+
+{% macro decision_waterfall(phase_3s='Unknown', phase_3m='Unknown', phase_3n='Unknown') -%}
+<ol class="decision-waterfall" aria-label="Decision waterfall">
+  <li><span>3S ROI gate</span><strong>{{ phase_3s }}</strong></li>
+  <li><span>3M sizing</span><strong>{{ phase_3m }}</strong></li>
+  <li><span>3N risk</span><strong>{{ phase_3n }}</strong></li>
+</ol>
+{%- endmacro %}
+
+{% macro risk_bar(label, used, limit, headroom) -%}
+<div class="risk-utilization" role="group" aria-label="{{ label }}">
+  <div class="risk-utilization-head">
+    <strong>{{ label }}</strong>
+    <span>Used {{ used }} / Limit {{ limit }} / Headroom {{ headroom }}</span>
+  </div>
+  <div class="risk-track"><div style="width: {{ used }}"></div></div>
+</div>
+{%- endmacro %}

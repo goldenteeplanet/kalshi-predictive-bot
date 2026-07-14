@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Models{% endblock %}
+{% block content %}
+{% set stats = namespace(active=0, waiting=0, needs_data=0, forecasts=0, trades=0) %}
+{% for row in models %}
+  {% set row_status = row.status | default('UNKNOWN') %}
+  {% set stats.forecasts = stats.forecasts + (row.forecast_count | int) %}
+  {% set stats.trades = stats.trades + (row.trade_count | int) %}
+  {% if row_status == 'ACTIVE' %}
+    {% set stats.active = stats.active + 1 %}
+  {% elif row_status == 'READY_BUT_NO_MATCHING_MARKETS' %}
+    {% set stats.waiting = stats.waiting + 1 %}
+  {% elif row_status == 'NEEDS_DATA' %}
+    {% set stats.needs_data = stats.needs_data + 1 %}
+  {% endif %}
+{% endfor %}
+
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>Model Performance Center</h1>
+    <p>Calibration, readiness, and paper trade behavior by model.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Paper evidence</span>
+    <a class="button" href="/models/readiness">Readiness</a>
+  </div>
+</section>
+
+<section class="section-band model-overview-band">
+  <div class="model-summary-grid" aria-label="Model summary">
+    <div><span>Active</span><strong>{{ stats.active }}</strong></div>
+    <div><span>No matching markets</span><strong>{{ stats.waiting }}</strong></div>
+    <div><span>Needs data</span><strong>{{ stats.needs_data }}</strong></div>
+    <div><span>Forecasts</span><strong>{{ stats.forecasts }}</strong></div>
+    <div><span>Paper trades</span><strong>{{ stats.trades }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band model-performance-panel">
+  <div class="section-head">
+    <div>
+      <h2>Model Status</h2>
+      <p class="muted">Open a row for missing inputs, available data, skip reasons, and next commands.</p>
+    </div>
+    <a class="button" href="{{ report_links.model_readiness }}">Readiness report</a>
+  </div>
+
+  <div class="model-status-list">
+    {% for row in models %}
+    {% set status_code = row.status | default('UNKNOWN') %}
+    {% set status_class = status_code | lower | replace('_', '-') %}
+    <article class="model-status-row model-status-row-{{ status_class }}">
+      <div class="model-row-main">
+        <div class="model-title-cell">
+          <h3>{{ row.model_name }}</h3>
+          <span>Registered {{ row.registered_label }} - Rank {{ row.rank_color }}</span>
+        </div>
+        <span class="status-pill model-status-pill status-model-{{ status_class }}">
+          {{ row.readiness_status_label | default(status_code) }}
+        </span>
+      </div>
+
+      <div class="model-metric-grid">
+        <div><span>Forecasts</span><strong>{{ row.forecast_count }}</strong></div>
+        <div><span>Paper trades</span><strong>{{ row.trade_count }}</strong></div>
+        <div><span>ROI</span><strong>{{ row.roi or 'n/a' }}</strong></div>
+        <div><span>Win rate</span><strong>{{ row.win_rate or 'n/a' }}</strong></div>
+        <div><span>Brier</span><strong>{{ row.brier_score or 'n/a' }}</strong></div>
+        <div>
+          <span>Latest</span>
+          <strong title="{{ row.latest_forecast_time or 'none' }}">
+            {{ row.latest_forecast_display | default(row.latest_forecast_time or 'none') }}
+          </strong>
+        </div>
+      </div>
+
+      <div class="model-evidence-grid">
+        <div>
+          <span>Missing data</span>
+          <p>{{ row.missing_data_label }}</p>
+        </div>
+        <div>
+          <span>Available data</span>
+          <p>{{ row.available_data_label }}</p>
+        </div>
+      </div>
+
+      <details class="model-diagnostics">
+        <summary>Diagnostics and next commands</summary>
+        <div class="model-diagnostics-grid">
+          <div>
+            <span>Last skip</span>
+            <p>{{ row.skip_reason }}</p>
+          </div>
+          <div>
+            <span>Next action</span>
+            <p>{{ row.next_action }}</p>
+          </div>
+        </div>
+        <div class="command-stack" aria-label="Next commands for {{ row.model_name }}">
+          {% for command in row.next_commands %}
+          <code>{{ command }}</code>
+          {% endfor %}
+        </div>
+      </details>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Long Job Monitor{% endblock %}
+{% block content %}
+<section class="today-hero" aria-labelledby="long-job-title">
+  <div>
+    <p class="page-kicker">System</p>
+    <h1 id="long-job-title">Long Job Monitor</h1>
+    <p class="muted">Phase 3AY refresh, SQLite writer state, and post-refresh diagnostics.</p>
+  </div>
+  <div class="today-hero-actions">
+    <span class="status-pill {{ 'status-incomplete' if monitor.phase3ay.budget_state == 'OVERRUNNING' else 'status-healthy' if monitor.phase3ay.status == 'STOPPED' else 'status-degraded' }}">
+      {{ monitor.phase3ay.budget_state }}
+    </span>
+    <a class="button" href="/api/long-jobs/status">Status JSON</a>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  {% set refresh = monitor.phase3ay %}
+  <div class="section-head">
+    <div>
+      <h2>Phase 3AY</h2>
+      <p class="muted">{{ monitor.recommended_next_action }}</p>
+    </div>
+    <span class="badge badge-info">READ ONLY</span>
+  </div>
+  <div class="metric-row four">
+    <div><span>Status</span><strong>{{ refresh.status }}</strong></div>
+    <div><span>Active PID</span><strong>{{ refresh.active_pid or 'none' }}</strong></div>
+    <div><span>Elapsed</span><strong>{{ refresh.elapsed_label or 'n/a' }}</strong></div>
+    <div><span>Budget state</span><strong>{{ refresh.budget_state }}</strong></div>
+    <div><span>Duration</span><strong>{{ refresh.duration_label or 'n/a' }}</strong></div>
+    <div><span>Budget</span><strong>{{ refresh.budget_label }}</strong></div>
+    <div><span>Budget used</span><strong>{{ refresh.progress_percent if refresh.progress_percent is not none else 'n/a' }}{% if refresh.progress_percent is not none %}%{% endif %}</strong></div>
+    <div><span>Latest status</span><strong>{{ refresh.latest_status }}</strong></div>
+    <div><span>History rows</span><strong>{{ refresh.history_rows }}</strong></div>
+    <div><span>Guard status</span><strong>{{ refresh.guard_status }}</strong></div>
+    <div><span>Guard stop needed</span><strong>{{ 'YES' if refresh.guard_should_stop else 'NO' }}</strong></div>
+    <div><span>Safe to resume</span><strong>{{ 'YES' if refresh.guard_safe_to_resume else 'NO' }}</strong></div>
+  </div>
+  {% if refresh.progress_percent is not none %}
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span>Budget used, not completion</span>
+      <span>{{ refresh.progress_percent }}%</span>
+    </div>
+    <div class="progress-track"><div style="width: {{ refresh.progress_percent }}%"></div></div>
+  </div>
+  {% endif %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Command</th><th>Latest report</th><th>Logs</th><th>Resume</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>{{ refresh.command or 'none' }}</code></td>
+          <td>{{ refresh.latest_report_generated_at or 'n/a' }}</td>
+          <td><code>{{ refresh.stdout_path or 'n/a' }}</code></td>
+          <td><code>{{ refresh.guard_resume_command or 'n/a' }}</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  {% set hook = monitor.post_refresh_hook %}
+  <div class="section-head">
+    <div>
+      <h2>Finish Hook</h2>
+      <p class="muted">Post-refresh diagnostics and next-phase artifact generation.</p>
+    </div>
+    <span class="status-pill {{ 'status-healthy' if hook.status == 'COMPLETE' else 'status-degraded' if hook.running else 'status-incomplete' }}">
+      {{ hook.status }}
+    </span>
+  </div>
+  <div class="metric-row four">
+    <div><span>PID</span><strong>{{ hook.pid or 'none' }}</strong></div>
+    <div><span>Running</span><strong>{{ 'YES' if hook.running else 'NO' }}</strong></div>
+    <div><span>Log</span><strong>{{ hook.log_path }}</strong></div>
+    <div><span>Last line</span><strong>{{ hook.last_log_line or 'n/a' }}</strong></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Planned command</th></tr></thead>
+      <tbody>
+      {% for command in hook.planned_commands %}
+        <tr><td><code>{{ command }}</code></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if hook.log_tail %}
+  <details class="trace-drawer">
+    <summary>Log tail</summary>
+    <pre>{% for line in hook.log_tail %}{{ line }}
+{% endfor %}</pre>
+  </details>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  {% set writer = monitor.db_writer_monitor %}
+  <div class="section-head">
+    <div>
+      <h2>SQLite Writer State</h2>
+      <p class="muted">{{ writer.recommended_next_action }}</p>
+    </div>
+    <span class="status-pill {{ 'status-healthy' if writer.safe_to_start_write else 'status-incomplete' }}">
+      {{ writer.status }}
+    </span>
+  </div>
+  <div class="metric-row four">
+    <div><span>Writer PID</span><strong>{{ writer.current_writer_pid or 'none' }}</strong></div>
+    <div><span>Safe to write</span><strong>{{ 'YES' if writer.safe_to_start_write else 'NO' }}</strong></div>
+    <div><span>Holders</span><strong>{{ writer.holder_count }}</strong></div>
+    <div><span>Backend</span><strong>{{ writer.backend }}</strong></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Current command</th><th>Next command after finish</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>{{ writer.current_writer_command or 'none' }}</code></td>
+          <td><code>{{ writer.recommended_next_command_after_finish }}</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

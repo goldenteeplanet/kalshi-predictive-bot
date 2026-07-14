@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Autopilot{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>{{ plain_status }}</h1>
+    <p>
+      {% if latest_cycle %}
+      Last cycle found {{ latest_cycle.opportunities_scanned }} opportunities and placed
+      {{ latest_cycle.orders_submitted }} demo orders.
+      {% else %}
+      No autopilot cycle has been recorded yet.
+      {% endif %}
+    </p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Demo Only</span>
+    <span class="badge badge-info">Dry Run</span>
+    <form data-action method="post" action="/autopilot/run-once">
+      <button class="primary" type="submit">Run one dry-run cycle</button>
+    </form>
+    <a class="button" href="{{ report_links.autopilot }}">View autopilot report</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Blocked because</span><strong>{{ blocked_reason }}</strong></div>
+  <div><span>Top guardrail blocking trades</span><strong>{{ top_guardrail }}</strong></div>
+  <div><span>Model</span><strong>{{ config.AUTOPILOT_MODEL }}</strong></div>
+  <div><span>Daily demo orders</span><strong>{{ daily_orders }}</strong></div>
+  <div><span>Open demo orders</span><strong>{{ open_demo_orders }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Autopilot Checklist</h2>
+      <p class="muted">Every item must be safe before demo-only cycles can proceed.</p>
+    </div>
+    <span class="badge badge-info">{{ recommended_next_action }}</span>
+  </div>
+  <ul class="checklist-grid">
+    {% for item in checklist %}
+    <li class="{{ 'pass' if item.passed else 'fail' }}">
+      <strong>{{ item.label }}</strong>
+      <span>{{ item.detail }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% set latest_summary = latest_cycle.summary if latest_cycle else {} %}
+<section class="section-band">
+  <div class="section-head">
+    <h2>Latest Order Activity</h2>
+    <span class="muted">Dry-run, submitted, and blocked records</span>
+  </div>
+  <div class="grid three">
+    <div class="mini-panel">
+      <h3>Dry-run orders</h3>
+      {% if latest_summary.dry_run_orders %}
+      <ul class="checks">
+      {% for order in latest_summary.dry_run_orders %}
+        <li>{{ order.ticker }} {{ order.side }} @ {{ order.price }} via {{ order.model_name }}</li>
+      {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty">None</div>
+      {% endif %}
+    </div>
+    <div class="mini-panel">
+      <h3>Submitted demo orders</h3>
+      {% if latest_summary.submitted_orders %}
+      <ul class="checks">
+      {% for order in latest_summary.submitted_orders %}
+        <li>{{ order.ticker }} {{ order.side }} @ {{ order.price }} via {{ order.model_name }}</li>
+      {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty">None</div>
+      {% endif %}
+    </div>
+    <div class="mini-panel">
+      <h3>Blocked orders</h3>
+      {% if latest_summary.blocked_orders %}
+      <ul class="checks">
+      {% for order in latest_summary.blocked_orders %}
+        <li>{{ order.ticker }} {{ order.side }} @ {{ order.price }} via {{ order.model_name }}</li>
+      {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty">None</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <h2>Recent Cycles</h2>
+    <span class="muted">{{ recent_cycles|length }} shown</span>
+  </div>
+  {% if recent_cycles %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Cycle</th>
+          <th>Status</th>
+          <th>Model</th>
+          <th>Scanned</th>
+          <th>Attempted</th>
+          <th>Submitted</th>
+          <th>Blocked</th>
+          <th>Stop reason</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for cycle in recent_cycles %}
+        <tr>
+          <td>#{{ cycle.id }}</td>
+          <td>{{ cycle.status }}</td>
+          <td>{{ cycle.model_name }}</td>
+          <td>{{ cycle.opportunities_scanned }}</td>
+          <td>{{ cycle.orders_attempted }}</td>
+          <td>{{ cycle.orders_submitted }}</td>
+          <td>{{ cycle.orders_blocked }}</td>
+          <td class="wide">{{ cycle.stop_reason or "n/a" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No autopilot cycles have been recorded.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <h2>Risk Events</h2>
+    <span class="muted">{{ risk_events|length }} shown</span>
+  </div>
+  {% if risk_events %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Guardrail</th>
+          <th>Ticker</th>
+          <th>Severity</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for event in risk_events %}
+        <tr>
+          <td>{{ event.created_at }}</td>
+          <td>{{ event.guardrail_name }}</td>
+          <td>{{ event.ticker or "n/a" }}</td>
+          <td>{{ event.severity }}</td>
+          <td class="wide">{{ event.message }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No risk events have been recorded.</div>
+  {% endif %}
+</section>
+{% endblock %}

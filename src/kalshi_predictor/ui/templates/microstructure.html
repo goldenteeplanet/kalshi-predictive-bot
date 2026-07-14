@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Microstructure{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>Market Microstructure</h1>
+    <p>Spread, liquidity, orderbook pressure, late moves, dislocations, and cautious informed-flow heuristics.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Read only</span>
+    <a class="button" href="{{ report_links.microstructure_report }}">Report</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Markets analyzed</span><strong>{{ summary.markets_analyzed }}</strong></div>
+  <div><span>Events</span><strong>{{ summary.events }}</strong></div>
+  <div><span>Latest feature</span><strong>{{ summary.latest_feature_at }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Recent Features</h2><span class="muted">{{ features|length }} shown</span></div>
+  {% if features %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Confidence</th><th>Spread</th><th>Liquidity</th><th>Imbalance</th><th>Late</th><th>Flow</th></tr></thead>
+      <tbody>
+      {% for row in features %}
+        <tr>
+          <td><a href="/microstructure/{{ row.ticker }}">{{ row.ticker }}</a></td>
+          <td>{{ row.microstructure_confidence or 'n/a' }}</td>
+          <td>{{ row.current_spread or 'n/a' }}</td>
+          <td>{{ row.current_liquidity or 'n/a' }}</td>
+          <td>{{ row.orderbook_imbalance or 'n/a' }}</td>
+          <td>{{ row.late_move_score or 'n/a' }}</td>
+          <td>{{ row.smart_money_score or 'n/a' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No microstructure features yet. Run `kalshi-bot build-microstructure-features --lookback-minutes 60`.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Recent Events</h2><span class="muted">{{ events|length }} shown</span></div>
+  {% if events %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Event</th><th>Severity</th><th>Score</th><th>Description</th></tr></thead>
+      <tbody>
+      {% for event in events %}
+        <tr>
+          <td><a href="/microstructure/{{ event.ticker }}">{{ event.ticker }}</a></td>
+          <td>{{ event.event_type }}</td>
+          <td>{{ event.severity }}</td>
+          <td>{{ event.score }}</td>
+          <td class="wide">{{ event.description }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No microstructure events have been detected.</div>
+  {% endif %}
+</section>
+{% endblock %}
+

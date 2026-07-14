@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Opportunities{% endblock %}
+{% block content %}
+<section class="section-band" data-auto-refresh-seconds="{{ crypto_freshness.auto_refresh_seconds }}">
+  <div class="section-head">
+    <div>
+      <h1>Opportunity Scanner</h1>
+      <p class="muted">Paper/demo candidates ranked from local forecasts and snapshots.</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-info">Demo Only</span>
+      <span class="badge badge-info">Paper Mode</span>
+      <a class="button primary" href="/opportunities/best-payouts">Best payouts</a>
+      <a class="button" href="/research">Research</a>
+    </div>
+  </div>
+
+  <div class="status-grid">
+    <div><span>Shown</span><strong>{{ summary.shown }}</strong></div>
+    <div><span>High confidence</span><strong>{{ summary.high_confidence }}</strong></div>
+    <div><span>Blocked research</span><strong>{{ summary.blocked_research }}</strong></div>
+    <div><span>Link status</span><strong>{{ opportunity_links.status }}</strong></div>
+    <div><span>Verified links</span><strong>{{ opportunity_links.verified_clickable_opportunities }}</strong></div>
+    <div><span>Diagnostic links</span><strong>{{ opportunity_links.diagnostic_only_rows }}</strong></div>
+    <div><span>Markets today</span><strong>{{ executive_summary.markets_scanned }}</strong></div>
+    <div><span>Forecasts today</span><strong>{{ executive_summary.forecasts_generated }}</strong></div>
+    <div><span>Opportunities today</span><strong>{{ executive_summary.opportunities_found }}</strong></div>
+    <div>
+      <span>Last data refresh</span>
+      <strong title="{{ executive_summary.last_data_refresh }}">
+        {{ executive_summary.last_data_refresh_label|default(executive_summary.last_data_refresh) }}
+      </strong>
+    </div>
+    <div>
+      <span>Page generated</span>
+      <strong title="{{ page_generated_at }}">{{ page_generated_label|default(page_generated_at) }}</strong>
+    </div>
+  </div>
+
+  <div class="freshness-watch-panel">
+    <div class="freshness-watch-head">
+      <h2>Crypto Freshness Watch</h2>
+      <span class="badge badge-{{ crypto_freshness.badge_kind }}">
+        {{ crypto_freshness.status_label }} {{ crypto_freshness.age_label }}
+      </span>
+    </div>
+    <div class="freshness-watch-grid">
+      <div>
+        <span>Watch state</span>
+        <strong title="{{ crypto_freshness.watch_state }}">
+          {{ crypto_freshness.watch_state_label|default(crypto_freshness.watch_state) }}
+        </strong>
+      </div>
+      <div><span>Paper-ready</span><strong>{{ crypto_freshness.paper_ready_candidates }}</strong></div>
+      <div><span>Positive EV preflight</span><strong>{{ crypto_freshness.positive_ev_preflight_candidates }}</strong></div>
+      <div>
+        <span>Action blocker</span>
+        <strong title="{{ crypto_freshness.actionability_gap }}">
+          {{ crypto_freshness.actionability_gap_label|default(crypto_freshness.actionability_gap) }}
+        </strong>
+      </div>
+      <div>
+        <span>Runner</span>
+        <strong title="{{ crypto_freshness.runner_status }}">
+          {{ crypto_freshness.runner_status_label|default(crypto_freshness.runner_status) }}
+        </strong>
+      </div>
+      <div><span>Cadence</span><strong>{{ crypto_freshness.cadence_minutes }} minutes</strong></div>
+    </div>
+    <p class="muted freshness-watch-note">{{ crypto_freshness.actionability_note }}</p>
+    {% if crypto_freshness.book_probe.available %}
+    <div class="book-probe">
+      <div class="book-probe-head">
+        <span>Executable book target</span>
+        <a href="{{ crypto_freshness.book_probe.detail_href }}">{{ crypto_freshness.book_probe.ticker }}</a>
+      </div>
+      <div class="book-probe-grid" aria-label="Executable book target details">
+        <div><span>Side</span><br><strong>{{ crypto_freshness.book_probe.side }}</strong></div>
+        <div><span>EV</span><br><strong>{{ crypto_freshness.book_probe.expected_value_label }}</strong></div>
+        <div><span>Liquidity</span><br><strong>{{ crypto_freshness.book_probe.liquidity_label }}</strong></div>
+        <div><span>Spread</span><br><strong>{{ crypto_freshness.book_probe.spread_label }}</strong></div>
+      </div>
+      <p class="muted">Current blockers: {{ crypto_freshness.book_probe.blockers_label }}</p>
+      <p class="muted">{{ crypto_freshness.book_probe.needed_label }}</p>
+      <p class="muted book-probe-safety">{{ crypto_freshness.book_probe.safety_label }}</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section-band" aria-labelledby="opportunity-table-title">
+  <div class="section-head">
+    <div>
+      <h2 id="opportunity-table-title">Best Opportunities Right Now</h2>
+      <p class="muted">Fast bounded view for page navigation.</p>
+    </div>
+    <div class="button-row">
+      <a class="button" href="{{ report_links.opportunity_link_audit }}">Link audit</a>
+      <a class="button" href="{{ report_links.opportunities }}">Opportunities report</a>
+    </div>
+  </div>
+
+  {% if opportunities %}
+  <div class="table-wrap professional-table">
+    <table>
+      <caption class="sr-only">Ranked paper opportunities</caption>
+      <thead>
+        <tr>
+          <th scope="col">Rank</th>
+          <th scope="col">Market</th>
+          <th scope="col">Side</th>
+          <th scope="col">Price</th>
+          <th scope="col">Confidence</th>
+          <th scope="col">Edge</th>
+          <th scope="col">EV</th>
+          <th scope="col">Score</th>
+          <th scope="col">Liquidity</th>
+          <th scope="col">Kalshi</th>
+          <th scope="col">Validity</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in opportunities %}
+        <tr>
+          <td class="numeric">{{ loop.index }}</td>
+          <td>
+            <a href="{{ item.detail_href }}">{{ item.short_title }}</a>
+            <small>{{ item.ticker }} / {{ item.model_name }}</small>
+          </td>
+          <td>{{ item.recommendation_label }}</td>
+          <td class="numeric">{{ item.price }}</td>
+          <td class="numeric">{{ item.confidence_percent }}</td>
+          <td class="numeric">{{ item.edge_cents }}</td>
+          <td class="numeric">{{ item.expected_value }}</td>
+          <td class="numeric">{{ item.payout_adjusted_score }}</td>
+          <td class="numeric">{{ item.liquidity }}</td>
+          <td>
+            {% if item.kalshi_url_verified %}
+            <a class="button" href="{{ item.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            <small>{{ item.kalshi_url_status }}</small>
+            {% elif item.kalshi_url and item.kalshi_url_status == "BUILT_FROM_EXACT_CATALOG" %}
+            <a class="button" href="{{ item.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            <small>{{ item.kalshi_url_status }}</small>
+            {% else %}
+            <span class="badge badge-caution">{{ item.kalshi_url_status }}</span>
+            <small>{{ item.kalshi_url_reason }}</small>
+            {% endif %}
+          </td>
+          <td>{{ item.data_freshness }} / {{ item.formatted_time_remaining }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="state-panel state-no_trade">
+    <strong>No trade</strong>
+    <span>No current candidate clears the visible ranking and liquidity filters.</span>
+  </div>
+  {% endif %}
+</section>
+
+{% if blocked_opportunities %}
+<section class="section-band" id="blocked-research" aria-labelledby="blocked-title">
+  <div class="section-head">
+    <div>
+      <h2 id="blocked-title">Blocked Research</h2>
+      <p class="muted">Rows kept out of the ready list.</p>
+    </div>
+  </div>
+  <div class="table-wrap professional-table">
+    <table>
+      <caption class="sr-only">Blocked opportunity research rows</caption>
+      <thead>
+        <tr>
+          <th scope="col">Market</th>
+          <th scope="col">Model</th>
+          <th scope="col">Reason</th>
+          <th scope="col">Kalshi</th>
+          <th scope="col">Score</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in blocked_opportunities %}
+        <tr>
+          <td>
+            <a href="{{ item.detail_href }}">{{ item.short_title }}</a>
+            <small>{{ item.ticker }}</small>
+          </td>
+          <td>{{ item.model_name }}</td>
+          <td>
+            {{ item.blocked_reason|default(item.recommended_action) }}
+            {% if item.blocked_reason_detail %}
+            <small>{{ item.blocked_reason_detail }}</small>
+            {% endif %}
+          </td>
+          <td>
+            {% if item.kalshi_url_verified %}
+            <a class="button" href="{{ item.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            {% elif item.kalshi_url and item.kalshi_url_status == "BUILT_FROM_EXACT_CATALOG" %}
+            <a class="button" href="{{ item.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            <small>{{ item.kalshi_url_status }}</small>
+            {% else %}
+            <span class="badge badge-caution">{{ item.kalshi_url_status }}</span>
+            <small>{{ item.kalshi_url_reason }}</small>
+            {% endif %}
+          </td>
+          <td class="numeric" title="Rounded opportunity score">{{ item.opportunity_score_label|default(item.opportunity_score) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

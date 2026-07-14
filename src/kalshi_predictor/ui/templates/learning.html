@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}Learning Mode{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>{{ status.plain_status }}</h1>
+    <p>Paper-only learning loop for collecting settled outcomes and improving model confidence.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Learning {{ config.LEARNING_MODE }}</span>
+    <span class="badge badge-info">Demo blocked {{ status.demo_execution_blocked }}</span>
+    <form data-action method="post" action="/learning/run-once">
+      <button
+        class="primary"
+        type="submit"
+        {% if status.daily_cap_reached %}disabled title="{{ status.daily_cap_tooltip }}"{% endif %}
+      >Run one learning cycle</button>
+      {% if status.daily_cap_reached %}
+      <div data-action-message role="alert" class="action-message visible error">
+        {{ status.daily_cap_message }} {{ status.daily_cap_next_action }}
+      </div>
+      {% endif %}
+    </form>
+    <a class="button" href="{{ report_links.learning_report }}">Learning report</a>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Tonight Mode</h2>
+      <p class="muted">Paper-only overnight readiness for learning data capture.</p>
+    </div>
+    <a class="button" href="{{ report_links.tonight_report }}">Tonight report</a>
+  </div>
+  <div class="status-grid">
+    <div><span>Status</span><strong>{{ tonight_status.status }}</strong></div>
+    <div><span>Learning Mode</span><strong>{{ tonight_status.learning_mode }}</strong></div>
+    <div><span>Paper-only confirmed</span><strong>{{ 'YES' if tonight_status.paper_only_confirmed else 'NO' }}</strong></div>
+    <div><span>Trades today</span><strong>{{ tonight_status.trades_today }}</strong></div>
+    <div><span>Settled progress</span><strong>{{ tonight_status.settled_progress }}</strong></div>
+    <div><span>Last cycle</span><strong>{{ tonight_status.last_cycle }}</strong></div>
+    <div><span>Errors</span><strong>{{ tonight_status.errors }}</strong></div>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Current progress</span><strong>{{ status.progress_percent }}</strong></div>
+  <div><span>Trade Generation Health</span><strong>{{ status.trade_generation_health.label }}</strong></div>
+  <div><span>Settled paper trades</span><strong>{{ status.settled_paper_trades }} / {{ status.target_settled_trades }}</strong></div>
+  <div><span>Paper trades today</span><strong>{{ status.paper_trades_created_today }} / {{ status.daily_paper_trade_cap }}</strong></div>
+  <div><span>Target per cycle</span><strong>{{ status.min_trades_per_cycle }} - {{ status.target_trades_per_cycle }}</strong></div>
+  <div><span>Forecasts evaluated</span><strong>{{ status.forecasts_evaluated }}</strong></div>
+  <div><span>Expected completion</span><strong>{{ status.expected_completion }}</strong></div>
+  <div><span>Fast settlement priority</span><strong>{{ 'ON' if status.fast_settlement_priority else 'OFF' }}</strong></div>
+  <div><span>Latest run</span><strong>{{ status.latest_run_status }}</strong></div>
+  <div><span>Latest cycle</span><strong>{{ status.latest_cycle_status }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="progress-wrap" aria-label="Learning Mode settled trade progress">
+    <div class="progress-label"><span>0</span><strong>{{ status.progress_percent }}</strong><span>{{ status.target_settled_trades }} settled trades</span></div>
+    <div class="progress-track"><div style="width: {{ status.progress_bar_width }}"></div></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="signal-callout">
+    <strong>Recommended Next Action</strong>
+    <span>{{ status.recommended_next_action }}</span>
+  </div>
+  <div class="signal-callout health-{{ status.trade_generation_health.kind }}">
+    <strong>Trade Generation Health: {{ status.trade_generation_health.label }}</strong>
+    <span>{{ status.trade_generation_health.message }}</span>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <h2>Trade Generation</h2>
+    <span class="muted">Recent Learning Mode cycles</span>
+  </div>
+  <div class="stats-grid compact-stats">
+    <div><span>Opportunities Evaluated</span><strong>{{ trade_generation.opportunities_evaluated }}</strong></div>
+    <div><span>Trades Created</span><strong>{{ trade_generation.trades_created }}</strong></div>
+    <div><span>Trades Blocked</span><strong>{{ trade_generation.trades_blocked }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Learning Diagnostics</h2>
+      <span class="muted">Markets &rarr; Forecasts &rarr; Opportunities &rarr; Paper Trades &rarr; Settlements</span>
+    </div>
+    <div class="button-row">
+      <form data-action method="post" action="/reports/learning-diagnostics">
+        <button class="button" type="submit">Write diagnostics report</button>
+      </form>
+      <a class="button" href="{{ report_links.learning_diagnostics }}">Diagnostics report</a>
+    </div>
+  </div>
+  <div class="signal-callout">
+    <strong>{{ diagnostics.bottleneck_banner }}</strong>
+    <span>{{ diagnostics.bottleneck_next_action }}</span>
+  </div>
+  <div class="stats-grid compact-stats">
+    <div><span title="{{ diagnostics.funnel_help.markets_scanned }}">Markets scanned</span><strong>{{ diagnostics.funnel.markets_scanned }}</strong></div>
+    <div><span title="{{ diagnostics.funnel_help.snapshots_available }}">Snapshots available</span><strong>{{ diagnostics.funnel.snapshots_available }}</strong></div>
+    <div><span title="{{ diagnostics.funnel_help.forecasts_generated }}">Forecasts generated</span><strong>{{ diagnostics.funnel.forecasts_generated }}</strong></div>
+    <div><span title="{{ diagnostics.funnel_help.forecasts_skipped }}">Forecasts skipped</span><strong>{{ diagnostics.funnel.forecasts_skipped }}</strong></div>
+    <div><span title="{{ diagnostics.funnel_help.rankings_inserted }}">Rankings inserted</span><strong>{{ diagnostics.funnel.rankings_inserted }}</strong></div>
+    <div><span title="{{ diagnostics.funnel_help.opportunities_detected }}">Opportunities detected</span><strong>{{ diagnostics.funnel.opportunities_detected }}</strong></div>
+    <div><span title="{{ diagnostics.funnel_help.learning_candidates }}">Learning candidates</span><strong>{{ diagnostics.funnel.learning_candidates }}</strong></div>
+    <div><span title="{{ diagnostics.funnel_help.paper_trades_created }}">Paper trades created</span><strong>{{ diagnostics.funnel.paper_trades_created }}</strong></div>
+    <div><span title="{{ diagnostics.funnel_help.settled_paper_trades }}">Settled paper trades</span><strong>{{ diagnostics.funnel.settled_paper_trades }}</strong></div>
+    <div><span>Candidate pool size</span><strong>{{ diagnostics.candidate_pool_size }}</strong></div>
+    <div><span>Duplicate cooldown</span><strong>{{ diagnostics.duplicate_cooldown.hours }}h</strong></div>
+  </div>
+  <div class="signal-callout">
+    <strong>Threshold Advisor</strong>
+    <span>{{ diagnostics.threshold_advisor.message }}</span>
+    <span>
+      Current min score {{ diagnostics.threshold_advisor.current_min_score }};
+      top score {{ diagnostics.threshold_advisor.observed_top_score or 'n/a' }};
+      expected additional paper trades {{ diagnostics.threshold_advisor.expected_additional_paper_trades }}.
+    </span>
+    <span>
+      Current pass {{ diagnostics.threshold_advisor.candidates_passing_current_thresholds }};
+      suggested pass {{ diagnostics.threshold_advisor.candidates_passing_suggested_thresholds }};
+      additional candidates {{ diagnostics.threshold_advisor.additional_candidates_available }}.
+    </span>
+  </div>
+  {% if diagnostics.rejection_breakdown %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Rejection Reason</th><th>Count</th><th>Percent</th><th>Example</th><th>Suggested fix</th></tr></thead>
+      <tbody>
+      {% for row in diagnostics.rejection_breakdown %}
+        <tr>
+          <td>{{ row.reason }}</td>
+          <td>{{ row.count }}</td>
+          <td>{{ row.percent }}</td>
+          <td>{{ row.example_ticker or '' }}</td>
+          <td class="wide">{{ row.suggested_fix }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No learning rejections have been logged yet.</div>
+  {% endif %}
+  {% if diagnostics.top_rejected_candidates %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Model</th><th>Reason</th><th>Edge</th><th>Score</th><th>ETA hours</th></tr></thead>
+      <tbody>
+      {% for row in diagnostics.top_rejected_candidates %}
+        <tr>
+          <td>{{ row.ticker }}</td>
+          <td>{{ row.model_name }}</td>
+          <td>{{ row.reason }}</td>
+          <td>{{ row.edge or '' }}</td>
+          <td>{{ row.opportunity_score or '' }}</td>
+          <td>{{ row.settlement_eta_hours or '' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if diagnostics.top_usable_non_duplicate_candidates %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Model</th><th>Side</th><th>Edge</th><th>Score</th><th>Priority</th><th>ETA hours</th><th>Category</th></tr></thead>
+      <tbody>
+      {% for row in diagnostics.top_usable_non_duplicate_candidates %}
+        <tr>
+          <td>{{ row.ticker }}</td>
+          <td>{{ row.model_name }}</td>
+          <td>{{ row.side or '' }}</td>
+          <td>{{ row.edge or '' }}</td>
+          <td>{{ row.opportunity_score or '' }}</td>
+          <td>{{ row.learning_priority_score or '' }}</td>
+          <td>{{ row.settlement_eta_hours or '' }}</td>
+          <td>{{ row.category }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <h2>Fast Settlement Categories</h2>
+    <span class="muted">Weather, crypto, economic, and general markets are preferred.</span>
+  </div>
+  {% if fast_settlement_categories %}
+  <div class="stats-grid compact-stats">
+    {% for row in fast_settlement_categories %}
+    <div><span>{{ row.category }}</span><strong>{{ row.best_speed }}</strong></div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">No fast-settlement categories have been identified yet.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <h2>Top Learning Targets</h2>
+    <a class="button" href="{{ report_links.learning_targets }}">Targets report</a>
+  </div>
+  {% if targets %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Model</th><th>Category</th><th>Speed</th><th>Priority</th><th>Reason</th></tr></thead>
+      <tbody>
+      {% for target in targets %}
+        <tr>
+          <td>{{ target.ticker }}</td>
+          <td>{{ target.model_name }}</td>
+          <td>{{ target.category }}</td>
+          <td>{{ target.settlement_speed_score }}</td>
+          <td>{{ target.learning_priority_score }}</td>
+          <td class="wide">{{ target.reason }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No learning targets have been generated yet.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <h2>Recent Learning Cycles</h2>
+    <span class="muted">{{ recent_cycles|length }} shown</span>
+  </div>
+  {% if recent_cycles %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cycle</th><th>Status</th><th>Markets</th><th>Forecasts</th><th>Opportunities</th><th>Paper orders</th><th>Settled total</th></tr></thead>
+      <tbody>
+      {% for cycle in recent_cycles %}
+        <tr>
+          <td>#{{ cycle.cycle_number }}</td>
+          <td>{{ cycle.status }}</td>
+          <td>{{ cycle.markets_scanned }}</td>
+          <td>{{ cycle.forecasts_generated }}</td>
+          <td>{{ cycle.opportunities_found }}</td>
+          <td>{{ cycle.paper_trades_created }}</td>
+          <td>{{ cycle.settled_paper_trades_total }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No Learning Mode cycles have been recorded.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <h2>Blocked Opportunities</h2>
+    <span class="muted">Recent paper-only skips from the learning trade generator</span>
+  </div>
+  {% if blocked_opportunities %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Reason</th><th>Count</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for row in blocked_opportunities %}
+        <tr>
+          <td>{{ row.reason }}</td>
+          <td>{{ row.count }}</td>
+          <td class="wide">{{ row.action }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No recent Learning Mode blockers.</div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Database Settings{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>Database Settings</h1>
+    <p>Read-only database health, migration, and recovery status.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge {{ 'badge-good' if database.status == 'READY' else 'badge-risk' }}">{{ database.status }}</span>
+    <a class="button" href="{{ report_links.database_report }}">Database report</a>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="settings-grid">
+    <div><span>Backend</span><strong>{{ database.backend }}</strong></div>
+    <div><span>Status</span><strong>{{ database.status }}</strong></div>
+    <div><span>Migration</span><strong>{{ database.migration_status }}</strong></div>
+    <div><span>Migration detail</span><strong>{{ database.migration_message }}</strong></div>
+    <div><span>URL</span><strong>{{ database.database_url }}</strong></div>
+    <div><span>Location</span><strong>{{ database.location }}</strong></div>
+    <div><span>DB_BACKEND</span><strong>{{ settings.db_backend }}</strong></div>
+    <div><span>Require PostgreSQL overnight</span><strong>{{ settings.require_postgres_for_overnight }}</strong></div>
+  </div>
+  {% if database.warning %}
+  <div class="signal-callout health-risk">
+    <strong>SQLite OneDrive warning</strong>
+    <span>{{ database.warning }}</span>
+  </div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Checks</h2>
+      <p class="muted">Latest database diagnostics from the active UI connection.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Status</th><th>Check</th><th>Message</th></tr></thead>
+      <tbody>
+      {% for item in database["items"] %}
+      <tr>
+        <td>{{ item.status }}</td>
+        <td>{{ item.name }}</td>
+        <td class="wide">{{ item.message }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Operator Commands</h2>
+      <p class="muted">Run from the terminal in the project environment.</p>
+    </div>
+  </div>
+  <div class="settings-grid">
+    <div><span>Health</span><strong>kalshi-bot db-health</strong></div>
+    <div><span>Doctor</span><strong>kalshi-bot db-doctor</strong></div>
+    <div><span>Migrate</span><strong>kalshi-bot db-migrate</strong></div>
+    <div><span>Backup</span><strong>kalshi-bot sqlite-backup</strong></div>
+  </div>
+</section>
+{% endblock %}

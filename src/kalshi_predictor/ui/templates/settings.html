@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>Settings</h1>
+    <p>Local paper/demo safety settings visible to the cockpit.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Demo Only</span>
+    <span class="badge {{ 'badge-risk' if safety.execution_kill_switch else 'badge-good' }}">Kill switch {{ safety.execution_kill_switch }}</span>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="stats-grid">
+    <div><span>UI read only</span><strong>{{ safety.ui_read_only }}</strong></div>
+    <div><span>Execution enabled</span><strong>{{ safety.execution_enabled }}</strong></div>
+    <div><span>Execution dry run</span><strong>{{ safety.execution_dry_run }}</strong></div>
+    <div><span>Environment</span><strong>{{ safety.environment }}</strong></div>
+    <div><span>Autopilot model</span><strong>{{ settings.autopilot_model }}</strong></div>
+    <div><span>Overnight model</span><strong>{{ settings.overnight_model }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Paper Liquidity Plan</h2>
+      <p class="muted">Simulated bankroll growth plan. This is paper-only sizing context, not live capital.</p>
+    </div>
+    <a class="button" href="/portfolio">Portfolio</a>
+  </div>
+  <div class="settings-grid">
+    <div><span>Mode</span><strong>{{ liquidity.mode }}</strong></div>
+    <div><span>Starting Capital</span><strong>${{ liquidity.starting_capital }}</strong></div>
+    <div><span>Growth Target</span><strong>${{ liquidity.growth_target }}</strong></div>
+    <div><span>Current Paper Equity</span><strong>${{ liquidity.current_equity }}</strong></div>
+    <div><span>Total Paper P&L</span><strong>${{ liquidity.total_pnl }}</strong></div>
+    <div><span>Open Exposure</span><strong>${{ liquidity.exposure }}</strong></div>
+    <div><span>Available Simulated Liquidity</span><strong>${{ liquidity.available_liquidity }}</strong></div>
+    <div><span>Suggested Max New Position</span><strong>${{ liquidity.max_new_position }}</strong></div>
+    <div><span>Max Position Fraction</span><strong>{{ liquidity.max_position_fraction }}</strong></div>
+    <div><span>Progress</span><strong>{{ liquidity.progress_percent }}</strong></div>
+  </div>
+  <div class="progress-wrap" aria-label="Paper liquidity growth progress">
+    <div class="progress-label">
+      <span>${{ liquidity.starting_capital }}</span>
+      <strong>{{ liquidity.progress_percent }}</strong>
+      <span>${{ liquidity.growth_target }}</span>
+    </div>
+    <div class="progress-track"><div style="width: {{ liquidity.progress_bar_width }}"></div></div>
+  </div>
+  <p class="muted">{{ liquidity.next_action }}</p>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Database</h2>
+      <p class="muted">Storage backend and migration status used by the bot.</p>
+    </div>
+    <div class="hero-status">
+      <a class="button" href="/settings/database">Database details</a>
+      <a class="button" href="{{ report_links.database_report }}">Database report</a>
+    </div>
+  </div>
+  <div class="settings-grid">
+    <div><span>Status</span><strong>{{ database.status }}</strong></div>
+    <div><span>Backend</span><strong>{{ database.backend }}</strong></div>
+    <div><span>Migration</span><strong>{{ database.migration_status }}</strong></div>
+    <div><span>URL</span><strong>{{ database.database_url }}</strong></div>
+    <div><span>Location</span><strong>{{ database.location }}</strong></div>
+    <div><span>OneDrive warning</span><strong>{{ database.warning or 'none' }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Market Memory</h2>
+      <p class="muted">Phase 3O durable decision and outcome capture settings.</p>
+    </div>
+    <div class="hero-status">
+      <a class="button" href="/memory">Memory status</a>
+      <a class="button" href="{{ report_links.market_memory_report }}">Memory report</a>
+    </div>
+  </div>
+  <div class="settings-grid">
+    <label class="setting-toggle">
+      <input type="checkbox" {% if memory.enabled %}checked{% endif %} disabled>
+      <span>Market Memory</span>
+      <strong>{{ 'ON' if memory.enabled else 'OFF' }}</strong>
+    </label>
+    <div><span>Status</span><strong>{{ memory.status }}</strong></div>
+    <div><span>Mode</span><strong>{{ memory.mode }}</strong></div>
+    <div><span>Schema Version</span><strong>{{ memory.schema_version }}</strong></div>
+    <div><span>Data Mode</span><strong>{{ memory.data_mode }}</strong></div>
+    <div><span>Forecast Events</span><strong>{{ memory.counts.forecast_memory }}</strong></div>
+    <div><span>Trade Events</span><strong>{{ memory.counts.trade_memory }}</strong></div>
+    <div><span>Quarantine</span><strong>{{ memory.counts.quarantine }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Advanced Risk Engine</h2>
+      <p class="muted">Phase 3N risk gate. Disabled and shadow modes preserve paper order behavior.</p>
+    </div>
+    <a class="button" href="{{ report_links.advanced_risk_report }}">Risk report</a>
+  </div>
+  <div class="settings-grid">
+    <div><span>Mode</span><strong>{{ advanced_risk.mode }}</strong></div>
+    <div><span>Paper-only</span><strong>{{ 'YES' if advanced_risk.paper_only else 'NO' }}</strong></div>
+    <div><span>Live Rollout Cap</span><strong>{{ advanced_risk.rollout_cap }}</strong></div>
+    <div><span>Global Cap</span><strong>{{ advanced_risk.global_cap }}</strong></div>
+    <div><span>Decisions</span><strong>{{ advanced_risk.decision_count }}</strong></div>
+    <div><span>Allowed</span><strong>{{ advanced_risk.allow_count }}</strong></div>
+    <div><span>Reduced</span><strong>{{ advanced_risk.reduce_count }}</strong></div>
+    <div><span>Blocked</span><strong>{{ advanced_risk.block_count }}</strong></div>
+    <div><span>Reserved Contracts</span><strong>{{ advanced_risk.active_reserved_contracts }}</strong></div>
+    <div><span>Latest Action</span><strong>{{ advanced_risk.latest_action }}</strong></div>
+    <div><span>Latest Ticker</span><strong>{{ advanced_risk.latest_ticker }}</strong></div>
+    <div><span>Latest Reason</span><strong>{{ advanced_risk.latest_reason }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Learning Mode</h2>
+      <p class="muted">Paper-only settings used by the primary paper-trade generator.</p>
+    </div>
+    <a class="button" href="/learning">Learning status</a>
+  </div>
+  <div class="settings-grid">
+    <label class="setting-toggle">
+      <input type="checkbox" {% if learning.enabled %}checked{% endif %} disabled>
+      <span>Learning Mode</span>
+      <strong>{{ 'ON' if learning.enabled else 'OFF' }}</strong>
+    </label>
+    <label class="setting-toggle">
+      <input type="checkbox" {% if learning.fast_settlement_priority %}checked{% endif %} disabled>
+      <span>Fast Settlement Priority</span>
+      <strong>{{ 'ON' if learning.fast_settlement_priority else 'OFF' }}</strong>
+    </label>
+    <div><span>Target Settled Trades</span><strong>{{ learning.target_settled_trades }}</strong></div>
+    <div><span>Current Settled Trades</span><strong>{{ learning.settled_paper_trades }}</strong></div>
+    <div><span>Progress</span><strong>{{ learning.progress_percent }}</strong></div>
+    <div><span>Paper Trades Created Today</span><strong>{{ learning.paper_trades_created_today }} / {{ learning.daily_paper_trade_cap }}</strong></div>
+    <div><span>Min Edge</span><strong>{{ config.LEARNING_MIN_EDGE }}</strong></div>
+    <div><span>Min Score</span><strong>{{ config.LEARNING_MIN_OPPORTUNITY_SCORE }}</strong></div>
+    <div><span>Min Trades Per Cycle</span><strong>{{ config.LEARNING_MIN_TRADES_PER_CYCLE }}</strong></div>
+    <div><span>Target Trades Per Cycle</span><strong>{{ config.LEARNING_TARGET_TRADES_PER_CYCLE }}</strong></div>
+    <div><span>Trade Health</span><strong>{{ learning.trade_generation_health.label }}</strong></div>
+    <div><span>Max Days To Settlement</span><strong>{{ learning.max_days_to_settlement }}</strong></div>
+    <div><span>Demo Execution</span><strong>{{ 'blocked' if learning.demo_execution_blocked else 'guarded' }}</strong></div>
+    <div><span>Live Execution</span><strong>{{ 'blocked' if learning.live_execution_blocked else 'guarded' }}</strong></div>
+  </div>
+  <div class="progress-wrap" aria-label="Learning Mode settled trade progress">
+    <div class="progress-label"><span>0</span><strong>{{ learning.progress_percent }}</strong><span>{{ learning.target_settled_trades }} settled trades</span></div>
+    <div class="progress-track"><div style="width: {{ learning.progress_bar_width }}"></div></div>
+  </div>
+</section>
+{% endblock %}

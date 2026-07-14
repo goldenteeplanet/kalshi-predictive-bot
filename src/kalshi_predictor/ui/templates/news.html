@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}News Intelligence{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>News Intelligence</h1>
+    <p>Local RSS/manual news, market links, news signals, and news_v1 paper/demo context.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">No external LLM</span>
+    <span class="badge badge-info">Paper / Demo Only</span>
+    <form data-action method="post" action="/reports/news-report">
+      <button type="submit">Write report</button>
+    </form>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>News Items</span><strong>{{ summary.items }}</strong></div>
+  <div><span>Linked Markets</span><strong>{{ summary.links }}</strong></div>
+  <div><span>Feature Rows</span><strong>{{ summary.features }}</strong></div>
+  <div><span>News Signals</span><strong>{{ summary.signals }}</strong></div>
+  <div><span>Mode</span><strong>Paper / Demo</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Latest News</h2>
+      <p class="muted">Items ingested from configured RSS feeds or manual JSON/CSV files.</p>
+    </div>
+    <a class="button" href="{{ report_links.news_opportunities }}">News opportunities</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Published</th>
+          <th>Category</th>
+          <th>Importance</th>
+          <th>Sentiment</th>
+          <th>Title</th>
+          <th>Entities</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in latest_items %}
+        <tr>
+          <td>{{ item.published_at or item.ingested_at }}</td>
+          <td>{{ item.category }}</td>
+          <td>{{ item.importance_score }}</td>
+          <td>{{ item.sentiment_score }}</td>
+          <td class="wide"><a href="/news/{{ item.id }}">{{ item.title }}</a></td>
+          <td>{{ item.entities|join(', ') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No news has been ingested yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="section-band">
+    <h2>Categories</h2>
+    <div class="stats-grid compact-stats">
+      {% for category, count in summary.categories.items() %}
+      <div><span>{{ category }}</span><strong>{{ count }}</strong></div>
+      {% else %}
+      <div><span>Status</span><strong>Needs news</strong></div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="section-band">
+    <h2>Latest News Signals</h2>
+    <ul class="checks">
+      {% for signal in latest_signals[:8] %}
+      <li>
+        <strong>{{ signal.signal_name }}</strong>
+        {{ signal.ticker }} / strength {{ signal.signal_strength }} /
+        confidence {{ signal.confidence }}
+      </li>
+      {% else %}
+      <li>No news signals generated yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Linked Markets</h2>
+      <p class="muted">News-to-market links built from stored market text and extracted terms.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Confidence</th>
+          <th>Reason</th>
+          <th>Matched Terms</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for link in latest_links %}
+        <tr>
+          <td><a href="/opportunities/{{ link.ticker }}">{{ link.ticker }}</a></td>
+          <td>{{ link.confidence }}</td>
+          <td class="wide">{{ link.reason }}</td>
+          <td>{{ link.matched_terms|join(', ') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">No linked markets yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Top News-Driven Opportunities</h2>
+      <p class="muted">Requires news features and news_v1 forecasts.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Market</th>
+          <th>Signal</th>
+          <th>Probability</th>
+          <th>Market</th>
+          <th>Edge</th>
+          <th>Kalshi</th>
+          <th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in opportunities %}
+        <tr>
+          <td><a href="/opportunities/{{ row.ticker }}">{{ row.ticker }}</a></td>
+          <td class="wide">{{ row.market }}</td>
+          <td>{{ row.signal_name }} {{ row.signal_strength }}</td>
+          <td>{{ row.news_v1_probability }}</td>
+          <td>{{ row.market_price }}</td>
+          <td>{{ row.edge }}</td>
+          <td>
+            {% if row.kalshi_url_verified %}
+            <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            {% else %}
+            <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+            <small>{{ row.kalshi_url_reason }}</small>
+            {% endif %}
+          </td>
+          <td>{{ row.recommendation }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8">No news-driven opportunities yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

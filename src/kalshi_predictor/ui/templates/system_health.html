@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}System Health{% endblock %}
+{% block content %}
+<section class="today-hero" aria-labelledby="system-title">
+  <div>
+    <p class="page-kicker">System</p>
+    <h1 id="system-title">Health and Release Readiness</h1>
+    <p class="muted">Read-only evidence view for UI, data, readiness, and certification state.</p>
+  </div>
+  <div class="today-hero-actions">
+    <span class="status-pill status-incomplete">{{ phase_3x_status.decision }}</span>
+    <a class="button" href="/system/long-jobs">Long jobs</a>
+    <a class="button" href="{{ report_links.system_certification_report }}">3W report</a>
+  </div>
+</section>
+
+<section class="today-grid">
+  <article class="today-panel">
+    <h2>Phase 3X</h2>
+    <div class="metric-row two">
+      <div><span>Decision</span><strong>{{ phase_3x_status.decision }}</strong></div>
+      <div><span>Mode</span><strong>{{ phase_3x_status.mode }}</strong></div>
+      <div><span>Routes audited</span><strong>{{ phase_3x_status.route_count }}</strong></div>
+      <div><span>Components</span><strong>{{ phase_3x_status.component_count }}</strong></div>
+    </div>
+    <p class="muted">{{ phase_3x_status.next_action }}</p>
+  </article>
+
+  <article class="today-panel">
+    <h2>Certification and Readiness</h2>
+    <div class="metric-row two">
+      <div><span>Phase 3W</span><strong>{{ phase_3w_status.overall_status }}</strong></div>
+      <div><span>3W live authorized</span><strong>NO</strong></div>
+      <div><span>Phase 3V</span><strong>{{ phase_3v_status.decision }}</strong></div>
+      <div><span>Database</span><strong>{{ database_status.status }}</strong></div>
+    </div>
+  </article>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Opportunity Links</h2>
+      <p class="muted">Exact-market link contract for scanner, Today, detail, and dashboard rows.</p>
+    </div>
+    <a class="button" href="{{ report_links.opportunity_link_audit }}">Link audit</a>
+  </div>
+  <div class="metric-row four">
+    <div><span>Status</span><strong>{{ opportunity_links.status }}</strong></div>
+    <div><span>Verified</span><strong>{{ opportunity_links.verified_clickable_opportunities }}</strong></div>
+    <div><span>Diagnostic</span><strong>{{ opportunity_links.diagnostic_only_rows }}</strong></div>
+    <div><span>Stale catalog</span><strong>{{ opportunity_links.stale_catalog_rows }}</strong></div>
+    <div><span>Last audit</span><strong>{{ opportunity_links.last_audit_at or 'none' }}</strong></div>
+    <div><span>Blocked</span><strong>{{ opportunity_links.blocked_unverified_opportunities }}</strong></div>
+  </div>
+  <p class="muted">{{ opportunity_links.next_action }}</p>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Workspace / Build Guard</h2>
+      <p class="muted">Confirms the UI, CLI, venv, package path, DB identity, and current command set line up.</p>
+    </div>
+    <span class="status-pill {{ workspace_guard.ui_badge.class }}">{{ workspace_guard.ui_badge.label }}</span>
+  </div>
+  <div class="metric-row four">
+    <div><span>Status</span><strong>{{ workspace_guard.summary.status }}</strong></div>
+    <div><span>Missing commands</span><strong>{{ workspace_guard.summary.missing_required_commands }}</strong></div>
+    <div><span>DB backend</span><strong>{{ workspace_guard.summary.database_backend }}</strong></div>
+    <div><span>Git commit</span><strong>{{ workspace_guard.summary.git_commit }}</strong></div>
+    <div><span>Repository</span><strong title="{{ workspace_guard.runtime.repository_root }}">{{ workspace_guard.runtime.repository_root }}</strong></div>
+    <div><span>Current directory</span><strong title="{{ workspace_guard.runtime.current_working_directory }}">{{ workspace_guard.runtime.current_working_directory }}</strong></div>
+    <div><span>Virtualenv</span><strong title="{{ workspace_guard.runtime.virtualenv or 'unknown' }}">{{ workspace_guard.runtime.virtualenv or 'unknown' }}</strong></div>
+    <div><span>DB fingerprint</span><strong title="{{ workspace_guard.database.database_fingerprint }}">{{ workspace_guard.database.database_fingerprint }}</strong></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Severity</th>
+          <th>Code</th>
+          <th>Finding</th>
+          <th>Next action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for finding in workspace_guard.findings %}
+        <tr>
+          <td>{{ finding.severity }}</td>
+          <td><code>{{ finding.code }}</code></td>
+          <td>{{ finding.message }}</td>
+          <td>{{ finding.next_action }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Guard next action: {{ workspace_guard.next_action }}</p>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Phase 3AY Refresh Monitor</h2>
+      <p class="muted">Read-only progress, finish hook, and post-refresh diagnostics state.</p>
+    </div>
+    <a class="button" href="/system/long-jobs">Open monitor</a>
+  </div>
+  {% set refresh = long_job_monitor.phase3ay %}
+  {% set hook = long_job_monitor.post_refresh_hook %}
+  <div class="metric-row four">
+    <div><span>Refresh</span><strong>{{ refresh.status }}</strong></div>
+    <div><span>PID</span><strong>{{ refresh.active_pid or 'none' }}</strong></div>
+    <div><span>Elapsed</span><strong>{{ refresh.elapsed_label or 'n/a' }}</strong></div>
+    <div><span>Budget state</span><strong>{{ refresh.budget_state }}</strong></div>
+    <div><span>Budget</span><strong>{{ refresh.budget_label }}</strong></div>
+    <div><span>Budget used</span><strong>{{ refresh.progress_percent if refresh.progress_percent is not none else 'n/a' }}{% if refresh.progress_percent is not none %}%{% endif %}</strong></div>
+    <div><span>Latest report</span><strong>{{ refresh.latest_status }}</strong></div>
+    <div><span>Finish hook</span><strong>{{ hook.status }}</strong></div>
+    <div><span>Hook PID</span><strong>{{ hook.pid or 'none' }}</strong></div>
+  </div>
+  {% if refresh.progress_percent is not none %}
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span>Budget used, not completion</span>
+      <span>{{ refresh.progress_percent }}%</span>
+    </div>
+    <div class="progress-track"><div style="width: {{ refresh.progress_percent }}%"></div></div>
+  </div>
+  {% endif %}
+  <p class="muted">{{ long_job_monitor.recommended_next_action }}</p>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>DB Writer / Long Job Monitor</h2>
+      <p class="muted">Read-only view of SQLite writer jobs so long writes do not overlap.</p>
+    </div>
+    <span class="status-pill {{ 'status-healthy' if db_writer_monitor.safe_to_start_write else 'status-incomplete' }}">{{ db_writer_monitor.status }}</span>
+  </div>
+  <div class="metric-row four">
+    <div><span>Current writer PID</span><strong>{{ db_writer_monitor.current_writer_pid or 'none' }}</strong></div>
+    <div><span>Elapsed time</span><strong>{{ db_writer_monitor.current_writer_elapsed or 'n/a' }}</strong></div>
+    <div><span>Safe to write</span><strong>{{ 'YES' if db_writer_monitor.safe_to_start_write else 'NO' }}</strong></div>
+    <div><span>DB holders</span><strong>{{ db_writer_monitor.holder_count }}</strong></div>
+    <div><span>Heartbeat</span><strong>{{ db_writer_monitor.long_job_heartbeat_display_status or db_writer_monitor.long_job_heartbeat_status or 'unknown' }}</strong></div>
+    <div><span>Heartbeat age</span><strong>{{ db_writer_monitor.long_job_heartbeat_age or 'n/a' }}</strong></div>
+    <div><span>Stage</span><strong>{{ db_writer_monitor.long_job_stage or 'none' }}</strong></div>
+    <div><span>Progress</span><strong>{{ db_writer_monitor.long_job_processed or 0 }} / {{ db_writer_monitor.long_job_total or 'unknown' }}</strong></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Command running</th>
+          <th>Recommended next command after finish</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>{{ db_writer_monitor.current_writer_command or 'none' }}</code></td>
+          <td><code>{{ db_writer_monitor.recommended_next_command_after_finish }}</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">{{ db_writer_monitor.recommended_next_action }}</p>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>System Remediation</h2>
+      <p class="muted">Paper-only refresh path for data freshness, reports, and readiness evidence.</p>
+    </div>
+    <a class="button" href="{{ system_remediation.report_href }}">Remediation report</a>
+  </div>
+  <div class="metric-row four">
+    <div><span>Status</span><strong>{{ system_remediation.status }}</strong></div>
+    <div><span>Paper-only confirmed</span><strong>{{ 'YES' if system_remediation.paper_only_confirmed else 'NO' }}</strong></div>
+    <div><span>Freshness</span><strong>{{ system_remediation.freshness_status }}</strong></div>
+    <div><span>Database</span><strong>{{ system_remediation.database_status }}</strong></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Recommended next action</th></tr></thead>
+      <tbody>
+      {% for item in system_remediation.recommendations %}
+        <tr><td>{{ item }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Next command:</p>
+  {% for command in system_remediation.next_commands %}
+    <code>{{ command }}</code>{% if not loop.last %}<br>{% endif %}
+  {% endfor %}
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Open Findings</h2>
+      <p class="muted">These block Phase 3X from production release claims.</p>
+    </div>
+    <form method="post" action="/reports/phase3x-report" data-action>
+      <button type="submit">Generate Phase 3X report</button>
+    </form>
+  </div>
+  <ul class="checks">
+    {% for finding in phase_3x_status.blockers %}
+    <li class="fail">{{ finding }}</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Route Inventory</h2>
+      <p class="muted">Primary job, authority, and migration disposition.</p>
+    </div>
+  </div>
+  <div class="table-wrap professional-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Route</th>
+          <th>User job</th>
+          <th>Source authority</th>
+          <th>Action authority</th>
+          <th>Disposition</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in audit.routes %}
+        <tr>
+          <td>{{ row.route }}</td>
+          <td>{{ row.primary_job }}</td>
+          <td>{{ row.source_authority }}</td>
+          <td>{{ row.action_authority }}</td>
+          <td>{{ row.disposition }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

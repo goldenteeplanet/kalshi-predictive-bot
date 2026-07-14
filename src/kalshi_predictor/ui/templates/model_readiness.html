@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Model Readiness{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>Model Readiness</h1>
+    <p>Data availability, forecast activity, and next commands for every expected model.</p>
+  </div>
+  <div class="hero-status">
+    <a class="button" href="{{ report_links.model_readiness }}">Readiness report</a>
+    <a class="button" href="/models">Performance</a>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Status</th>
+          <th>Registered</th>
+          <th>Forecasts</th>
+          <th>Latest Forecast</th>
+          <th>Missing Data</th>
+          <th>Available Data</th>
+          <th>Last Skip</th>
+          <th>Next Commands</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in models %}
+        <tr>
+          <td>{{ row.model_name }}</td>
+          <td>{{ row.status_label }}</td>
+          <td>{{ row.registered_label }}</td>
+          <td>{{ row.forecast_count }}</td>
+          <td>{{ row.latest_forecast_time or 'none' }}</td>
+          <td class="wide">{{ row.missing_data_label }}</td>
+          <td class="wide">{{ row.available_data_label }}</td>
+          <td class="wide">{{ row.skip_reason }}</td>
+          <td class="wide">
+            <div>{{ row.next_action }}</div>
+            {% for command in row.next_commands %}
+            <code>{{ command }}</code>{% if not loop.last %}<br>{% endif %}
+            {% endfor %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

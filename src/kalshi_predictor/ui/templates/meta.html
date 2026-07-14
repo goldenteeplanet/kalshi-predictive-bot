@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Meta Model{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>Meta Model</h1>
+    <p>Local selector for which forecasting model to trust by market, category, and data condition.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Paper / Demo Only</span>
+    <a class="button" href="{{ report_links.meta_report }}">Report</a>
+    <a class="button" href="{{ report_links.meta_evaluation }}">Evaluation</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Decisions</span><strong>{{ summary.decisions }}</strong></div>
+  <div><span>Top selected model</span><strong>{{ summary.top_selected_model }}</strong></div>
+  <div><span>Fallback rate</span><strong>{{ summary.fallback_rate }}</strong></div>
+  <div><span>Fallback count</span><strong>{{ summary.fallback_count }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Latest Selected Models</h2></div>
+  {% if latest_decisions %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Selected</th><th>Trust</th><th>Fallback</th><th>Reason</th></tr></thead>
+      <tbody>
+      {% for row in latest_decisions[:25] %}
+      <tr>
+        <td><a href="/meta/{{ row.ticker }}">{{ row.ticker }}</a></td>
+        <td>{{ row.selected_model_name }}</td>
+        <td>{{ row.selected_confidence }}</td>
+        <td>{{ row.fallback_model_name or 'no' }}</td>
+        <td>{{ row.decision_reason }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No meta decisions yet. Run `kalshi-bot forecast --model meta_model_v1`.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Meta Opportunities</h2><a class="button" href="{{ report_links.meta_opportunities }}">Report</a></div>
+  {% if opportunities %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Model</th><th>Trust</th><th>Probability</th><th>Edge</th><th>Score</th><th>Kalshi</th></tr></thead>
+      <tbody>
+      {% for row in opportunities %}
+      <tr>
+        <td><a href="/meta/{{ row.ticker }}">{{ row.ticker }}</a></td>
+        <td>{{ row.selected_model }}</td>
+        <td>{{ row.trust_score }}</td>
+        <td>{{ row.probability }}</td>
+        <td>{{ row.edge }}</td>
+        <td>{{ row.opportunity_score }}</td>
+        <td>
+          {% if row.kalshi_url_verified %}
+          <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+          {% else %}
+          <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+          <small>{{ row.kalshi_url_reason }}</small>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No meta opportunities yet.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Warnings</h2></div>
+  {% for diagnostic in diagnostics %}
+  <p><strong>{{ diagnostic.severity }}: {{ diagnostic.title }}</strong><br>{{ diagnostic.message }}</p>
+  {% else %}
+  <div class="empty">No meta warnings.</div>
+  {% endfor %}
+</section>
+{% endblock %}

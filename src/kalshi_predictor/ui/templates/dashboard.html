@@ -1,0 +1,686 @@
+{% extends "base.html" %}
+{% block title %}Trader Cockpit{% endblock %}
+{% block content %}
+<section class="executive-dashboard">
+  <div class="section-head">
+    <div>
+      <h1>Today's Summary</h1>
+      <p class="muted">Decision Cockpit for paper/demo opportunity intelligence from local market data.</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-info">Demo Only</span>
+      <span class="badge badge-info">Paper Mode</span>
+      <a class="button primary" href="/opportunities/best-payouts">Best payouts</a>
+      <a class="button" href="/research">Research</a>
+    </div>
+  </div>
+  <div class="executive-grid">
+    <div><span>Markets scanned</span><strong>{{ executive_summary.markets_scanned }}</strong></div>
+    <div><span>Forecasts generated</span><strong>{{ executive_summary.forecasts_generated }}</strong></div>
+    <div><span>Opportunities found</span><strong>{{ executive_summary.opportunities_found }}</strong></div>
+    <div><span>Paper trades open</span><strong>{{ executive_summary.paper_trades_open }}</strong></div>
+    <div><span>Paper P&L</span><strong>{{ executive_summary.paper_pnl }}</strong></div>
+    <div><span>Best model</span><strong>{{ executive_summary.best_model }}</strong></div>
+    <div><span>Best opportunity</span><strong>{{ executive_summary.best_opportunity }}</strong></div>
+    <div><span>Autopilot status</span><strong>{{ executive_summary.autopilot_status }}</strong></div>
+    <div><span>Verified links</span><strong>{{ opportunity_links.verified_clickable_opportunities }}</strong></div>
+    <div><span>Diagnostic links</span><strong>{{ opportunity_links.diagnostic_only_rows }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Where should the bot hunt next?</h2>
+      <p class="muted">{{ free_source_hunt.next_codex_sprint }}</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-info">{{ free_source_hunt.status_label }}</span>
+      <a class="button" href="{{ free_source_hunt.report_href }}">Sprint report</a>
+      <a class="button" href="{{ free_source_hunt.scorecard_href }}">Scorecard</a>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Best category</span><strong>{{ free_source_hunt.best_next_category }}</strong></div>
+    <div><span>Markets scanned</span><strong>{{ free_source_hunt.markets_scanned }}</strong></div>
+    <div><span>Positive EV</span><strong>{{ free_source_hunt.positive_ev_rows }}</strong></div>
+    <div><span>Paper-ready</span><strong>{{ free_source_hunt.paper_ready_rows }}</strong></div>
+    <div><span>First blocker</span><strong>{{ free_source_hunt.first_hard_blocker }}</strong></div>
+    <div><span>Updated</span><strong>{{ free_source_hunt.generated_at }}</strong></div>
+  </div>
+  {% if free_source_hunt.rows %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Score</th>
+          <th>Current</th>
+          <th>Source</th>
+          <th>Linked</th>
+          <th>Forecast</th>
+          <th>Book</th>
+          <th>EV</th>
+          <th>Paper</th>
+          <th>Blocker</th>
+          <th>Next</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in free_source_hunt.rows %}
+      <tr>
+        <td>{{ row.category }}</td>
+        <td>{{ row.score }}</td>
+        <td>{{ row.current_markets }}</td>
+        <td>{{ row.source_ready }}</td>
+        <td>{{ row.linked }}</td>
+        <td>{{ row.forecast_ready }}</td>
+        <td>{{ row.book_ready }}</td>
+        <td>{{ row.positive_ev }}</td>
+        <td>{{ row.paper_ready }}</td>
+        <td class="wide">{{ row.top_blocker }}</td>
+        <td class="wide">{{ row.next_action }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  <div class="signal-callout health-warning">
+    <strong>Operator command</strong>
+    <span><code>{{ free_source_hunt.operator_next_command }}</code></span>
+  </div>
+</section>
+
+{% if inactive_models %}
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Some models are inactive.</h2>
+      <p class="muted">These models need data, feature links, or a forecast run before they can contribute.</p>
+    </div>
+    <a class="button" href="/models/readiness">Model readiness</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Model</th><th>Status</th><th>Forecasts</th><th>Latest Forecast</th><th>Missing Data</th><th>Next Commands</th></tr></thead>
+      <tbody>
+      {% for row in inactive_models %}
+      <tr>
+        <td>{{ row.model_name }}</td>
+        <td>{{ row.status_label }}</td>
+        <td>{{ row.forecast_count }}</td>
+        <td>{{ row.latest_forecast_time or 'none' }}</td>
+        <td class="wide">{{ row.missing_data_label }}</td>
+        <td class="wide">
+          <div>{{ row.next_action }}</div>
+          {% for command in row.next_commands %}
+          <code>{{ command }}</code>{% if not loop.last %}<br>{% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Dual-Lane Control</h2>
+      <p class="muted">{{ control_center.recommended_next_action }}</p>
+    </div>
+    <a class="button" href="/control-center">Control center</a>
+  </div>
+  <div class="status-grid">
+    {% set learning_lane = control_center.lane_cards.learning %}
+    {% set autopilot_lane = control_center.lane_cards.autopilot %}
+    <div><span>Learning settled</span><strong>{{ learning_lane.settled_paper_trades }}</strong></div>
+    <div><span>Progress to 500</span><strong>{{ learning_lane.progress_to_500 }}</strong></div>
+    <div><span>Learning trades today</span><strong>{{ learning_lane.trades_created_today }}</strong></div>
+    <div><span>Learning confidence</span><strong>{{ learning_lane.learning_confidence }}</strong></div>
+    <div><span>Autopilot opportunities</span><strong>{{ autopilot_lane.opportunities_found }}</strong></div>
+    <div><span>Dry-run orders</span><strong>{{ autopilot_lane.dry_run_orders }}</strong></div>
+    <div><span>Top model</span><strong>{{ autopilot_lane.top_model }}</strong></div>
+    <div><span>Current confidence</span><strong>{{ autopilot_lane.current_confidence }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Tonight Mode</h2>
+      <p class="muted">Safe overnight paper-only readiness and control status.</p>
+    </div>
+    <a class="button" href="{{ report_links.tonight_report }}">Tonight report</a>
+  </div>
+  <div class="status-grid">
+    <div><span>Status</span><strong>{{ tonight_status.status }}</strong></div>
+    <div><span>Learning Mode</span><strong>{{ tonight_status.learning_mode }}</strong></div>
+    <div><span>Paper-only confirmed</span><strong>{{ 'YES' if tonight_status.paper_only_confirmed else 'NO' }}</strong></div>
+    <div><span>Trades today</span><strong>{{ tonight_status.trades_today }}</strong></div>
+    <div><span>Settled progress</span><strong>{{ tonight_status.settled_progress }}</strong></div>
+    <div><span>Last cycle</span><strong>{{ tonight_status.last_cycle }}</strong></div>
+    <div><span>Errors</span><strong>{{ tonight_status.errors }}</strong></div>
+    <div><span>Inactive signals</span><strong>{{ tonight_status.inactive_signals }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Database</h2>
+      <p class="muted">Storage backend, migration, and SQLite safety status.</p>
+    </div>
+    <div class="hero-status">
+      <a class="button" href="/settings/database">Database settings</a>
+      <a class="button" href="{{ report_links.database_report }}">Database report</a>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Status</span><strong>{{ database_status.status }}</strong></div>
+    <div><span>Backend</span><strong>{{ database_status.backend }}</strong></div>
+    <div><span>Migration</span><strong>{{ database_status.migration_status }}</strong></div>
+    <div><span>Location</span><strong>{{ database_status.location }}</strong></div>
+  </div>
+  {% if database_status.warning %}
+  <div class="signal-callout health-risk">
+    <strong>Database warning</strong>
+    <span>{{ database_status.warning }}</span>
+  </div>
+  {% endif %}
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Market Memory</h2>
+      <p class="muted">Phase 3O point-in-time learning ledger capture status.</p>
+    </div>
+    <div class="hero-status">
+      <a class="button" href="/memory">Memory status</a>
+      <a class="button" href="{{ report_links.market_memory_report }}">Memory report</a>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Status</span><strong>{{ market_memory_status.status }}</strong></div>
+    <div><span>Mode</span><strong>{{ market_memory_status.mode }}</strong></div>
+    <div><span>Market Events</span><strong>{{ market_memory_status.counts.market_memory }}</strong></div>
+    <div><span>Forecast Events</span><strong>{{ market_memory_status.counts.forecast_memory }}</strong></div>
+    <div><span>Trade Events</span><strong>{{ market_memory_status.counts.trade_memory }}</strong></div>
+    <div><span>Quarantine</span><strong>{{ market_memory_status.counts.quarantine }}</strong></div>
+    <div><span>Pending Outcomes</span><strong>{{ market_memory_status.pending_outcomes }}</strong></div>
+    <div><span>Latest Forecast</span><strong>{{ market_memory_status.counts.latest_forecast_event }}</strong></div>
+  </div>
+  {% if market_memory_status.issues %}
+  <div class="signal-callout health-risk">
+    <strong>Memory warning</strong>
+    <span>{{ market_memory_status.issues[0] }}</span>
+  </div>
+  {% endif %}
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Advanced Risk Engine</h2>
+      <p class="muted">Phase 3N pre-order risk gate after dynamic position sizing.</p>
+    </div>
+    <a class="button" href="{{ report_links.advanced_risk_report }}">Risk report</a>
+  </div>
+  <div class="status-grid">
+    <div><span>Mode</span><strong>{{ advanced_risk_status.mode }}</strong></div>
+    <div><span>Paper-only</span><strong>{{ 'YES' if advanced_risk_status.paper_only else 'NO' }}</strong></div>
+    <div><span>Decisions</span><strong>{{ advanced_risk_status.decision_count }}</strong></div>
+    <div><span>Allowed</span><strong>{{ advanced_risk_status.allow_count }}</strong></div>
+    <div><span>Reduced</span><strong>{{ advanced_risk_status.reduce_count }}</strong></div>
+    <div><span>Blocked</span><strong>{{ advanced_risk_status.block_count }}</strong></div>
+    <div><span>Reserved contracts</span><strong>{{ advanced_risk_status.active_reserved_contracts }}</strong></div>
+    <div><span>Latest</span><strong>{{ advanced_risk_status.latest_action }} {{ advanced_risk_status.latest_ticker }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Live Readiness Review</h2>
+      <p class="muted">Phase 3V evidence review. This does not enable live or demo execution.</p>
+    </div>
+    <div class="hero-status">
+      <a class="button" href="/live-readiness">Open review</a>
+      <a class="button" href="{{ report_links.live_readiness_report }}">Readiness report</a>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Decision</span><strong>{{ live_readiness_status.decision }}</strong></div>
+    <div><span>Mode</span><strong>{{ live_readiness_status.mode }}</strong></div>
+    <div><span>Target stage</span><strong>{{ live_readiness_status.target_stage }}</strong></div>
+    <div><span>Score</span><strong>{{ live_readiness_status.diagnostic_score }}</strong></div>
+    <div><span>Controls</span><strong>{{ live_readiness_status.control_count }}</strong></div>
+    <div><span>Critical blockers</span><strong>{{ live_readiness_status.critical_blockers }}</strong></div>
+    <div><span>Certificate</span><strong>{{ live_readiness_status.certificate }}</strong></div>
+    <div><span>Paper-only</span><strong>{{ 'YES' if live_readiness_status.paper_only else 'NO' }}</strong></div>
+  </div>
+  <div class="signal-callout health-warning">
+    <strong>Next action</strong>
+    <span>{{ live_readiness_status.next_action }}</span>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>System Certification</h2>
+      <p class="muted">Phase 3W end-to-end audit status. This does not authorize live trading.</p>
+    </div>
+    <div class="hero-status">
+      <a class="button" href="/system-certification">Open audit</a>
+      <a class="button" href="{{ report_links.system_certification_report }}">Certification report</a>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Status</span><strong>{{ system_certification_status.overall_status }}</strong></div>
+    <div><span>Mode</span><strong>{{ system_certification_status.mode }}</strong></div>
+    <div><span>Phases</span><strong>{{ system_certification_status.phase_count }}</strong></div>
+    <div><span>Connections</span><strong>{{ system_certification_status.connection_count }}</strong></div>
+    <div><span>Latest run</span><strong>{{ system_certification_status.latest_run_id }}</strong></div>
+    <div><span>Live authorized</span><strong>NO</strong></div>
+  </div>
+  <div class="signal-callout health-warning">
+    <strong>Next action</strong>
+    <span>{{ system_certification_status.next_action }}</span>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Learning Mode</h2>
+      <p class="muted">{{ learning_status.plain_status }}. Paper-only data capture for model refinement.</p>
+    </div>
+    <div class="hero-status">
+      <a class="button" href="/learning">Learning status</a>
+      <a class="button" href="/models/confidence">Model confidence</a>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Status</span><strong>{{ 'ON' if learning_status.enabled else 'OFF' }}</strong></div>
+    <div><span>Trade Generation Health</span><strong>{{ learning_status.trade_generation_health.label }}</strong></div>
+    <div><span>Settled trades</span><strong>{{ learning_status.settled_paper_trades }} / {{ learning_status.target_settled_trades }}</strong></div>
+    <div><span>Today's trades</span><strong>{{ learning_status.paper_trades_created_today }} / {{ learning_status.daily_paper_trade_cap }}</strong></div>
+    <div><span>Forecasts evaluated</span><strong>{{ learning_status.forecasts_evaluated }}</strong></div>
+    <div><span>Expected completion</span><strong>{{ learning_status.expected_completion }}</strong></div>
+    <div><span>Fast settlement</span><strong>{{ 'ON' if learning_status.fast_settlement_priority else 'OFF' }}</strong></div>
+    <div><span>Demo execution</span><strong>{{ 'blocked' if learning_status.demo_execution_blocked else 'guarded' }}</strong></div>
+  </div>
+  <div class="signal-callout health-{{ learning_status.trade_generation_health.kind }}">
+    <strong>Trade Generation Health: {{ learning_status.trade_generation_health.label }}</strong>
+    <span>{{ learning_status.trade_generation_health.message }}</span>
+  </div>
+  <div class="progress-wrap" aria-label="Learning Mode settled trade progress">
+    <div class="progress-label"><span>0</span><strong>{{ learning_status.progress_percent }}</strong><span>{{ learning_status.target_settled_trades }} settled trades</span></div>
+    <div class="progress-track"><div style="width: {{ learning_status.progress_bar_width }}"></div></div>
+  </div>
+</section>
+
+<section class="portfolio-header">
+  <div class="section-head">
+    <div>
+      <h2>Paper Portfolio</h2>
+      <p class="muted">How the paper book is doing right now.</p>
+    </div>
+    <a class="button" href="/portfolio">Open positions</a>
+  </div>
+  <div class="portfolio-grid">
+    <div><span>Current paper P&L</span><strong>{{ portfolio.total_pnl }}</strong></div>
+    <div><span>Realized P&L</span><strong>{{ portfolio.realized_pnl }}</strong></div>
+    <div><span>Unrealized P&L</span><strong>{{ portfolio.unrealized_pnl }}</strong></div>
+    <div><span>Open positions</span><strong>{{ portfolio.open_positions }}</strong></div>
+    <div><span>Open opportunities</span><strong>{{ executive_summary.open_opportunities }}</strong></div>
+    <div><span>Largest exposure</span><strong>{{ executive_summary.largest_exposure }}</strong></div>
+  </div>
+</section>
+
+<section class="cockpit-layout">
+  <div class="trade-feed">
+    <div class="section-head">
+      <div>
+        <h2>Best Opportunities Right Now</h2>
+        <p class="muted">Opportunity Intelligence ranked from local forecasts and snapshots.</p>
+      </div>
+      <div class="button-row">
+        {% if blocked_opportunities %}
+        <a class="button" href="#blocked-research">Blocked research ({{ blocked_opportunities|length }})</a>
+        {% endif %}
+        <a class="button" href="{{ report_links.opportunity_link_audit }}">Link audit</a>
+        <a class="button" href="{{ report_links.opportunities }}">Opportunities report</a>
+      </div>
+    </div>
+
+    {% if opportunities %}
+      {% for item in opportunities %}
+      {% set clarity = item.decision_clarity %}
+      {% set structure = clarity.market_structure %}
+      {% set lookup = structure.kalshi_lookup %}
+      <article class="trade-card trade-{{ item.traffic_light.kind }}">
+        <div class="trade-card-top">
+          <div>
+            <div class="trade-meta">
+              <span class="category-badge category-{{ item.category|lower }}">{{ item.category_badge }}</span>
+              <span class="traffic traffic-{{ item.traffic_light.kind }}">{{ item.traffic_light.label }}</span>
+            </div>
+            <h3>{{ item.short_title }}</h3>
+            <div class="mini-actions">
+              {% if item.market_identity.kalshi_url_verified %}
+              <a class="button" href="{{ item.market_identity.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+              {% else %}
+              <span class="badge badge-caution">{{ item.market_identity.kalshi_url_status }}</span>
+              <small>{{ item.market_identity.kalshi_url_reason }}</small>
+              {% endif %}
+            </div>
+            {% if structure.is_unsupported %}
+            <div class="market-lookup-summary">
+              <span class="eyebrow">Kalshi lookup title</span>
+              <strong>{{ structure.kalshi_search_title }}</strong>
+              <p class="muted">{{ structure.raw_title }}</p>
+              {% if lookup.exact_api_note %}
+              <p class="muted">{{ lookup.exact_api_note }}</p>
+              {% endif %}
+              {% if lookup.web_search_note %}
+              <p class="muted">{{ lookup.web_search_note }}</p>
+              {% endif %}
+              <div class="mini-actions">
+                {% if lookup.event_api_url %}
+                <a class="button secondary" href="{{ lookup.event_api_url }}" target="_blank" rel="noreferrer">
+                  Open combo event API
+                </a>
+                {% endif %}
+                {% if lookup.api_url %}
+                <a class="button secondary" href="{{ lookup.api_url }}" target="_blank" rel="noreferrer">
+                  Check exact API status
+                </a>
+                {% endif %}
+                <button type="button" data-copy-text="{{ item.ticker }}">Copy exact ticker</button>
+                {% if structure.component_market_ticker_text %}
+                <button type="button" data-copy-text="{{ structure.component_market_ticker_text }}">Copy component tickers</button>
+                {% endif %}
+                <button type="button" data-copy-text="{{ structure.kalshi_search_query }}">Copy search text</button>
+              </div>
+            </div>
+            {% endif %}
+            <p class="muted">{{ item.ticker }} / {{ item.model_name }}</p>
+          </div>
+          <div class="trade-recommendation">
+            {{ item.recommendation_label }}
+            <small>{{ item.recommendation }}</small>
+          </div>
+        </div>
+
+        <div class="trade-metrics">
+          <div><span>Confidence</span><strong>{{ item.confidence_percent }}</strong></div>
+          <div><span>Score</span><strong>{{ item.opportunity_score }}</strong></div>
+          <div><span>Edge</span><strong>{{ item.edge_cents }}</strong></div>
+          <div><span>Expected value</span><strong>{{ item.expected_value }}</strong></div>
+          <div><span>Price</span><strong>{{ item.price }}</strong></div>
+          <div><span>Spread</span><strong>{{ item.spread }}</strong></div>
+          <div><span>Liquidity</span><strong>{{ item.liquidity }}</strong></div>
+          <div><span>Time remaining</span><strong>{{ item.formatted_time_remaining }}</strong></div>
+        </div>
+
+        {% if item.meta_selection.available %}
+        <div class="signal-callout">
+          <strong>Trusted model: {{ item.meta_selection.selected_model }}</strong>
+          <span>
+            Trust: {{ item.meta_selection.trust_score }}/100
+            {% if item.meta_selection.fallback %}<span class="badge badge-info">Fallback</span>{% endif %}
+          </span>
+        </div>
+        {% endif %}
+
+        <div class="risk-meter">
+          <div class="risk-meter-head">
+            <strong>Risk Level: {{ item.risk_meter.level }}</strong>
+            <span class="meter-bars" aria-label="risk meter">{{ item.risk_meter.bars }}</span>
+          </div>
+          <div class="risk-factor-list">
+            {% for factor in item.risk_meter.factors %}
+            <span class="factor factor-{{ factor.kind }}">{{ factor.label }}</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% if structure.is_unsupported and structure.option_list %}
+        <div class="component-preview">
+          <div class="component-preview-head">
+            <strong>{{ structure.leg_count }} selected component legs</strong>
+            <span>{{ structure.parser_label }}</span>
+          </div>
+          <ul>
+            {% for leg in structure.option_list[:4] %}
+            <li>
+              <span>{{ leg.contract_line }}</span>
+              <small>{{ leg.market_type }} / {{ leg.provenance_status }}</small>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <div class="trade-explain">
+          <div>
+            <h4>Why This Looks Interesting</h4>
+            <p><strong>Why This Looks Good:</strong> {{ item.primary_driver }}</p>
+            <ul>
+              {% for signal in item.supporting_signals[:3] %}
+              <li>{{ signal }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          <div>
+            <h4>Why This Might Be Risky</h4>
+            <p><strong>Risks:</strong> {{ item.top_risk }}</p>
+            <ul>
+              {% for risk in item.risks[:3] %}
+              <li>{{ risk }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+
+        {% if item.forum_consensus.available %}
+        <div class="signal-callout">
+          <strong>{{ item.forum_consensus.label }}</strong>
+          <span>{{ item.forum_consensus.summary }}</span>
+        </div>
+        {% endif %}
+
+        <div class="signal-badges">
+          {% for signal in item.signal_badges[:3] %}
+          <a class="factor factor-info" href="/signals/{{ signal.name|replace(' ', '%20') }}">{{ signal.name }}</a>
+          {% else %}
+          <span class="factor factor-neutral">Signals pending</span>
+          {% endfor %}
+        </div>
+
+        {% if item.microstructure.available %}
+        <div class="signal-callout">
+          <strong>Microstructure</strong>
+          <span>
+            Spread {{ item.microstructure.spread_trend }},
+            liquidity {{ item.microstructure.liquidity_trend }},
+            {{ item.microstructure.orderbook_pressure }},
+            late move {{ item.microstructure.late_move_warning }},
+            possible informed flow {{ item.microstructure.possible_informed_flow }}.
+          </span>
+        </div>
+        {% endif %}
+
+        <details class="market-details">
+          <summary>View Market Details</summary>
+          <p>{{ item.title }}</p>
+          <dl>
+            <dt>Payout/risk</dt><dd>{{ item.payout_to_risk_ratio }}</dd>
+            <dt>Paper position</dt><dd>{{ item.paper_position }}</dd>
+            <dt>Data freshness</dt><dd>{{ item.data_freshness }}</dd>
+          </dl>
+        </details>
+
+        <div class="card-foot">
+          <span>Paper/demo only. No live order is placed.</span>
+          {% if item.market_identity.kalshi_url_verified %}
+          <a class="button" href="{{ item.market_identity.kalshi_url }}" target="_blank" rel="noopener">Kalshi</a>
+          {% endif %}
+          <a class="button" href="/research/opportunity/{{ item.ticker }}?model_name={{ item.model_name }}">Why?</a>
+          <a class="button primary" href="/opportunities/{{ item.ticker }}">Full breakdown</a>
+        </div>
+      </article>
+      {% endfor %}
+    {% else %}
+    <div class="empty">
+      No directly reviewable opportunities right now. Unsupported, stale, no-liquidity, and not-directly-openable combo rows are parked under Blocked Research Candidates.
+    </div>
+    {% endif %}
+
+    {% if blocked_opportunities %}
+    <section class="blocked-research-panel" id="blocked-research">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Blocked Research Candidates</h3>
+          <p class="muted">These can be inspected, but they are not direct Kalshi trade candidates.</p>
+        </div>
+      </div>
+      {% for item in blocked_opportunities[:5] %}
+      {% set clarity = item.decision_clarity %}
+      {% set structure = clarity.market_structure %}
+      <article class="blocked-research-row">
+        <div>
+          <strong>{{ item.short_title }}</strong>
+          <p class="muted">{{ clarity.primary_block_reason }}</p>
+          <p class="muted">{{ item.market_identity.kalshi_url_status }}: {{ item.market_identity.kalshi_url_reason }}</p>
+        </div>
+        <div class="mini-actions">
+          {% if item.market_identity.kalshi_url_verified %}
+          <a class="button" href="{{ item.market_identity.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+          {% endif %}
+          <a class="button" href="/opportunities/{{ item.ticker }}">Full breakdown</a>
+          <button type="button" data-copy-text="{{ item.ticker }}">Copy exact ticker</button>
+          {% if structure.component_market_ticker_text %}
+          <button type="button" data-copy-text="{{ structure.component_market_ticker_text }}">Copy component tickers</button>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="cockpit-rail">
+    <div class="mini-panel">
+      <div class="section-head compact-head">
+        <h3>Model Leaderboard</h3>
+        <a href="/leaderboard">View all</a>
+      </div>
+      {% for model in model_rows[:4] %}
+      <div class="leader-row">
+        <span class="rank-dot rank-{{ model.rank_color }}"></span>
+        <strong>{{ loop.index }}. {{ model.model_name }}</strong>
+        <span>ROI {{ model.roi or 'n/a' }}</span>
+        <small>Brier {{ model.brier_score or 'n/a' }} / Trades {{ model.trade_count }}</small>
+        <em>{{ 'Needs Data' if model.trade_count == 0 else 'Leading' if model.rank_color == 'green' else 'Underperforming' if model.rank_color == 'red' else 'Average' }}</em>
+      </div>
+      {% else %}
+      <p>Needs more settled paper trades.</p>
+      {% endfor %}
+    </div>
+
+    <div class="mini-panel">
+      <h3>Best Payout Preview</h3>
+      {% for row in best_payouts[:3] %}
+      <p><strong>{{ row.market }}</strong><br><span class="muted">EV {{ row.expected_value }} / ratio {{ row.payout_to_risk_ratio }}</span></p>
+      {% else %}
+      <p>Needs more acceptable payout-adjusted rows.</p>
+      {% endfor %}
+    </div>
+
+    <div class="mini-panel">
+      <h3>Research Assistant</h3>
+      {% for item in research_summary.top_opportunities[:3] %}
+      <p><strong>{{ item.evidence.short_market_name }}</strong><br><span class="muted">{{ item.narrative.primary_driver }}</span></p>
+      {% else %}
+      <p>Needs ranked opportunities before research writeups appear.</p>
+      {% endfor %}
+      <a class="button" href="/research">Open research</a>
+    </div>
+
+    <div class="mini-panel">
+      <h3>Alerts</h3>
+      {% for event in alert_status.events[:4] %}
+      <p>{{ event.severity }}: {{ event.message }}</p>
+      {% else %}<p>No alerts yet.</p>{% endfor %}
+    </div>
+  </aside>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Charts</h2>
+      <p class="muted">Lightweight local trends. Run overnight collection to populate sparse charts.</p>
+    </div>
+    <a class="button" href="/analytics">Analytics</a>
+  </div>
+  <div class="chart-grid">
+    {% for chart in dashboard_charts %}
+    <div class="chart-card">
+      <h3>{{ chart.title }}</h3>
+      {% if chart.points %}
+      <svg class="mini-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="{{ chart.title }}">
+        <polyline points="{% for point in chart.points %}{{ point.x }},{{ point.y }} {% endfor %}"></polyline>
+      </svg>
+      {% else %}
+      <div class="empty">Not enough history yet. Run overnight collection to populate this chart.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% set overnight_cycle = overnight_status.latest_cycle %}
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Overnight Paper Learning</h2>
+      <p class="muted">{{ overnight_status.plain_status }}. PAPER / DEMO ONLY.</p>
+    </div>
+    <a class="button" href="/overnight">View overnight status</a>
+  </div>
+  <div class="status-grid">
+    <div><span>Last run</span><strong>{{ overnight_status.latest_run.status if overnight_status.latest_run else 'none' }}</strong></div>
+    <div><span>Cycles completed</span><strong>{{ overnight_status.latest_run.cycles_completed if overnight_status.latest_run else 0 }}</strong></div>
+    <div><span>Errors</span><strong>{{ overnight_status.latest_run.errors_count if overnight_status.latest_run else 0 }}</strong></div>
+    <div><span>Latest paper P&L</span><strong>{{ overnight_status.latest_paper_pnl.total_pnl if overnight_status.latest_paper_pnl else 'n/a' }}</strong></div>
+    <div><span>Latest opportunities</span><strong>{{ overnight_status.latest_opportunity_count }}</strong></div>
+    <div><span>Paper orders</span><strong>{{ overnight_cycle.paper_orders_created if overnight_cycle else 0 }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band" id="reports">
+  <div class="section-head">
+    <div>
+      <h2>Reports</h2>
+      <p class="muted">Local Markdown reports generated by the CLI.</p>
+    </div>
+  </div>
+  <div class="report-grid">
+    {% for report in report_cards %}
+    <a class="report-card" href="{{ report.href }}">
+      <span>{{ report.status }}</span>
+      <strong>{{ report.title }}</strong>
+      <small>Last generated: {{ report.last_generated }}</small>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

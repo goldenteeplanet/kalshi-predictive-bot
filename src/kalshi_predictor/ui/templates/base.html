@@ -1,0 +1,173 @@
+<!doctype html>
+{% set shell = shell_context if shell_context is defined else default_shell_context %}
+{% set build_guard = shell.workspace_guard if shell.workspace_guard is defined else default_shell_context.workspace_guard %}
+{% set current_path = request.url.path if request is defined else '/' %}
+{% set asset_version = 'phase3bb-r2-model-layout-20260704a' %}
+<html lang="en" data-theme="{{ shell.theme }}" data-density="{{ shell.density }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Decision UI{% endblock %}</title>
+    <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}">
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <div class="safety-banner" role="status">
+      <strong>DEMO ONLY</strong>
+      <span>DRY RUN defaults are active. No production live trading controls exist in this UI.</span>
+    </div>
+    <section class="professional-status-bar" aria-label="Global system context">
+      <div class="status-item">
+        <span>Environment</span>
+        <strong>{{ shell.environment }}</strong>
+      </div>
+      <div class="status-item">
+        <span>Mode</span>
+        <strong>{{ shell.execution_mode }}</strong>
+      </div>
+      <div class="status-item">
+        <span>Build</span>
+        <a
+          class="status-pill {{ build_guard.class }}"
+          href="{{ build_guard.href }}"
+          title="{{ build_guard.description }}"
+        >
+          {{ build_guard.label }}
+        </a>
+      </div>
+      <div class="status-item">
+        <span>Paper Health</span>
+        <strong
+          class="status-pill {{ shell.paper_runtime.class }}"
+          title="{{ shell.paper_runtime.description }}"
+        >
+          {{ shell.paper_runtime.icon }} {{ shell.paper_runtime.label }}
+        </strong>
+      </div>
+      <div class="status-item">
+        <span>Market Data</span>
+        <strong
+          class="status-pill {{ shell.market_freshness.class }}"
+          title="{{ shell.market_freshness.description }}"
+        >
+          {{ shell.market_freshness.icon }} {{ shell.market_freshness.label }}
+          {% if shell.market_freshness.age_label %} {{ shell.market_freshness.age_label }}{% endif %}
+        </strong>
+      </div>
+      <div class="status-item">
+        <span>As of</span>
+        <strong title="{{ shell.snapshot_as_of }}">{{ shell.snapshot_as_of_label | default(shell.snapshot_as_of) }}</strong>
+      </div>
+      <div class="status-item">
+        <span>Prod Cert</span>
+        <a
+          class="status-pill status-incomplete"
+          href="{{ shell.phase_3w.href }}"
+          title="Production certification gate. This can stay incomplete while paper learning runs."
+        >
+          {{ shell.phase_3w.label }}
+        </a>
+      </div>
+      <div class="status-item">
+        <span>Live Ready</span>
+        <a
+          class="status-pill status-incomplete"
+          href="{{ shell.phase_3v.href }}"
+          title="Live-capital readiness gate. This should remain blocked until explicitly approved."
+        >
+          {{ shell.phase_3v.label }}
+        </a>
+      </div>
+      <div class="status-item">
+        <span>Timezone</span>
+        <strong>{{ shell.timezone }}</strong>
+      </div>
+    </section>
+    <header class="topbar">
+      <a class="brand" href="/today">Kalshi Predictive Bot</a>
+      <span class="badge badge-demo">DEMO ONLY</span>
+      <div class="topbar-actions">
+        {% if shell.command_palette_enabled %}
+        <button
+          type="button"
+          class="button command-open"
+          data-command-open
+          data-domain-mutations="false"
+          aria-haspopup="dialog"
+        >
+          Search
+        </button>
+        {% endif %}
+        <a class="button" href="/system">System</a>
+      </div>
+    </header>
+    <div class="app-shell">
+      <aside class="side-nav" aria-label="Primary navigation">
+        <nav>
+          {% for item in shell.nav_items %}
+          <a
+            href="{{ item.href }}"
+            class="{{ 'active' if current_path == item.href or (item.href != '/' and current_path.startswith(item.href + '/')) else '' }}"
+          >
+            {{ item.label }}
+          </a>
+          {% endfor %}
+        </nav>
+        <details class="side-report-links">
+          <summary>Reports</summary>
+          <a href="/opportunities/best-payouts">Best payouts</a>
+          <a href="/reports/research_report.md">Research report</a>
+          <a href="/reports/link_coverage_report.md">Link coverage</a>
+          <a href="/reports/signal_report.md">Signal report</a>
+          <a href="/reports/news_report.md">News report</a>
+          <a href="/reports/sports_report.md">Sports report</a>
+          <a href="/reports/microstructure_report.md">Microstructure report</a>
+          <a href="/reports/meta_report.md">Meta model</a>
+          <a href="/reports/learning_report.md">Learning report</a>
+          <a href="/reports/learning_diagnostics.md">Learning diagnostics</a>
+          <a href="/reports/self_evaluation_journal.md">Self-evaluation</a>
+          <a href="/reports/tonight_report.md">Tonight report</a>
+          <a href="/reports/market_memory_report.md">Memory report</a>
+          <a href="/reports/institutional_dashboard.md">Institutional report</a>
+          <a href="/reports/live_readiness_report.md">Live readiness</a>
+          <a href="/reports/system_certification/system_certification_report.md">
+            System certification
+          </a>
+          <a href="/reports/personal_trader_brief.md">Personal trader</a>
+          <a href="/reports/portfolio_summary.md">Portfolio report</a>
+        </details>
+      </aside>
+      <main id="main-content" tabindex="-1">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+    {% if shell.command_palette_enabled %}
+    <dialog class="command-dialog" data-command-dialog aria-label="Command palette">
+      <form method="dialog" class="command-shell">
+        <div class="section-head compact-head">
+          <div>
+            <h2>Open a view</h2>
+            <p class="muted">Navigation only. This command surface cannot submit orders.</p>
+          </div>
+          <button type="submit" class="button">Close</button>
+        </div>
+        <label class="sr-only" for="command-filter">Filter routes</label>
+        <input
+          id="command-filter"
+          class="command-input"
+          data-command-filter
+          type="search"
+          placeholder="Search markets, routes, reports"
+          autocomplete="off"
+        >
+        <div class="command-list" data-command-list>
+          {% for item in shell.command_items %}
+          <a href="{{ item.href }}" data-command-item>{{ item.label }}</a>
+          {% endfor %}
+        </div>
+      </form>
+    </dialog>
+    {% endif %}
+    <script src="/static/app.js?v={{ asset_version }}"></script>
+  </body>
+</html>

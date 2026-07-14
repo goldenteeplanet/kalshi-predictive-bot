@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ current.ticker }} Position{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>{{ current.ticker }}</h1>
+    <p>{{ current.title }}</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">{{ current.category }}</span>
+    <span class="badge badge-info">Paper only</span>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Current Position</span><strong>{{ current.position_size }}</strong></div>
+  <div><span>Average Cost</span><strong>{{ current.avg_cost or 'n/a' }}</strong></div>
+  <div><span>Current Market Price</span><strong>{{ current.market_price or 'n/a' }}</strong></div>
+  <div><span>Realized P&L</span><strong>{{ current.realized_pnl }}</strong></div>
+  <div><span>Unrealized P&L</span><strong>{{ current.unrealized_pnl }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="grid two">
+    <div class="mini-panel">
+      <h2>History chart</h2>
+      {% for row in history[:12] %}
+      <p>{{ row.recorded_at }} total {{ row.total_pnl }} exposure {{ row.exposure }}</p>
+      {% else %}<div class="empty">No position history yet.</div>{% endfor %}
+    </div>
+    <div class="mini-panel">
+      <h2>Recent fills</h2>
+      {% for row in recent_fills %}
+      <p>{{ row.filled_at }} {{ row.side }} {{ row.quantity }} @ {{ row.price }}</p>
+      {% else %}<div class="empty">No fills.</div>{% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="tab-shell" data-tabs>
+    <div class="tab-list" role="tablist">
+      <button type="button" class="tab active" data-tab-target="forecasts">Forecasts</button>
+      <button type="button" class="tab" data-tab-target="opportunities">Opportunities</button>
+      <button type="button" class="tab" data-tab-target="backtests">Backtests</button>
+    </div>
+    <div class="tab-panel active" data-tab-panel="forecasts">
+      {% for row in forecasts %}
+      <p>{{ row.forecasted_at }} {{ row.model_name }} YES {{ row.yes_probability }}</p>
+      {% else %}<div class="empty">No forecasts.</div>{% endfor %}
+    </div>
+    <div class="tab-panel" data-tab-panel="opportunities">
+      {% for row in opportunities %}
+      <p>
+        {{ row.detected_at }} {{ row.model_name }} {{ row.side }} score {{ row.opportunity_score }}
+        {% if row.kalshi_url_verified %}
+        <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+        {% else %}
+        <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+        <small>{{ row.kalshi_url_reason }}</small>
+        {% endif %}
+      </p>
+      {% else %}<div class="empty">No opportunities.</div>{% endfor %}
+    </div>
+    <div class="tab-panel" data-tab-panel="backtests">
+      {% for row in backtests %}
+      <p>{{ row.simulated_at }} {{ row.model_name }} {{ row.side }} P&L {{ row.pnl }}</p>
+      {% else %}<div class="empty">No backtests.</div>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

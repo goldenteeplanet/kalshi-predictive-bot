@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Meta Model {{ ticker }}{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>{{ ticker }}</h1>
+    <p>{{ explanation.summary }}</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Trusted model: {{ explanation.selected_model }}</span>
+    {% if explanation.fallback %}<span class="badge badge-info">Fallback</span>{% endif %}
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Selected model</span><strong>{{ decision.selected_model_name }}</strong></div>
+  <div><span>Trust score</span><strong>{{ decision.selected_confidence }}</strong></div>
+  <div><span>Selected probability</span><strong>{{ decision.selected_probability }}</strong></div>
+  <div><span>Fallback</span><strong>{{ decision.fallback_model_name or 'no' }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Competing Models</h2></div>
+  {% if competing_models %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Model</th><th>Probability</th><th>Trust</th></tr></thead>
+      <tbody>
+      {% for model, row in competing_models.items() %}
+      <tr>
+        <td>{{ model }}</td>
+        <td>{{ row.probability }}</td>
+        <td>{{ row.trust_score }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No competing model scores stored.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Diagnostics</h2></div>
+  {% for diagnostic in diagnostics %}
+  <p><strong>{{ diagnostic.severity }}: {{ diagnostic.title }}</strong><br>{{ diagnostic.message }}</p>
+  {% else %}
+  <div class="empty">No ticker-specific meta diagnostics.</div>
+  {% endfor %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Recent Forecasts</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Time</th><th>Model</th><th>YES Probability</th><th>Notes</th></tr></thead>
+      <tbody>
+      {% for row in forecast_history %}
+      <tr>
+        <td>{{ row.forecasted_at }}</td>
+        <td>{{ row.model_name }}</td>
+        <td>{{ row.yes_probability }}</td>
+        <td>{{ row.notes }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

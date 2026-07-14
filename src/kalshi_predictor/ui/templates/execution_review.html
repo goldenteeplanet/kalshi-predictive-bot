@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+{% set item = detail.opportunity if detail.opportunity is defined else none %}
+{% set clarity = item.decision_clarity if item and item.decision_clarity is defined else none %}
+{% set identity = item.market_identity if item and item.market_identity is defined else none %}
+{% set structure = clarity.market_structure if clarity else none %}
+{% set lookup = structure.kalshi_lookup if structure else none %}
+{% block title %}Execution Review {{ detail.ticker }}{% endblock %}
+{% block content %}
+<section class="panel cockpit-hero detail-hero execution-hero">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Execution Review</p>
+      {% if structure and structure.is_unsupported and structure.contract_short_title %}
+      <p class="eyebrow">Contract YES side</p>
+      <h1>{{ structure.contract_short_title }}</h1>
+      <p class="market-kind-line">{{ structure.clean_title }}</p>
+      {% else %}
+      <h1>{{ structure.clean_title if structure else detail.title }}</h1>
+      {% endif %}
+      <p class="muted">
+        {% if structure and structure.is_unsupported %}
+        {{ structure.parser_label }}. This market can be inspected, but it is not eligible for
+        execution until every component is verified.
+        {% else %}
+        Paper/read-only review for the selected ranked opportunity.
+        {% endif %}
+      </p>
+      {% if structure %}
+      <div class="contract-summary">
+        <div>
+          <span class="eyebrow">Contract YES Side</span>
+          <strong>{{ structure.contract_yes_summary }}</strong>
+        </div>
+        <div>
+          <span class="eyebrow">Contract NO Side</span>
+          <p>{{ structure.contract_no_summary }}</p>
+        </div>
+        <p class="muted">{{ structure.lookup_guidance }}</p>
+      </div>
+      {% if structure.is_unsupported %}
+      <div class="market-lookup-summary detail-lookup-summary">
+        <span class="eyebrow">Kalshi lookup title</span>
+        <strong>{{ structure.kalshi_search_title }}</strong>
+        <p class="muted">{{ structure.raw_title }}</p>
+        {% if lookup.exact_api_note %}
+        <p class="muted">{{ lookup.exact_api_note }}</p>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% endif %}
+      <dl class="review-identity-grid">
+        <dt>Exact ticker</dt><dd>{{ detail.ticker }}</dd>
+        {% if structure and structure.event_ticker %}
+        <dt>Event ticker</dt><dd>{{ structure.event_ticker }}</dd>
+        {% endif %}
+        {% if structure and structure.raw_title %}
+        <dt>Kalshi title</dt><dd>{{ structure.raw_title }}</dd>
+        {% elif detail.title %}
+        <dt>Kalshi title</dt><dd>{{ detail.title }}</dd>
+        {% endif %}
+        {% if identity %}
+        <dt>Link status</dt><dd>{{ identity.kalshi_url_status }}</dd>
+        <dt>Link reason</dt><dd>{{ identity.kalshi_url_reason }}</dd>
+        {% endif %}
+      </dl>
+      <div class="actions-row safe-actions">
+        {% if lookup and lookup.event_api_url %}
+        <a class="button secondary" href="{{ lookup.event_api_url }}" target="_blank" rel="noreferrer">
+          Open combo event API
+        </a>
+        {% endif %}
+        {% if lookup and lookup.api_url %}
+        <a class="button secondary" href="{{ lookup.api_url }}" target="_blank" rel="noreferrer">
+          Check exact API status
+        </a>
+        {% endif %}
+        {% if identity and identity.kalshi_url_verified %}
+        <a class="button primary" href="{{ identity.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+        {% elif identity %}
+        <span class="badge badge-caution">{{ identity.kalshi_url_status }}</span>
+        {% endif %}
+        <button type="button" data-copy-text="{{ detail.ticker }}">Copy exact ticker</button>
+        {% if structure and structure.component_market_ticker_text %}
+        <button type="button" data-copy-text="{{ structure.component_market_ticker_text }}">Copy component tickers</button>
+        {% endif %}
+        {% if structure and structure.kalshi_search_query %}
+        <button type="button" data-copy-text="{{ structure.kalshi_search_query }}">Copy search text</button>
+        {% endif %}
+        {% if structure and structure.event_ticker %}
+        <button type="button" data-copy-text="{{ structure.event_ticker }}">Copy event ticker</button>
+        {% endif %}
+        {% if structure and structure.series_ticker %}
+        <button type="button" data-copy-text="{{ structure.series_ticker }}">Copy series ticker</button>
+        {% endif %}
+      </div>
+      {% if lookup and lookup.exact_api_note %}
+      <p class="muted">{{ lookup.exact_api_note }}</p>
+      {% endif %}
+      {% if lookup and lookup.web_search_note %}
+      <p class="muted">{{ lookup.web_search_note }}</p>
+      {% endif %}
+      {% if structure and structure.option_list %}
+      <div class="yes-leg-list" aria-label="Selected market components">
+        {% for leg in structure.option_list %}
+        <div class="yes-leg">
+          <div class="leg-header">
+            <span class="badge badge-info">Leg {{ leg.index }}</span>
+            <strong>{{ leg.contract_line }}</strong>
+          </div>
+          <dl class="leg-detail-grid">
+            <dt>Entity</dt><dd>{{ leg.entity }}</dd>
+            <dt>Condition</dt><dd>{{ leg.terms }}</dd>
+            <dt>Parser</dt><dd>{{ leg.market_type }} · {{ leg.confidence }}</dd>
+            <dt>Provenance</dt><dd>{{ leg.provenance_status }}</dd>
+            {% if leg.component_market_ticker %}
+            <dt>Component ticker</dt><dd>{{ leg.component_market_ticker }}</dd>
+            {% endif %}
+            {% if leg.component_event_ticker %}
+            <dt>Component event</dt><dd>{{ leg.component_event_ticker }}</dd>
+            {% endif %}
+          </dl>
+          <div class="mini-actions">
+            {% if leg.component_lookup_url %}
+            <a class="button secondary" href="{{ leg.component_lookup_url }}" target="_blank" rel="noreferrer">
+              Open component API data
+            </a>
+            {% endif %}
+            {% if leg.component_market_ticker %}
+            <button type="button" data-copy-text="{{ leg.component_market_ticker }}">
+              Copy component ticker
+            </button>
+            {% endif %}
+            {% if leg.component_event_ticker %}
+            <button type="button" data-copy-text="{{ leg.component_event_ticker }}">
+              Copy component event
+            </button>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="decision-stack">
+      <span class="badge badge-demo">{{ environment }}</span>
+      <span class="badge badge-warn">{% if dry_run %}DRY RUN{% else %}READ ONLY{% endif %}</span>
+      <span class="badge badge-ok">READ ONLY</span>
+    </div>
+  </div>
+</section>
+
+{% if clarity %}
+<section class="panel">
+  <div class="section-head">
+    <div>
+      <h2>Decision Summary</h2>
+      <p class="muted">
+        Model signal, execution quality, risk gate, and final decision are shown separately.
+      </p>
+    </div>
+    <div class="decision-card {{ clarity.final_decision_kind }}">
+      <span>Final Decision</span>
+      <strong>{{ clarity.final_decision }}</strong>
+      <small>{{ clarity.final_action_label }}</small>
+    </div>
+  </div>
+  <div class="summary-grid">
+    <div class="stat-card">
+      <span>Model Direction</span>
+      <strong>{{ clarity.model_direction }}</strong>
+    </div>
+    <div class="stat-card">
+      <span>Execution Quality</span>
+      <strong>{{ clarity.execution_quality }}</strong>
+    </div>
+    <div class="stat-card">
+      <span>Primary Block Reason</span>
+      <strong>{{ clarity.primary_block_reason }}</strong>
+    </div>
+  </div>
+  {% if clarity.secondary_block_reasons %}
+  <div class="callout caution">
+    <strong>Secondary block reasons</strong>
+    <ul>
+      {% for reason in clarity.secondary_block_reasons %}
+      <li>{{ reason }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <div class="chip-row">
+    {% for chip in clarity.gate_chips %}
+    <span class="chip {{ chip.kind }}">{{ chip.label }}: {{ chip.value }}</span>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="panel">
+    <h2>Why This Looks Interesting</h2>
+    {% if clarity.opportunity_reasons %}
+    <ul>
+      {% for reason in clarity.opportunity_reasons %}
+      <li>{{ reason }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No positive model-signal explanation is available for this row.</p>
+    {% endif %}
+  </div>
+  <div class="panel">
+    <h2>Why This Is Not Tradable</h2>
+    {% if clarity.risk_reasons %}
+    <ul>
+      {% for reason in clarity.risk_reasons %}
+      <li>{{ reason }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No blocking reason is currently recorded.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="panel">
+    <h2>Decision Waterfall</h2>
+    <ol class="decision-waterfall detail-waterfall">
+      {% for step in clarity.decision_waterfall %}
+      <li class="waterfall-{{ step.kind }}">
+        <span>{{ step.label }}</span>
+        <strong>{{ step.value }}</strong>
+        <small>{{ step.detail }}</small>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  <div class="panel">
+    <h2>What Would Make This Tradable?</h2>
+    <ul>
+      {% for condition in clarity.tradable_conditions %}
+      <li>{{ condition }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <div>
+      <h2>Market Structure</h2>
+      <p class="muted">
+        Clean title, parser state, category mapping, and component provenance for this market.
+      </p>
+    </div>
+    {% if structure and structure.is_unsupported %}
+    <span class="badge badge-risk">Unsupported Market</span>
+    {% endif %}
+  </div>
+  {% if structure %}
+  <dl class="detail-grid">
+    <dt>clean title</dt><dd>{{ structure.clean_title }}</dd>
+    <dt>raw title</dt><dd>{{ structure.raw_title }}</dd>
+    <dt>category</dt><dd>{{ structure.category }}</dd>
+    <dt>category confidence</dt><dd>{{ structure.category_confidence }}</dd>
+    <dt>parser status</dt><dd>{{ structure.parser_status }}</dd>
+    <dt>mapping reason</dt><dd>{{ structure.mapping_reason }}</dd>
+    <dt>unsupported reason</dt><dd>{{ structure.unsupported_reason or "none" }}</dd>
+    <dt>component legs</dt><dd>{{ structure.leg_count }}</dd>
+  </dl>
+  {% if structure.option_list %}
+  <div class="table-wrap">
+    <table class="data-table component-legs">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Side</th>
+          <th>Readable option</th>
+          <th>Entity</th>
+          <th>Condition</th>
+          <th>Category</th>
+          <th>Confidence</th>
+          <th>Provenance</th>
+          <th>Placeholder</th>
+          <th>Block reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for leg in structure.option_list %}
+        <tr>
+          <td>{{ leg.index }}</td>
+          <td>{{ leg.side|upper }}</td>
+          <td>{{ leg.human_label }}</td>
+          <td>{{ leg.entity }}</td>
+          <td>{{ leg.terms }}</td>
+          <td>{{ leg.category }}</td>
+          <td>{{ leg.confidence }}</td>
+          <td>{{ leg.provenance_status }}</td>
+          <td>{{ leg.placeholder_status }}</td>
+          <td>{{ leg.block_reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No parsed component legs are available for this market.</p>
+  {% endif %}
+  {% else %}
+  <p class="muted">No market-structure parser output is available.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="grid two">
+  <div class="panel">
+    <h2>Pre-trade Checklist</h2>
+    <ul class="checks">
+      {% for check in checks %}
+      <li class="{{ 'pass' if check.passed else 'fail' }}">{{ check.name }}: {{ check.detail }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="panel">
+    <h2>Order Preview</h2>
+    <dl>
+      {% for key, value in order_preview.items() %}
+      <dt>{{ key }}</dt><dd>{{ value }}</dd>
+      {% endfor %}
+    </dl>
+    <p>Kill switch: <strong>{{ kill_switch }}</strong></p>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Read-only Safety Boundary</h2>
+  <p class="muted">
+    This screen is review-only. Demo and live order submission controls are not exposed here.
+    Trading writes remain blocked unless a separate paper-only workflow has exact evidence and
+    all configured safety gates pass.
+  </p>
+  {% if not execution_enabled %}
+  <p class="muted">Execution enabled: EXECUTION_ENABLED=false.</p>
+  {% elif dry_run %}
+  <p class="muted">Dry-run mode: EXECUTION_DRY_RUN=true.</p>
+  {% else %}
+  <p class="muted">Execution configuration is not armed from this review screen.</p>
+  {% endif %}
+  <details class="trace-drawer">
+    <summary>Trace details</summary>
+    <dl class="detail-grid">
+      <dt>market ticker</dt><dd>{{ detail.ticker }}</dd>
+      {% if identity %}
+      <dt>market identity</dt><dd>{{ identity.kalshi_url_status }} / {{ identity.kalshi_url_reason }}</dd>
+      <dt>source lineage</dt><dd>{{ identity.source_lineage }}</dd>
+      {% endif %}
+      {% if structure %}
+      <dt>event ticker</dt><dd>{{ structure.event_ticker or "n/a" }}</dd>
+      <dt>series ticker</dt><dd>{{ structure.series_ticker or "n/a" }}</dd>
+      <dt>market type</dt><dd>{{ structure.market_type }}</dd>
+      <dt>parser status</dt><dd>{{ structure.parser_status }}</dd>
+      <dt>raw title</dt><dd>{{ structure.raw_title }}</dd>
+      {% endif %}
+      {% if clarity %}
+      {% for row in clarity.trace_details %}
+      <dt>{{ row.label }}</dt><dd>{{ row.value }}</dd>
+      {% endfor %}
+      {% endif %}
+    </dl>
+  </details>
+</section>
+{% endblock %}

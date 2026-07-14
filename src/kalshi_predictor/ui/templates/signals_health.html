@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Signal Health{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>Signal Health</h1>
+    <p>Readiness, missing data, and skip diagnostics for expected signals.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Paper / Demo Only</span>
+    <a class="button" href="/signals">Marketplace</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Active Signals</span><strong>{{ summary.active }}</strong></div>
+  <div><span>Inactive Signals</span><strong>{{ summary.inactive }}</strong></div>
+  <div><span>Skip Logs</span><strong>{{ summary.skip_count }}</strong></div>
+  <div><span>Live Trading</span><strong>Disabled</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Inactive Signals</h2>
+      <p class="muted">Zero-output signals stay visible with their missing input and next command.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Signal</th>
+          <th>Status</th>
+          <th>Missing Data</th>
+          <th>Skip Count</th>
+          <th>Latest Signal</th>
+          <th>Next Command</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in inactive_signals %}
+        <tr>
+          <td>{{ row.signal_name }}</td>
+          <td>{{ row.status_label }}</td>
+          <td>{{ row.missing_data }}</td>
+          <td>{{ row.skip_count }}</td>
+          <td>{{ row.latest_signal }}</td>
+          <td class="wide">{{ row.next_action }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Active Signals</h2>
+      <p class="muted">Signals with forecasts, trades, or generated signal events.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Signal</th>
+          <th>Forecasts</th>
+          <th>Trades</th>
+          <th>Latest Signal</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in active_signals %}
+        <tr>
+          <td>{{ row.signal_name }}</td>
+          <td>{{ row.forecast_count }}</td>
+          <td>{{ row.trade_count }}</td>
+          <td>{{ row.latest_signal }}</td>
+          <td>{{ row.status_label }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Missing Data</h2>
+      <p class="muted">Inputs currently blocking expected signal output.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Signal</th>
+          <th>Required Data</th>
+          <th>Missing Data</th>
+          <th>Reason</th>
+          <th>Next Command</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in missing_data %}
+        <tr>
+          <td>{{ row.signal_name }}</td>
+          <td class="wide">{{ row.required_data }}</td>
+          <td>{{ row.missing_data }}</td>
+          <td class="wide">{{ row.skip_reason }}</td>
+          <td class="wide">{{ row.next_action }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

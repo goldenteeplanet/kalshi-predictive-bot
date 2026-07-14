@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Markets{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div><h1>Market Monitor</h1><p>Top tracked markets ranked by stored local opportunity data.</p></div>
+  <div class="hero-status"><span class="badge badge-info">Top 100</span></div>
+</section>
+<section class="section-band">
+  <form class="filter-bar" method="get" action="/markets">
+    <input name="search" placeholder="Search markets">
+    <select name="category"><option value="">Category</option><option>Sports</option><option>Weather</option><option>Crypto</option><option>Economics</option><option>General</option></select>
+    <input name="model" placeholder="Model">
+    <input name="min_score" placeholder="Min score" type="number" step="1">
+    <input name="min_liquidity" placeholder="Min liquidity" type="number" step="1">
+    <input name="min_confidence" placeholder="Min confidence" type="number" step="1">
+    <button class="primary" type="submit">Filter</button>
+  </form>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Market</th><th>Category</th><th>Current Price</th><th>Spread</th><th>Liquidity</th><th>Data Quality</th><th>Snapshot Repair</th><th>Data Freshness</th><th>Opportunity Score</th><th>Best Model</th><th>Recommended Action</th></tr></thead>
+      <tbody>
+      {% for row in markets %}
+      <tr>
+        <td class="wide">{{ row.market }}<br><span class="muted">{{ row.ticker }}</span></td>
+        <td>{{ row.category }}</td>
+        <td>{{ row.current_price }}</td>
+        <td>{{ row.spread }}</td>
+        <td>{{ row.liquidity }}</td>
+        <td>{{ row.data_quality }}</td>
+        <td>{{ row.snapshot_repair_status }}</td>
+        <td>{{ row.data_freshness }}</td>
+        <td>{{ row.opportunity_score }}</td>
+        <td>{{ row.best_model }}</td>
+        <td>{{ row.recommended_action }}</td>
+      </tr>
+      {% else %}<tr><td colspan="11">No ranked markets found.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

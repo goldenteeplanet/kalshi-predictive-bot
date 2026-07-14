@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/phase-3x-ui-preferences.schema.json",
+  "title": "Phase 3X UI Preferences",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "user_scope",
+    "theme",
+    "density",
+    "timezone",
+    "default_route",
+    "chart_table_preference",
+    "tables",
+    "saved_views",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "phase-3x-ui-preferences-v1"
+    },
+    "user_scope": {
+      "type": "string",
+      "minLength": 1
+    },
+    "theme": {
+      "enum": [
+        "light",
+        "dark",
+        "system"
+      ]
+    },
+    "density": {
+      "enum": [
+        "comfortable",
+        "compact"
+      ]
+    },
+    "timezone": {
+      "type": "string",
+      "minLength": 1
+    },
+    "default_route": {
+      "enum": [
+        "/today",
+        "/opportunities",
+        "/markets",
+        "/portfolio",
+        "/risk",
+        "/trades",
+        "/models",
+        "/journal",
+        "/system"
+      ]
+    },
+    "chart_table_preference": {
+      "enum": [
+        "chart_first",
+        "table_first",
+        "remember_per_panel"
+      ]
+    },
+    "tables": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "visible_columns",
+          "column_order",
+          "page_size"
+        ],
+        "properties": {
+          "visible_columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "column_order": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 250
+          }
+        }
+      }
+    },
+    "saved_views": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "view_id",
+          "name",
+          "route",
+          "filters",
+          "visibility",
+          "definition_version",
+          "updated_at"
+        ],
+        "properties": {
+          "view_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "route": {
+            "type": "string",
+            "pattern": "^/"
+          },
+          "filters": {
+            "type": "object"
+          },
+          "visibility": {
+            "enum": [
+              "private",
+              "team"
+            ]
+          },
+          "definition_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

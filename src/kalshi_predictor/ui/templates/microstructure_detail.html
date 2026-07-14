@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Microstructure {{ ticker }}{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>{{ ticker }}</h1>
+    <p>{{ research_explanation }}</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Microstructure detail</span>
+    <a class="button" href="{{ report_links.microstructure_report }}">Report</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Confidence</span><strong>{{ latest_feature.microstructure_confidence or 'n/a' }}</strong></div>
+  <div><span>Spread</span><strong>{{ latest_feature.current_spread or 'n/a' }}</strong></div>
+  <div><span>Liquidity</span><strong>{{ latest_feature.current_liquidity or 'n/a' }}</strong></div>
+  <div><span>Imbalance</span><strong>{{ latest_feature.orderbook_imbalance or 'n/a' }}</strong></div>
+  <div><span>Late move</span><strong>{{ latest_feature.late_move_score or 'n/a' }}</strong></div>
+  <div><span>Possible flow</span><strong>{{ latest_feature.smart_money_score or 'n/a' }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="chart-grid">
+    {% for chart in charts %}
+    <div class="chart-card">
+      <h3>{{ chart.title }}</h3>
+      {% if chart.points %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Value</th></tr></thead>
+          <tbody>
+          {% for point in chart.points[-10:] %}
+          <tr><td>{{ point.x }}</td><td>{{ point.y or 'n/a' }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty">No chart data.</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Events</h2><span class="muted">{{ events|length }} shown</span></div>
+  {% if events %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Time</th><th>Event</th><th>Severity</th><th>Score</th><th>Description</th></tr></thead>
+      <tbody>
+      {% for event in events %}
+      <tr>
+        <td>{{ event.created_at }}</td>
+        <td>{{ event.event_type }}</td>
+        <td>{{ event.severity }}</td>
+        <td>{{ event.score }}</td>
+        <td class="wide">{{ event.description }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No events for this ticker.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Signals</h2><span class="muted">{{ signals|length }} shown</span></div>
+  {% if signals %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Signal</th><th>Direction</th><th>Strength</th><th>Confidence</th><th>Explanation</th></tr></thead>
+      <tbody>
+      {% for signal in signals %}
+      <tr>
+        <td>{{ signal.signal_name }}</td>
+        <td>{{ signal.signal_direction or 'neutral' }}</td>
+        <td>{{ signal.signal_strength }}</td>
+        <td>{{ signal.confidence }}</td>
+        <td class="wide">{{ signal.explanation }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No microstructure signals for this ticker.</div>
+  {% endif %}
+</section>
+{% endblock %}
+

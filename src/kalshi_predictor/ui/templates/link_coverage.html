@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Link Coverage{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>Market Link Coverage</h1>
+    <p>Parsed market legs, specialized link coverage, and the next data command for each gap.</p>
+    <p>
+      <span class="status-pill {{ coverage.freshness_class | default('status-incomplete') }}">
+        {{ coverage.freshness_status | default('REPORT_UNKNOWN') }}
+      </span>
+      {% if coverage.age_label %}
+      <span class="muted">Age {{ coverage.age_label }}</span>
+      {% endif %}
+      {% if coverage.freshness_note %}
+      <span class="muted">{{ coverage.freshness_note }}</span>
+      {% endif %}
+    </p>
+    <p class="muted">Source: {{ coverage.data_source | default('live_database') }}{% if coverage.generated_at %} · As of {{ coverage.generated_at }}{% endif %}</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-demo">{{ coverage.mode }}</span>
+    <a class="button" href="{{ report_links.link_coverage }}">Coverage report</a>
+    <a class="button" href="/models/readiness">Model readiness</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  {% for card in coverage.summary_cards %}
+  <div title="{{ card.definition | default('') }}">
+    <span>{{ card.label }}</span>
+    <strong>{{ card.value }}</strong>
+    {% if card.definition %}
+    <small>{{ card.definition }}</small>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+
+<section class="section-band">
+  <div class="section-head compact-head">
+    <div>
+      <h2>{{ "Coverage Status" if coverage.bottleneck.status == "CONNECTED" else "Main Bottleneck" }}</h2>
+      <p>{{ coverage.bottleneck.message }}</p>
+    </div>
+    <span class="status-pill {{ 'status-healthy' if coverage.bottleneck.status == 'CONNECTED' else 'status-degraded' }}">
+      {{ coverage.bottleneck.status }}
+    </span>
+  </div>
+  <p class="muted">{{ coverage.bottleneck.next_action }}</p>
+  {% if coverage.next_commands %}
+  <div class="command-stack">
+    {% for command in coverage.next_commands %}
+    <code>{{ command }}</code>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">No coverage command is required right now.</p>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head compact-head">
+    <div>
+      <h2>Category Coverage</h2>
+      <p>Connected means parsed markets have backing link rows. Derived means usable Kalshi-event-derived rows exist, but external schedule evidence can still upgrade them. Partial markets are unresolved distinct tickers, while partial link rows are the raw fallback rows.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Status</th>
+          <th class="numeric">Parsed Legs</th>
+          <th class="numeric">Markets</th>
+          <th class="numeric">Linked</th>
+          <th class="numeric">Derived Markets</th>
+          <th class="numeric">Verified Markets</th>
+          <th class="numeric">Partial Markets</th>
+          <th class="numeric">Partial Legs</th>
+          <th class="numeric">Partial Link Rows</th>
+          <th class="numeric">Unsupported Composites</th>
+          <th class="numeric">Coverage</th>
+          <th>Next Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in coverage.category_rows %}
+        <tr>
+          <td>{{ row.category }}</td>
+          <td><span class="status-pill {{ row.status_class }}">{{ row.status_label }}</span></td>
+          <td class="numeric">{{ row.parsed_legs }}</td>
+          <td class="numeric">{{ row.parsed_markets }}</td>
+          <td class="numeric">{{ row.linked_markets }}</td>
+          <td class="numeric">{{ row.derived_usable_markets }}</td>
+          <td class="numeric">{{ row.verified_schedule_markets }}</td>
+          <td class="numeric">{{ row.partial_markets }}</td>
+          <td class="numeric">{{ row.partial_legs }}</td>
+          <td class="numeric">{{ row.partial_link_rows }}</td>
+          <td class="numeric">{{ row.unsupported_multileg_markets | default(0) }}</td>
+          <td class="numeric">{{ row.coverage_percent }}</td>
+          <td class="wide">{{ row.next_action }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head compact-head">
+    <div>
+      <h2>Count Definitions</h2>
+      <p>The link report separates legs, distinct markets, and raw link rows so the counts reconcile.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Count</th>
+          <th>Definition</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in coverage.count_definitions %}
+        <tr>
+          <td>{{ item.label }}</td>
+          <td class="wide">{{ item.definition }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head compact-head">
+    <div>
+      <h2>Link Tables</h2>
+      <p>Distinct linked markets by specialized data source.</p>
+    </div>
+  </div>
+  <div class="grid three">
+    {% for row in coverage.link_counts %}
+    <div>
+      <span>{{ row.label }}</span>
+      <strong>{{ row.value }}</strong>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="section-band">
+    <div class="section-head compact-head">
+      <div>
+        <h2>Unlinked Examples</h2>
+        <p>Parsed markets that do not yet have a matching specialized link row.</p>
+      </div>
+    </div>
+    {% if coverage.unlinked_examples %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Category</th>
+            <th>Leg</th>
+            <th>Next Action</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for example in coverage.unlinked_examples %}
+          <tr>
+            <td>{{ example.ticker }}</td>
+            <td>{{ example.category }}</td>
+            <td class="wide">{{ example.raw_text }}</td>
+            <td class="wide">{{ example.next_action }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty">No unlinked parsed examples.</p>
+    {% endif %}
+  </div>
+
+  <div class="section-band">
+    <div class="section-head compact-head">
+      <div>
+        <h2>Partial Examples</h2>
+        <p>Links that exist but still need backing data before the model can fully use them.</p>
+      </div>
+    </div>
+    {% if coverage.partial_examples %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Category</th>
+            <th>Leg</th>
+            <th>Next Action</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for example in coverage.partial_examples %}
+          <tr>
+            <td>{{ example.ticker }}</td>
+            <td>{{ example.category }}</td>
+            <td class="wide">{{ example.raw_text }}</td>
+            <td class="wide">{{ example.next_action }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty">No partial link examples.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head compact-head">
+    <div>
+      <h2>Data Table Counts</h2>
+      <p>Raw inventory used to explain readiness gaps.</p>
+    </div>
+  </div>
+  <div class="grid three">
+    {% for key, value in coverage.table_counts.items() %}
+    <div>
+      <span>{{ key }}</span>
+      <strong>{{ value }}</strong>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

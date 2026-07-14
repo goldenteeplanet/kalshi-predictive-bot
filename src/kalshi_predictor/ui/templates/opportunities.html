@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+{% block title %}Opportunities{% endblock %}
+{% block content %}
+<section
+  class="section-band"
+  data-auto-refresh-seconds="{{ crypto_freshness.auto_refresh_seconds }}"
+>
+  <div class="section-head">
+    <div>
+      <h1>Opportunity Scanner</h1>
+      <p class="muted">Paper/demo opportunity intelligence ranked from local forecasts and snapshots.</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-info">Demo Only</span>
+      <span class="badge badge-info">Paper Mode</span>
+      <a class="button primary" href="/opportunities/best-payouts">Best payouts</a>
+      <a class="button" href="/research">Research</a>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Shown</span><strong>{{ summary.shown }}</strong></div>
+    <div><span>High confidence</span><strong>{{ summary.high_confidence }}</strong></div>
+    <div><span>No-trade rows</span><strong>{{ summary.no_trade }}</strong></div>
+    <a class="status-grid-card" href="#blocked-research">
+      <span>Blocked research</span><strong>{{ summary.blocked_research }}</strong>
+    </a>
+    <div><span>Link status</span><strong>{{ opportunity_links.status }}</strong></div>
+    <div><span>Verified links</span><strong>{{ opportunity_links.verified_clickable_opportunities }}</strong></div>
+    <div><span>Diagnostic links</span><strong>{{ opportunity_links.diagnostic_only_rows }}</strong></div>
+    <div><span>Top action</span><strong>{{ summary.top_action }}</strong></div>
+    <div><span>Markets scanned today</span><strong>{{ executive_summary.markets_scanned }}</strong></div>
+    <div><span>Forecasts today</span><strong>{{ executive_summary.forecasts_generated }}</strong></div>
+    <div><span>Opportunities today</span><strong>{{ executive_summary.opportunities_found }}</strong></div>
+    <div>
+      <span>Last data refresh</span>
+      <strong title="{{ executive_summary.last_data_refresh }}">
+        {{ executive_summary.last_data_refresh_label|default(executive_summary.last_data_refresh) }}
+      </strong>
+    </div>
+    <div>
+      <span>Page generated</span>
+      <strong title="{{ page_generated_at }}">{{ page_generated_label|default(page_generated_at) }}</strong>
+    </div>
+  </div>
+  <div class="freshness-watch-panel">
+    <div>
+      <div class="freshness-watch-head">
+        <h2>Crypto Freshness Watch</h2>
+        <span class="badge badge-{{ crypto_freshness.badge_kind }}">
+          {{ crypto_freshness.status_label }} {{ crypto_freshness.age_label }}
+        </span>
+      </div>
+      <p class="muted">{{ crypto_freshness.description }}</p>
+    </div>
+    <div class="freshness-watch-grid">
+      <div>
+        <span>Watch state</span>
+        <strong title="{{ crypto_freshness.watch_state }}">
+          {{ crypto_freshness.watch_state_label|default(crypto_freshness.watch_state) }}
+        </strong>
+      </div>
+      <div><span>Current crypto windows</span><strong>{{ crypto_freshness.current_active_window_rows }}</strong></div>
+      <div><span>Expired excluded</span><strong>{{ crypto_freshness.expired_crypto_window_rows }}</strong></div>
+      <div><span>Paper-ready</span><strong>{{ crypto_freshness.paper_ready_candidates }}</strong></div>
+      <div><span>Positive EV preflight</span><strong>{{ crypto_freshness.positive_ev_preflight_candidates }}</strong></div>
+      <div>
+        <span>Action blocker</span>
+        <strong title="{{ crypto_freshness.actionability_gap }}">
+          {{ crypto_freshness.actionability_gap_label|default(crypto_freshness.actionability_gap) }}
+        </strong>
+      </div>
+      <div>
+        <span>Refresh backlog</span>
+        <strong title="{{ crypto_freshness.primary_gap }}">
+          {{ crypto_freshness.primary_gap_label|default(crypto_freshness.primary_gap) }}
+        </strong>
+      </div>
+      <div><span>Exact refresh selected</span><strong>{{ crypto_freshness.exact_snapshot_refresh_selected }}</strong></div>
+      <div><span>Visible-book refresh</span><strong>{{ crypto_freshness.exact_snapshot_refresh_book_visible_candidates }}</strong></div>
+      <div><span>Cadence</span><strong>{{ crypto_freshness.cadence_minutes }} minutes</strong></div>
+      <div>
+        <span>Runner</span>
+        <strong title="{{ crypto_freshness.runner_status }}">
+          {{ crypto_freshness.runner_status_label|default(crypto_freshness.runner_status) }}
+        </strong>
+      </div>
+      <div><span>Watch report</span><strong>{{ crypto_freshness.generated_at }}</strong></div>
+      <div><span>Page refresh</span><strong>{{ crypto_freshness.auto_refresh_label }}</strong></div>
+    </div>
+    {% if crypto_freshness.runner_next_action %}
+    <p class="muted">{{ crypto_freshness.runner_next_action }}</p>
+    {% endif %}
+    <p class="muted freshness-watch-note">{{ crypto_freshness.actionability_note }}</p>
+    {% if crypto_freshness.book_probe.available %}
+    <div class="book-probe">
+      <div class="book-probe-head">
+        <span>Executable book target</span>
+        <a href="{{ crypto_freshness.book_probe.detail_href }}">{{ crypto_freshness.book_probe.ticker }}</a>
+      </div>
+      <div class="book-probe-grid" aria-label="Executable book target details">
+        <div><span>Side</span><br><strong>{{ crypto_freshness.book_probe.side }}</strong></div>
+        <div><span>EV</span><br><strong>{{ crypto_freshness.book_probe.expected_value_label }}</strong></div>
+        <div><span>Liquidity</span><br><strong>{{ crypto_freshness.book_probe.liquidity_label }}</strong></div>
+        <div><span>Spread</span><br><strong>{{ crypto_freshness.book_probe.spread_label }}</strong></div>
+      </div>
+      <p class="muted">Current blockers: {{ crypto_freshness.book_probe.blockers_label }}</p>
+      <p class="muted">{{ crypto_freshness.book_probe.needed_label }}</p>
+      <p class="muted book-probe-safety">{{ crypto_freshness.book_probe.safety_label }}</p>
+    </div>
+    {% endif %}
+    <div class="near-miss-watch">
+      <div class="freshness-watch-head">
+        <div>
+          <h3>Near-Miss EV Watch</h3>
+          <p class="muted">{{ crypto_freshness.near_miss_summary }}</p>
+        </div>
+        <span class="badge badge-caution">{{ crypto_freshness.ev_calibration_label }}</span>
+      </div>
+      <div class="freshness-watch-grid near-miss-metrics">
+        <div><span>Near misses</span><strong>{{ crypto_freshness.ev_near_miss_rows }}</strong></div>
+        <div><span>Best current EV</span><strong>{{ crypto_freshness.best_current_expected_value_label }}</strong></div>
+        <div><span>Closest gap</span><strong>{{ crypto_freshness.best_ev_gap_to_positive_label }}</strong></div>
+        <div><span>Visible book</span><strong>{{ crypto_freshness.ev_near_miss_liquidity_positive_rows }}</strong></div>
+        <div><span>Clean execution</span><strong>{{ crypto_freshness.ev_near_miss_clean_execution_rows }}</strong></div>
+        <div><span>Positive EV no book</span><strong>{{ crypto_freshness.positive_ev_no_executable_book_rows }}</strong></div>
+        <div><span>Positive EV stale forecast</span><strong>{{ crypto_freshness.positive_ev_forecast_stale_rows }}</strong></div>
+        <div><span>Positive EV stale snapshot</span><strong>{{ crypto_freshness.positive_ev_snapshot_stale_rows }}</strong></div>
+        <div><span>Clean book risk missing</span><strong>{{ crypto_freshness.positive_ev_clean_book_risk_missing_rows }}</strong></div>
+        <div><span>Liquidity appeared</span><strong>{{ crypto_freshness.liquidity_emergence_rows }}</strong></div>
+        <div><span>Clean book appeared</span><strong>{{ crypto_freshness.clean_execution_emergence_rows }}</strong></div>
+        <div><span>Watch band</span><strong>{{ crypto_freshness.ev_near_miss_band_label }}</strong></div>
+      </div>
+      <div class="liquidity-emergence-watch">
+        <h3>Liquidity Emergence</h3>
+        <p class="muted">{{ crypto_freshness.liquidity_emergence_summary }}</p>
+        {% if crypto_freshness.liquidity_emergence_examples %}
+        <div class="near-miss-list" aria-label="Crypto liquidity emergence candidates">
+          {% for row in crypto_freshness.liquidity_emergence_examples %}
+          <a class="near-miss-row" href="{{ row.detail_href }}">
+            <span class="near-miss-main">
+              <strong>{{ row.title }}</strong>
+              <small>{{ row.ticker }} Â· {{ row.best_side }} Â· {{ row.watch_type }}</small>
+            </span>
+            <span class="near-miss-values">
+              <span>{{ row.transition_label }}</span>
+              <span>EV {{ row.expected_value_label }}</span>
+              <span>{{ row.previous_liquidity_label }} to {{ row.current_liquidity_label }}</span>
+              <span>spread {{ row.spread_label }}</span>
+            </span>
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% if crypto_freshness.near_miss_examples %}
+      <div class="near-miss-list" aria-label="Near-miss crypto candidates">
+        {% for row in crypto_freshness.near_miss_examples %}
+        <a class="near-miss-row" href="{{ row.detail_href }}">
+          <span class="near-miss-main">
+            <strong>{{ row.title }}</strong>
+            <small>{{ row.ticker }} · {{ row.best_side }} · {{ row.status_label }}</small>
+          </span>
+          <span class="near-miss-values">
+            <span>EV {{ row.expected_value_label }}</span>
+            <span>needs {{ row.gap_label }}</span>
+            <span>{{ row.liquidity_label }} liquidity</span>
+            <span>spread {{ row.spread_label }}</span>
+          </span>
+          <span class="near-miss-note">{{ row.what_would_make_ready }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <p class="muted near-miss-safety">
+        Diagnostic only: paper-only Phase 3M/3N preflight remains blocked until EV is strictly positive and liquidity/spread are clean.
+      </p>
+    </div>
+    <div class="freshness-command">
+      <span>Refresh command</span>
+      <code>{{ crypto_freshness.command }}</code>
+    </div>
+    <div class="mini-actions">
+      <a class="button" href="{{ crypto_freshness.report_href }}">Crypto freshness report</a>
+      <button type="button" data-copy-text="{{ crypto_freshness.command }}">Copy refresh command</button>
+      <button type="button" data-copy-text="{{ crypto_freshness.scheduler_command }}">Copy scheduler profile</button>
+    </div>
+  </div>
+</section>
+
+<section class="cockpit-layout">
+  <div class="trade-feed">
+    <div class="section-head">
+      <div>
+        <h2>Best Opportunities Right Now</h2>
+        <p class="muted">Market probability, model probability, edge, and gate status stay visibly distinct.</p>
+      </div>
+      <div class="button-row">
+        {% if blocked_opportunities %}
+        <a class="button" href="#blocked-research">Blocked research ({{ summary.blocked_research }})</a>
+        {% endif %}
+        <a class="button" href="{{ report_links.opportunity_link_audit }}">Link audit</a>
+        <a class="button" href="{{ report_links.opportunities }}">Opportunities report</a>
+      </div>
+    </div>
+
+    {% if opportunities %}
+      {% for item in opportunities %}
+      {% set clarity = item.decision_clarity %}
+      {% set structure = clarity.market_structure %}
+      {% set lookup = structure.kalshi_lookup %}
+      <article class="trade-card trade-{{ item.traffic_light.kind }}">
+        <div class="trade-card-top">
+          <div>
+            <div class="trade-meta">
+              <span class="category-badge category-{{ item.category|lower }}">{{ structure.category }}</span>
+              <span class="traffic traffic-{{ item.traffic_light.kind }}">{{ item.traffic_light.label }}</span>
+              <span class="badge badge-{{ clarity.execution_quality_kind }}">{{ clarity.execution_quality }}</span>
+            </div>
+            <h3>{{ item.short_title }}</h3>
+            <div class="mini-actions">
+              {% if item.market_identity.kalshi_url_verified %}
+              <a class="button" href="{{ item.market_identity.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+              {% else %}
+              <span class="badge badge-caution">{{ item.market_identity.kalshi_url_status }}</span>
+              <small>{{ item.market_identity.kalshi_url_reason }}</small>
+              {% endif %}
+            </div>
+            {% if structure.is_unsupported %}
+            <div class="market-lookup-summary">
+              <span class="eyebrow">Kalshi lookup title</span>
+              <strong>{{ structure.kalshi_search_title }}</strong>
+              <p class="muted">{{ structure.raw_title }}</p>
+              {% if lookup.exact_api_note %}
+              <p class="muted">{{ lookup.exact_api_note }}</p>
+              {% endif %}
+              {% if lookup.web_search_note %}
+              <p class="muted">{{ lookup.web_search_note }}</p>
+              {% endif %}
+              <div class="mini-actions">
+                {% if lookup.event_api_url %}
+                <a class="button secondary" href="{{ lookup.event_api_url }}" target="_blank" rel="noreferrer">
+                  Open combo event API
+                </a>
+                {% endif %}
+                {% if lookup.api_url %}
+                <a class="button secondary" href="{{ lookup.api_url }}" target="_blank" rel="noreferrer">
+                  Check exact API status
+                </a>
+                {% endif %}
+                <button type="button" data-copy-text="{{ item.ticker }}">Copy exact ticker</button>
+                {% if structure.component_market_ticker_text %}
+                <button type="button" data-copy-text="{{ structure.component_market_ticker_text }}">Copy component tickers</button>
+                {% endif %}
+                <button type="button" data-copy-text="{{ structure.kalshi_search_query }}">Copy search text</button>
+              </div>
+            </div>
+            {% endif %}
+            <p class="muted">{{ item.ticker }} / {{ item.model_name }}</p>
+          </div>
+          <div class="trade-recommendation decision-recommendation">
+            {{ clarity.final_decision }}
+            <small>{{ clarity.model_direction }} / {{ clarity.final_action_label }}</small>
+          </div>
+        </div>
+
+        <div class="trade-metrics">
+          <div><span>Confidence</span><strong>{{ clarity.formats.score }}</strong></div>
+          <div><span>Model probability</span><strong>{{ clarity.formats.model_probability }}</strong></div>
+          <div><span>Edge</span><strong>{{ clarity.formats.edge }}</strong></div>
+          <div><span>Expected value</span><strong>{{ clarity.formats.expected_value }}</strong></div>
+          <div><span>Price</span><strong>{{ clarity.formats.market_price }}</strong></div>
+          <div><span>Spread</span><strong>{{ clarity.formats.spread }}</strong></div>
+          <div><span>Liquidity</span><strong>{{ clarity.formats.liquidity }}</strong></div>
+          <div><span>Time remaining</span><strong>{{ clarity.formats.time_remaining }}</strong></div>
+        </div>
+
+        <div class="gate-chip-row card-gates">
+          {% for chip in clarity.gate_chips %}
+          <span class="badge badge-{{ chip.kind }}">{{ chip.label }}: {{ chip.value }}</span>
+          {% endfor %}
+        </div>
+
+        {% if structure.is_unsupported and structure.option_list %}
+        <div class="component-preview">
+          <div class="component-preview-head">
+            <strong>{{ structure.leg_count }} selected component legs</strong>
+            <span>{{ structure.parser_label }}</span>
+          </div>
+          <ul>
+            {% for leg in structure.option_list[:4] %}
+            <li>
+              <span>{{ leg.contract_line }}</span>
+              <small>{{ leg.market_type }} / {{ leg.provenance_status }}</small>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <div class="trade-explain">
+          <div>
+            <h4>Why This Looks Interesting</h4>
+            <ul>
+              {% for reason in clarity.opportunity_reasons[:3] %}
+              <li>{{ reason }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          <div>
+            <h4>Why This Is Not Tradable</h4>
+            <p>{{ clarity.primary_block_reason }}</p>
+            <ul>
+              {% for risk in clarity.secondary_block_reasons[:3] %}
+              <li>{{ risk }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+
+        {% if item.forum_consensus.available %}
+        <div class="signal-callout">
+          <strong>{{ item.forum_consensus.label }}</strong>
+          <span>{{ item.forum_consensus.summary }}</span>
+        </div>
+        {% endif %}
+
+        <div class="signal-badges">
+          {% for signal in item.signal_badges[:3] %}
+          <a class="factor factor-info" href="/signals/{{ signal.name|replace(' ', '%20') }}">{{ signal.name }}</a>
+          {% else %}
+          <span class="factor factor-neutral">Signals pending</span>
+          {% endfor %}
+        </div>
+
+        <div
+          class="payout-calculator compact-payout"
+          data-payout-calculator
+          data-side="{{ item.side }}"
+          data-price="{{ item.price }}"
+        >
+          <div class="payout-head">
+            <div>
+              <h4>Hypothetical payout</h4>
+              <p class="muted">{{ item.recommendation_label }} at {{ item.price }}. Paper estimate only.</p>
+            </div>
+            <label>
+              Amount
+              <input type="number" min="1" step="1" value="100" data-payout-input>
+            </label>
+          </div>
+          <div class="payout-result-grid">
+            <div><span>Contracts</span><strong data-payout-contracts>--</strong></div>
+            <div><span>Cost used</span><strong data-payout-cost>--</strong></div>
+            <div><span>Profit if correct</span><strong data-payout-profit>--</strong></div>
+            <div><span>Max loss</span><strong data-payout-loss>--</strong></div>
+          </div>
+        </div>
+
+        <div class="card-foot">
+          <span>Paper/demo only. No live order is placed.</span>
+          {% if item.market_identity.kalshi_url_verified %}
+          <a class="button" href="{{ item.market_identity.kalshi_url }}" target="_blank" rel="noopener">Kalshi</a>
+          {% endif %}
+          <a class="button" href="/research/opportunity/{{ item.ticker }}?model_name={{ item.model_name }}">Why?</a>
+          <a class="button primary" href="/opportunities/{{ item.ticker }}">Full breakdown</a>
+        </div>
+      </article>
+      {% endfor %}
+    {% else %}
+    <div class="empty">
+      No directly reviewable opportunities right now. Unsupported, stale, no-liquidity, and not-directly-openable combo rows are parked under Blocked Research Candidates.
+    </div>
+    {% endif %}
+
+    {% if blocked_opportunities %}
+    <section class="blocked-research-panel" id="blocked-research">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Blocked Research Candidates</h3>
+          <p class="muted">These can be inspected, but they are not direct Kalshi trade candidates.</p>
+        </div>
+      </div>
+      {% for item in blocked_opportunities[:5] %}
+      {% set clarity = item.decision_clarity %}
+      {% set structure = clarity.market_structure %}
+      {% set lookup = structure.kalshi_lookup %}
+      <article class="blocked-research-row">
+        <div>
+          <strong>{{ item.short_title }}</strong>
+          <p class="muted">{{ clarity.primary_block_reason }}</p>
+          <p class="muted">{{ item.market_identity.kalshi_url_status }}: {{ item.market_identity.kalshi_url_reason }}</p>
+          {% if lookup.exact_api_note %}
+          <p class="muted">{{ lookup.exact_api_note }}</p>
+          {% endif %}
+        </div>
+        <div class="mini-actions">
+          {% if item.market_identity.kalshi_url_verified %}
+          <a class="button" href="{{ item.market_identity.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+          {% endif %}
+          <a class="button" href="/opportunities/{{ item.ticker }}">Full breakdown</a>
+          <button type="button" data-copy-text="{{ item.ticker }}">Copy exact ticker</button>
+          {% if structure.component_market_ticker_text %}
+          <button type="button" data-copy-text="{{ structure.component_market_ticker_text }}">Copy component tickers</button>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="cockpit-rail">
+    <div class="mini-panel">
+      <div class="section-head compact-head">
+        <h3>Model Leaderboard</h3>
+        <a href="/leaderboard">View all</a>
+      </div>
+      {% for model in model_rows[:4] %}
+      <div class="leader-row">
+        <span class="rank-dot rank-{{ model.rank_color }}"></span>
+        <strong>{{ loop.index }}. {{ model.model_name }}</strong>
+        <span>ROI {{ model.roi or 'n/a' }}</span>
+        <small>Brier {{ model.brier_score or 'n/a' }} / Trades {{ model.trade_count }}</small>
+      </div>
+      {% else %}
+      <p>Needs more settled paper trades.</p>
+      {% endfor %}
+    </div>
+
+    <div class="mini-panel">
+      <h3>Best Payout Preview</h3>
+      {% for row in best_payouts[:3] %}
+      <p>
+        <strong>{{ row.market }}</strong><br>
+        <span class="muted">EV {{ row.expected_value }} / ratio {{ row.payout_to_risk_ratio }}</span>
+      </p>
+      {% else %}
+      <p>Needs more acceptable payout-adjusted rows.</p>
+      {% endfor %}
+    </div>
+
+    <div class="mini-panel">
+      <h3>Research Assistant</h3>
+      {% for item in research_summary.top_opportunities[:3] %}
+      <p>
+        <strong>{{ item.evidence.short_market_name }}</strong><br>
+        <span class="muted">{{ item.narrative.primary_driver }}</span>
+      </p>
+      {% else %}
+      <p>Needs ranked opportunities before research writeups appear.</p>
+      {% endfor %}
+      <a class="button" href="/research">Open research</a>
+    </div>
+  </aside>
+</section>
+{% endblock %}

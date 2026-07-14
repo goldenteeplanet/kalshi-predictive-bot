@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Model Confidence{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>Model Confidence Engine</h1>
+    <p>Settled forecast calibration, paper P&L, sample size, and dynamic `ensemble_v2` weights.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Paper evidence</span>
+    <a class="button" href="{{ report_links.model_confidence }}">Confidence report</a>
+  </div>
+</section>
+
+<section class="section-band">
+  {% if rows %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Model</th>
+          <th>Settled</th>
+          <th>Brier</th>
+          <th>Win rate</th>
+          <th>ROI</th>
+          <th>Score</th>
+          <th>Label</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>{{ row.category }}</td>
+          <td>{{ row.model_name }}</td>
+          <td>{{ row.settled_trade_count }}</td>
+          <td>{{ row.brier_score or 'n/a' }}</td>
+          <td>{{ row.win_rate or 'n/a' }}</td>
+          <td>{{ row.roi_on_exposure or 'n/a' }}</td>
+          <td>{{ row.confidence_score }}</td>
+          <td>{{ row.confidence_label }}</td>
+          <td class="wide">{{ row.notes }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No model confidence scores yet. Run `kalshi-bot model-confidence` after paper outcomes settle.</div>
+  {% endif %}
+</section>
+{% endblock %}
+

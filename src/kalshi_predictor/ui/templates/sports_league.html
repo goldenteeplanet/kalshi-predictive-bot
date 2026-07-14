@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ league }} Sports Intelligence{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>{{ league }} Sports Intelligence</h1>
+    <p>League-filtered games, links, signals, and paper/demo sports opportunity context.</p>
+  </div>
+  <div class="hero-status">
+    <a class="button" href="/sports">All sports</a>
+    <a class="button" href="{{ report_links.sports_report }}">Sports report</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Games</span><strong>{{ summary.games }}</strong></div>
+  <div><span>Linked Markets</span><strong>{{ summary.links }}</strong></div>
+  <div><span>Feature Rows</span><strong>{{ summary.features }}</strong></div>
+  <div><span>Signals</span><strong>{{ summary.signals }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>{{ league }} Games</h2>
+      <p class="muted">Recent and upcoming games available in the local sports database.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Scheduled</th>
+          <th>Game</th>
+          <th>Status</th>
+          <th>Venue</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for game in latest_games %}
+        <tr>
+          <td>{{ game.scheduled_at or 'n/a' }}</td>
+          <td class="wide"><a href="/sports/games/{{ game.game_key }}">{{ game.away_team_key }} at {{ game.home_team_key }}</a></td>
+          <td>{{ game.status }}</td>
+          <td>{{ game.venue or 'n/a' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">No {{ league }} games yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <h2>{{ league }} Opportunities</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Market</th>
+          <th>Signal</th>
+          <th>Probability</th>
+          <th>Edge</th>
+          <th>Kalshi</th>
+          <th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in opportunities %}
+        <tr>
+          <td><a href="/opportunities/{{ row.ticker }}">{{ row.ticker }}</a></td>
+          <td class="wide">{{ row.market }}</td>
+          <td>{{ row.signal_name }} {{ row.signal_strength }}</td>
+          <td>{{ row.sports_probability }}</td>
+          <td>{{ row.edge }}</td>
+          <td>
+            {% if row.kalshi_url_verified %}
+            <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            {% else %}
+            <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+            <small>{{ row.kalshi_url_reason }}</small>
+            {% endif %}
+          </td>
+          <td>{{ row.recommendation }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No {{ league }} sports opportunities yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

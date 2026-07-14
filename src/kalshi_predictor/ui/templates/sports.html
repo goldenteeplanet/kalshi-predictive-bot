@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Sports Intelligence{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>Sports Intelligence</h1>
+    <p>Local sports games, market links, feature edges, sports signals, and paper/demo context.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Manual / Public Free</span>
+    <span class="badge badge-info">Paper / Demo Only</span>
+    <form data-action method="post" action="/reports/sports-report">
+      <button type="submit">Write report</button>
+    </form>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Teams</span><strong>{{ summary.teams }}</strong></div>
+  <div><span>Games</span><strong>{{ summary.games }}</strong></div>
+  <div><span>Linked Markets</span><strong>{{ summary.links }}</strong></div>
+  <div><span>Feature Rows</span><strong>{{ summary.features }}</strong></div>
+  <div><span>Sports Signals</span><strong>{{ summary.signals }}</strong></div>
+</section>
+
+<section class="grid two">
+  <div class="section-band">
+    <h2>Leagues</h2>
+    <div class="stats-grid compact-stats">
+      {% for league_name, count in summary.league_counts.items() %}
+      <a href="/sports/leagues/{{ league_name }}"><span>{{ league_name }}</span><strong>{{ count }}</strong></a>
+      {% else %}
+      <div><span>Status</span><strong>Needs data</strong></div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="section-band">
+    <h2>Latest Sports Signals</h2>
+    <ul class="checks">
+      {% for signal in latest_signals[:8] %}
+      <li>
+        <strong>{{ signal.signal_name }}</strong>
+        {{ signal.ticker }} / {{ signal.league }} / confidence {{ signal.confidence }}
+      </li>
+      {% else %}
+      <li>No sports signals generated yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Latest Games</h2>
+      <p class="muted">Games ingested from manual JSON/CSV or future public/free adapters.</p>
+    </div>
+    <a class="button" href="{{ report_links.sports_opportunities }}">Sports opportunities</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>League</th>
+          <th>Scheduled</th>
+          <th>Game</th>
+          <th>Status</th>
+          <th>Venue</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for game in latest_games %}
+        <tr>
+          <td><a href="/sports/leagues/{{ game.league }}">{{ game.league }}</a></td>
+          <td>{{ game.scheduled_at or 'n/a' }}</td>
+          <td class="wide"><a href="/sports/games/{{ game.game_key }}">{{ game.away_team_key }} at {{ game.home_team_key }}</a></td>
+          <td>{{ game.status }}</td>
+          <td>{{ game.venue or 'n/a' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No sports games have been ingested yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Linked Sports Markets</h2>
+      <p class="muted">Market-to-game links built from league, team, market type, and schedule clues.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>League</th>
+          <th>Type</th>
+          <th>Confidence</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for link in latest_links %}
+        <tr>
+          <td><a href="/opportunities/{{ link.ticker }}">{{ link.ticker }}</a></td>
+          <td>{{ link.league }}</td>
+          <td>{{ link.market_type }}</td>
+          <td>{{ link.confidence }}</td>
+          <td class="wide">{{ link.reason }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No linked sports markets yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Top Sports Opportunities</h2>
+      <p class="muted">Requires sports links, sports features, and sports_v1 forecasts.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>League</th>
+          <th>Market</th>
+          <th>Signal</th>
+          <th>Probability</th>
+          <th>Edge</th>
+          <th>Kalshi</th>
+          <th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in opportunities %}
+        <tr>
+          <td><a href="/opportunities/{{ row.ticker }}">{{ row.ticker }}</a></td>
+          <td>{{ row.league }}</td>
+          <td class="wide">{{ row.market }}</td>
+          <td>{{ row.signal_name }} {{ row.signal_strength }}</td>
+          <td>{{ row.sports_probability }}</td>
+          <td>{{ row.edge }}</td>
+          <td>
+            {% if row.kalshi_url_verified %}
+            <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            {% else %}
+            <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+            <small>{{ row.kalshi_url_reason }}</small>
+            {% endif %}
+          </td>
+          <td>{{ row.recommendation }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8">No sports-driven opportunities yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

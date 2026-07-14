@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+{% block title %}Institutional Dashboard{% endblock %}
+{% block content %}
+<section class="section-band institutional-header">
+  <div class="section-head">
+    <div>
+      <h1>Institutional Cockpit</h1>
+      <p class="muted">Read-only market, risk, execution, settlement, and research state.</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-info">{{ snapshot.dashboard_mode }}</span>
+      <span class="badge badge-info">{{ snapshot.execution_mode }}</span>
+      <a class="button" href="/api/dashboard/v1/snapshots/current">Snapshot JSON</a>
+      <a class="button" href="/api/dashboard/v1/export/snapshot.csv">CSV export</a>
+      <a class="button" href="/reports/institutional_dashboard.md">Report</a>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Snapshot</span><strong>{{ snapshot.snapshot_id }}</strong></div>
+    <div><span>As of</span><strong>{{ snapshot.generated_at }}</strong></div>
+    <div><span>Data watermark</span><strong>{{ snapshot.cross_panel_skew.newest_watermark or 'n/a' }}</strong></div>
+    <div><span>Effective query</span><strong>{{ snapshot.effective_as_of }}</strong></div>
+    <div><span>Freshness</span><strong>{{ snapshot.freshness_status }}</strong></div>
+    <div><span>Completeness</span><strong>{{ snapshot.completeness_status }}</strong></div>
+    <div><span>Consistency</span><strong>{{ snapshot.consistency_mode }}</strong></div>
+    <div>
+      <span>Cross-panel skew</span>
+      <strong>
+        {{ snapshot.cross_panel_skew.value_seconds if snapshot.cross_panel_skew.value_seconds is not none else 'n/a' }}
+        {{ snapshot.cross_panel_skew.unit }}
+      </strong>
+    </div>
+    <div><span>Skew pair</span><strong>{{ snapshot.cross_panel_skew.oldest_source_id or 'n/a' }} -> {{ snapshot.cross_panel_skew.newest_source_id or 'n/a' }}</strong></div>
+    <div><span>Reconciliation</span><strong>{{ snapshot.reconciliation.status }}</strong></div>
+    <div><span>Phase 3T gate</span><strong>{{ snapshot.phase_3t_gate.status }}</strong></div>
+    <div><span>Certification time</span><strong>{{ snapshot.panels.system_certification.generated_at or snapshot.panels.system_certification.completed_at or 'n/a' }}</strong></div>
+    <div><span>Trading writes</span><strong>{{ 'blocked' if snapshot.read_only_boundary.read_only else 'review' }}</strong></div>
+  </div>
+  {% if snapshot.warnings %}
+  <div class="signal-callout health-warning">
+    <strong>Dashboard warnings</strong>
+    <span>{{ snapshot.warnings | join('; ') }}</span>
+  </div>
+  {% endif %}
+</section>
+
+<section class="section-band compact-band sticky-status">
+  <div class="section-head">
+    <div>
+      <h2>Portfolio And Risk Ribbon</h2>
+      <p class="muted">Authoritative local paper ledger and Phase 3N status.</p>
+    </div>
+    <a class="button" href="/api/dashboard/v1/query/risk-limits">Risk API</a>
+  </div>
+  {% set kpi = snapshot.panels.kpi_ribbon %}
+  <div class="status-grid">
+    <div><span>Net P&L</span><strong>{{ kpi.net_pnl }}</strong></div>
+    <div><span>Realized</span><strong>{{ kpi.realized_pnl }}</strong></div>
+    <div><span>Unrealized</span><strong>{{ kpi.unrealized_pnl }}</strong></div>
+    <div><span>Open positions</span><strong>{{ kpi.open_positions }}</strong></div>
+    <div><span>Open orders</span><strong>{{ kpi.open_orders }}</strong></div>
+    <div><span>Risk decisions</span><strong>{{ kpi.risk_decisions }}</strong></div>
+    <div><span>Blocked</span><strong>{{ kpi.risk_blocked }}</strong></div>
+    <div><span>Warnings</span><strong>{{ kpi.warnings }}</strong></div>
+  </div>
+</section>
+
+<section class="institutional-grid">
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>Market Heat Map</h2>
+        <p class="muted">Category and model dislocation cells. Missing cells are not interpolated.</p>
+      </div>
+      <a class="button" href="/api/dashboard/v1/query/heatmap">API</a>
+    </div>
+    <div class="heatmap-grid" role="table" aria-label="Market heat map table alternative">
+      {% for row in snapshot.panels.market_heatmap %}
+      <div class="heat-cell" role="row">
+        <span>{{ row.category }}</span>
+        <strong>{{ row.avg_opportunity_score }}</strong>
+        <small>{{ row.model }} · {{ row.markets }} markets · spread {{ row.avg_spread }}</small>
+      </div>
+      {% else %}
+      <p class="muted">No ranked market cells are available.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>Opportunity Scanner</h2>
+        <p class="muted">Market price, model probability, score, liquidity, and Phase 3N decision.</p>
+      </div>
+      <a class="button" href="/api/dashboard/v1/query/opportunities">API</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ticker</th><th>Model</th><th>Score</th><th>Edge</th><th>Spread</th><th>Kalshi</th><th>3N</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in snapshot.panels.opportunity_scanner %}
+          <tr>
+            <td><a href="/opportunities/{{ row.ticker }}">{{ row.ticker }}</a></td>
+            <td>{{ row.model }}</td>
+            <td>{{ row.opportunity_score }}</td>
+            <td>{{ row.edge }}</td>
+            <td>{{ row.spread }}</td>
+            <td>
+              {% if row.kalshi_url_verified %}
+              <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open</a>
+              {% else %}
+              <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+              {% endif %}
+            </td>
+            <td>{{ row.phase_3n_action }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7">No current opportunities matched the filters.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>Exposure Maps</h2>
+        <p class="muted">Paper exposure by current position and category.</p>
+      </div>
+      <a class="button" href="/api/dashboard/v1/query/exposures">API</a>
+    </div>
+    <div class="status-grid">
+      <div><span>Total exposure</span><strong>{{ snapshot.panels.exposure_maps.total_exposure }}</strong></div>
+      <div><span>Positions</span><strong>{{ snapshot.panels.exposure_maps.positions | length }}</strong></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ticker</th><th>Category</th><th>Size</th><th>Exposure</th></tr></thead>
+        <tbody>
+          {% for row in snapshot.panels.exposure_maps.positions[:8] %}
+          <tr>
+            <td>{{ row.ticker }}</td><td>{{ row.category }}</td>
+            <td>{{ row.position_size }}</td><td>{{ row.exposure }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4">No paper exposure is open.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>Model Matrix</h2>
+        <p class="muted">Forecast count, ROI, win rate, and sample-support warnings.</p>
+      </div>
+      <a class="button" href="/api/dashboard/v1/query/model-matrix">API</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Model</th><th>Forecasts</th><th>Win rate</th><th>ROI</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for row in snapshot.panels.model_matrix %}
+          <tr>
+            <td>{{ row.model_name }}</td><td>{{ row.forecast_count }}</td>
+            <td>{{ row.win_rate }}</td><td>{{ row.roi }}</td><td>{{ row.status }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="institutional-grid">
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>Risk Waterfall</h2>
+        <p class="muted">Phase 3M proposal and Phase 3N final authority remain distinct.</p>
+      </div>
+      <a class="button" href="/api/dashboard/v1/query/risk-limits">API</a>
+    </div>
+    {% set risk = snapshot.panels.risk_waterfall %}
+    <div class="status-grid">
+      <div><span>Mode</span><strong>{{ risk.mode }}</strong></div>
+      <div><span>Allow</span><strong>{{ risk.allow_count }}</strong></div>
+      <div><span>Reduce</span><strong>{{ risk.reduce_count }}</strong></div>
+      <div><span>Block</span><strong>{{ risk.block_count }}</strong></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>Ticker</th><th>Action</th><th>3M</th><th>Executed</th></tr></thead>
+        <tbody>
+          {% for row in risk.recent_decisions[:8] %}
+          <tr>
+            <td>{{ row.decision_timestamp }}</td><td>{{ row.ticker }}</td>
+            <td>{{ row.action }}</td><td>{{ row.phase_3m_proposed_contracts }}</td>
+            <td>{{ row.executed_contracts }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5">No Phase 3N decisions recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>Trade And Settlement Blotter</h2>
+        <p class="muted">Paper, live, provisional, and final evidence remain labeled.</p>
+      </div>
+      <a class="button" href="/api/dashboard/v1/query/trades">API</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Trade</th><th>Ticker</th><th>Mode</th><th>Status</th><th>Evidence</th></tr></thead>
+        <tbody>
+          {% for row in snapshot.panels.trade_blotter[:10] %}
+          <tr>
+            <td>{{ row.trade_id }}</td><td>{{ row.ticker }}</td>
+            <td>{{ row.execution_mode }}</td><td>{{ row.status }}</td><td>{{ row.evidence_type }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5">No paper or memory trades are available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>Live Readiness</h2>
+        <p class="muted">Phase 3V governance state. No exchange write path is exposed here.</p>
+      </div>
+      <a class="button" href="/live-readiness">Open</a>
+    </div>
+    {% set ready = snapshot.panels.live_readiness %}
+    <div class="status-grid">
+      <div><span>Decision</span><strong>{{ ready.decision }}</strong></div>
+      <div><span>Stage</span><strong>{{ ready.target_stage }}</strong></div>
+      <div><span>Score</span><strong>{{ ready.diagnostic_score }}</strong></div>
+      <div><span>Blockers</span><strong>{{ ready.critical_blockers }}</strong></div>
+      <div><span>Certificate</span><strong>{{ ready.certificate }}</strong></div>
+      <div><span>Order create</span><strong>{{ 'blocked' if not ready.allow_order_create else 'review' }}</strong></div>
+    </div>
+  </div>
+
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>System Certification</h2>
+        <p class="muted">Phase 3W audit status. This report does not authorize live trading.</p>
+      </div>
+      <a class="button" href="/system-certification">Open</a>
+    </div>
+    {% set cert = snapshot.panels.system_certification %}
+    <div class="status-grid">
+      <div><span>Status</span><strong>{{ cert.overall_status }}</strong></div>
+      <div><span>Mode</span><strong>{{ cert.mode }}</strong></div>
+      <div><span>Phases</span><strong>{{ cert.phase_count }}</strong></div>
+      <div><span>Connections</span><strong>{{ cert.connection_count }}</strong></div>
+      <div><span>Live authorized</span><strong>NO</strong></div>
+      <div><span>Order create</span><strong>{{ 'blocked' if not cert.allow_order_create else 'review' }}</strong></div>
+    </div>
+  </div>
+</section>
+
+<section class="institutional-grid">
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>System Health And Freshness</h2>
+        <p class="muted">Every source keeps row count, watermark, freshness, and completeness.</p>
+      </div>
+      <a class="button" href="/api/dashboard/v1/query/system-health">API</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th><th>State</th><th>Enabled</th><th>Rows</th><th>Last attempt</th>
+            <th>Last success</th><th>Data watermark</th><th>Freshness</th><th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for source in snapshot.source_watermarks %}
+          <tr>
+            <td>{{ source.source_name }}<br><small>{{ source.source_id }}</small></td>
+            <td>{{ source.requirement_state }}<br><small>{{ source.lifecycle_state }}</small></td>
+            <td>{{ source.enabled }}</td>
+            <td>{{ source.row_count }}</td>
+            <td>{{ source.last_attempt_at or 'n/a' }}</td>
+            <td>{{ source.last_success_at or 'n/a' }}</td>
+            <td>{{ source.data_watermark or 'n/a' }}</td>
+            <td>{{ source.freshness_status }}<br><small>{{ source.freshness_threshold_seconds }}s threshold</small></td>
+            <td>{{ source.error or source.warning or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel institutional-panel">
+    <div class="section-head">
+      <div>
+        <h2>Research Layers</h2>
+        <p class="muted">Phase 3P journal, 3Q discovery, 3R synthetic, and 3S policy status.</p>
+      </div>
+      <a class="button" href="/api/dashboard/v1/query/research">API</a>
+    </div>
+    {% set research = snapshot.panels.research_layers %}
+    <div class="status-grid">
+      <div><span>3P Journal</span><strong>{{ research.phase_3p.status }}</strong></div>
+      <div><span>3Q Runs</span><strong>{{ research.phase_3q.run_count }}</strong></div>
+      <div><span>3R Status</span><strong>{{ research.phase_3r.latest_status }}</strong></div>
+      <div><span>3S Status</span><strong>{{ research.phase_3s.latest_status }}</strong></div>
+    </div>
+    <div class="signal-callout health-info">
+      <strong>{{ research.phase_3r.synthetic_label }}</strong>
+      <span>Phase 3S PROCEED is displayed as a recommendation, not an order.</span>
+    </div>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Panel Registry</h2>
+      <p class="muted">Versioned source, metric, freshness, and drill-down contracts.</p>
+    </div>
+    <span class="badge badge-info">{{ snapshot.panel_registry_version }}</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Panel</th><th>Type</th><th>Criticality</th><th>Sources</th><th>Drilldown</th></tr></thead>
+      <tbody>
+        {% for panel in snapshot.panel_registry %}
+        <tr>
+          <td>{{ panel.title }}</td><td>{{ panel.panel_type }}</td><td>{{ panel.criticality }}</td>
+          <td>{{ panel.sources | join(', ') }}</td><td>{{ panel.drilldown }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

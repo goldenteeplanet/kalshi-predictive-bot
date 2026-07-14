@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Signal: {{ card.signal_name }}{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>{{ card.signal_name }}</h1>
+    <p>{{ signal.description }}</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">{{ card.category }}</span>
+    <span class="badge badge-info">{{ card.status }}</span>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>ROI</span><strong>{{ card.roi or 'n/a' }}</strong></div>
+  <div><span>Win Rate</span><strong>{{ card.win_rate or 'n/a' }}</strong></div>
+  <div><span>Forecasts</span><strong>{{ card.forecast_count }}</strong></div>
+  <div><span>Trades</span><strong>{{ card.trade_count }}</strong></div>
+  <div><span>Confidence</span><strong>{{ card.confidence_score or 'n/a' }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Performance</h2>
+      <p class="muted">{{ research_summary }}</p>
+    </div>
+  </div>
+  <div class="stats-grid">
+    <div><span>Total P&L</span><strong>{{ card.total_pnl or 'n/a' }}</strong></div>
+    <div><span>Brier Score</span><strong>{{ card.brier_score or 'n/a' }}</strong></div>
+    <div><span>Average Edge</span><strong>{{ card.avg_edge or 'n/a' }}</strong></div>
+    <div><span>Average Opportunity Score</span><strong>{{ card.avg_opportunity_score or 'n/a' }}</strong></div>
+    <div><span>Settled Trades</span><strong>{{ card.settled_trade_count }}</strong></div>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="section-band">
+    <h2>Recent Opportunities</h2>
+    <ul class="checks">
+      {% for row in recent_opportunities %}
+      <li>
+        {{ row.ticker }} / {{ row.model_name }} / score {{ row.score }} / edge {{ row.edge or 'n/a' }}
+        {% if row.kalshi_url_verified %}
+        <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+        {% else %}
+        <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+        <small>{{ row.kalshi_url_reason }}</small>
+        {% endif %}
+      </li>
+      {% else %}
+      <li>No recent opportunities attributed yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="section-band">
+    <h2>Recent Trades</h2>
+    <ul class="checks">
+      {% for row in recent_trades %}
+      <li>{{ row.ticker }} {{ row.side }} x{{ row.quantity }} edge {{ row.edge }} / {{ row.status }}</li>
+      {% else %}
+      <li>No recent paper trades attributed yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="section-band">
+    <h2>Top Performing Markets</h2>
+    <ul class="checks">
+      {% for row in top_markets %}
+      <li>{{ row.ticker }} / edge {{ row.edge }} / {{ row.model_name }}</li>
+      {% else %}
+      <li>No market performance rows yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="section-band">
+    <h2>Worst Performing Markets</h2>
+    <ul class="checks">
+      {% for row in worst_markets %}
+      <li>{{ row.ticker }} / edge {{ row.edge }} / {{ row.model_name }}</li>
+      {% else %}
+      <li>No market performance rows yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section-band">
+  <h2>Recent Markets</h2>
+  <div class="signal-badges">
+    {% for ticker in recent_markets %}
+    <span class="factor factor-info">{{ ticker }}</span>
+    {% else %}
+    <span class="muted">No recent markets attributed yet.</span>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

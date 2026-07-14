@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Personal AI Trader{% endblock %}
+{% block content %}
+<section class="institutional-header">
+  <div>
+    <p class="eyebrow">Phase 3U</p>
+    <h1>Personal AI Trader</h1>
+    <p>Advisory-only ranked brief. No orders, demo execution, or live execution are available here.</p>
+  </div>
+  <div class="status-cluster">
+    <span class="badge badge-demo">{{ brief.execution_mode }}</span>
+    <span class="badge">Schema {{ brief.schema_version }}</span>
+    <span class="badge">Rank {{ brief.ranking_policy_version }}</span>
+  </div>
+</section>
+
+<section class="dashboard-grid">
+  <article class="panel span-2">
+    <div class="panel-header">
+      <h2>Today's Trade Brief</h2>
+      <form method="post" action="/reports/personal-trader">
+        <button type="submit">Write report</button>
+      </form>
+    </div>
+    <pre class="code-block">{{ conversation }}</pre>
+  </article>
+
+  <article class="panel">
+    <h2>Summary</h2>
+    <div class="metric-list">
+      <div><span>Markets scanned</span><strong>{{ brief.summary.markets_scanned }}</strong></div>
+      <div><span>Candidates</span><strong>{{ brief.summary.candidates_considered }}</strong></div>
+      <div><span>Eligible</span><strong>{{ brief.summary.eligible_count }}</strong></div>
+      <div><span>Recommended</span><strong>{{ brief.summary.recommended_count }}</strong></div>
+      <div><span>No trade</span><strong>{{ brief.no_trade.active }}</strong></div>
+    </div>
+  </article>
+</section>
+
+<section class="panel">
+  <h2>Recommendations</h2>
+  {% if brief.recommendations %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Market</th>
+            <th>Side</th>
+            <th>Size</th>
+            <th>Net EV</th>
+            <th>Risk LCB</th>
+            <th>Expires</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for card in brief.recommendations %}
+            <tr>
+              <td>{{ card.slate_rank }}</td>
+              <td>{{ card.market.market_ticker }}</td>
+              <td>{{ card.market.side }}</td>
+              <td>{{ card.economics.approved_quantity }}</td>
+              <td>{{ card.economics.expected_net_ev_total }}</td>
+              <td>{{ card.economics.risk_adjusted_ev_lcb_total }}</td>
+              <td>{{ card.timing.recommendation_expires_at }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty-state">Trade nothing right now. {{ brief.no_trade.message }}</p>
+  {% endif %}
+</section>
+
+<section class="dashboard-grid">
+  <article class="panel">
+    <h2>Rejection Summary</h2>
+    <div class="metric-list">
+      {% for key, value in brief.rejection_summary.items() %}
+        <div><span>{{ key }}</span><strong>{{ value }}</strong></div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel">
+    <h2>Risk Boundary</h2>
+    <div class="metric-list">
+      <div><span>Advisory only</span><strong>true</strong></div>
+      <div><span>Order create</span><strong>false</strong></div>
+      <div><span>Demo execute</span><strong>false</strong></div>
+      <div><span>Live execute</span><strong>false</strong></div>
+      <div><span>Risk override</span><strong>false</strong></div>
+    </div>
+  </article>
+</section>
+
+<section class="panel">
+  <h2>Watchlist And Rejections</h2>
+  {% if brief.watchlist %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Market</th>
+            <th>Status</th>
+            <th>Side</th>
+            <th>Reasons</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in brief.watchlist %}
+            <tr>
+              <td>{{ row.market_id }}</td>
+              <td>{{ row.status }}</td>
+              <td>{{ row.side }}</td>
+              <td>{{ row.reason_codes | join(", ") }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty-state">No watchlist rows.</p>
+  {% endif %}
+</section>
+
+<section class="dashboard-grid">
+  <article class="panel">
+    <h2>Source Health</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Status</th>
+            <th>As of</th>
+            <th>Lag ms</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in brief.source_health %}
+            <tr>
+              <td>{{ row.source }}</td>
+              <td>{{ row.status }}</td>
+              <td>{{ row.as_of }}</td>
+              <td>{{ row.lag_ms }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="panel">
+    <h2>Recent Audit Events</h2>
+    {% if audit_events %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Event</th>
+              <th>Candidate</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in audit_events %}
+              <tr>
+                <td>{{ row.created_at }}</td>
+                <td>{{ row.event_type }}</td>
+                <td>{{ row.candidate_id or "n/a" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="empty-state">No persisted advisory events yet.</p>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

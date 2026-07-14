@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+{% block title %}{{ detail.title }}{% endblock %}
+{% block content %}
+{% set item = detail.opportunity %}
+{% set clarity = item.decision_clarity if item else none %}
+{% set identity = item.market_identity if item else none %}
+{% set lookup = clarity.market_structure.kalshi_lookup if clarity else none %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>{{ clarity.market_structure.clean_title if clarity else detail.title }}</h1>
+    <p class="ticker-line">{{ detail.ticker }}</p>
+    {% if lookup %}
+    <div class="market-action-row">
+      {% if lookup.event_api_url %}
+      <a class="button" href="{{ lookup.event_api_url }}" target="_blank" rel="noopener">
+        Open combo event API
+      </a>
+      {% endif %}
+      {% if lookup.api_url %}
+      <a class="button" href="{{ lookup.api_url }}" target="_blank" rel="noopener">
+        Check exact API status
+      </a>
+      {% endif %}
+      {% if identity and identity.kalshi_url_verified %}
+      <a class="button primary" href="{{ identity.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+      {% elif identity %}
+      <span class="badge badge-caution">{{ identity.kalshi_url_status }}</span>
+      {% endif %}
+      <button type="button" class="button" data-copy-text="{{ detail.ticker }}">Copy exact ticker</button>
+      {% if clarity and clarity.market_structure.component_market_ticker_text %}
+      <button type="button" class="button" data-copy-text="{{ clarity.market_structure.component_market_ticker_text }}">
+        Copy component tickers
+      </button>
+      {% endif %}
+      {% if clarity and clarity.market_structure.kalshi_search_query %}
+      <button type="button" class="button" data-copy-text="{{ clarity.market_structure.kalshi_search_query }}">
+        Copy search text
+      </button>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if clarity and clarity.market_structure.is_unsupported %}
+    <div class="market-lookup-summary detail-lookup-summary">
+      <span class="eyebrow">Kalshi lookup title</span>
+      <strong>{{ clarity.market_structure.kalshi_search_title }}</strong>
+      <p class="muted">{{ clarity.market_structure.lookup_guidance }}</p>
+      {% if lookup and lookup.exact_api_note %}
+      <p class="muted">{{ lookup.exact_api_note }}</p>
+      {% endif %}
+      {% if lookup and lookup.web_search_note %}
+      <p class="muted">{{ lookup.web_search_note }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+    <details class="market-details inline-details">
+      <summary>View full stored Kalshi title and lookup IDs</summary>
+      <p>{{ detail.title }}</p>
+      {% if clarity %}
+      <dl class="compact-dl lookup-dl">
+        <dt>Market ticker</dt><dd>{{ detail.ticker }}</dd>
+        <dt>Event ticker</dt><dd>{{ clarity.market_structure.event_ticker or 'n/a' }}</dd>
+        <dt>Series ticker</dt><dd>{{ clarity.market_structure.series_ticker or 'n/a' }}</dd>
+        <dt>Parser status</dt><dd>{{ clarity.market_structure.parser_label }}</dd>
+        {% if identity %}
+        <dt>Link status</dt><dd>{{ identity.kalshi_url_status }}</dd>
+        <dt>Kalshi URL</dt>
+        <dd>
+          {% if identity.kalshi_url_verified %}
+          <a href="{{ identity.kalshi_url }}" target="_blank" rel="noopener">{{ identity.kalshi_url }}</a>
+          {% else %}
+          {{ identity.kalshi_url_reason }}
+          {% endif %}
+        </dd>
+        <dt>Catalog seen</dt><dd>{{ identity.catalog_last_seen_at or 'n/a' }}</dd>
+        {% endif %}
+      </dl>
+      {% endif %}
+    </details>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Demo Only</span>
+    <span class="badge badge-info">Dry Run</span>
+    <a class="button primary" href="/execution/review/{{ detail.ticker }}">Execution review</a>
+  </div>
+</section>
+
+{% if item %}
+<section class="section-band decision-summary-band">
+  <div class="section-head">
+    <div>
+      <h2>Decision Summary</h2>
+      <p class="muted">Model signal, execution quality, risk gating, and final action are separated.</p>
+    </div>
+    <span class="badge badge-{{ clarity.final_decision_kind }}">{{ clarity.final_decision }}</span>
+  </div>
+  <div class="decision-summary-grid">
+    <div><span>Final Decision</span><strong>{{ clarity.final_decision }}</strong></div>
+    <div><span>Model Direction</span><strong>{{ clarity.model_direction }}</strong></div>
+    <div>
+      <span>Execution Quality</span>
+      <strong>{{ clarity.execution_quality }}</strong>
+      <small>{{ clarity.final_action_label }}</small>
+    </div>
+    <div><span>Primary Block Reason</span><strong>{{ clarity.primary_block_reason }}</strong></div>
+  </div>
+  {% if clarity.secondary_block_reasons %}
+  <div class="reason-list compact-reasons">
+    <h3>Secondary Block Reasons</h3>
+    <ul>
+      {% for reason in clarity.secondary_block_reasons %}
+      <li>{{ reason }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <div class="gate-chip-row">
+    {% for chip in clarity.gate_chips %}
+    <span class="badge badge-{{ chip.kind }}">{{ chip.label }}: {{ chip.value }}</span>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Decision Waterfall</h2>
+      <p class="muted">Price, model probability, edge, execution quality, and risk gates in order.</p>
+    </div>
+  </div>
+  <ol class="decision-waterfall detail-waterfall">
+    {% for step in clarity.decision_waterfall %}
+    <li class="waterfall-{{ step.kind }}">
+      <span>{{ step.label }}</span>
+      <strong>{{ step.value }}</strong>
+      {% if step.detail %}<small>{{ step.detail }}</small>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="summary-grid">
+  <div><span>Market price</span><strong>{{ clarity.formats.market_price }}</strong></div>
+  <div><span>Model probability</span><strong>{{ clarity.formats.model_probability }}</strong></div>
+  <div><span>Edge</span><strong>{{ clarity.formats.edge }}</strong></div>
+  <div><span>Expected value</span><strong>{{ clarity.formats.expected_value }}</strong></div>
+  <div><span>Score</span><strong>{{ clarity.formats.score }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div
+    class="payout-calculator"
+    data-payout-calculator
+    data-side="{{ item.side }}"
+    data-price="{{ item.price }}"
+  >
+    <div class="section-head">
+      <div>
+        <h2>Hypothetical Payout Calculator</h2>
+        <p class="muted">
+          Estimate contracts, payout, profit, and max loss for {{ item.recommendation_label }}
+          at {{ item.price }}. This is paper-only and before fees.
+        </p>
+      </div>
+      <label class="payout-input-label">
+        Amount to test
+        <input type="number" min="1" step="1" value="100" data-payout-input>
+      </label>
+    </div>
+    <div class="payout-result-grid detail-payout-grid">
+      <div><span>Contracts</span><strong data-payout-contracts>--</strong></div>
+      <div><span>Cost used</span><strong data-payout-cost>--</strong></div>
+      <div><span>Unused cash</span><strong data-payout-unused>--</strong></div>
+      <div><span>Gross if correct</span><strong data-payout-gross>--</strong></div>
+      <div><span>Profit if correct</span><strong data-payout-profit>--</strong></div>
+      <div><span>Max loss</span><strong data-payout-loss>--</strong></div>
+      <div><span>Return if correct</span><strong data-payout-roi>--</strong></div>
+      <div><span>Break-even probability</span><strong data-payout-breakeven>--</strong></div>
+    </div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="explain-grid detail-explain">
+    <div>
+      <h2>Why This Looks Interesting</h2>
+      <ul class="checks">
+        {% for reason in clarity.opportunity_reasons %}
+        <li>{{ reason }}</li>
+        {% else %}
+        <li>No positive model signal is available yet.</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <h2>Why This Is Not Tradable</h2>
+      <ul class="checks">
+        {% for reason in clarity.risk_reasons %}
+        <li>{{ reason }}</li>
+        {% else %}
+        <li>No local blocker is currently recorded.</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <h2>What Would Make This Tradable?</h2>
+      <ul class="checks">
+        {% for condition in clarity.tradable_conditions %}
+        <li>{{ condition }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <h2>Category and Parser Status</h2>
+      <dl class="compact-dl">
+        <dt>Category</dt><dd>{{ clarity.market_structure.category }}</dd>
+        <dt>Confidence</dt><dd>{{ clarity.market_structure.category_confidence }}</dd>
+        <dt>Mapping reason</dt><dd>{{ clarity.market_structure.mapping_reason }}</dd>
+        <dt>Parser status</dt><dd>{{ clarity.market_structure.parser_label }}</dd>
+        {% if clarity.market_structure.unsupported_reason %}
+        <dt>Unsupported reason</dt><dd>{{ clarity.market_structure.unsupported_reason }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+</section>
+
+{% if clarity.market_structure.option_list %}
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Structured Options</h2>
+      <p class="muted">Parsed legs are listed here instead of being concatenated into the headline.</p>
+    </div>
+    <span class="badge badge-{{ 'risk' if clarity.market_structure.is_unsupported else 'good' }}">
+      {{ clarity.market_structure.parser_status }}
+    </span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Side</th><th>Option</th><th>Component market</th><th>Entity</th><th>Type</th><th>Terms</th><th>Category</th><th>Confidence</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for option in clarity.market_structure.option_list %}
+        <tr>
+          <td>{{ option.index }}</td>
+          <td>{{ option.side }}</td>
+          <td>
+            <strong>{{ option.human_label }}</strong>
+            {% if option.label != option.human_label %}<small>{{ option.label }}</small>{% endif %}
+          </td>
+          <td>
+            {% if option.component_market_ticker %}
+            <a href="{{ option.component_lookup_url }}" target="_blank" rel="noopener">
+              {{ option.component_market_ticker }}
+            </a>
+            <small>{{ option.component_event_ticker }}{% if option.component_side %} / {{ option.component_side | upper }}{% endif %}</small>
+            {% else %}
+            <span class="muted">n/a</span>
+            {% endif %}
+          </td>
+          <td>{{ option.entity }}</td>
+          <td>{{ option.market_type }}</td>
+          <td>{{ option.terms }}</td>
+          <td>{{ option.category }}</td>
+          <td>{{ option.confidence }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="section-band">
+  <details class="trace-details">
+    <summary>Trace details</summary>
+    <dl class="compact-dl trace-grid">
+      {% if identity %}
+      <dt>Market identity</dt><dd>{{ identity.kalshi_url_status }} / {{ identity.kalshi_url_reason }}</dd>
+      <dt>Source lineage</dt><dd>{{ identity.source_lineage }}</dd>
+      {% endif %}
+      {% for row in clarity.trace_details %}
+      <dt>{{ row.label }}</dt><dd>{{ row.value }}</dd>
+      {% endfor %}
+    </dl>
+  </details>
+</section>
+
+{% if item.meta_selection.available %}
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Meta Model Selection</h2>
+      <p class="muted">{{ item.meta_selection.summary }}</p>
+    </div>
+    <a class="button" href="/meta/{{ detail.ticker }}">Meta detail</a>
+  </div>
+  <div class="stats-grid">
+    <div><span>Trusted model</span><strong>{{ item.meta_selection.selected_model }}</strong></div>
+    <div><span>Trust</span><strong>{{ item.meta_selection.trust_score }}/100</strong></div>
+    <div><span>Fallback</span><strong>{{ 'yes' if item.meta_selection.fallback else 'no' }}</strong></div>
+  </div>
+</section>
+{% endif %}
+
+{% if item.forum_consensus.available %}
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Forum Consensus</h2>
+      <p class="muted">Imported aggregate signal from historically winning participants.</p>
+    </div>
+    <span class="badge {{ 'badge-caution' if item.forum_consensus.qualifies else 'badge-neutral' }}">
+      {{ item.forum_consensus.label }}
+    </span>
+  </div>
+  <div class="stats-grid">
+    <div><span>Winning participants</span><strong>{{ item.forum_consensus.winner_count }}</strong></div>
+    <div><span>Total participants</span><strong>{{ item.forum_consensus.participant_count }}</strong></div>
+    <div><span>Average win rate</span><strong>{{ item.forum_consensus.average_win_rate or 'n/a' }}</strong></div>
+    <div><span>Longshot price</span><strong>{{ item.forum_consensus.longshot_price or 'n/a' }}</strong></div>
+  </div>
+  <p>{{ item.forum_consensus.summary }}</p>
+</section>
+{% endif %}
+{% else %}
+<div class="empty">No local ranking exists for this market yet.</div>
+{% endif %}
+
+<section class="section-band">
+  <div class="tab-shell" data-tabs>
+    <div class="tab-list" role="tablist">
+      <button type="button" class="tab active" data-tab-target="forecast">Forecast</button>
+      <button type="button" class="tab" data-tab-target="market-quality">Market Quality</button>
+      <button type="button" class="tab" data-tab-target="risk-checks">Risk Checks</button>
+      <button type="button" class="tab" data-tab-target="paper-history">Paper History</button>
+      <button type="button" class="tab" data-tab-target="backtest-history">Backtest History</button>
+      <button type="button" class="tab" data-tab-target="raw-data">Raw Data</button>
+    </div>
+
+    <div class="tab-panel active" data-tab-panel="forecast">
+      <h2>Forecast</h2>
+      {% if item %}
+      <p>{{ item.model_explanation }}</p>
+      {% endif %}
+      {% if detail.forecast_history %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Model</th><th>YES forecast</th><th>Market midpoint</th></tr></thead>
+          <tbody>
+          {% for row in detail.forecast_history %}
+          <tr>
+            <td>{{ row.forecasted_at }}</td>
+            <td>{{ row.model_name }}</td>
+            <td>{{ row.yes_probability }}</td>
+            <td>{{ row.market_mid_probability }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<div class="empty">No forecasts.</div>{% endif %}
+    </div>
+
+    <div class="tab-panel" data-tab-panel="market-quality">
+      <h2>Market Quality</h2>
+      {% if item %}
+      <div class="stats-grid">
+        <div><span>Spread</span><strong>{{ clarity.formats.spread }}</strong></div>
+        <div><span>Liquidity</span><strong>{{ clarity.formats.liquidity }}</strong></div>
+        <div><span>Time remaining</span><strong>{{ clarity.formats.time_remaining }}</strong></div>
+        <div><span>Data Freshness</span><strong>{{ item.data_freshness }}</strong></div>
+      </div>
+      {% endif %}
+      <h3>Latest Orderbook</h3>
+      <dl>
+        {% for key, value in detail.orderbook_summary.items() %}
+        <dt>{{ key }}</dt><dd>{{ value }}</dd>
+        {% endfor %}
+      </dl>
+    </div>
+
+    <div class="tab-panel" data-tab-panel="risk-checks">
+      <h2>Risk Checks</h2>
+      <ul class="checks">
+        {% for check in detail.risk_checks %}
+        <li class="{{ 'pass' if check.passed else 'fail' }}">{{ check.name }}: {{ check.detail }}</li>
+        {% endfor %}
+      </ul>
+      {% if item and item.risks %}
+      <h3>Plain-English risks</h3>
+      <ul class="checks">
+        {% for risk in item.risks %}
+        <li>{{ risk }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+
+    <div class="tab-panel" data-tab-panel="paper-history">
+      <h2>Paper History</h2>
+      <div class="grid two">
+        <div>
+          <h3>Paper P&L</h3>
+          {% for row in detail.paper_pnl %}
+          <p>{{ row.calculated_at }}: {{ row.total_pnl }}</p>
+          {% else %}<div class="empty">No paper P&L rows.</div>{% endfor %}
+        </div>
+        <div>
+          <h3>Recent Fills</h3>
+          {% for row in detail.recent_fills %}
+          <p>{{ row.filled_at }} {{ row.side }} {{ row.quantity }} @ {{ row.price }}</p>
+          {% else %}<div class="empty">No simulated fills.</div>{% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-tab-panel="backtest-history">
+      <h2>Backtest History</h2>
+      {% for row in detail.backtest_history %}
+      <p>{{ row.simulated_at }} {{ row.model_name }} {{ row.side }} P&L {{ row.pnl }}</p>
+      {% else %}<div class="empty">No backtest rows.</div>{% endfor %}
+    </div>
+
+    <div class="tab-panel" data-tab-panel="raw-data">
+      <h2>Advanced / Raw Data</h2>
+      <details class="raw-data">
+        <summary>Show raw feature JSON and market rules</summary>
+        <h3>Market Rules</h3>
+        <pre>{{ detail.rules }}</pre>
+        <h3>Model Components</h3>
+        <pre>{{ detail.component_probabilities }}</pre>
+        <h3>Feature JSON</h3>
+        <pre>{{ detail.feature_json }}</pre>
+      </details>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,511 @@
+{
+  "boundary_assertions": [
+    {
+      "detail": "Phase 3X adds shell, routing, reports, and presentation adapters only.",
+      "name": "presentation_only",
+      "passed": true
+    },
+    {
+      "detail": "No Phase 3X frontend route calls exchange write clients.",
+      "name": "no_direct_exchange_client",
+      "passed": true
+    },
+    {
+      "detail": "Institutional dashboard routes remain read-only.",
+      "name": "phase_3t_read_only",
+      "passed": true
+    },
+    {
+      "detail": "Allowed preferences exclude thresholds, model weights, and risk limits.",
+      "name": "preferences_are_presentation_only",
+      "passed": true
+    }
+  ],
+  "components": [
+    {
+      "authority": "Presentation only",
+      "name": "Professional shell",
+      "purpose": "Persistent environment, mode, freshness, 3W, and 3V context.",
+      "states": "normal, degraded, incomplete, mobile"
+    },
+    {
+      "authority": "Navigation only",
+      "name": "Command palette",
+      "purpose": "Keyboard route navigation without domain mutations.",
+      "states": "open, filtered, empty"
+    },
+    {
+      "authority": "Presentation mapping",
+      "name": "Status pill",
+      "purpose": "Icon plus text status, never color-only.",
+      "states": "blocked, degraded, failed, fresh, healthy, incomplete, live, no_trade, paper, stale, unknown"
+    },
+    {
+      "authority": "Existing ranking/forecast values",
+      "name": "Probability pair",
+      "purpose": "Keep market probability and model probability visually distinct.",
+      "states": "available, unknown, stale"
+    },
+    {
+      "authority": "Existing phase outputs only",
+      "name": "Decision waterfall",
+      "purpose": "Show Phase 3S to 3M to 3N gate outcomes in order.",
+      "states": "proceed, skip, allow, reduce, block, unknown"
+    },
+    {
+      "authority": "Presentation only",
+      "name": "State panel",
+      "purpose": "Truthful loading, no-trade, stale, partial, blocked, and error states.",
+      "states": "empty-valid, no-trade, unavailable, blocked, expired, error"
+    }
+  ],
+  "content_policy": {
+    "ai_copy_authority": "structured evidence remains authoritative",
+    "prohibited_terms": [
+      "sure thing",
+      "guaranteed",
+      "safe trade",
+      "can't miss",
+      "free money",
+      "lock",
+      "strong play",
+      "act now"
+    ]
+  },
+  "generated_at": "2026-06-27T19:27:38.463567+00:00",
+  "open_findings": [
+    "Phase 3W is not SYSTEM_PASS for production rollout.",
+    "Phase 3V readiness is not live-capital approved.",
+    "Accessibility manual evidence is not complete.",
+    "Visual regression baselines are not complete.",
+    "Performance budget evidence is not complete.",
+    "Rollback rehearsal evidence is not complete."
+  ],
+  "phase_3w_prerequisite": {
+    "note": "SYSTEM_PASS is required before production rollout claims.",
+    "production_rollout_allowed": false,
+    "status": "SYSTEM_INCOMPLETE"
+  },
+  "preferences": {
+    "chart_table_preference": "table_first",
+    "default_route": "/today",
+    "density": "comfortable",
+    "saved_views": [],
+    "schema_version": "phase-3x-ui-preferences-v1",
+    "tables": {},
+    "theme": "system",
+    "timezone": "America/Chicago",
+    "user_scope": "local"
+  },
+  "release_decision": "INCOMPLETE",
+  "routes": [
+    {
+      "action_authority": "Read-only; no domain mutations",
+      "disposition": "add",
+      "primary_job": "Answer what to focus on today without hiding no-trade states.",
+      "risk": "Requires parity evidence before default production rollout",
+      "route": "/today",
+      "source_authority": "Phase 3U/3T read models and existing dashboard services"
+    },
+    {
+      "action_authority": "Existing guarded action routes only",
+      "disposition": "retain",
+      "primary_job": "Legacy trader cockpit landing route",
+      "risk": "Legacy density and terminology remain until route migration",
+      "route": "/",
+      "source_authority": "DecisionUiService.dashboard"
+    },
+    {
+      "action_authority": "Read by default; existing review route for actions",
+      "disposition": "refine",
+      "primary_job": "Scan and investigate ranked opportunities",
+      "risk": "Must keep fixed route ordering before /opportunities/{ticker}",
+      "route": "/opportunities",
+      "source_authority": "MarketRanking, Forecast, MarketSnapshot"
+    },
+    {
+      "action_authority": "Existing execution review route",
+      "disposition": "refine",
+      "primary_job": "Inspect lineage, probabilities, risk, and paper history",
+      "risk": "Market and model probability labels must remain distinct",
+      "route": "/opportunities/{ticker}",
+      "source_authority": "Market, MarketRanking, Forecast, Paper ledger"
+    },
+    {
+      "action_authority": "Read-only diagnostics; CLI owns parsing mutations",
+      "disposition": "add",
+      "primary_job": "Inspect parsed market legs and specialized link coverage",
+      "risk": "Coverage evidence must not imply live-trading readiness",
+      "route": "/links/coverage",
+      "source_authority": "MarketLeg and crypto/weather/economic/sports/news link tables"
+    },
+    {
+      "action_authority": "Read-only Phase 3T boundary",
+      "disposition": "retain",
+      "primary_job": "Read-only institutional dashboard snapshot",
+      "risk": "Cannot grow write controls",
+      "route": "/institutional",
+      "source_authority": "Phase 3T dashboard snapshot service"
+    },
+    {
+      "action_authority": "Read-only investigation",
+      "disposition": "refine",
+      "primary_job": "Inspect paper positions and portfolio P&L",
+      "risk": "Gross, net, realized, and projected values must stay labeled",
+      "route": "/portfolio",
+      "source_authority": "Paper ledger and workstation repositories"
+    },
+    {
+      "action_authority": "Read-only; no model promotion",
+      "disposition": "refine",
+      "primary_job": "Review model readiness and performance",
+      "risk": "Predictive accuracy and economic profitability can be confused",
+      "route": "/models",
+      "source_authority": "Forecasts, confidence, model status"
+    },
+    {
+      "action_authority": "Questions/report generation only",
+      "disposition": "retain",
+      "primary_job": "Research-only opportunity explanations and evidence",
+      "risk": "Research candidates must not look tradable by default",
+      "route": "/research",
+      "source_authority": "Research assistant and reports"
+    },
+    {
+      "action_authority": "No direct orders; existing guarded workflows only",
+      "disposition": "refine",
+      "primary_job": "Phase 3U structured recommendation brief",
+      "risk": "LLM narrative must remain subordinate to structured evidence",
+      "route": "/personal-trader",
+      "source_authority": "Phase 3U recommendation service"
+    },
+    {
+      "action_authority": "Review/audit only; no execution enablement",
+      "disposition": "retain",
+      "primary_job": "Phase 3V readiness evidence and certificate state",
+      "risk": "Expired or incomplete certificates must block success claims",
+      "route": "/live-readiness",
+      "source_authority": "Phase 3V readiness service"
+    },
+    {
+      "action_authority": "Audit-only by default",
+      "disposition": "retain",
+      "primary_job": "Phase 3W end-to-end certification evidence",
+      "risk": "SYSTEM_INCOMPLETE must not look like production readiness",
+      "route": "/system-certification",
+      "source_authority": "Phase 3W certification service"
+    },
+    {
+      "action_authority": "Read-only overview and report links",
+      "disposition": "add",
+      "primary_job": "Unified system health and release-readiness overview",
+      "risk": "Shell rendering alone cannot imply healthy data",
+      "route": "/system",
+      "source_authority": "DB, Phase 3V, Phase 3W, Phase 3X status cards"
+    },
+    {
+      "action_authority": "Presentation preferences only in Phase 3X",
+      "disposition": "retain",
+      "primary_job": "Presentation and database settings visibility",
+      "risk": "Preferences must never change domain thresholds",
+      "route": "/settings",
+      "source_authority": "Settings and database status"
+    }
+  ],
+  "schema_version": "phase-3x-professional-ux-v1",
+  "shell_context": {
+    "account_scope": "local",
+    "command_items": [
+      {
+        "family": "today",
+        "href": "/today",
+        "label": "Today"
+      },
+      {
+        "family": "opportunities",
+        "href": "/opportunities",
+        "label": "Opportunities"
+      },
+      {
+        "family": "markets",
+        "href": "/markets",
+        "label": "Markets"
+      },
+      {
+        "family": "markets",
+        "href": "/links/coverage",
+        "label": "Links"
+      },
+      {
+        "family": "portfolio",
+        "href": "/portfolio",
+        "label": "Portfolio"
+      },
+      {
+        "family": "risk",
+        "href": "/risk",
+        "label": "Risk"
+      },
+      {
+        "family": "trades",
+        "href": "/trades",
+        "label": "Trades"
+      },
+      {
+        "family": "models",
+        "href": "/models",
+        "label": "Models"
+      },
+      {
+        "family": "journal",
+        "href": "/journal",
+        "label": "Journal"
+      },
+      {
+        "family": "research",
+        "href": "/research",
+        "label": "Research"
+      },
+      {
+        "family": "system",
+        "href": "/system",
+        "label": "System"
+      },
+      {
+        "family": "settings",
+        "href": "/settings",
+        "label": "Settings"
+      },
+      {
+        "family": "system",
+        "href": "/system/health",
+        "label": "System health"
+      },
+      {
+        "family": "system",
+        "href": "/system/certification",
+        "label": "System certification"
+      },
+      {
+        "family": "system",
+        "href": "/live-readiness",
+        "label": "Live readiness"
+      },
+      {
+        "family": "system",
+        "href": "/learning",
+        "label": "Learning"
+      },
+      {
+        "family": "system",
+        "href": "/control-center",
+        "label": "Control center"
+      },
+      {
+        "family": "research",
+        "href": "/signals",
+        "label": "Signals"
+      },
+      {
+        "family": "markets",
+        "href": "/links/coverage",
+        "label": "Link coverage"
+      }
+    ],
+    "command_palette_enabled": true,
+    "database_fingerprint": "sha256:264e0ee3b0e22d22b071db87c2ca7f77717a98ac5c99f34aab0b2422b6888373",
+    "density": "comfortable",
+    "environment": "DEMO",
+    "execution_mode": "PAPER / READ-ONLY",
+    "git_commit": "unknown",
+    "market_freshness": {
+      "age_label": "uninitialized",
+      "as_of": "unknown",
+      "class": "status-incomplete",
+      "code": "unknown",
+      "description": "No authoritative source value is available.",
+      "icon": "UNK",
+      "label": "Unknown"
+    },
+    "nav_items": [
+      {
+        "family": "today",
+        "href": "/today",
+        "label": "Today"
+      },
+      {
+        "family": "opportunities",
+        "href": "/opportunities",
+        "label": "Opportunities"
+      },
+      {
+        "family": "markets",
+        "href": "/markets",
+        "label": "Markets"
+      },
+      {
+        "family": "markets",
+        "href": "/links/coverage",
+        "label": "Links"
+      },
+      {
+        "family": "portfolio",
+        "href": "/portfolio",
+        "label": "Portfolio"
+      },
+      {
+        "family": "risk",
+        "href": "/risk",
+        "label": "Risk"
+      },
+      {
+        "family": "trades",
+        "href": "/trades",
+        "label": "Trades"
+      },
+      {
+        "family": "models",
+        "href": "/models",
+        "label": "Models"
+      },
+      {
+        "family": "journal",
+        "href": "/journal",
+        "label": "Journal"
+      },
+      {
+        "family": "research",
+        "href": "/research",
+        "label": "Research"
+      },
+      {
+        "family": "system",
+        "href": "/system",
+        "label": "System"
+      },
+      {
+        "family": "settings",
+        "href": "/settings",
+        "label": "Settings"
+      }
+    ],
+    "paper_runtime": {
+      "class": "status-healthy",
+      "code": "healthy",
+      "description": "Paper-only runtime is reachable and execution guards are blocking demo/live orders.",
+      "icon": "OK",
+      "label": "Healthy"
+    },
+    "phase_3v": {
+      "href": "/live-readiness",
+      "label": "3V NOT READY",
+      "status": "NOT_READY"
+    },
+    "phase_3w": {
+      "href": "/system-certification",
+      "label": "3W INCOMPLETE",
+      "status": "SYSTEM_INCOMPLETE"
+    },
+    "phase_3x": {
+      "blockers": [
+        "Phase 3W is not SYSTEM_PASS for production rollout.",
+        "Phase 3V readiness is not live-capital approved.",
+        "Accessibility manual evidence is not complete.",
+        "Visual regression baselines are not complete.",
+        "Performance budget evidence is not complete.",
+        "Rollback rehearsal evidence is not complete."
+      ],
+      "boundary_passed": true,
+      "component_count": 6,
+      "decision": "INCOMPLETE",
+      "enabled": true,
+      "live_trading_authorized": false,
+      "mode": "preview",
+      "next_action": "Use Phase 3X as audit/preview until Phase 3W is SYSTEM_PASS.",
+      "phase": "3X",
+      "phase_3v_decision": "INCOMPLETE",
+      "phase_3w_status": "SYSTEM_INCOMPLETE",
+      "release_stage": "audit_preview",
+      "route_count": 14,
+      "version": "phase-3x-professional-ux-v1"
+    },
+    "snapshot_as_of": "2026-06-27T19:27:38.050594+00:00",
+    "system_status": {
+      "class": "status-healthy",
+      "code": "healthy",
+      "description": "Paper-only runtime is reachable and execution guards are blocking demo/live orders.",
+      "icon": "OK",
+      "label": "Healthy"
+    },
+    "theme": "system",
+    "timezone": "America/Chicago"
+  },
+  "status_grammar": {
+    "blocked": {
+      "class": "status-failed",
+      "description": "A gate prevents the action or recommendation path.",
+      "icon": "BLOCK",
+      "label": "Blocked"
+    },
+    "degraded": {
+      "class": "status-degraded",
+      "description": "The source is available with warnings or partial data.",
+      "icon": "WARN",
+      "label": "Degraded"
+    },
+    "failed": {
+      "class": "status-failed",
+      "description": "The source failed and must not be treated as current.",
+      "icon": "FAIL",
+      "label": "Failed"
+    },
+    "fresh": {
+      "class": "status-healthy",
+      "description": "Data is inside the fresh window.",
+      "icon": "OK",
+      "label": "Fresh"
+    },
+    "healthy": {
+      "class": "status-healthy",
+      "description": "The source reports current usable data.",
+      "icon": "OK",
+      "label": "Healthy"
+    },
+    "incomplete": {
+      "class": "status-incomplete",
+      "description": "Required evidence is missing.",
+      "icon": "INC",
+      "label": "Incomplete"
+    },
+    "live": {
+      "class": "status-failed",
+      "description": "Live-capital context. Requires explicit authorization.",
+      "icon": "LIVE",
+      "label": "Live"
+    },
+    "no_trade": {
+      "class": "status-incomplete",
+      "description": "No candidate currently clears the required gates.",
+      "icon": "NO",
+      "label": "No trade"
+    },
+    "paper": {
+      "class": "status-paper",
+      "description": "Paper-only simulated trading context.",
+      "icon": "PAPER",
+      "label": "Paper"
+    },
+    "stale": {
+      "class": "status-degraded",
+      "description": "Data is outside the fresh window.",
+      "icon": "STALE",
+      "label": "Stale"
+    },
+    "unknown": {
+      "class": "status-incomplete",
+      "description": "No authoritative source value is available.",
+      "icon": "UNK",
+      "label": "Unknown"
+    }
+  }
+}

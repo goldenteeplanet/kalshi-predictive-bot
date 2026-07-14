@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Best Payouts{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>Best Payouts</h1>
+    <p>Payout-adjusted opportunities sorted by expected value and payout/risk.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Demo Only</span>
+    <span class="badge badge-info">{{ model_name }}</span>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Payout-Adjusted Opportunities</h2>
+      <p class="muted">Low-confidence longshots are filtered out before ranking.</p>
+    </div>
+    <form data-action method="post" action="/reports/best-payouts">
+      <input type="hidden" name="model_name" value="{{ model_name }}">
+      <input type="hidden" name="limit" value="{{ rows|length or 20 }}">
+      <button type="submit">Write report</button>
+    </form>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Market</th>
+          <th>Kalshi</th>
+          <th>Recommendation</th>
+          <th>Expected value</th>
+          <th>Payout/risk</th>
+          <th>Score</th>
+          <th>Confidence</th>
+          <th>Risk notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="wide"><a href="/opportunities/{{ row.ticker }}">{{ row.market }}</a><br><span class="muted">{{ row.ticker }}</span></td>
+          <td>
+            {% if row.kalshi_url_verified %}
+            <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            {% else %}
+            <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+            {% endif %}
+          </td>
+          <td>{{ row.recommendation }}</td>
+          <td>{{ row.expected_value }}</td>
+          <td>{{ row.payout_to_risk_ratio }}</td>
+          <td>{{ row.payout_adjusted_score }}</td>
+          <td>{{ row.confidence }}</td>
+          <td>{{ row.risks|join("; ") }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8">No acceptable payout opportunities yet. Run fresh scans or wait for stronger confidence/liquidity and verified links.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

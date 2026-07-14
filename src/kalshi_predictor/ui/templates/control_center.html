@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Control Center{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>Control Center</h1>
+    <p>{{ recommended_next_action }}</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Paper / Demo Only</span>
+    <a class="button" href="{{ report_links.control_center }}">Report</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  {% set learning_lane = lane_cards.learning %}
+  {% set autopilot_lane = lane_cards.autopilot %}
+  <div><span>Learning settled</span><strong>{{ learning_lane.settled_paper_trades }}</strong></div>
+  <div><span>Progress to 500</span><strong>{{ learning_lane.progress_to_500 }}</strong></div>
+  <div><span>Learning trades today</span><strong>{{ learning_lane.trades_created_today }}</strong></div>
+  <div><span>Learning confidence</span><strong>{{ learning_lane.learning_confidence }}</strong></div>
+  <div><span>Autopilot opportunities</span><strong>{{ autopilot_lane.opportunities_found }}</strong></div>
+  <div><span>Dry-run orders</span><strong>{{ autopilot_lane.dry_run_orders }}</strong></div>
+  <div><span>Top model</span><strong>{{ autopilot_lane.top_model }}</strong></div>
+  <div><span>Current confidence</span><strong>{{ autopilot_lane.current_confidence }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Lane Status</h2></div>
+  <div class="status-grid">
+    <div><span>Learning Mode Status</span><strong>{{ learning.plain_status }}</strong></div>
+    <div><span>Autopilot Status</span><strong>{{ autopilot.plain_status }}</strong></div>
+    <div><span>Target settled trades</span><strong>{{ learning.target_settled_trades }}</strong></div>
+    <div><span>Demo execution</span><strong>{{ 'blocked' if learning.demo_execution_blocked else 'guarded' }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><h2>Model Confidence Engine</h2><span class="muted">{{ model_confidence_rows|length }} rows</span></div>
+  {% if category_leaders %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Category</th><th>Leader</th><th>Confidence</th><th>Settled</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for row in category_leaders %}
+      <tr>
+        <td>{{ row.category }}</td>
+        <td>{{ row.model_name }}</td>
+        <td>{{ row.confidence_score }}</td>
+        <td>{{ row.settled_trade_count }}</td>
+        <td>{{ row.confidence_label }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No model confidence rows yet. Run model-confidence after paper trades settle.</div>
+  {% endif %}
+</section>
+{% endblock %}

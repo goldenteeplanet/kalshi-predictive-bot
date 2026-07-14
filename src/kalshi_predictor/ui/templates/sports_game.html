@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Sports Game{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>{{ game.away_team_key }} at {{ game.home_team_key }}</h1>
+    <p>{{ game.league }} / {{ game.scheduled_at or 'schedule pending' }} / {{ game.status }}</p>
+  </div>
+  <div class="hero-status">
+    <a class="button" href="/sports/leagues/{{ game.league }}">{{ game.league }}</a>
+    <a class="button" href="/sports">All sports</a>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>League</span><strong>{{ game.league }}</strong></div>
+  <div><span>Home</span><strong>{{ game.home_team_key }}</strong></div>
+  <div><span>Away</span><strong>{{ game.away_team_key }}</strong></div>
+  <div><span>Venue</span><strong>{{ game.venue or 'n/a' }}</strong></div>
+</section>
+
+<section class="section-band">
+  <h2>Feature Edge</h2>
+  {% if feature %}
+  <div class="stats-grid compact-stats">
+    <div><span>Team strength</span><strong>{{ feature.team_strength_edge }}</strong></div>
+    <div><span>Injuries</span><strong>{{ feature.injury_edge }}</strong></div>
+    <div><span>Rest</span><strong>{{ feature.rest_edge }}</strong></div>
+    <div><span>Travel</span><strong>{{ feature.travel_edge }}</strong></div>
+    <div><span>Odds</span><strong>{{ feature.odds_edge }}</strong></div>
+    <div><span>Weather</span><strong>{{ feature.weather_edge }}</strong></div>
+    <div><span>Total edge</span><strong>{{ feature.total_edge }}</strong></div>
+    <div><span>Confidence</span><strong>{{ feature.confidence_score }}</strong></div>
+  </div>
+  {% else %}
+  <div class="empty">No sports feature has been built for this game yet.</div>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  <h2>Linked Markets</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Type</th>
+          <th>Confidence</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for link in links %}
+        <tr>
+          <td><a href="/opportunities/{{ link.ticker }}">{{ link.ticker }}</a></td>
+          <td>{{ link.market_type }}</td>
+          <td>{{ link.confidence }}</td>
+          <td class="wide">{{ link.reason }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">No linked markets yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <h2>Recent Sports Signals</h2>
+  <ul class="checks">
+    {% for signal in signals[:10] %}
+    <li>
+      <strong>{{ signal.signal_name }}</strong>
+      {{ signal.ticker }} / {{ signal.signal_direction or 'neutral' }} /
+      confidence {{ signal.confidence }}
+    </li>
+    {% else %}
+    <li>No sports signals generated yet.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

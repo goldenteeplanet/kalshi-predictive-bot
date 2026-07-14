@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Research: {{ evidence.short_market_name }}{% endblock %}
+{% block content %}
+{% set identity = evidence.market_identity %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>{{ evidence.short_market_name }}</h1>
+    <p>{{ evidence.ticker }} / {{ evidence.model_name }}</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Research Assistant</span>
+    <span class="badge badge-info">Paper / Demo Only</span>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Rank</span><strong>{{ evidence.rank or 'n/a' }}</strong></div>
+  <div><span>Score</span><strong>{{ evidence.opportunity_score or 'n/a' }}</strong></div>
+  <div><span>Edge</span><strong>{{ evidence.edge_cents }}</strong></div>
+  <div><span>Recommendation</span><strong>{{ narrative.recommendation }}</strong></div>
+  <div><span>Confidence</span><strong>{{ narrative.confidence_label }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Analyst Writeup</h2>
+      <p class="muted">Generated locally from stored market, model, and paper-trading data.</p>
+    </div>
+    {% if identity.kalshi_url_verified %}
+    <a class="button" href="{{ identity.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+    {% else %}
+    <span class="badge badge-caution">{{ identity.kalshi_url_status }}</span>
+    {% endif %}
+    <a class="button" href="/opportunities/{{ evidence.ticker }}">Market detail</a>
+  </div>
+  <div class="explain-grid detail-explain">
+    <div>
+      <h2>Why This Is Ranked Here</h2>
+      <p>{{ narrative.why_ranked }}</p>
+    </div>
+    <div>
+      <h2>What The Bot Thinks</h2>
+      <p>{{ narrative.bot_thinks }}</p>
+    </div>
+    <div>
+      <h2>How Strong The Evidence Is</h2>
+      <p>{{ narrative.evidence_strength }}</p>
+    </div>
+    <div>
+      <h2>What To Do Next</h2>
+      <p>{{ narrative.next_action }}</p>
+    </div>
+  </div>
+</section>
+
+{% if meta_selection.available %}
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Why This Model Was Selected</h2>
+      <p class="muted">Meta model explanation from local trust scoring.</p>
+    </div>
+    <a class="button" href="/meta/{{ evidence.ticker }}">Meta detail</a>
+  </div>
+  <p>{{ meta_selection.summary }}</p>
+  <div class="stats-grid">
+    <div><span>Trusted model</span><strong>{{ meta_selection.selected_model }}</strong></div>
+    <div><span>Trust</span><strong>{{ meta_selection.trust_score }}/100</strong></div>
+    <div><span>Fallback</span><strong>{{ 'yes' if meta_selection.fallback else 'no' }}</strong></div>
+  </div>
+</section>
+{% endif %}
+
+<section class="grid two">
+  <div class="section-band">
+    <h2>Supporting Signals</h2>
+    <ul class="checks">
+      {% for signal in narrative.supporting_signals %}
+      <li>{{ signal }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="section-band">
+    <h2>Risks</h2>
+    <ul class="checks">
+      {% for risk in narrative.risks %}
+      <li>{{ risk }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section-band">
+  <h2>Evidence Snapshot</h2>
+  <div class="stats-grid">
+    <div><span>Market price</span><strong>{{ evidence.market_price or 'n/a' }}</strong></div>
+    <div><span>Model probability</span><strong>{{ evidence.model_probability_label }}</strong></div>
+    <div><span>Liquidity</span><strong>{{ evidence.liquidity_status }}</strong></div>
+    <div><span>Spread</span><strong>{{ evidence.spread_status }}</strong></div>
+    <div><span>Freshness</span><strong>{{ evidence.data_freshness }}</strong></div>
+    <div><span>Paper position</span><strong>{{ evidence.paper_position }}</strong></div>
+    <div><span>Kalshi link</span><strong>{{ identity.kalshi_url_status }}</strong></div>
+    <div><span>Link reason</span><strong>{{ identity.kalshi_url_reason }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <h2>Missing Data</h2>
+  <p>{{ narrative.missing_data }}</p>
+</section>
+{% endblock %}

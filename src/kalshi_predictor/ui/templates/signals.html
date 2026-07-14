@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Signal Marketplace{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>Signal Marketplace</h1>
+    <p>Which local signals are producing forecasts, trades, and paper/demo P&L.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Paper / Demo Only</span>
+    <a class="button" href="/signals/health">Health</a>
+    <form data-action method="post" action="/reports/signal-report">
+      <button type="submit">Write report</button>
+    </form>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Signals</span><strong>{{ summary.signals }}</strong></div>
+  <div><span>Attributed Forecasts</span><strong>{{ summary.active_forecasts }}</strong></div>
+  <div><span>Attributed Trades</span><strong>{{ summary.active_trades }}</strong></div>
+  <div><span>Mode</span><strong>Paper / Demo</strong></div>
+  <div><span>Live Trading</span><strong>Disabled</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Signal Cards</h2>
+      <p class="muted">Signals remain visible even with insufficient data.</p>
+    </div>
+  </div>
+  <div class="grid three">
+    {% for card in cards %}
+    <article class="mini-panel">
+      <div class="section-head compact-head">
+        <h3>{{ card.signal_name }}</h3>
+        <span class="badge badge-info">{{ card.status }}</span>
+      </div>
+      <p class="muted">{{ card.category }}</p>
+      <p>{{ card.description }}</p>
+      <div class="stats-grid compact-stats">
+        <div><span>ROI</span><strong>{{ card.roi or 'n/a' }}</strong></div>
+        <div><span>Win Rate</span><strong>{{ card.win_rate or 'n/a' }}</strong></div>
+        <div><span>Trades</span><strong>{{ card.trade_count }}</strong></div>
+        <div><span>Forecasts</span><strong>{{ card.forecast_count }}</strong></div>
+        <div><span>Confidence</span><strong>{{ card.confidence_score or 'n/a' }}</strong></div>
+        <div><span>Missing</span><strong>{{ card.missing_data }}</strong></div>
+      </div>
+      <p class="muted">Latest signal: {{ card.latest_signal }}</p>
+      <p class="muted">Next action: {{ card.next_action }}</p>
+      <div class="card-foot">
+        <a class="button primary" href="/signals/{{ card.signal_name|replace(' ', '%20') }}">Open signal</a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Signal Leaderboard</h2>
+      <p class="muted">Ranking uses ROI, sample size, calibration, and confidence.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Signal</th>
+          <th>ROI</th>
+          <th>Win Rate</th>
+          <th>Forecasts</th>
+          <th>Trades</th>
+          <th>Confidence</th>
+          <th>Status</th>
+          <th>Missing Data</th>
+          <th>Next Action</th>
+          <th>Latest Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in leaderboard %}
+        <tr>
+          <td>{{ row.rank }}</td>
+          <td><a href="/signals/{{ row.signal_name|replace(' ', '%20') }}">{{ row.signal_name }}</a></td>
+          <td>{{ row.roi or 'n/a' }}</td>
+          <td>{{ row.win_rate or 'n/a' }}</td>
+          <td>{{ row.forecast_count }}</td>
+          <td>{{ row.trade_count }}</td>
+          <td>{{ row.confidence_score or 'n/a' }}</td>
+          <td>{{ row.status }}</td>
+          <td>{{ row.missing_data }}</td>
+          <td class="wide">{{ row.next_action }}</td>
+          <td>{{ row.latest_signal }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

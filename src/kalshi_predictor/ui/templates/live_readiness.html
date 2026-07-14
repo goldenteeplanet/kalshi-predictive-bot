@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Live Readiness{% endblock %}
+{% block content %}
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h1>Live Readiness Review</h1>
+      <p class="muted">Phase 3V governance status for the exact build, config, model, account, and stage.</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-info">{{ status.mode }}</span>
+      <span class="badge badge-info">{{ status.decision }}</span>
+      <a class="button" href="{{ report_links.live_readiness_report }}">Report</a>
+      <button id="run-live-readiness-review" class="button primary" type="button">Run review</button>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Decision</span><strong id="live-readiness-decision">{{ status.decision }}</strong></div>
+    <div><span>Target stage</span><strong>{{ status.target_stage }}</strong></div>
+    <div><span>Diagnostic score</span><strong>{{ status.diagnostic_score }}</strong></div>
+    <div><span>Control count</span><strong>{{ status.control_count }}</strong></div>
+    <div><span>Critical blockers</span><strong>{{ status.critical_blockers }}</strong></div>
+    <div><span>Latest review</span><strong>{{ status.latest_review }}</strong></div>
+    <div><span>Certificate</span><strong>{{ status.certificate }}</strong></div>
+    <div><span>Review records</span><strong>{{ status.review_count }}</strong></div>
+  </div>
+  <div id="live-readiness-message" class="signal-callout health-warning">
+    <strong>Next action</strong>
+    <span>{{ status.next_action }}</span>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Safety Boundary</h2>
+      <p class="muted">Readiness review output is advisory evidence and a guard contract, not an execution command.</p>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Live trading enabled</span><strong>NO</strong></div>
+    <div><span>Demo execution enabled</span><strong>NO</strong></div>
+    <div><span>Orders created</span><strong>NO</strong></div>
+    <div><span>Risk limits changed</span><strong>NO</strong></div>
+  </div>
+</section>
+
+{% if latest %}
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Latest Review</h2>
+      <p class="muted">{{ latest.review_id }}</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Reason Code</th></tr></thead>
+      <tbody>
+      {% for code in latest.reason_codes %}
+      <tr><td>{{ code }}</td></tr>
+      {% else %}
+      <tr><td>No reason codes recorded.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<script>
+(() => {
+  const button = document.getElementById("run-live-readiness-review");
+  const message = document.getElementById("live-readiness-message");
+  if (!button || !message) return;
+  button.addEventListener("click", async () => {
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "Running...";
+    try {
+      const response = await fetch("/api/live-readiness/review", {
+        method: "POST",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify({target_stage: "{{ status.target_stage }}"})
+      });
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("application/json")
+        ? await response.json()
+        : {ok: false, message: await response.text()};
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || payload.message || "Live readiness review failed.");
+      }
+      message.className = "signal-callout health-good";
+      message.innerHTML = `<strong>${payload.message}</strong><span>${payload.report_path}</span>`;
+      setTimeout(() => window.location.reload(), 600);
+    } catch (error) {
+      console.error("Live readiness review action failed", error);
+      message.className = "signal-callout health-risk";
+      message.innerHTML = `<strong>Review failed</strong><span>${error.message}</span>`;
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  });
+})();
+</script>
+{% endblock %}
+

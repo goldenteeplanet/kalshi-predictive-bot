@@ -1,0 +1,138 @@
+# Phase 3X — Professional UX/UI Overhaul
+# Safe example configuration. Replace REQUIRED values explicitly.
+
+phase_3x:
+  enabled: false
+  mode: audit_only  # audit_only | preview | staging | production
+  configuration_version: phase-3x-example-v1
+
+  prerequisite:
+    require_phase_3w_report: true
+    required_production_status: SYSTEM_PASS
+    allow_conditional_for_preview_only: true
+    maximum_report_age_seconds: REQUIRED
+    require_repository_fingerprint_match: true
+    require_build_fingerprint_match: true
+    require_config_fingerprint_match: true
+    require_ui_facing_smoke_after_change: true
+
+  boundaries:
+    change_domain_authority: false
+    allow_direct_exchange_clients: false
+    allow_browser_domain_calculations: false
+    allow_phase_3t_mutations: false
+    allow_risk_overrides: false
+    allow_position_size_increases: false
+    allow_model_or_feature_promotion: false
+    allow_settlement_mutation: false
+    allow_llm_authoritative_numbers: false
+    presentation_preference_writes_only: true
+
+  rollout:
+    route_flags_enabled: true
+    shell_flag: phase_3x_shell
+    today_flag: phase_3x_today
+    opportunities_flag: phase_3x_opportunities
+    portfolio_flag: phase_3x_portfolio
+    risk_flag: phase_3x_risk
+    trades_flag: phase_3x_trades
+    models_flag: phase_3x_models
+    journal_flag: phase_3x_journal
+    research_flag: phase_3x_research
+    system_flag: phase_3x_system
+    preserve_legacy_routes: true
+    deterministic_redirects: true
+    require_value_parity_before_cutover: true
+
+  application_shell:
+    default_route: /today
+    show_environment: true
+    show_execution_mode: true
+    show_account_scope: true
+    show_system_health: true
+    show_market_freshness: true
+    show_snapshot_time: true
+    show_phase_3w_status: true
+    show_phase_3v_status_when_relevant: true
+    display_timezone: America/Chicago
+    internal_timezone: UTC
+    command_palette_enabled: true
+    command_palette_allows_domain_mutations: false
+
+  design_system:
+    reuse_existing_stack: true
+    theme_modes:
+      - light
+      - dark
+      - system
+    density_modes:
+      - comfortable
+      - compact
+    respect_reduced_motion: true
+    support_forced_colors: true
+    require_semantic_tokens: true
+    prohibit_color_only_status: true
+    numeric_tabular_figures: true
+
+  preferences:
+    enabled: false
+    schema_version: phase-3x-ui-preferences-v1
+    allowed:
+      - theme
+      - density
+      - timezone
+      - default_route
+      - columns
+      - page_size
+      - chart_table_preference
+      - saved_views
+    prohibit_domain_thresholds: true
+    server_authorization_on_saved_views: true
+
+  accessibility:
+    target: WCAG_2_2_AA
+    automated_checks_required: true
+    keyboard_checks_required: true
+    screen_reader_checks_required: true
+    chart_table_alternatives_required: true
+    zoom_reflow_checks_required: true
+
+  performance:
+    field_measurement_enabled: false
+    core_web_vitals:
+      lcp_good_ms: 2500
+      inp_good_ms: 200
+      cls_good: 0.1
+      percentile: 75
+    route_budgets:
+      initial_js_bytes: REQUIRED
+      maximum_route_js_bytes: REQUIRED
+      maximum_css_bytes: REQUIRED
+      maximum_api_response_bytes: REQUIRED
+      time_to_first_useful_data_ms: REQUIRED
+    cancel_obsolete_requests: true
+    split_expensive_visualizations: true
+    test_long_sessions: true
+
+  telemetry:
+    enabled: false
+    redact_sensitive_values: true
+    include_correlation_ids: true
+    capture_route_failures: true
+    capture_data_state_failures: true
+    capture_stream_resyncs: true
+    capture_interaction_latency: true
+    capture_saved_view_migration_failures: true
+
+  testing:
+    unit: true
+    component: true
+    contract: true
+    integration: true
+    end_to_end: true
+    accessibility: true
+    visual_regression: true
+    performance: true
+    security: true
+    authorization: true
+    require_phase_3w_smoke: true

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}System Certification{% endblock %}
+{% block content %}
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h1>System Certification</h1>
+      <p class="muted">Phase 3W audit across Phase 1 through Phase 3V.</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-info">{{ status.mode }}</span>
+      <span class="badge badge-info">{{ status.overall_status }}</span>
+      <a class="button" href="{{ report_links.system_certification_report }}">Report</a>
+      <button id="run-system-certification" class="button primary" type="button">Run audit</button>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Outcome</span><strong>{{ status.overall_status }}</strong></div>
+    <div><span>Latest run</span><strong>{{ status.latest_run_id }}</strong></div>
+    <div><span>Completed</span><strong>{{ status.completed_at }}</strong></div>
+    <div><span>Phases</span><strong>{{ status.phase_count }}</strong></div>
+    <div><span>Connections</span><strong>{{ status.connection_count }}</strong></div>
+    <div><span>Live trading authorized</span><strong>FALSE</strong></div>
+  </div>
+  <div id="system-certification-message" class="signal-callout health-warning">
+    <strong>Next action</strong>
+    <span>{{ status.next_action }}</span>
+  </div>
+</section>
+
+<section class="section-band compact-band">
+  <div class="section-head">
+    <div>
+      <h2>Certification Boundary</h2>
+      <p class="muted">A system pass would still be integration evidence only, not capital authorization.</p>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Production writes</span><strong>DISABLED</strong></div>
+    <div><span>Safe repair</span><strong>OFF BY DEFAULT</strong></div>
+    <div><span>Runtime observed</span><strong>NO</strong></div>
+    <div><span>Human approval</span><strong>REQUIRED</strong></div>
+  </div>
+</section>
+
+<script>
+(() => {
+  const button = document.getElementById("run-system-certification");
+  const message = document.getElementById("system-certification-message");
+  if (!button || !message) return;
+  button.addEventListener("click", async () => {
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "Running...";
+    try {
+      const response = await fetch("/api/system-certification/run", {
+        method: "POST",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify({output_dir: "reports/system_certification"})
+      });
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("application/json")
+        ? await response.json()
+        : {ok: false, message: await response.text()};
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || payload.message || "System certification failed.");
+      }
+      message.className = "signal-callout health-good";
+      message.innerHTML = `<strong>${payload.message}</strong><span>${payload.overall_status} · ${payload.report_path}</span>`;
+      setTimeout(() => window.location.reload(), 600);
+    } catch (error) {
+      console.error("System certification action failed", error);
+      message.className = "signal-callout health-risk";
+      message.innerHTML = `<strong>Audit failed</strong><span>${error.message}</span>`;
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  });
+})();
+</script>
+{% endblock %}
+

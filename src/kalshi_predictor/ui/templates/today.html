@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% import "_phase3x_components.html" as ux %}
+{% block title %}Today{% endblock %}
+{% block content %}
+<section class="today-hero" aria-labelledby="today-title">
+  <div>
+    <p class="page-kicker">Professional cockpit</p>
+    <h1 id="today-title">Today</h1>
+    <p class="muted">{{ today_workspace.headline }}</p>
+  </div>
+  <div class="today-hero-actions">
+    <span class="status-pill status-{{ today_workspace.decision_state }}">
+      {{ today_workspace.decision_label }}
+    </span>
+    <a class="button primary" href="/opportunities">Open scanner</a>
+    <a class="button" href="/system">System health</a>
+  </div>
+</section>
+
+<section class="section-band compact-band" data-auto-refresh-seconds="{{ crypto_freshness.auto_refresh_seconds }}">
+  <div class="section-head">
+    <div>
+      <h2>Crypto Freshness Watch</h2>
+      <p class="muted">{{ crypto_freshness.actionability_note }}</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-{{ crypto_freshness.badge_kind }}">
+        {{ crypto_freshness.status_label }} {{ crypto_freshness.age_label }}
+      </span>
+      <a class="button" href="{{ crypto_freshness.report_href }}">Watch report</a>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div>
+      <span>Watch state</span>
+      <strong title="{{ crypto_freshness.watch_state }}">
+        {{ crypto_freshness.watch_state_label|default(crypto_freshness.watch_state) }}
+      </strong>
+    </div>
+    <div><span>Paper-ready</span><strong>{{ crypto_freshness.paper_ready_candidates }}</strong></div>
+    <div><span>Positive EV</span><strong>{{ crypto_freshness.positive_ev_rows }}</strong></div>
+    <div><span>Progress</span><strong>{{ crypto_freshness.watch_progress_label }}</strong></div>
+    <div><span>Elapsed</span><strong>{{ crypto_freshness.elapsed_label }}</strong></div>
+    <div><span>ETA</span><strong>{{ crypto_freshness.eta_label }}</strong></div>
+    <div>
+      <span>Action blocker</span>
+      <strong title="{{ crypto_freshness.actionability_gap }}">
+        {{ crypto_freshness.actionability_gap_label|default(crypto_freshness.actionability_gap) }}
+      </strong>
+    </div>
+    <div>
+      <span>Runner</span>
+      <strong title="{{ crypto_freshness.runner_status }}">
+        {{ crypto_freshness.runner_status_label|default(crypto_freshness.runner_status) }}
+      </strong>
+    </div>
+    <div><span>Cadence</span><strong>{{ crypto_freshness.cadence_minutes }} minutes</strong></div>
+    <div><span>Best row</span><strong>{{ crypto_freshness.best_ev_candidate_ticker }}</strong></div>
+    <div><span>Best EV</span><strong>{{ crypto_freshness.best_current_expected_value_label }}</strong></div>
+    <div><span>Gap to positive</span><strong>{{ crypto_freshness.best_ev_gap_to_positive_label }}</strong></div>
+  </div>
+</section>
+
+<section class="section-band compact-band" aria-labelledby="paper-blockers-title">
+  <div class="section-head">
+    <div>
+      <h2 id="paper-blockers-title">Why No Paper Trades?</h2>
+      <p class="muted">{{ paper_trade_blockers.summary }}</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-{{ paper_trade_blockers.status_kind }}">{{ paper_trade_blockers.status_label }}</span>
+      {% for link in paper_trade_blockers.report_links[:2] %}
+      <a class="button" href="{{ link.href }}">{{ link.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="status-grid">
+    {% for item in paper_trade_blockers.metrics %}
+    <div><span>{{ item.label }}</span><strong>{{ item.value }}</strong></div>
+    {% endfor %}
+    <div><span>Last report</span><strong>{{ paper_trade_blockers.last_updated }}</strong></div>
+  </div>
+  <div class="table-wrap professional-table paper-blocker-table">
+    <table>
+      <caption class="sr-only">Paper trade blockers summarized from phase reports</caption>
+      <thead>
+        <tr>
+          <th scope="col">Area</th>
+          <th scope="col">Status</th>
+          <th scope="col">Evidence</th>
+          <th scope="col">Next action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in paper_trade_blockers.blockers %}
+        <tr>
+          <td><strong>{{ row.area }}</strong><small>{{ row.source }}</small></td>
+          <td><span class="status-pill status-{{ row.status_kind }}">{{ row.status_label }}</span></td>
+          <td>{{ row.evidence }}</td>
+          <td>{{ row.next_action }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if paper_trade_blockers.positive_ev_rows %}
+  <div class="table-wrap professional-table paper-positive-ev-table">
+    <table>
+      <caption class="sr-only">Positive-EV rows classified by verified Kalshi link and book status</caption>
+      <thead>
+        <tr>
+          <th scope="col">Market</th>
+          <th scope="col">Kalshi link</th>
+          <th scope="col">EV</th>
+          <th scope="col">Book</th>
+          <th scope="col">Blocker</th>
+          <th scope="col">Next action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in paper_trade_blockers.positive_ev_rows %}
+        <tr>
+          <td>
+            <strong>{{ row.market_ticker }}</strong>
+            <small>{{ row.market_title }} / {{ row.forecast_model }}</small>
+          </td>
+          <td>
+            {% if row.kalshi_url_verified and row.kalshi_url %}
+            <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            {% else %}
+            <span class="status-pill status-{{ row.url_status_kind }}">{{ row.url_status_label }}</span>
+            {% endif %}
+            <small>exact catalog match: {{ 'yes' if row.catalog_match_exists else 'no' }}</small>
+            <small>stored official URL: {{ 'yes' if row.stored_official_url else 'no' }}</small>
+            {% if row.malformed_reason %}
+            <small>reason: {{ row.malformed_reason }}</small>
+            {% endif %}
+            {% if row.repair_command_required %}
+            <small>repair required</small>
+            {% endif %}
+          </td>
+          <td class="numeric">{{ row.raw_ev }}c<small>quote age {{ row.quote_age }}</small></td>
+          <td>
+            <span class="status-pill status-{{ 'blocked' if row.book_refresh_needed else 'unknown' }}">{{ row.book_status_label }}</span>
+          </td>
+          <td><span class="status-pill status-blocked">{{ row.primary_blocker_label }}</span></td>
+          <td>{{ row.next_action }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  <div class="mini-actions">
+    {% for link in paper_trade_blockers.report_links[2:] %}
+    <a href="{{ link.href }}">{{ link.label }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="today-grid" aria-label="Today control overview">
+  <article class="today-panel">
+    <div class="section-head compact-head">
+      <div>
+        <h2>Portfolio and Risk</h2>
+        <p class="muted">Paper portfolio state from the existing ledger.</p>
+      </div>
+      <a class="button" href="/portfolio">Details</a>
+    </div>
+    <div class="metric-row">
+      <div><span>Paper P&L</span><strong class="numeric">{{ portfolio.total_pnl }}</strong></div>
+      <div><span>Open positions</span><strong class="numeric">{{ portfolio.open_positions }}</strong></div>
+      <div><span>3N blocked</span><strong class="numeric">{{ today_workspace.blocked_count }}</strong></div>
+      <div><span>3N reduced</span><strong class="numeric">{{ today_workspace.reduced_count }}</strong></div>
+    </div>
+    {{ ux.risk_bar('Daily loss used', '0%', 'authoritative report', 'see risk detail') }}
+  </article>
+
+  <article class="today-panel">
+    <div class="section-head compact-head">
+      <div>
+        <h2>System and Data Warnings</h2>
+        <p class="muted">A rendered shell is not evidence of healthy data.</p>
+      </div>
+      <a class="button" href="/system/health">Health</a>
+    </div>
+    <div class="warning-list">
+      {% for warning in today_workspace.warnings %}
+      <div class="state-panel state-{{ warning.severity }}">
+        <strong>{{ warning.title }}</strong>
+        <span>{{ warning.detail }}</span>
+      </div>
+      {% else %}
+      <div class="state-panel state-healthy">
+        <strong>No active shell warnings</strong>
+        <span>Still verify underlying data freshness before taking action.</span>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="section-band today-opportunities" aria-labelledby="today-opportunities-title">
+  <div class="section-head">
+    <div>
+      <h2 id="today-opportunities-title">Ranked Opportunities</h2>
+      <p class="muted">
+        Market probability, model probability, edge, and gate status stay visibly distinct.
+      </p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-neutral">{{ today_workspace.candidate_count }} rankings</span>
+      <span class="badge badge-neutral">{{ today_workspace.forecast_count }} forecasts</span>
+      <span class="badge badge-neutral">{{ today_workspace.paper_trade_count }} paper trades</span>
+      <span class="badge badge-neutral">{{ opportunity_links.verified_clickable_opportunities }} verified links</span>
+      <span class="badge badge-neutral">{{ opportunity_links.blocked_unverified_opportunities }} diagnostic links</span>
+    </div>
+  </div>
+  {% if opportunities %}
+  <div class="table-wrap professional-table">
+    <table>
+      <caption class="sr-only">Ranked opportunities with market and model probability labels</caption>
+      <thead>
+        <tr>
+          <th scope="col">Rank</th>
+          <th scope="col">Market</th>
+          <th scope="col">Side</th>
+          <th scope="col">Market probability</th>
+          <th scope="col">Model probability</th>
+          <th scope="col">Edge</th>
+          <th scope="col">Risk-adjusted score</th>
+          <th scope="col">Liquidity</th>
+          <th scope="col">Kalshi</th>
+          <th scope="col">Decision chain</th>
+          <th scope="col">Validity</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in opportunities[:12] %}
+        <tr>
+          <td class="numeric">{{ loop.index }}</td>
+          <td>
+            <a href="/opportunities/{{ item.ticker }}">{{ item.short_title }}</a>
+            <small>{{ item.ticker }} / {{ item.model_name }}</small>
+          </td>
+          <td>{{ item.recommendation_label }}</td>
+          <td class="numeric">{{ item.price }}</td>
+          <td class="numeric">{{ item.confidence_percent }}</td>
+          <td class="numeric">{{ item.edge_cents }}</td>
+          <td class="numeric">{{ item.payout_adjusted_score }}</td>
+          <td class="numeric">{{ item.liquidity }}</td>
+          <td>
+            {% if item.kalshi_url_verified %}
+            <a class="button" href="{{ item.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            {% else %}
+            <span class="badge badge-caution">{{ item.kalshi_url_status }}</span>
+            {% endif %}
+          </td>
+          <td>{{ ux.decision_waterfall('Unknown', 'Proposed only', 'See 3N') }}</td>
+          <td>{{ item.data_freshness }} / {{ item.formatted_time_remaining }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="state-panel state-no_trade">
+    <strong>No trade</strong>
+    <span>{{ today_workspace.no_trade_message }}</span>
+    <span class="sr-only">Market probability Model probability 3S ROI gate</span>
+  </div>
+  {% endif %}
+</section>
+
+<section class="today-grid" aria-label="Evidence and recent changes">
+  <article class="today-panel">
+    <div class="section-head compact-head">
+      <div>
+        <h2>What Changed</h2>
+        <p class="muted">Recent alerts and report evidence.</p>
+      </div>
+      <a class="button" href="/alerts">Alerts</a>
+    </div>
+    {% for event in alert_status.events[:5] %}
+    <p><strong>{{ event.severity }}</strong>: {{ event.message }}</p>
+    {% else %}
+    <p class="muted">No current alert events.</p>
+    {% endfor %}
+  </article>
+
+  <article class="today-panel">
+    <div class="section-head compact-head">
+      <div>
+        <h2>Nightly Journal</h2>
+        <p class="muted">Learning and model-confidence follow-up.</p>
+      </div>
+      <a class="button" href="/memory">Journal</a>
+    </div>
+    <div class="metric-row two">
+      <div><span>Settled learning</span><strong>{{ learning_status.settled_paper_trades }}</strong></div>
+      <div><span>Confidence</span><strong>{{ learning_status.learning_confidence }}</strong></div>
+      <div><span>Trade health</span><strong>{{ learning_status.trade_generation_health.label }}</strong></div>
+      <div><span>Expected completion</span><strong>{{ learning_status.expected_completion }}</strong></div>
+    </div>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}News Item{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>{{ item.title }}</h1>
+    <p>{{ item.source }} / {{ item.category }} / ingested {{ item.ingested_at }}</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">Importance {{ item.importance_score }}</span>
+    <span class="badge badge-info">Sentiment {{ item.sentiment_score }}</span>
+    <a class="button" href="/news">Back to news</a>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="section-band">
+    <h2>News Detail</h2>
+    <dl>
+      <dt>Published</dt><dd>{{ item.published_at or 'n/a' }}</dd>
+      <dt>Author</dt><dd>{{ item.author or 'n/a' }}</dd>
+      <dt>Source URL</dt>
+      <dd>
+        {% if item.source_url %}
+        <a href="{{ item.source_url }}">{{ item.source_url }}</a>
+        {% else %}
+        n/a
+        {% endif %}
+      </dd>
+      <dt>Freshness</dt><dd>{{ item.freshness_score }}</dd>
+      <dt>Entities</dt><dd>{{ item.entities|join(', ') or 'none' }}</dd>
+    </dl>
+    <p>{{ item.summary or 'No summary available.' }}</p>
+    {% if item.body %}
+    <details class="raw-data">
+      <summary>Body</summary>
+      <p>{{ item.body }}</p>
+    </details>
+    {% endif %}
+  </div>
+
+  <div class="section-band">
+    <h2>Linked Markets</h2>
+    <ul class="checks">
+      {% for link in links %}
+      <li>
+        <strong><a href="/opportunities/{{ link.ticker }}">{{ link.ticker }}</a></strong>
+        confidence {{ link.link_confidence }}: {{ link.link_reason }}
+      </li>
+      {% else %}
+      <li>No markets linked to this item yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="section-band">
+  <h2>Related Opportunities</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Market</th>
+          <th>Probability</th>
+          <th>Edge</th>
+          <th>Risk</th>
+          <th>Kalshi</th>
+          <th>Recommendation</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in opportunities %}
+        <tr>
+          <td><a href="/opportunities/{{ row.ticker }}">{{ row.ticker }}</a></td>
+          <td class="wide">{{ row.market }}</td>
+          <td>{{ row.news_v1_probability }}</td>
+          <td>{{ row.edge }}</td>
+          <td>{{ row.risk }}</td>
+          <td>
+            {% if row.kalshi_url_verified %}
+            <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+            {% else %}
+            <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+            <small>{{ row.kalshi_url_reason }}</small>
+            {% endif %}
+          </td>
+          <td>{{ row.recommendation }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No news_v1 opportunity rows yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section-band">
+  <details class="raw-data">
+    <summary>Raw Classification Payload</summary>
+    <pre>{{ item.raw_json }}</pre>
+  </details>
+</section>
+{% endblock %}

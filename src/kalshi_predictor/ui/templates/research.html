@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Research Assistant{% endblock %}
+{% block content %}
+<section class="cockpit-hero">
+  <div>
+    <h1>Research Assistant</h1>
+    <p>Deterministic local explanations from rankings, forecasts, features, paper results, and reports.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">No external LLM</span>
+    <span class="badge badge-info">{{ model_name }}</span>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Ask Research</h2>
+      <p class="muted">Answers use predefined local templates and stored evidence only.</p>
+    </div>
+    <form data-action method="post" action="/reports/research-report">
+      <input type="hidden" name="model_name" value="{{ model_name }}">
+      <input type="hidden" name="limit" value="10">
+      <button type="submit">Write report</button>
+    </form>
+  </div>
+  <form data-action method="post" action="/research/ask" class="grid three">
+    <label>
+      Question
+      <select name="question">
+        {% for question in questions %}
+        <option value="{{ question }}">{{ question }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Ticker
+      <input name="ticker" placeholder="Optional ticker">
+    </label>
+    <label>
+      Model
+      <input name="model_name" value="{{ model_name }}">
+    </label>
+    <button type="submit" class="primary">Ask</button>
+  </form>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Top Opportunities Explained</h2>
+      <p class="muted">Current best-ranked opportunities with evidence-based narratives.</p>
+    </div>
+  </div>
+  <div class="grid two">
+    {% for item in top_opportunities %}
+    {% set evidence = item.evidence %}
+    {% set narrative = item.narrative %}
+    {% set identity = evidence.market_identity %}
+    <article class="mini-panel">
+      <h3>{{ evidence.short_market_name }}</h3>
+      <p class="muted">{{ evidence.ticker }} / rank {{ evidence.rank or 'n/a' }}</p>
+      <p><strong>Primary Driver:</strong> {{ narrative.primary_driver }}</p>
+      <p>{{ narrative.why_ranked }}</p>
+      <p>
+        {% if identity.kalshi_url_verified %}
+        <a class="button" href="{{ identity.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+        {% else %}
+        <span class="badge badge-caution">{{ identity.kalshi_url_status }}</span>
+        <small>{{ identity.kalshi_url_reason }}</small>
+        {% endif %}
+      </p>
+      <div class="card-foot">
+        <span>{{ narrative.confidence_label }}</span>
+        <a class="button primary" href="/research/opportunity/{{ evidence.ticker }}?model_name={{ model_name }}">Full writeup</a>
+      </div>
+    </article>
+    {% else %}
+    <div class="empty">No ranked opportunities are available yet.</div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="grid three">
+  <div class="section-band">
+    <h2>Top Risks Today</h2>
+    <ul class="checks">
+      {% for risk in top_risks %}
+      <li>{{ risk }}</li>
+      {% else %}
+      <li>No major risks detected.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="section-band">
+    <h2>Missing Data</h2>
+    <ul class="checks">
+      {% for item in missing_warnings %}
+      <li>{{ item }}</li>
+      {% else %}
+      <li>No major gaps detected.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="section-band">
+    <h2>Model Drivers</h2>
+    <ul class="checks">
+      {% for driver in model_drivers %}
+      <li>{{ driver }}</li>
+      {% else %}
+      <li>No model drivers available yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}

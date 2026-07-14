@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Watchlists{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div><h1>Watchlists</h1><p>Default, high conviction, crypto, weather, and sports watchlists.</p></div>
+  <div class="hero-status"><span class="badge badge-info">Local state</span></div>
+</section>
+<section class="section-band">
+  <div class="grid two">
+  {% for watchlist in watchlists %}
+    <div class="mini-panel">
+      <h2>{{ watchlist.name }}</h2>
+      <form data-action method="post" action="/watchlists/add">
+        <input type="hidden" name="watchlist_id" value="{{ watchlist.id }}">
+        <input name="ticker" placeholder="Ticker">
+        <button class="primary" type="submit">Add market</button>
+      </form>
+      {% for row in watchlist.markets %}
+      <form class="inline-form" data-action method="post" action="/watchlists/remove?item_id={{ row.id }}">
+        <span>
+          {{ row.ticker }} score {{ row.opportunity_score }}
+          {% if row.kalshi_url_verified %}
+          <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
+          {% else %}
+          <span class="badge badge-caution">{{ row.kalshi_url_status }}</span>
+          {% endif %}
+        </span>
+        <button type="submit">Remove</button>
+      </form>
+      {% else %}<p>No markets yet.</p>{% endfor %}
+    </div>
+  {% endfor %}
+  </div>
+</section>
+{% endblock %}

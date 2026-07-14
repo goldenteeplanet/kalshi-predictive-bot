@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div><h1>Performance Analytics</h1><p>P&L, forecast, opportunity, ranking, and paper trade growth trends.</p></div>
+  <div class="hero-status"><span class="badge badge-info">Paper analytics</span></div>
+</section>
+<section class="section-band">
+  <div class="grid three">
+    <div class="chart-card"><h2>Daily P&L</h2>{% for row in analytics.daily_pnl %}<p>{{ row.time }}: {{ row.total_pnl }}</p>{% else %}<p>No data.</p>{% endfor %}</div>
+    <div class="chart-card"><h2>Weekly P&L</h2>{% for row in analytics.weekly_pnl %}<p>{{ row.time }}: {{ row.total_pnl }}</p>{% else %}<p>No data.</p>{% endfor %}</div>
+    <div class="chart-card"><h2>Monthly P&L</h2>{% for row in analytics.monthly_pnl %}<p>{{ row.time }}: {{ row.total_pnl }}</p>{% else %}<p>No data.</p>{% endfor %}</div>
+    <div class="chart-card"><h2>Forecast accuracy trend</h2>{% for row in analytics.forecast_accuracy_trend[-8:] %}<p>{{ row.time }}: {{ row.value }}</p>{% else %}<p>No data.</p>{% endfor %}</div>
+    <div class="chart-card"><h2>Opportunity trend</h2>{% for row in analytics.opportunity_trend[-8:] %}<p>{{ row.time }}: {{ row.value }}</p>{% else %}<p>No data.</p>{% endfor %}</div>
+    <div class="chart-card"><h2>Paper trade growth</h2>{% for row in analytics.paper_trade_growth[-8:] %}<p>{{ row.time }}: {{ row.value }}</p>{% else %}<p>No data.</p>{% endfor %}</div>
+  </div>
+</section>
+{% endblock %}

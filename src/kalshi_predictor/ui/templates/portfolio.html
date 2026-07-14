@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Portfolio{% endblock %}
+{% block content %}
+<section class="cockpit-hero detail-hero">
+  <div>
+    <h1>Portfolio</h1>
+    <p>Paper position management, exposure, and P&L snapshots.</p>
+  </div>
+  <div class="hero-status">
+    <span class="badge badge-info">DEMO ONLY</span>
+    <span class="badge badge-info">Paper positions</span>
+  </div>
+</section>
+
+<section class="summary-grid">
+  <div><span>Portfolio Value</span><strong>{{ portfolio.portfolio_value }}</strong></div>
+  <div><span>Total Exposure</span><strong>{{ portfolio.total_exposure }}</strong></div>
+  <div><span>Direct Positions</span><strong>{{ portfolio.open_positions }}</strong></div>
+  <div><span>Composite Backlog</span><strong>{{ portfolio.local_composite_backlog_count }}</strong></div>
+  <div><span>Realized P&L</span><strong>{{ portfolio.realized_pnl }}</strong></div>
+  <div><span>Unrealized P&L</span><strong>{{ portfolio.unrealized_pnl }}</strong></div>
+</section>
+
+<section class="section-band">
+  <div class="grid three">
+    <div class="chart-card">
+      <h2>P&L over time</h2>
+      <ul>
+      {% for point in portfolio.pnl_series[-8:] %}
+        <li>{{ point.time }}: {{ point.value }}</li>
+      {% else %}
+        <li>No snapshots yet.</li>
+      {% endfor %}
+      </ul>
+    </div>
+    <div class="chart-card"><h2>Exposure over time</h2><ul>{% for point in portfolio.exposure_series[-8:] %}<li>{{ point.time }}: {{ point.value }}</li>{% else %}<li>No snapshots yet.</li>{% endfor %}</ul></div>
+    <div class="chart-card"><h2>Positions by category</h2><ul>{% for row in portfolio.category_allocation %}<li>{{ row.category }}: {{ row.exposure }}</li>{% else %}<li>No category exposure.</li>{% endfor %}</ul></div>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="section-head">
+    <h2>Direct Paper Positions</h2>
+    <span class="muted">{{ portfolio.positions|length }} shown{% if portfolio.positions_truncated %} of {{ portfolio.open_positions }}{% endif %}</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Category</th><th>Size</th><th>Avg cost</th><th>Market price</th><th>Realized</th><th>Unrealized</th><th>Total</th><th>Exposure</th></tr></thead>
+      <tbody>
+      {% for row in portfolio.positions %}
+        <tr>
+          <td><a href="/positions/{{ row.ticker }}">{{ row.ticker }}</a></td>
+          <td>{{ row.category }}</td>
+          <td>{{ row.position_size }}</td>
+          <td>{{ row.avg_cost or 'n/a' }}</td>
+          <td>{{ row.market_price or 'n/a' }}</td>
+          <td>{{ row.realized_pnl }}</td>
+          <td>{{ row.unrealized_pnl }}</td>
+          <td>{{ row.total_pnl }}</td>
+          <td>{{ row.exposure }}</td>
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="9">
+            {% if portfolio.local_composite_backlog_count %}
+              No exchange-backed paper positions are open. {{ portfolio.local_composite_backlog_count }} local composite rows are waiting for guarded exact settlement evidence.
+            {% else %}
+              No paper positions yet.
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if portfolio.local_composite_backlog_count %}
+<section class="section-band">
+  <div class="section-head">
+    <h2>Local Composite Settlement Backlog</h2>
+    <span class="muted">{{ portfolio.local_composite_backlog|length }} shown{% if portfolio.local_composite_backlog_truncated %} of {{ portfolio.local_composite_backlog_count }}{% endif %}</span>
+  </div>
+  <p class="muted">{{ portfolio.local_composite_notice }} {{ portfolio.local_composite_resolved_count }} local composite rows are already realized; {{ portfolio.local_composite_settlement_ready_count }} have exact composite settlement evidence but still need paper P&L realization.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Category</th><th>Size</th><th>Realized</th><th>Exposure</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for row in portfolio.local_composite_backlog %}
+        <tr>
+          <td><a href="/positions/{{ row.ticker }}">{{ row.ticker }}</a></td>
+          <td>{{ row.category }}</td>
+          <td>{{ row.position_size }}</td>
+          <td>{{ row.realized_pnl }}</td>
+          <td>{{ row.exposure }}</td>
+          <td>{{ row.settlement_status }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6">No local composite backlog rows.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
