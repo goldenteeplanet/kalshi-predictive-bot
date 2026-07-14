@@ -1,7 +1,7 @@
-Build: Phase 3AH: Sports Placeholder Watch.
+Build: Phase 3AE: Fast Market Harvester.
 
 Objective:
-Keep round-placeholder schedule rows blocked until source schedules name real teams, then rerun Phase 3AE after the clean team + time + market-type gate can evaluate them.
+Collect, rank, and route more 0-24h markets before creating new paper trades.
 
 Safety:
 - Do NOT add live trading.
@@ -14,42 +14,39 @@ Safety:
 
 Current evidence:
 - Exact settlement eligible trades: 0
-- Active unsettled trades: 3
-- Due or overdue trades: 3
-- ETA buckets: {'overdue': 3}
+- Active unsettled trades: 0
+- Due or overdue trades: 0
+- ETA buckets: {}
 - Phase 3AA-R5 closed/no-outcome rows: 0
 - Phase 3AA-R5 usable outcome candidates: 0
 - Fast settlement candidates: 0
-- Slow settlement avoids: 54
-- Sports partial links without upgrade: 259
-- Sports provenance counts: {'verified_schedule': 31, 'kalshi_event_derived': 51063, 'partial_market_derived': 259}
+- Slow settlement avoids: 53
+- Sports partial links without upgrade: 0
+- Sports provenance counts: {'verified_schedule': 31, 'kalshi_event_derived': 51105, 'partial_market_derived': 0}
 - Phase 3AH round placeholder rows: 19
 - Phase 3AH placeholder resolver safe rows: 13
 - Phase 3AH placeholder resolver still placeholders: 6
 - Phase 3AH placeholder watch rows: 19
 - Phase 3AH placeholder watch gate: READY_FOR_PHASE3AE_SAFE_ROWS
-- Phase 3AH roster rework rows: 0
+- Phase 3AH roster rework rows: 8
 - Phase 3AZ implementation queue: []
 - Phase 3AZ recommended next action: No implementation gap is currently actionable; keep the refresh/watch loops running.
-- Market coverage recommendations: ['sports: Review partial or legacy links']
+- Market coverage recommendations: ['Coverage pipeline is producing measurable rows.']
 
 Detected bottlenecks:
-- DUE_OR_OVERDUE_SETTLEMENTS (MEDIUM): 3 paper trade(s) are due or overdue. Next: Run the Phase 3AA-R2 exact-ticker settlement harvest before realizing paper P&L.
 - NO_FAST_LEARNING_CANDIDATES (MEDIUM): Learning governor found no 0-24h candidates. Next: Collect and rank more short-dated markets before starting new learning cycles.
 - RL_POLICY_NOT_EVALUATED (LOW): Phase 3S has not produced an offline/shadow policy evaluation yet. Next: Run rl-evaluate after enough paper outcomes settle.
 - FEATURE_DISCOVERY_NOT_RUN (LOW): Phase 3Q has not searched for new feature candidates yet. Next: Run feature-discovery-run once paper/forecast history is current.
 - SELF_EVALUATION_NOT_RUN (LOW): Phase 3P has not written a self-evaluation journal yet. Next: Run self-evaluate to turn diagnostics into recurring lessons.
-- PARTIAL_SPORTS_PROVENANCE (MEDIUM): 259 sports link(s) remain partial. Next: Add verified sports schedule/team ingestion to upgrade provenance.
 - LEARNING_BOUNDED_DIAGNOSTICS (LOW): Phase 3AD used bounded aggregate learning diagnostics for fast post-refresh roadmap generation. Next: Run kalshi-bot learning-diagnostics separately when full rejection replay is needed.
-- COVERAGE_SPORTS_LINKER_DEGRADED (LOW): sports coverage health is LINKER_DEGRADED. Next: Review partial or legacy links
 
 Self-improvement candidates:
-- Keep paper and market health fresh automatically | model: health_refresh | priority: 92 | blocked_by: none | next: kalshi-bot phase3ay-health-refresh --cycles 999 --interval-seconds 300 --all-markets
-- Harvest exact ticker settlement evidence for due paper orders | model: settlement_reconciliation | priority: 88 | blocked_by: needs exact ticker source settlement evidence | next: kalshi-bot phase3aa-r2-exact-settlement-harvest --output-dir reports/phase3aa_r2
 - Route learning toward markets that settle soonest | model: learning_governor | priority: 85 | blocked_by: needs more fresh short-dated candidates | next: kalshi-bot phase3ab-learning-governor
 - Search for new predictive features from paper evidence | model: feature_discovery | priority: 80 | blocked_by: none | next: kalshi-bot feature-discovery-run --run-type INCREMENTAL
 - Evaluate policy actions with offline/shadow reinforcement learning | model: reinforcement_learning | priority: 80 | blocked_by: none | next: kalshi-bot rl-evaluate --enable-research
 - Watch sports bracket placeholders until source schedules name teams | model: market_linking | priority: 78 | blocked_by: source still has bracket placeholders | next: kalshi-bot phase3ah-sports-placeholder-watch --output-dir reports/phase3ah_sports
+- Verify sports player/participant roster evidence | model: market_linking | priority: 75 | blocked_by: needs verified roster/team evidence | next: kalshi-bot phase3ah-roster-participant-verification --output-dir reports/phase3ah_sports
+- Keep paper and market health fresh automatically | model: health_refresh | priority: 72 | blocked_by: none | next: kalshi-bot phase3ay-health-refresh --cycles 999 --interval-seconds 300 --all-markets
 
 Tasks:
 1. Inspect the current Phase 3AA, 3AB, 3AC, and 3AD reports.

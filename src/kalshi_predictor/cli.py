@@ -1,4 +1,4 @@
-# ruff: noqa: E402
+# ruff: noqa: E402, I001
 import importlib.util
 import json
 import os
@@ -295,6 +295,9 @@ from kalshi_predictor.phase3ab import write_phase3ab_report
 from kalshi_predictor.phase3ac import write_phase3ac_report
 from kalshi_predictor.phase3ad import write_phase_orchestrator_report
 from kalshi_predictor.phase3ae import write_phase3ae_report
+from kalshi_predictor.phase3ae_fast_market import (
+    write_phase3ae_fast_market_harvester_report,
+)
 from kalshi_predictor.phase3ae_roster_candidates import (
     write_phase3ae_roster_candidate_diagnostics,
 )
@@ -3108,6 +3111,51 @@ def phase3ab_learning_governor_command(
         )
     console.print("Phase 3AB Learning Governor / Fast Settlement Router")
     console.print("Mode: PAPER ONLY diagnostics")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
+@app.command("phase3ae-fast-market-harvester")
+def phase3ae_fast_market_harvester_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for Phase 3AE fast market harvester artifacts."),
+    ] = Path("reports/phase3ae_fast_market"),
+    model_name: Annotated[
+        str,
+        typer.Option(help="Ranking model to inspect and refresh."),
+    ] = "ensemble_v2",
+    ranking_limit: Annotated[
+        int,
+        typer.Option(help="Maximum unique ranking candidates to inspect."),
+    ] = 500,
+    market_limit: Annotated[
+        int,
+        typer.Option(help="Maximum open 0-24h markets to inspect for ranking gaps."),
+    ] = 500,
+    horizon_hours: Annotated[
+        int,
+        typer.Option(help="Fast-settlement horizon in hours."),
+    ] = 24,
+) -> None:
+    """Write the paper-only Phase 3AE fast-settlement market harvest report."""
+    engine = init_db()
+    settings = get_settings()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        artifacts = write_phase3ae_fast_market_harvester_report(
+            session,
+            output_dir=output_dir,
+            settings=settings,
+            model_name=model_name,
+            ranking_limit=ranking_limit,
+            market_limit=market_limit,
+            horizon_hours=horizon_hours,
+        )
+    console.print("Phase 3AE Fast Market Harvester")
+    console.print("Mode: PAPER ONLY read-only diagnostics")
+    console.print("Live/demo execution: blocked")
+    console.print("Order submission/cancel/replace: blocked")
     console.print(f"Wrote JSON: {artifacts.json_path}")
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
