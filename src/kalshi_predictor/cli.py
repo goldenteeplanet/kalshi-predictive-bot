@@ -18202,15 +18202,119 @@ def build_crypto_features_command(
 
 
 @app.command("link-crypto-markets")
-def link_crypto_markets_command() -> None:
+def link_crypto_markets_command(
+    limit: Annotated[
+        int,
+        typer.Option(help="Maximum markets to scan in this batch. Use 0 for all markets."),
+    ] = 0,
+    progress_every: Annotated[
+        int,
+        typer.Option(help="Write/print progress every N markets. Use 0 for every processed row."),
+    ] = 1000,
+    checkpoint_every: Annotated[
+        int,
+        typer.Option(help="Commit and write a checkpoint every N processed markets. Use 0 to disable."),
+    ] = 1000,
+    stop_after_minutes: Annotated[
+        int,
+        typer.Option(help="Stop cleanly after N minutes and keep committed checkpoint batches. Use 0 for no limit."),
+    ] = 0,
+    heartbeat_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for crypto linker heartbeat/checkpoint artifacts."),
+    ] = Path("reports/crypto_link"),
+) -> None:
     engine = init_db()
     session_factory = get_session_factory(engine)
+    heartbeat_dir.mkdir(parents=True, exist_ok=True)
+    heartbeat_path = heartbeat_dir / "link_crypto_markets_heartbeat.json"
+    checkpoint_path = heartbeat_dir / "link_crypto_markets_checkpoint.json"
+    summary_path = heartbeat_dir / "link_crypto_markets_summary.json"
+    started_monotonic = time.monotonic()
+    deadline = (
+        started_monotonic + (stop_after_minutes * 60)
+        if stop_after_minutes and stop_after_minutes > 0
+        else None
+    )
+
+    def _state_payload(progress: dict[str, object], *, final: bool = False) -> dict[str, object]:
+        elapsed = time.monotonic() - started_monotonic
+        return {
+            **progress,
+            "pid": os.getpid(),
+            "elapsed_seconds": round(elapsed, 3),
+            "limit": limit,
+            "progress_every": progress_every,
+            "checkpoint_every": checkpoint_every,
+            "stop_after_minutes": stop_after_minutes,
+            "resume": True,
+            "resume_mode": "idempotent_skip_matching_latest_link",
+            "final": final,
+            "paper_only_safety": "PAPER_ONLY_NO_EXCHANGE_WRITES",
+        }
+
+    def _write_json(path: Path, payload: dict[str, object]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+
+    def _should_stop() -> bool:
+        return deadline is not None and time.monotonic() >= deadline
+
     with session_factory() as session:
-        summary = link_crypto_markets(session)
+        def _progress(progress: dict[str, object]) -> None:
+            state = _state_payload(progress)
+            _write_json(heartbeat_path, state)
+            processed = int(progress.get("processed") or 0)
+            status = str(progress.get("status") or "")
+            should_checkpoint = (
+                checkpoint_every > 0
+                and processed > 0
+                and (processed % checkpoint_every == 0 or status in {"COMPLETE", "STOPPED_EARLY"})
+            )
+            if should_checkpoint:
+                session.commit()
+                _write_json(checkpoint_path, state)
+            if status in {"COMPLETE", "STOPPED_EARLY"} or (
+                progress_every >= 0 and processed > 0 and (progress_every == 0 or processed % progress_every == 0)
+            ):
+                console.print(
+                    "Crypto link progress: "
+                    f"{processed}/{progress.get('total')} "
+                    f"status={status} created={progress.get('created')} "
+                    f"ticker={progress.get('ticker')}"
+                )
+
+        summary = link_crypto_markets(
+            session,
+            limit=limit if limit > 0 else None,
+            progress_callback=_progress,
+            progress_every=max(progress_every, 0),
+            should_stop=_should_stop,
+        )
         session.commit()
+    _write_json(
+        summary_path,
+        _state_payload(
+            {
+                "stage": "crypto_link",
+                "status": "STOPPED_EARLY" if summary.stopped_early else "COMPLETE",
+                "processed": summary.markets_processed,
+                "total": summary.markets_scanned,
+                "ticker": summary.last_ticker,
+                "created": summary.links_created,
+                "already_linked": summary.already_linked,
+                "rejected_by_reason": summary.rejected_by_reason or {},
+            },
+            final=True,
+        ),
+    )
     console.print("Crypto market link summary")
     console.print(f"Markets scanned: {summary.markets_scanned}")
+    console.print(f"Markets processed: {summary.markets_processed}")
     console.print(f"Links created: {summary.links_created}")
+    console.print(f"Already linked: {summary.already_linked}")
+    console.print(f"Stopped early: {summary.stopped_early}")
+    console.print(f"Last ticker: {summary.last_ticker}")
     console.print(f"BTC links: {summary.btc_links}")
     console.print(f"ETH links: {summary.eth_links}")
     console.print(f"Generic links: {summary.generic_links}")
@@ -18219,6 +18323,9 @@ def link_crypto_markets_command() -> None:
     console.print(f"Ambiguous markets: {summary.ambiguous_markets}")
     console.print(f"Unsupported markets: {summary.unsupported_markets}")
     console.print(f"Links by symbol: {summary.links_by_symbol}")
+    console.print(f"Wrote heartbeat: {heartbeat_path}")
+    console.print(f"Wrote checkpoint: {checkpoint_path}")
+    console.print(f"Wrote summary: {summary_path}")
 
 
 @app.command("crypto-report")

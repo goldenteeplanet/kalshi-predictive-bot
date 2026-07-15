@@ -35,6 +35,9 @@ class CryptoLinkResult:
     btc_links: int
     eth_links: int
     generic_links: int
+    markets_processed: int = 0
+    stopped_early: bool = False
+    last_ticker: str | None = None
     already_linked: int = 0
     target_price_links: int = 0
     multi_asset_links: int = 0
@@ -82,7 +85,12 @@ def link_crypto_markets(
         if limit is not None:
             statement = statement.limit(limit)
         markets = list(session.scalars(statement))
-        legs_by_ticker = _crypto_legs_by_ticker(session)
+        market_tickers = [market.ticker for market in markets]
+        legs_by_ticker = (
+            _crypto_legs_by_ticker(session, tickers=market_tickers)
+            if limit is not None
+            else _crypto_legs_by_ticker(session)
+        )
     btc_links = 0
     eth_links = 0
     generic_links = 0
@@ -95,19 +103,25 @@ def link_crypto_markets(
     exact_semantic_links = 0
     ambiguous_markets = 0
     unsupported_markets = 0
+    markets_processed = 0
+    stopped_early = False
+    last_ticker: str | None = None
 
     for index, market in enumerate(markets, start=1):
         if should_stop is not None and should_stop():
+            stopped_early = True
             _emit_progress(
                 progress_callback,
                 progress_every=progress_every,
-                processed=index - 1,
+                processed=markets_processed,
                 total=len(markets),
                 ticker=market.ticker,
                 status="STOPPED_EARLY",
                 created=links_created,
             )
             break
+        markets_processed = index
+        last_ticker = market.ticker
         legs = legs_by_ticker.get(market.ticker, [])
         terms = parse_crypto_market_terms(market, legs=legs)
         if terms.status == AMBIGUOUS:
@@ -117,10 +131,28 @@ def link_crypto_markets(
         symbol, confidence, reason = detect_crypto_market(market, legs=legs)
         if confidence <= 0 or symbol is None:
             rejected[reason] = rejected.get(reason, 0) + 1
+            _emit_progress(
+                progress_callback,
+                progress_every=progress_every,
+                processed=index,
+                total=len(markets),
+                ticker=market.ticker,
+                status="REJECTED",
+                created=links_created,
+            )
             continue
         latest_link = get_latest_crypto_link_for_ticker(session, market.ticker)
         if latest_link is not None and latest_link.symbol == symbol:
             already_linked += 1
+            _emit_progress(
+                progress_callback,
+                progress_every=progress_every,
+                processed=index,
+                total=len(markets),
+                ticker=market.ticker,
+                status="ALREADY_LINKED",
+                created=links_created,
+            )
             continue
         raw_market = decode_json(market.raw_json)
         insert_crypto_market_link(
@@ -166,16 +198,28 @@ def link_crypto_markets(
             processed=index,
             total=len(markets),
             ticker=market.ticker,
-            status="PROGRESS",
+            status="LINK_CREATED",
             created=links_created,
         )
 
+    _emit_progress(
+        progress_callback,
+        progress_every=progress_every,
+        processed=markets_processed,
+        total=len(markets),
+        ticker=last_ticker or "",
+        status="COMPLETE" if not stopped_early else "STOPPED_EARLY",
+        created=links_created,
+    )
     return CryptoLinkResult(
         markets_scanned=len(markets),
         links_created=links_created,
         btc_links=btc_links,
         eth_links=eth_links,
         generic_links=generic_links,
+        markets_processed=markets_processed,
+        stopped_early=stopped_early,
+        last_ticker=last_ticker,
         already_linked=already_linked,
         target_price_links=target_price_links,
         multi_asset_links=multi_asset_links,
@@ -317,7 +361,7 @@ def _emit_progress(
     if progress_callback is None:
         return
     cadence = max(progress_every, 0)
-    if status == "PROGRESS" and cadence and processed % cadence != 0 and processed != total:
+    if status not in {"COMPLETE", "STOPPED_EARLY"} and cadence and processed % cadence != 0 and processed != total:
         return
     progress_callback(
         {

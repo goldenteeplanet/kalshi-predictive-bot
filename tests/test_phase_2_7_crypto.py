@@ -5,7 +5,8 @@ from sqlalchemy import select
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.crypto.features import calculate_crypto_features
-from kalshi_predictor.crypto.linker import detect_crypto_market
+
+from kalshi_predictor.crypto.linker import detect_crypto_market, link_crypto_markets
 from kalshi_predictor.crypto.providers import parse_coinbase_spot_response
 from kalshi_predictor.crypto.reports import generate_crypto_backtest_report
 from kalshi_predictor.crypto.repository import (
@@ -126,6 +127,42 @@ def test_linker_does_not_treat_solana_player_name_as_crypto(tmp_path) -> None:
     assert symbol is None
     assert confidence == Decimal("0.0")
     assert reason == "No crypto keyword match."
+
+
+def test_link_crypto_markets_emits_progress_for_created_and_rejected_rows(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    events: list[dict[str, object]] = []
+    with session_factory() as session:
+        upsert_market(session, {"ticker": "BTC-LINK", "title": "Will BTC exceed 70000?"})
+        upsert_market(session, {"ticker": "WEATHER-NO-LINK", "title": "Will it rain?"})
+
+        summary = link_crypto_markets(
+            session,
+            progress_callback=events.append,
+            progress_every=1,
+        )
+
+    statuses = {str(event["status"]) for event in events}
+    assert summary.markets_scanned == 2
+    assert summary.markets_processed == 2
+    assert summary.links_created == 1
+    assert summary.stopped_early is False
+    assert "LINK_CREATED" in statuses
+    assert "REJECTED" in statuses
+    assert "COMPLETE" in statuses
+
+
+def test_link_crypto_markets_honors_limit(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        upsert_market(session, {"ticker": "BTC-LIMIT-1", "title": "Will BTC exceed 70000?"})
+        upsert_market(session, {"ticker": "ETH-LIMIT-2", "title": "Will ETH exceed 4000?"})
+
+        summary = link_crypto_markets(session, limit=1, progress_every=1)
+
+    assert summary.markets_scanned == 1
+    assert summary.markets_processed == 1
+    assert summary.links_created == 1
 
 
 def test_crypto_v2_skips_without_link(tmp_path) -> None:
