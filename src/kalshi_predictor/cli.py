@@ -18392,10 +18392,16 @@ def phase3bb_r43_single_writer_coordinator_command(
     ] = True,
 ) -> None:
     settings = get_settings()
-    engine = init_db()
-    session_factory = get_session_factory(engine)
+    session_factory_cache: dict[str, Any] = {}
+
+    def _coordinator_session_factory():
+        if "factory" not in session_factory_cache:
+            engine = init_db()
+            session_factory_cache["factory"] = get_session_factory(engine)
+        return session_factory_cache["factory"]()
+
     artifacts = run_phase3bb_r43_single_writer_coordinator(
-        session_factory=session_factory,
+        session_factory=_coordinator_session_factory,
         output_dir=output_dir,
         symbols=parse_symbols(symbols),
         crypto_sources=[
