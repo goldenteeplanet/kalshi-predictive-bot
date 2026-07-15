@@ -301,6 +301,9 @@ from kalshi_predictor.phase3ae_fast_market import (
 from kalshi_predictor.phase3ae_roster_candidates import (
     write_phase3ae_roster_candidate_diagnostics,
 )
+from kalshi_predictor.single_writer_coordinator import (
+    run_phase3bb_r43_single_writer_coordinator,
+)
 from kalshi_predictor.phase3af import DEFAULT_SOCCER_COMPETITIONS, write_phase3af_report
 from kalshi_predictor.phase3ag import write_phase3ag_repair_report, write_phase3ag_report
 from kalshi_predictor.phase3ag_crypto import write_phase3ag_crypto_report
@@ -18326,6 +18329,98 @@ def link_crypto_markets_command(
     console.print(f"Wrote heartbeat: {heartbeat_path}")
     console.print(f"Wrote checkpoint: {checkpoint_path}")
     console.print(f"Wrote summary: {summary_path}")
+
+
+@app.command("phase3bb-r43-single-writer-coordinator")
+def phase3bb_r43_single_writer_coordinator_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for Phase 3BB-R43 coordinator artifacts."),
+    ] = Path("reports/phase3bb_r43"),
+    symbols: Annotated[
+        str,
+        typer.Option(help=f"Comma-separated crypto symbols, for example {DEFAULT_CRYPTO_SYMBOLS}."),
+    ] = DEFAULT_CRYPTO_SYMBOLS,
+    crypto_sources: Annotated[
+        str,
+        typer.Option(help="Comma-separated crypto quote sources to stage in parallel."),
+    ] = "coinbase",
+    staging_dir: Annotated[
+        Path | None,
+        typer.Option(help="Existing staging directory to drain, or omitted for a fresh run directory."),
+    ] = None,
+    max_workers: Annotated[
+        int,
+        typer.Option(help="Maximum parallel fetch workers for staging."),
+    ] = 4,
+    stage_fetches: Annotated[
+        bool,
+        typer.Option("--stage-fetches/--skip-stage-fetches", help="Fetch into staging files."),
+    ] = True,
+    drain_staged: Annotated[
+        bool,
+        typer.Option("--drain-staged/--stage-only", help="Drain staged files through one DB writer."),
+    ] = False,
+    build_features_after_drain: Annotated[
+        bool,
+        typer.Option(
+            "--build-features-after-drain/--skip-features-after-drain",
+            help="Build crypto features after the staged quote drain.",
+        ),
+    ] = True,
+    link_crypto_after_drain: Annotated[
+        bool,
+        typer.Option(
+            "--link-crypto-after-drain/--skip-link-crypto-after-drain",
+            help="Run bounded crypto market linking after staged quote drain.",
+        ),
+    ] = False,
+    crypto_link_limit: Annotated[
+        int,
+        typer.Option(help="Maximum crypto markets to link during the optional writer drain stage."),
+    ] = 500,
+    stop_after_minutes: Annotated[
+        int,
+        typer.Option(help="Stop cleanly after this many minutes. Use 0 for no deadline."),
+    ] = 0,
+    guard_active_writer: Annotated[
+        bool,
+        typer.Option(
+            "--guard-active-writer/--allow-active-writer",
+            help="Refuse the writer drain if db-writer-monitor sees another active writer.",
+        ),
+    ] = True,
+) -> None:
+    settings = get_settings()
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    artifacts = run_phase3bb_r43_single_writer_coordinator(
+        session_factory=session_factory,
+        output_dir=output_dir,
+        symbols=parse_symbols(symbols),
+        crypto_sources=[
+            source.strip().lower()
+            for source in crypto_sources.split(",")
+            if source.strip()
+        ],
+        stage_fetches=stage_fetches,
+        drain_staged=drain_staged,
+        build_features_after_drain=build_features_after_drain,
+        link_crypto_after_drain=link_crypto_after_drain,
+        crypto_link_limit=crypto_link_limit,
+        staging_dir=staging_dir,
+        max_workers=max_workers,
+        stop_after_minutes=stop_after_minutes,
+        guard_active_writer=guard_active_writer,
+        settings=settings,
+    )
+    console.print("Phase 3BB-R43 single-writer coordinator")
+    console.print("Mode: PAPER ONLY coordinator")
+    console.print("Live/demo execution: blocked")
+    console.print("Order submission/cancel/replace: blocked")
+    console.print(f"Staging dir: {artifacts.staging_dir}")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
 @app.command("crypto-report")
