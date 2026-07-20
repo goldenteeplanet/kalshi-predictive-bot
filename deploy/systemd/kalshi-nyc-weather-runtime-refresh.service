@@ -1,7 +1,9 @@
 [Unit]
-Description=Kalshi GH-1 guarded single-writer staging drain
+Description=Kalshi guarded NYC weather runtime refresh
 After=network-online.target
+Wants=network-online.target
 ConditionPathExists=/etc/kalshi-bot/kalshi-bot.env
+ConditionPathExists=/var/lib/kalshi-bot/kalshi_phase1.db
 
 [Service]
 Type=oneshot
@@ -12,10 +14,11 @@ Environment=UI_READ_ONLY=true
 Environment=EXECUTION_ENABLED=false
 Environment=EXECUTION_DRY_RUN=true
 Environment=EXECUTION_KILL_SWITCH=true
+Environment=AUTOPILOT_ENABLED=false
 Environment=AUTOPILOT_DRY_RUN=true
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/opt/kalshi-predictive-bot/scripts/cloud/kalshi-gh1-drain.sh
-TimeoutStartSec=60s
+ExecStart=/opt/kalshi-predictive-bot/scripts/cloud/kalshi-nyc-weather-refresh.sh
+TimeoutStartSec=5min
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
@@ -25,7 +28,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-MemoryMax=384M
+MemoryMax=512M
 TasksMax=48
-ReadWritePaths=/opt/kalshi-predictive-bot/reports/phase_gh1 /var/lib/kalshi-bot
+ReadWritePaths=/var/lib/kalshi-bot
 ReadOnlyPaths=/opt/kalshi-predictive-bot /etc/kalshi-bot

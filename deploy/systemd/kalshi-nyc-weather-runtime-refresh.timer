@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh exact NYC weather runtime inputs every 15 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=15min
+AccuracySec=15s
+RandomizedDelaySec=30s
+Persistent=false
+Unit=kalshi-nyc-weather-runtime-refresh.service
+
+[Install]
+WantedBy=timers.target
