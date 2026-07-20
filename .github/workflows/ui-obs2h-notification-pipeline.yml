@@ -35,6 +35,13 @@ jobs:
       - name: Install local project
         run: python -m pip install --disable-pip-version-check -e ".[dev]"
 
+      - name: Build deterministic offline UI-OBS-2D through 2G evidence
+        run: |
+          python scripts/ui_obs2d_incident_resolution.py
+          python scripts/ui_obs2e_notification_routing.py
+          python scripts/ui_obs2f_delivery_simulator.py
+          python scripts/ui_obs2g_notification_receipt_audit.py
+
       - name: Run deterministic offline UI-OBS-2H gate
         run: >-
           python scripts/ui_obs2h_notification_pipeline_ci.py
