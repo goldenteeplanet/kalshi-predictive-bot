@@ -1,0 +1,53 @@
+{
+  "cycle_assessments": [
+    {
+      "cycle_id": "synthetic-1",
+      "evidence": {
+        "actual_output_sha256": "synthetic-parity-hash",
+        "actual_row_count": 100,
+        "execution_enabled": false,
+        "locks_clear_after": true,
+        "memory_events": {"oom": 0, "oom_kill": 0},
+        "memory_peak_bytes": 1048576000,
+        "r3_heartbeat_max_age_seconds": 15,
+        "r5_heartbeat_max_age_seconds": 15,
+        "runtime_seconds": 600,
+        "writer_clear_after": true
+      },
+      "status": "PASSED"
+    },
+    {
+      "cycle_id": "synthetic-2",
+      "evidence": {
+        "actual_output_sha256": "synthetic-parity-hash",
+        "actual_row_count": 100,
+        "execution_enabled": false,
+        "locks_clear_after": true,
+        "memory_events": {"oom": 0, "oom_kill": 0},
+        "memory_peak_bytes": 1059061760,
+        "r3_heartbeat_max_age_seconds": 15,
+        "r5_heartbeat_max_age_seconds": 15,
+        "runtime_seconds": 605,
+        "writer_clear_after": true
+      },
+      "status": "PASSED"
+    },
+    {
+      "cycle_id": "synthetic-3",
+      "evidence": {
+        "actual_output_sha256": "synthetic-parity-hash",
+        "actual_row_count": 100,
+        "execution_enabled": false,
+        "locks_clear_after": true,
+        "memory_events": {"oom": 0, "oom_kill": 0},
+        "memory_peak_bytes": 1069547520,
+        "r3_heartbeat_max_age_seconds": 15,
+        "r5_heartbeat_max_age_seconds": 15,
+        "runtime_seconds": 610,
+        "writer_clear_after": true
+      },
+      "status": "PASSED"
+    }
+  ],
+  "report_sha256": "synthetic-source-hash"
+}
