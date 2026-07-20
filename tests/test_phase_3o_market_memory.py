@@ -348,7 +348,7 @@ def test_memory_ui_renders_dashboard_and_page(tmp_path) -> None:
         session.commit()
     client = TestClient(create_app(session_factory=session_factory, settings=Settings()))
 
-    dashboard = client.get("/")
+    dashboard = client.get("/dashboard")
     memory_page = client.get("/memory")
 
     assert dashboard.status_code == 200

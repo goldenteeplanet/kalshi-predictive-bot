@@ -251,6 +251,7 @@ def get_latest_forecast_per_ticker(
     session: Session,
     *,
     model_name: str | None = None,
+    ticker_scope: set[str] | list[str] | tuple[str, ...] | None = None,
 ) -> list[Forecast]:
     statement = select(
         Forecast,
@@ -263,6 +264,11 @@ def get_latest_forecast_per_ticker(
     )
     if model_name:
         statement = statement.where(Forecast.model_name == model_name)
+    if ticker_scope is not None:
+        tickers = sorted({str(ticker) for ticker in ticker_scope if str(ticker).strip()})
+        if not tickers:
+            return []
+        statement = statement.where(Forecast.ticker.in_(tickers))
     ranked = statement.subquery()
     forecast = aliased(Forecast, ranked)
     return list(

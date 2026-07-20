@@ -332,7 +332,7 @@ def test_ui_learning_and_model_confidence_pages_render(tmp_path) -> None:
     client = TestClient(create_app(session_factory=session_factory, settings=settings))
 
     learning = client.get("/learning")
-    dashboard = client.get("/")
+    dashboard = client.get("/dashboard")
     settings_page = client.get("/settings")
     confidence = client.get("/models/confidence")
     blocked = client.post("/demo-execute/UI-LEARN?confirmation=DEMO%20ONLY")

@@ -125,7 +125,7 @@ def test_database_settings_page_and_dashboard_card_render(tmp_path) -> None:
     client = TestClient(create_app(session_factory=session_factory, settings=Settings()))
 
     settings_response = client.get("/settings/database")
-    dashboard_response = client.get("/")
+    dashboard_response = client.get("/dashboard")
 
     assert settings_response.status_code == 200
     assert "Database Settings" in settings_response.text

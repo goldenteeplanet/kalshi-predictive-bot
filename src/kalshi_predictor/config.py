@@ -20,6 +20,23 @@ class Settings(BaseSettings):
         validation_alias="KALSHI_BASE_URL",
     )
     kalshi_env: str = Field(default="demo", validation_alias="KALSHI_ENV")
+    kalshi_websocket_enabled: bool = Field(
+        default=False,
+        validation_alias="KALSHI_WEBSOCKET_ENABLED",
+    )
+    kalshi_websocket_url: str = Field(
+        default="wss://external-api-ws.demo.kalshi.co/trade-api/ws/v2",
+        validation_alias="KALSHI_WEBSOCKET_URL",
+    )
+    kalshi_api_key_id: str | None = Field(default=None, validation_alias="KALSHI_API_KEY_ID")
+    kalshi_private_key_path: str | None = Field(
+        default=None,
+        validation_alias="KALSHI_PRIVATE_KEY_PATH",
+    )
+    kalshi_websocket_staging_dir: str = Field(
+        default="reports/phase_gh1/staging",
+        validation_alias="KALSHI_WEBSOCKET_STAGING_DIR",
+    )
     kalshi_db_url: str = Field(
         default="sqlite:///data/kalshi_phase1.db",
         validation_alias=AliasChoices("DATABASE_URL", "KALSHI_DB_URL"),
@@ -39,6 +56,20 @@ class Settings(BaseSettings):
     require_postgres_for_overnight: bool = Field(
         default=False,
         validation_alias="REQUIRE_POSTGRES_FOR_OVERNIGHT",
+    )
+    prov11_dashboard_preview_enabled: bool = Field(
+        default=False,
+        validation_alias="PROV11_DASHBOARD_PREVIEW_ENABLED",
+    )
+    prov12_decision_trace_preview_enabled: bool = Field(
+        default=False,
+        validation_alias="PROV12_DECISION_TRACE_PREVIEW_ENABLED",
+    )
+    prov12_provenance_stale_after_minutes: int = Field(
+        default=60,
+        ge=5,
+        le=1440,
+        validation_alias="PROV12_PROVENANCE_STALE_AFTER_MINUTES",
     )
     phase_3o_market_memory_enabled: bool = Field(
         default=True,
@@ -850,6 +881,14 @@ class Settings(BaseSettings):
     weather_v2_default_location_key: str = Field(
         default="kansas_city",
         validation_alias="WEATHER_V2_DEFAULT_LOCATION_KEY",
+    )
+    weather_v2_knyc_observation_enabled: bool = Field(
+        default=False,
+        validation_alias="WEATHER_V2_KNYC_OBSERVATION_ENABLED",
+    )
+    runtime_provenance_dual_write_enabled: bool = Field(
+        default=False,
+        validation_alias="RUNTIME_PROVENANCE_DUAL_WRITE_ENABLED",
     )
     ui_read_only: bool = Field(default=True, validation_alias="UI_READ_ONLY")
     execution_enabled: bool = Field(default=False, validation_alias="EXECUTION_ENABLED")

@@ -94,6 +94,7 @@ def write_phase3bd_r7_economic_opportunity_quality_gate_report(
     require_actual_consensus: bool = True,
     max_preflight: int = 10,
     risk_preflight: bool = False,
+    now: Any | None = None,
 ) -> Phase3BDR7Artifacts:
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = build_phase3bd_r7_payload(
@@ -109,6 +110,7 @@ def write_phase3bd_r7_economic_opportunity_quality_gate_report(
         require_actual_consensus=require_actual_consensus,
         max_preflight=max_preflight,
         risk_preflight=risk_preflight,
+        now=now,
     )
     json_path = output_dir / "phase3bd_r7_economic_opportunity_quality_gate.json"
     markdown_path = output_dir / "phase3bd_r7_economic_opportunity_quality_gate.md"

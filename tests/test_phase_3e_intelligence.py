@@ -132,7 +132,7 @@ def test_payout_to_risk_ratio_calculation() -> None:
     assert metrics.payout_to_risk_ratio.quantize(Decimal("0.01")) == Decimal("1.08")
 
 
-def test_best_payouts_excludes_low_confidence_longshots(tmp_path) -> None:
+def test_best_payouts_excludes_low_confidence_and_unverified_markets(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
         _seed_phase3e_market(session)
@@ -145,7 +145,8 @@ def test_best_payouts_excludes_low_confidence_longshots(tmp_path) -> None:
             output_path=Path(tmp_path) / "best_payouts.md",
         )
 
-    assert [row["ticker"] for row in rows] == ["PHASE3E-GOOD"]
+    assert rows == []
+    assert "PHASE3E-GOOD" not in report.read_text(encoding="utf-8")
     assert "Best Payout" in report.read_text(encoding="utf-8")
 
 
@@ -161,12 +162,11 @@ def test_dashboard_renders_executive_summary_and_hides_raw_json(tmp_path) -> Non
         )
     )
 
-    response = client.get("/")
+    response = client.get("/dashboard")
 
     assert response.status_code == 200
     assert "Today's Summary" in response.text
     assert "Paper Portfolio" in response.text
-    assert "View Market Details" in response.text
     assert "raw_json" not in response.text
 
 

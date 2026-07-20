@@ -186,7 +186,7 @@ def test_ui_model_readiness_page_and_dashboard_card_render(tmp_path) -> None:
     client = TestClient(create_app(session_factory=session_factory))
 
     readiness = client.get("/models/readiness")
-    dashboard = client.get("/")
+    dashboard = client.get("/dashboard")
 
     assert readiness.status_code == 200
     assert "Model Readiness" in readiness.text

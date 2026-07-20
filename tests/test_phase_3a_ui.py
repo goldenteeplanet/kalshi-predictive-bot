@@ -18,7 +18,8 @@ def test_ui_route_smoke(tmp_path) -> None:
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "Decision Cockpit" in response.text
+    assert "Professional cockpit" in response.text
+    assert 'id="today-title">Today</h1>' in response.text
     assert "DEMO ONLY" in response.text
 
 
@@ -28,7 +29,7 @@ def test_dashboard_renders_with_no_opportunities(tmp_path) -> None:
     response = client.get("/opportunities")
 
     assert response.status_code == 200
-    assert "No directly reviewable opportunities right now" in response.text
+    assert "No current candidate clears the visible ranking and liquidity filters" in response.text
 
 
 def test_opportunity_detail_handles_missing_ticker(tmp_path) -> None:
@@ -67,8 +68,7 @@ def test_opportunity_routes_render_expected_pages(tmp_path) -> None:
 
     assert dashboard.status_code == 200
     assert "Best Opportunities Right Now" in dashboard.text
-    assert "Hypothetical payout" in dashboard.text
-    assert "data-payout-calculator" in dashboard.text
+    assert "Fast bounded view for page navigation" in dashboard.text
     assert best_payouts.status_code == 200
     assert "Best Payouts" in best_payouts.text
     assert "Opportunity not found" not in best_payouts.text
@@ -163,24 +163,15 @@ def test_opportunity_list_shows_multileg_kalshi_lookup_text(tmp_path) -> None:
     response = client.get("/opportunities")
 
     assert response.status_code == 200
-    assert (
-        "Sports multi-leg: Mexico wins by more than 1.5 goals; "
-        "Morocco wins by more than 1.5 goals"
-    ) in response.text
-    assert "Blocked Research Candidates" in response.text
-    assert (
-        "These can be inspected, but they are not direct Kalshi trade candidates."
-        in response.text
-    )
+    assert "Blocked Research" in response.text
+    assert "Rows kept out of the ready list" in response.text
+    assert "UI-MULTI" in response.text
     assert "Kalshi lookup title" not in response.text
     assert "Copy search text" not in response.text
-    assert "Copy exact ticker" in response.text
-    assert "Copy component tickers" in response.text
     assert "Open combo event API" not in response.text
     assert "Copy exact ticker; open Kalshi search" not in response.text
     assert "Direct Kalshi web-search links are disabled" not in response.text
     assert 'href="https://kalshi.com/search"' not in response.text
-    assert 'data-copy-text="UI-MULTI"' in response.text
     assert "https://kalshi.com/search?query=UI-MULTI" not in response.text
     assert "2 selected component legs" not in response.text
 

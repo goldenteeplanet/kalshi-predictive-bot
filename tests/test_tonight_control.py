@@ -127,7 +127,7 @@ def test_ui_tonight_card_renders(tmp_path) -> None:
         session.commit()
     client = TestClient(create_app(session_factory=session_factory, settings=Settings()))
 
-    dashboard = client.get("/")
+    dashboard = client.get("/dashboard")
     learning = client.get("/learning")
 
     assert dashboard.status_code == 200

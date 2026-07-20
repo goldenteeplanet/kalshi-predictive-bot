@@ -103,7 +103,7 @@ def test_system_remediation_card_and_system_page_render(tmp_path) -> None:
     assert response.status_code == 200
     assert "System Remediation" in response.text
     assert "Paper-only confirmed" in response.text
-    assert "kalshi-bot system-remediate --refresh-data" in response.text
+    assert "kalshi-bot ui-shell-status-refresh" in response.text
 
 
 def _settings(

@@ -1,0 +1,12 @@
+[Unit]
+Description=PREVIEW ONLY - schedule bounded R5 after prior cycle becomes inactive
+
+[Timer]
+OnActiveSec=15min
+OnUnitInactiveSec=15min
+AccuracySec=30s
+RandomizedDelaySec=30s
+Persistent=false
+Unit=kalshi-r5-bounded.service
+
+# Preview artifact: .preview prevents systemd discovery and no [Install] section is present.

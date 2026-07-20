@@ -72,7 +72,7 @@
       "act now"
     ]
   },
-  "generated_at": "2026-06-27T19:27:38.463567+00:00",
+  "generated_at": "2026-07-20T22:31:46.785681+00:00",
   "open_findings": [
     "Phase 3W is not SYSTEM_PASS for production rollout.",
     "Phase 3V readiness is not live-capital approved.",
@@ -313,19 +313,19 @@
       }
     ],
     "command_palette_enabled": true,
-    "database_fingerprint": "sha256:264e0ee3b0e22d22b071db87c2ca7f77717a98ac5c99f34aab0b2422b6888373",
+    "database_fingerprint": "sha256:3a7b4e7704a4509067fbc76e76093251da0eb7885831b628b9810e5cf0bdfcbe",
     "density": "comfortable",
     "environment": "DEMO",
     "execution_mode": "PAPER / READ-ONLY",
-    "git_commit": "unknown",
+    "git_commit": "00c5263",
     "market_freshness": {
       "age_label": "uninitialized",
       "as_of": "unknown",
       "class": "status-incomplete",
       "code": "unknown",
-      "description": "No authoritative source value is available.",
-      "icon": "UNK",
-      "label": "Unknown"
+      "description": "market_state has no data watermark. Lifecycle state: UNINITIALIZED.",
+      "icon": "SRC",
+      "label": "UNINITIALIZED"
     },
     "nav_items": [
       {
@@ -429,7 +429,8 @@
       "route_count": 14,
       "version": "phase-3x-professional-ux-v1"
     },
-    "snapshot_as_of": "2026-06-27T19:27:38.050594+00:00",
+    "snapshot_as_of": "2026-07-20T22:31:44.915726+00:00",
+    "snapshot_as_of_label": "Jul 20 22:31",
     "system_status": {
       "class": "status-healthy",
       "code": "healthy",
@@ -438,7 +439,14 @@
       "label": "Healthy"
     },
     "theme": "system",
-    "timezone": "America/Chicago"
+    "timezone": "America/Chicago",
+    "workspace_guard": {
+      "class": "status-healthy",
+      "description": "Workspace, venv, package, DB identity, and required commands are aligned.",
+      "href": "/system",
+      "label": "Build OK",
+      "status": "PASS"
+    }
   },
   "status_grammar": {
     "blocked": {

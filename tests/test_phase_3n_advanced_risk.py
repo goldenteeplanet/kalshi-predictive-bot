@@ -211,7 +211,7 @@ def test_advanced_risk_report_and_ui_render(tmp_path) -> None:
         )
 
     client = TestClient(create_app(session_factory=session_factory, settings=settings))
-    dashboard = client.get("/")
+    dashboard = client.get("/dashboard")
     settings_page = client.get("/settings")
 
     assert path.exists()

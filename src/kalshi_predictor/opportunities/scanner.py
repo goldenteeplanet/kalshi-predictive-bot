@@ -12,6 +12,7 @@ from kalshi_predictor.data.repositories import decode_json
 from kalshi_predictor.data.schema import Forecast, Market, MarketSnapshot
 from kalshi_predictor.learning.config import learning_paper_settings
 from kalshi_predictor.learning.repository import insert_learning_rejection
+from kalshi_predictor.kalshi.orderbook import LocalOrderbook
 from kalshi_predictor.opportunities.payout_scoring import calculate_payout_metrics
 from kalshi_predictor.opportunities.repository import (
     insert_market_opportunity,
@@ -70,15 +71,20 @@ def scan_opportunities(
         if ticker_scope is not None
         else None
     )
-    all_forecasts = get_latest_forecast_per_ticker(session, model_name=model_name)
-    forecasts = (
-        [forecast for forecast in all_forecasts if forecast.ticker in allowed_tickers]
-        if allowed_tickers is not None
-        else all_forecasts
+    forecasts = get_latest_forecast_per_ticker(
+        session,
+        model_name=model_name,
+        ticker_scope=allowed_tickers,
     )
-    historical_rows_excluded = (
-        max(0, len(all_forecasts) - len(forecasts)) if allowed_tickers is not None else 0
-    )
+    # Preserve the diagnostic with a scalar count; never materialize out-of-scope rows.
+    historical_rows_excluded = 0
+    if allowed_tickers is not None:
+        total_tickers = session.scalar(
+            select(func.count(func.distinct(Forecast.ticker))).where(
+                Forecast.model_name == model_name
+            )
+        ) or 0
+        historical_rows_excluded = max(0, int(total_tickers) - len(forecasts))
     forecast_tickers = [forecast.ticker for forecast in forecasts]
     snapshots = _latest_snapshots_by_ticker(session, forecast_tickers)
     statuses = _market_status_by_ticker(
@@ -254,7 +260,12 @@ def build_market_ranking(
         spread = yes_ask - yes_bid if yes_bid is not None and yes_ask is not None else None
     midpoint_value = _midpoint(snapshot)
     time_to_close = _time_to_close_minutes(snapshot, raw_market)
-    liquidity = raw_market.get("liquidity_dollars")
+    market_liquidity = to_decimal(raw_market.get("liquidity_dollars")) or Decimal("0")
+    orderbook_depth_notional = top5_orderbook_notional(
+        ticker=snapshot.ticker,
+        raw_orderbook_json=snapshot.raw_orderbook_json,
+    )
+    liquidity = max(market_liquidity, orderbook_depth_notional)
     liquidity_score = score_liquidity(
         volume=snapshot.volume_fp,
         open_interest=snapshot.open_interest_fp,
@@ -281,6 +292,8 @@ def build_market_ranking(
     reason = _reason(side, edge, opportunity_score, spread, time_to_close)
     return {
         "ticker": snapshot.ticker,
+        "forecast_id": forecast.id,
+        "market_snapshot_id": snapshot.id,
         "ranked_at": ranked_at,
         "title": raw_market.get("title"),
         "status": snapshot.status,
@@ -309,9 +322,30 @@ def build_market_ranking(
             "snapshot_id": snapshot.id,
             "best_yes_ask": decimal_to_str(best_yes_ask),
             "best_no_ask": decimal_to_str(best_no_ask),
+            "market_liquidity_dollars": decimal_to_str(market_liquidity),
+            "orderbook_top5_notional": decimal_to_str(orderbook_depth_notional),
+            "liquidity_input_source": (
+                "ORDERBOOK_TOP5_NOTIONAL"
+                if orderbook_depth_notional > market_liquidity
+                else "MARKET_LIQUIDITY_DOLLARS"
+            ),
             **payout_fields,
         },
     }
+
+
+def top5_orderbook_notional(*, ticker: str, raw_orderbook_json: str | None) -> Decimal:
+    if not raw_orderbook_json:
+        return Decimal("0")
+    try:
+        payload = decode_json(raw_orderbook_json)
+        book = LocalOrderbook(ticker)
+        book.apply_rest_snapshot(payload, resume_sequence=0)
+    except Exception:
+        return Decimal("0")
+    yes = sorted(book.yes.items(), reverse=True)[:5]
+    no = sorted(book.no.items(), reverse=True)[:5]
+    return sum((price * quantity for price, quantity in yes + no), Decimal("0"))
 
 
 def _best_side(

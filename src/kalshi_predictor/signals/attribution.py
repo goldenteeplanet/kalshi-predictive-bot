@@ -600,6 +600,7 @@ def _latest_forecast(
         select(Forecast)
         .where(Forecast.ticker == ticker, Forecast.model_name == model_name)
         .order_by(desc(Forecast.forecasted_at), desc(Forecast.id))
+        .limit(1)
     )
 
 
@@ -613,6 +614,7 @@ def _latest_ranking(
         select(MarketRanking)
         .where(MarketRanking.ticker == ticker, MarketRanking.forecast_model == model_name)
         .order_by(desc(MarketRanking.ranked_at), desc(MarketRanking.id))
+        .limit(1)
     )
 
 
@@ -621,6 +623,7 @@ def _latest_snapshot(session: Session, *, ticker: str) -> MarketSnapshot | None:
         select(MarketSnapshot)
         .where(MarketSnapshot.ticker == ticker)
         .order_by(desc(MarketSnapshot.captured_at), desc(MarketSnapshot.id))
+        .limit(1)
     )
 
 
@@ -633,6 +636,7 @@ def _latest_crypto_context(
         select(CryptoMarketLink)
         .where(CryptoMarketLink.ticker == ticker)
         .order_by(desc(CryptoMarketLink.detected_at), desc(CryptoMarketLink.id))
+        .limit(1)
     )
     if link is None:
         return None, None
@@ -640,6 +644,7 @@ def _latest_crypto_context(
         select(CryptoFeature)
         .where(CryptoFeature.symbol == link.symbol)
         .order_by(desc(CryptoFeature.generated_at), desc(CryptoFeature.id))
+        .limit(1)
     )
     return link, feature
 
@@ -653,6 +658,7 @@ def _latest_economic_context(
         select(EconomicMarketLink)
         .where(EconomicMarketLink.ticker == ticker)
         .order_by(desc(EconomicMarketLink.detected_at), desc(EconomicMarketLink.id))
+        .limit(1)
     )
     if link is None:
         return None, None
@@ -660,6 +666,7 @@ def _latest_economic_context(
         select(EconomicFeature)
         .where(EconomicFeature.event_key == link.event_key)
         .order_by(desc(EconomicFeature.generated_at), desc(EconomicFeature.id))
+        .limit(1)
     )
     return link, feature
 
@@ -673,6 +680,7 @@ def _latest_weather_context(
         select(WeatherMarketLink)
         .where(WeatherMarketLink.ticker == ticker)
         .order_by(desc(WeatherMarketLink.detected_at), desc(WeatherMarketLink.id))
+        .limit(1)
     )
     if link is None:
         return None, None
@@ -680,6 +688,7 @@ def _latest_weather_context(
         select(WeatherFeature)
         .where(WeatherFeature.location_key == link.location_key)
         .order_by(desc(WeatherFeature.generated_at), desc(WeatherFeature.id))
+        .limit(1)
     )
     return link, feature
 

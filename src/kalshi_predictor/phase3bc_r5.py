@@ -44,6 +44,7 @@ from kalshi_predictor.phase3bc_r7 import (
     write_phase3bc_r7_crypto_ranking_coverage_repair_report,
 )
 from kalshi_predictor.position_sizing.service import ensure_paper_decision_sized
+from kalshi_predictor.runtime_stage_heartbeat import AtomicStageHeartbeat
 from kalshi_predictor.utils.decimals import decimal_to_str, to_decimal
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
@@ -140,7 +141,11 @@ def write_phase3bc_r5_crypto_freshness_watch_report(
     preflight_rows_path = output_dir / "phase3bc_r5_positive_ev_preflight_rows.json"
     history_path = output_dir / "phase3bc_r5_crypto_freshness_watch_history.jsonl"
     previous_payload = _read_json(json_path)
-    stage_timer = _StageTimer()
+    stage_timer = _StageTimer(
+        output_dir,
+        cycle_number=cycle_number,
+        total_cycles=total_cycles,
+    )
 
     stage_timer.mark("phase3bc_r3_refresh")
     r3_artifacts = write_phase3bc_r3_active_crypto_refresh_report(
@@ -1267,28 +1272,18 @@ def _slowest_stage(stage_duration_seconds: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-class _StageTimer:
-    def __init__(self) -> None:
-        self.timings: list[dict[str, Any]] = []
-        self._current_stage: str | None = None
-        self._current_started_at: Any | None = None
-
-    def mark(self, stage: str) -> None:
-        now = utc_now()
-        if self._current_stage is not None and self._current_started_at is not None:
-            self.timings.append(
-                {
-                    "stage": self._current_stage,
-                    "started_at": self._current_started_at.isoformat(),
-                    "completed_at": now.isoformat(),
-                    "duration_seconds": round(
-                        (now - self._current_started_at).total_seconds(),
-                        3,
-                    ),
-                }
-            )
-        self._current_stage = stage
-        self._current_started_at = now
+class _StageTimer(AtomicStageHeartbeat):
+    def __init__(self, output_dir: Path, *, cycle_number: int, total_cycles: int) -> None:
+        super().__init__(
+            output_dir / "phase3bc_r5_heartbeat.json",
+            phase="3BC-R5",
+            metadata={
+                "cycle_number": cycle_number,
+                "total_cycles": total_cycles,
+                "paper_only_safety": PAPER_ONLY_SAFETY,
+                "live_or_demo_execution": False,
+            },
+        )
 
 
 def _maybe_refresh_exact_snapshots(

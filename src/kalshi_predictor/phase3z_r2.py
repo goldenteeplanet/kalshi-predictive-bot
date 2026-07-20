@@ -417,7 +417,6 @@ def _summary(
     safe_rows = [row for row in rows if row["safe_to_repair"]]
     blocked_rows = [row for row in rows if not row["safe_to_repair"]]
     placeholders = [row for row in rows if row["placeholder_involved"]]
-    candidate_count = int(row_scan["candidate_degraded_rows"] or 0)
     upstream_placeholder_rows = int(
         placeholder_summary.get("phase3ae_blocked_placeholder_rows")
         or placeholder_summary.get("still_placeholder_rows")
@@ -440,9 +439,7 @@ def _summary(
         "partial_legacy_markets": len(unresolved_partial_tickers),
         "partial_legacy_link_rows": provenance_counts["partial_market_derived"],
         "unlinked_parsed_markets": unlinked_count,
-        "placeholder_blocked_rows": int(
-            upstream_placeholder_rows if candidate_count else len(placeholders)
-        ),
+        "placeholder_blocked_rows": max(upstream_placeholder_rows, len(placeholders)),
         "placeholder_involved_degraded_rows": len(placeholders),
         "candidate_degraded_rows": row_scan["candidate_degraded_rows"],
         "rows_reviewed": len(rows),

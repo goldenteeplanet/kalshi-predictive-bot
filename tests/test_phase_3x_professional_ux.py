@@ -118,9 +118,9 @@ def test_phase_3x_opportunities_route_uses_scanner_shell(tmp_path) -> None:
     assert "Fast bounded view" in response.text
     assert "Page generated" in response.text
     assert "UX-TEST" in response.text
-    assert "styles.css?v=phase3aa-r6-ui-perf-20260703a" in response.text
-    assert "app.js?v=phase3aa-r6-ui-perf-20260703a" in response.text
-    assert response.headers["cache-control"] == "no-store, max-age=0"
+    assert "styles.css?v=phase3bb-r2-model-layout-20260704a" in response.text
+    assert "app.js?v=phase3bb-r2-model-layout-20260704a" in response.text
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_phase_3x_opportunities_route_lists_fast_bounded_rows(tmp_path) -> None:

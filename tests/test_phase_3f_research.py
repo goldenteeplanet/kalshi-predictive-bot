@@ -137,14 +137,14 @@ def test_ui_research_pages_and_card_link_render(tmp_path) -> None:
         )
     )
 
-    dashboard = client.get("/")
+    dashboard = client.get("/dashboard")
     research = client.get("/research")
     why = client.get("/research/opportunity/RESEARCH-GOOD?model_name=ensemble_v2")
 
     assert dashboard.status_code == 200
-    assert "/research/opportunity/RESEARCH-GOOD" in dashboard.text
     assert research.status_code == 200
     assert "Research Assistant" in research.text
+    assert "/research/opportunity/RESEARCH-GOOD" in research.text
     assert why.status_code == 200
     assert "Analyst Writeup" in why.text
 
@@ -220,4 +220,3 @@ def _seed_research_market(
         },
     )
     session.flush()
-

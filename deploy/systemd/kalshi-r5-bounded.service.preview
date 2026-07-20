@@ -1,0 +1,30 @@
+[Unit]
+Description=PREVIEW ONLY - permanent bounded Kalshi R5 cycle
+After=network-online.target
+ConditionPathExists=/etc/kalshi-bot/kalshi-bot.env
+ConditionPathExists=/var/lib/kalshi-bot/kalshi_phase1.db
+
+[Service]
+Type=oneshot
+User=kalshi
+WorkingDirectory=/opt/kalshi-predictive-bot
+EnvironmentFile=/etc/kalshi-bot/kalshi-bot.env
+Environment=PYTHONUNBUFFERED=1
+Environment=EXECUTION_ENABLED=false
+Environment=EXECUTION_DRY_RUN=true
+Environment=EXECUTION_KILL_SWITCH=true
+ExecStartPre=/opt/kalshi-predictive-bot/scripts/cloud/kalshi-r5-start-guard.sh
+ExecStart=/opt/kalshi-predictive-bot/.venv/bin/python -m kalshi_predictor.cli phase3bc-r5-crypto-freshness-watch --output-dir reports/phase3bc_r5 --phase3bc-output-dir reports/phase3bc --phase3bc-r3-output-dir reports/phase3bc_r3 --phase3bc-r4-output-dir reports/phase3bc_r4 --phase3bc-r7-output-dir reports/phase3bc_r7 --symbols BTC,ETH,SOL,XRP,DOGE --crypto-series-tickers KXBTC,KXETH,KXSOLE,KXXRP,KXDOGE --source coinbase --market-limit 150 --market-max-pages 1 --crypto-market-scan-limit 2500 --crypto-link-limit 500 --forecast-limit 1000 --opportunity-limit 500 --phase3bc-limit 1000 --cadence-minutes 15 --freshness-minutes 15 --max-preflight 10 --ranking-repair-limit 500 --cycles 1 --interval-minutes 0 --near-money-per-symbol-limit 40 --near-money-window-limit 20 --snapshot-fetch-concurrency 2 --refresh-open-markets --external-crypto-ingest --diagnose-snapshots --forecast-current-windows-only --skip-opportunity-report --risk-preflight --ranking-repair --near-money-only
+TimeoutStartSec=45min
+TimeoutStopSec=60
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/kalshi-predictive-bot/reports /var/lib/kalshi-bot
+MemoryAccounting=true
+MemoryHigh=1800M
+MemoryMax=2200M
+Restart=no
+
+# Preview artifact: .preview prevents systemd discovery and no [Install] section is present.

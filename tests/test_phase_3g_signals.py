@@ -113,16 +113,14 @@ def test_signal_ui_pages_and_research_integration(tmp_path) -> None:
     )
     marketplace = client.get("/signals")
     detail = client.get("/signals/Market%20Divergence%20Signal")
-    dashboard = client.get("/")
 
     assert str(evidence["primary_signal"]).endswith("Signal")
     assert evidence["signal_badges"]
     assert marketplace.status_code == 200
     assert "Signal Marketplace" in marketplace.text
+    assert "/signals/" in marketplace.text
     assert detail.status_code == 200
     assert "Market Divergence Signal" in detail.text
-    assert dashboard.status_code == 200
-    assert "/signals/" in dashboard.text
 
 
 def _session_factory(tmp_path):

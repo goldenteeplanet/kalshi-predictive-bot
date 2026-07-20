@@ -52,6 +52,7 @@ PHASE3BB_R8_VERSION = "phase3bb_r8_unified_paper_gate_v1"
 DEFAULT_OUTPUT_DIR = Path("reports/phase3bb_r8")
 DEFAULT_REPORTS_DIR = Path("reports")
 DEFAULT_LIMIT_PER_CATEGORY = 500
+DECISION_LOG_RECENT_ROW_LIMIT = 10_000
 ACTIVE_MARKET_STATUSES = {"active", "open"}
 APPROVED_RISK_ACTIONS = {"APPROVE", "APPROVED", "PROCEED", "ALLOW"}
 
@@ -272,13 +273,16 @@ def build_unified_paper_gate_rows(
         PositionSizingDecisionLog,
         tickers,
         PositionSizingDecisionLog.decision_timestamp,
+        recent_row_limit=DECISION_LOG_RECENT_ROW_LIMIT,
     )
     risk = _latest_by_ticker(
         session,
         AdvancedRiskDecisionLog,
         tickers,
         AdvancedRiskDecisionLog.decision_timestamp,
+        recent_row_limit=DECISION_LOG_RECENT_ROW_LIMIT,
     )
+    evidence = _batched_evidence(session, contexts)
     rows = []
     for ctx in contexts:
         ticker = ctx["ticker"]
@@ -292,6 +296,8 @@ def build_unified_paper_gate_rows(
                 ranking=rankings.get(ticker),
                 sizing=sizing.get(ticker),
                 risk=risk.get(ticker),
+                source=evidence["sources"].get(ticker),
+                feature_exists=evidence["features"].get(ticker, False),
                 settings=settings,
                 now=now,
             )
@@ -387,6 +393,100 @@ def _candidate_contexts(
     return contexts
 
 
+def _batched_evidence(
+    session: Session,
+    contexts: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Load source and feature evidence in bounded set queries, keyed by ticker."""
+    sources: dict[str, Any] = {}
+    features: dict[str, bool] = {}
+
+    crypto_symbols = {ctx.get("symbol") for ctx in contexts if ctx["category"] == "crypto"}
+    weather_locations = {
+        ctx.get("location_key") for ctx in contexts if ctx["category"] == "weather"
+    }
+    economic_keys = {
+        ctx.get("event_key") for ctx in contexts if ctx["category"] == "economic"
+    }
+    crypto_symbols.discard(None)
+    weather_locations.discard(None)
+    economic_keys.discard(None)
+
+    crypto_sources = _latest_by_key(
+        session, CryptoPrice, CryptoPrice.symbol, crypto_symbols, CryptoPrice.observed_at
+    )
+    weather_sources = _latest_by_key(
+        session,
+        WeatherForecast,
+        WeatherForecast.location_key,
+        weather_locations,
+        WeatherForecast.forecast_generated_at,
+    )
+    economic_sources = _latest_by_key(
+        session, EconomicEvent, EconomicEvent.event_key, economic_keys, EconomicEvent.event_time
+    )
+    sports_keys = {
+        (ctx.get("league"), ctx.get("game_key"))
+        for ctx in contexts
+        if ctx["category"] == "sports" and ctx.get("league") and ctx.get("game_key")
+    }
+    sports_games = {
+        (row.league, row.game_key): row
+        for row in session.scalars(
+            select(SportsGame).where(
+                SportsGame.league.in_({key[0] for key in sports_keys}),
+                SportsGame.game_key.in_({key[1] for key in sports_keys}),
+            )
+        )
+    } if sports_keys else {}
+
+    crypto_feature_keys = set(session.scalars(
+        select(CryptoFeature.symbol).distinct().where(CryptoFeature.symbol.in_(crypto_symbols))
+    )) if crypto_symbols else set()
+    weather_feature_keys = set(session.scalars(
+        select(WeatherFeature.location_key).distinct().where(
+            WeatherFeature.location_key.in_(weather_locations)
+        )
+    )) if weather_locations else set()
+    economic_feature_keys = set(session.scalars(
+        select(EconomicFeature.event_key).distinct().where(
+            EconomicFeature.event_key.in_(economic_keys)
+        )
+    )) if economic_keys else set()
+    sports_tickers = {ctx["ticker"] for ctx in contexts if ctx["category"] == "sports"}
+    sports_feature_tickers = set(session.scalars(
+        select(SportsFeature.ticker).distinct().where(SportsFeature.ticker.in_(sports_tickers))
+    )) if sports_tickers else set()
+    sports_signal_tickers = set(session.scalars(
+        select(SportsSignal.ticker).distinct().where(SportsSignal.ticker.in_(sports_tickers))
+    )) if sports_tickers else set()
+    news_tickers = {ctx["ticker"] for ctx in contexts if ctx["category"] == "news"}
+    news_feature_tickers = set(session.scalars(
+        select(NewsFeature.ticker).distinct().where(NewsFeature.ticker.in_(news_tickers))
+    )) if news_tickers else set()
+
+    for ctx in contexts:
+        ticker = ctx["ticker"]
+        category = ctx["category"]
+        if category == "crypto":
+            sources[ticker] = crypto_sources.get(ctx.get("symbol"))
+            features[ticker] = ctx.get("symbol") in crypto_feature_keys
+        elif category == "weather":
+            sources[ticker] = weather_sources.get(ctx.get("location_key"))
+            features[ticker] = ctx.get("location_key") in weather_feature_keys
+        elif category == "economic":
+            sources[ticker] = economic_sources.get(ctx.get("event_key"))
+            features[ticker] = ctx.get("event_key") in economic_feature_keys
+        elif category == "sports":
+            sources[ticker] = sports_games.get((ctx.get("league"), ctx.get("game_key")))
+            features[ticker] = ticker in sports_feature_tickers or ticker in sports_signal_tickers
+        elif category == "news":
+            features[ticker] = ticker in news_feature_tickers
+        elif category == "agriculture_general":
+            features[ticker] = bool(ctx.get("usda_candidate_feature"))
+    return {"sources": sources, "features": features}
+
+
 def _link_contexts(
     session: Session,
     *,
@@ -398,8 +498,8 @@ def _link_contexts(
     limit: int,
     detail_fn: Any,
 ) -> list[dict[str, Any]]:
-    rows = session.scalars(
-        select(link_cls)
+    rows = session.execute(
+        select(link_cls, Market)
         .join(Market, Market.ticker == link_cls.ticker)
         .where(func.lower(Market.status).in_(ACTIVE_MARKET_STATUSES))
         .order_by(desc(order_col), desc(link_cls.id))
@@ -407,10 +507,9 @@ def _link_contexts(
     )
     contexts: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for link in rows:
+    for link, market in rows:
         if link.ticker in seen:
             continue
-        market = session.get(Market, link.ticker)
         if not _active_current_market(market, now=now):
             continue
         seen.add(link.ticker)
@@ -430,7 +529,7 @@ def _link_contexts(
 
 def _news_contexts(session: Session, *, now: datetime, limit: int) -> list[dict[str, Any]]:
     rows = session.execute(
-        select(NewsMarketLink, NewsItem)
+        select(NewsMarketLink, NewsItem, Market)
         .join(Market, Market.ticker == NewsMarketLink.ticker)
         .join(NewsItem, NewsItem.id == NewsMarketLink.news_item_id)
         .where(func.lower(Market.status).in_(ACTIVE_MARKET_STATUSES))
@@ -439,10 +538,9 @@ def _news_contexts(session: Session, *, now: datetime, limit: int) -> list[dict[
     )
     contexts: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for link, item in rows:
+    for link, item, market in rows:
         if link.ticker in seen:
             continue
-        market = session.get(Market, link.ticker)
         if not _active_current_market(market, now=now):
             continue
         seen.add(link.ticker)
@@ -474,11 +572,13 @@ def _agriculture_general_contexts(
 ) -> list[dict[str, Any]]:
     contexts: list[dict[str, Any]] = []
     usda_rows = _read_csv(reports_dir / "phase3bb_r5" / "usda_rows.csv")
+    usda_tickers = [row.get("market_ticker") or "" for row in usda_rows[:limit]]
+    usda_markets = _markets_by_ticker(session, [ticker for ticker in usda_tickers if ticker])
     for row in usda_rows[:limit]:
         ticker = row.get("market_ticker") or ""
         if not ticker:
             continue
-        market = session.get(Market, ticker)
+        market = usda_markets.get(ticker)
         if not _active_current_market(market, now=now):
             continue
         contexts.append(
@@ -497,7 +597,7 @@ def _agriculture_general_contexts(
     if contexts:
         return contexts
     leg_rows = session.execute(
-        select(MarketLeg.ticker, MarketLeg.category)
+        select(MarketLeg.ticker, MarketLeg.category, Market)
         .join(Market, Market.ticker == MarketLeg.ticker)
         .where(MarketLeg.category.in_(["general", "agriculture", "agriculture_usda"]))
         .where(func.lower(Market.status).in_(ACTIVE_MARKET_STATUSES))
@@ -505,10 +605,9 @@ def _agriculture_general_contexts(
         .limit(max(limit * 5, limit))
     )
     seen: set[str] = set()
-    for ticker, category in leg_rows:
+    for ticker, category, market in leg_rows:
         if ticker in seen:
             continue
-        market = session.get(Market, ticker)
         if not _active_current_market(market, now=now):
             continue
         seen.add(ticker)
@@ -536,12 +635,13 @@ def _paper_gate_row(
     ranking: MarketRanking | None,
     sizing: PositionSizingDecisionLog | None,
     risk: AdvancedRiskDecisionLog | None,
+    source: Any | None,
+    feature_exists: bool,
     settings: Settings,
     now: datetime,
 ) -> dict[str, Any]:
     category = ctx["category"]
-    source = _source_status(session, ctx)
-    feature_exists = _feature_exists(session, ctx)
+    source = _source_status_from_row(ctx, source)
     snapshot_age = _age_minutes(snapshot.captured_at, now) if snapshot else None
     snapshot_fresh = bool(
         snapshot is not None
@@ -629,16 +729,14 @@ def _paper_gate_row(
     }
 
 
-def _source_status(session: Session, ctx: dict[str, Any]) -> dict[str, Any]:
+def _source_status_from_row(ctx: dict[str, Any], source: Any | None) -> dict[str, Any]:
     category = ctx["category"]
     if category == "crypto":
-        source = _latest_crypto_price(session, ctx.get("symbol"))
         return {
             "fresh": source is not None,
             "detail": f"crypto_price_at={_iso(source.observed_at if source else None)}",
         }
     if category == "weather":
-        source = _latest_weather_forecast(session, ctx.get("location_key"))
         return {
             "fresh": source is not None,
             "detail": (
@@ -647,13 +745,11 @@ def _source_status(session: Session, ctx: dict[str, Any]) -> dict[str, Any]:
             ),
         }
     if category == "economic":
-        source = _latest_economic_event(session, ctx.get("event_key"))
         return {
             "fresh": source is not None,
             "detail": f"economic_event_time={_iso(source.event_time if source else None)}",
         }
     if category == "sports":
-        source = _sports_game(session, ctx.get("league"), ctx.get("game_key"))
         return {
             "fresh": source is not None,
             "detail": f"sports_game_status={getattr(source, 'status', '') if source else ''}",
@@ -908,52 +1004,73 @@ def _latest_by_ticker(
     model: type[Any],
     tickers: list[str],
     timestamp_col: Any,
+    recent_row_limit: int | None = None,
 ) -> dict[str, Any]:
     if not tickers:
         return {}
+    statement = select(
+            model.id.label("row_id"),
+            func.row_number()
+            .over(
+                partition_by=model.ticker,
+                order_by=(desc(timestamp_col), desc(model.id)),
+            )
+            .label("row_number"),
+        ).where(model.ticker.in_(tickers))
+    if recent_row_limit is not None:
+        recent_ids = (
+            select(model.id.label("row_id"))
+            .order_by(desc(model.id))
+            .limit(recent_row_limit)
+            .subquery()
+        )
+        statement = statement.where(model.id.in_(select(recent_ids.c.row_id)))
+    ranked = statement.subquery()
     rows = session.scalars(
         select(model)
-        .where(model.ticker.in_(tickers))
-        .order_by(model.ticker, desc(timestamp_col), desc(model.id))
+        .join(ranked, model.id == ranked.c.row_id)
+        .where(ranked.c.row_number == 1)
     )
-    latest: dict[str, Any] = {}
-    for row in rows:
-        if row.ticker not in latest:
-            latest[row.ticker] = row
-    return latest
+    return {row.ticker: row for row in rows}
+
+
+def _latest_by_key(
+    session: Session,
+    model: type[Any],
+    key_col: Any,
+    keys: set[Any],
+    timestamp_col: Any,
+) -> dict[Any, Any]:
+    if not keys:
+        return {}
+    ranked = (
+        select(
+            model.id.label("row_id"),
+            func.row_number()
+            .over(
+                partition_by=key_col,
+                order_by=(desc(timestamp_col), desc(model.id)),
+            )
+            .label("row_number"),
+        )
+        .where(key_col.in_(keys))
+        .subquery()
+    )
+    rows = session.scalars(
+        select(model).join(ranked, model.id == ranked.c.row_id).where(ranked.c.row_number == 1)
+    )
+    return {getattr(row, key_col.key): row for row in rows}
 
 
 def _latest_forecasts_by_ticker(session: Session, tickers: list[str]) -> dict[str, Forecast]:
-    if not tickers:
-        return {}
-    rows = session.scalars(
-        select(Forecast)
-        .where(Forecast.ticker.in_(tickers))
-        .order_by(Forecast.ticker, desc(Forecast.forecasted_at), desc(Forecast.id))
-    )
-    latest: dict[str, Forecast] = {}
-    for row in rows:
-        if row.ticker not in latest:
-            latest[row.ticker] = row
-    return latest
+    return _latest_by_ticker(session, Forecast, tickers, Forecast.forecasted_at)
 
 
 def _latest_rankings_by_ticker(
     session: Session,
     tickers: list[str],
 ) -> dict[str, MarketRanking]:
-    if not tickers:
-        return {}
-    rows = session.scalars(
-        select(MarketRanking)
-        .where(MarketRanking.ticker.in_(tickers))
-        .order_by(MarketRanking.ticker, desc(MarketRanking.ranked_at), desc(MarketRanking.id))
-    )
-    latest: dict[str, MarketRanking] = {}
-    for row in rows:
-        if row.ticker not in latest:
-            latest[row.ticker] = row
-    return latest
+    return _latest_by_ticker(session, MarketRanking, tickers, MarketRanking.ranked_at)
 
 
 def _latest_crypto_price(session: Session, symbol: str | None) -> CryptoPrice | None:

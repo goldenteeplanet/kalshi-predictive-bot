@@ -1,4 +1,5 @@
 # ruff: noqa: E402, I001
+import gc
 import importlib.util
 import json
 import os
@@ -202,6 +203,14 @@ from kalshi_predictor.forecasting.status import (
 from kalshi_predictor.ingest.markets import sync_markets as sync_markets_job
 from kalshi_predictor.ingest.markets import sync_settlements as sync_settlements_job
 from kalshi_predictor.ingest.snapshots import capture_snapshots
+from kalshi_predictor.ingest.websocket_orderbooks import (
+    adapter_from_settings,
+    drain_staged_websocket_orderbooks,
+)
+from kalshi_predictor.ingest.websocket_watch import (
+    DEFAULT_WATCH_SERIES,
+    run_reconnecting_websocket_watch,
+)
 from kalshi_predictor.institutional_dashboard.reports import (
     generate_institutional_dashboard_report,
     institutional_dashboard_status,
@@ -211,6 +220,7 @@ from kalshi_predictor.institutional_dashboard.service import (
     export_snapshot_csv,
 )
 from kalshi_predictor.jobs.collect_once import collect_once as collect_once_job
+from kalshi_predictor.kalshi.client import KalshiClient
 from kalshi_predictor.leaderboard.reports import generate_leaderboard_report
 from kalshi_predictor.learning.accelerator import accelerate_learning
 from kalshi_predictor.learning.exploration import seed_exploratory_paper_trades
@@ -838,6 +848,7 @@ def _install_friendly_cli_error_handlers() -> None:
         if command_info.callback is not None:
             command_info.callback = _with_friendly_database_lock_handling(command_info.callback)
 
+
 PHASE_3G_EXPECTED_COMMANDS = (
     "db-health",
     "db-doctor",
@@ -1094,8 +1105,7 @@ def db_locks_command(
             files = ", ".join(Path(path).name for path in holder["open_files"])
             elapsed = holder.get("elapsed") or "n/a"
             console.print(
-                f"- pid {holder['pid']} ({marker}, elapsed {elapsed}) "
-                f"{holder['command']} [{files}]"
+                f"- pid {holder['pid']} ({marker}, elapsed {elapsed}) {holder['command']} [{files}]"
             )
     else:
         console.print("Open DB holders: none visible")
@@ -1121,8 +1131,7 @@ def _print_db_writer_monitor(payload: dict[str, object]) -> None:
     console.print(f"Heartbeat stage: {payload.get('long_job_stage') or 'none'}")
     console.print(f"Heartbeat age: {payload.get('long_job_heartbeat_age') or 'n/a'}")
     console.print(
-        "Safe to start another write job: "
-        f"{'yes' if payload.get('safe_to_start_write') else 'no'}"
+        f"Safe to start another write job: {'yes' if payload.get('safe_to_start_write') else 'no'}"
     )
     console.print(
         "Recommended next command after finish: "
@@ -1359,6 +1368,14 @@ def workspace_guard_command(
 def ui_command(
     host: Annotated[str, typer.Option(help="Local bind host.")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Local bind port.")] = 8080,
+    limit_max_requests: Annotated[
+        int,
+        typer.Option(help="Recycle the read-only UI worker after this many requests."),
+    ] = 500,
+    timeout_keep_alive: Annotated[
+        int,
+        typer.Option(help="Bound idle HTTP keep-alive time in seconds."),
+    ] = 5,
 ) -> None:
     import uvicorn
 
@@ -1369,7 +1386,13 @@ def ui_command(
     console.print(f"Read-only mode: {settings.ui_read_only}")
     console.print(f"Execution enabled: {settings.execution_enabled}")
     console.print(f"Execution dry-run: {settings.execution_dry_run}")
-    uvicorn.run("kalshi_predictor.ui.app:app", host=host, port=port)
+    uvicorn.run(
+        "kalshi_predictor.ui.app:app",
+        host=host,
+        port=port,
+        limit_max_requests=max(10, limit_max_requests),
+        timeout_keep_alive=max(1, timeout_keep_alive),
+    )
 
 
 @app.command("autopilot-status")
@@ -2091,8 +2114,7 @@ def phase3au_status_command(
     console.print(f"PID: {heartbeat.get('pid') or 'none'}")
     console.print(f"Stage: {heartbeat.get('stage') or 'none'}")
     console.print(
-        f"Processed: {heartbeat.get('processed') or 0} / "
-        f"{heartbeat.get('total') or 'unknown'}"
+        f"Processed: {heartbeat.get('processed') or 0} / {heartbeat.get('total') or 'unknown'}"
     )
     console.print(f"Elapsed: {heartbeat.get('elapsed') or 'n/a'}")
     console.print(f"Heartbeat age: {status.get('heartbeat_age') or 'n/a'}")
@@ -2829,7 +2851,9 @@ def composite_settlement_resolve_command(
     ] = 5,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run/--apply", help="Dry-run by default; --apply requires --backup-first."),
+        typer.Option(
+            "--dry-run/--apply", help="Dry-run by default; --apply requires --backup-first."
+        ),
     ] = True,
     backup_first: Annotated[
         bool,
@@ -2991,7 +3015,9 @@ def market_data_refresh_command(
     ] = True,
     enqueue_if_writer_active: Annotated[
         bool,
-        typer.Option(help="Report queue intent when a writer is active; no duplicate queue is created."),
+        typer.Option(
+            help="Report queue intent when a writer is active; no duplicate queue is created."
+        ),
     ] = False,
     output_dir: Annotated[
         Path,
@@ -3016,7 +3042,9 @@ def market_data_refresh_command(
             settings=settings,
         )
     if enqueue_if_writer_active:
-        console.print("Queue mode requested; Phase 3AK currently reports one bounded retry path only.")
+        console.print(
+            "Queue mode requested; Phase 3AK currently reports one bounded retry path only."
+        )
     console.print("Phase 3AK market-data refresh coordinator")
     console.print("Mode: bounded status/write guard")
     console.print("Live/demo execution: blocked")
@@ -3321,10 +3349,7 @@ def phase3ae_verified_sports_connector_command(
     max_schedule_delta_hours: Annotated[
         int,
         typer.Option(
-            help=(
-                "Maximum hours between market close and verified game time. "
-                "Use 0 to disable."
-            )
+            help=("Maximum hours between market close and verified game time. Use 0 to disable.")
         ),
     ] = 18,
     roster_evidence_path: Annotated[
@@ -3362,9 +3387,7 @@ def phase3ae_verified_sports_connector_command(
             roster_evidence_path=roster_evidence_path,
             team_alias_review_path=team_alias_review_path,
             manual_disambiguation_path=manual_disambiguation_path,
-            progress_callback=_phase_progress_printer("Phase 3AE")
-            if progress_every > 0
-            else None,
+            progress_callback=_phase_progress_printer("Phase 3AE") if progress_every > 0 else None,
             progress_every=progress_every,
         )
         session.commit()
@@ -3396,10 +3419,7 @@ def phase3ae_roster_candidate_diagnostics_command(
     max_schedule_delta_hours: Annotated[
         int,
         typer.Option(
-            help=(
-                "Maximum hours between market close and verified game time. "
-                "Use 0 to disable."
-            )
+            help=("Maximum hours between market close and verified game time. Use 0 to disable.")
         ),
     ] = 18,
 ) -> None:
@@ -4278,7 +4298,9 @@ def phase3an_economic_link_event_repair_command(
     ] = 50,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run/--apply", help="Dry-run by default; --apply requires --backup-first."),
+        typer.Option(
+            "--dry-run/--apply", help="Dry-run by default; --apply requires --backup-first."
+        ),
     ] = True,
     backup_first: Annotated[
         bool,
@@ -4322,7 +4344,9 @@ def phase3an_economic_parser_leg_backfill_command(
     ] = 50,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run/--apply", help="Dry-run by default; --apply requires --backup-first."),
+        typer.Option(
+            "--dry-run/--apply", help="Dry-run by default; --apply requires --backup-first."
+        ),
     ] = True,
     backup_first: Annotated[
         bool,
@@ -4392,7 +4416,9 @@ def phase3an_economic_approval_safety_guard_command(
     ] = Path("reports/phase3an"),
     packet_path: Annotated[
         Path | None,
-        typer.Option(help="Optional existing approval-packet JSON to audit without opening the DB."),
+        typer.Option(
+            help="Optional existing approval-packet JSON to audit without opening the DB."
+        ),
     ] = None,
     limit: Annotated[
         int,
@@ -4950,8 +4976,7 @@ def phase3aq_refresh_verified_opportunity_books_command(
     console.print(f"Status: {payload['status']}")
     console.print(f"Market-data writes: {payload['market_data_writes']}")
     console.print(
-        "Verified book refresh candidates: "
-        f"{payload['summary']['book_refresh_needed_rows']}"
+        f"Verified book refresh candidates: {payload['summary']['book_refresh_needed_rows']}"
     )
     console.print(f"Wrote JSON: {artifacts.json_path}")
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
@@ -5029,9 +5054,7 @@ def phase3aq_link_and_book_unblock_report_command(
             window_hours=window_hours,
             limit=limit,
         )
-        payload = json.loads(
-            artifacts.paper_ready_gate_summary_path.read_text(encoding="utf-8")
-        )
+        payload = json.loads(artifacts.paper_ready_gate_summary_path.read_text(encoding="utf-8"))
     console.print("Phase 3AQ Link and Book Unblock Report")
     console.print("Mode: PAPER / READ ONLY")
     console.print("Live/demo execution: blocked")
@@ -5976,9 +5999,7 @@ def phase3ah_sports_evidence_backfill_command(
             leagues=leagues,
             window_days_before=window_days_before,
             window_days_after=window_days_after,
-            max_windows_per_league=max_windows_per_league
-            if max_windows_per_league > 0
-            else None,
+            max_windows_per_league=max_windows_per_league if max_windows_per_league > 0 else None,
             limit=limit if limit > 0 else None,
             fetch_schedules=fetch_schedules,
             ingest_schedules=ingest_schedules,
@@ -5997,9 +6018,7 @@ def phase3ah_sports_evidence_backfill_command(
     console.print(
         f"Wrote manual disambiguation template: {artifacts.manual_disambiguation_template_path}"
     )
-    console.print(
-        f"Wrote round placeholder template: {artifacts.round_placeholder_template_path}"
-    )
+    console.print(f"Wrote round placeholder template: {artifacts.round_placeholder_template_path}")
     if fetch_schedules:
         console.print("Fetched schedule windows from Phase 3AG failed close dates.")
     if ingest_schedules:
@@ -6783,7 +6802,9 @@ def phase3az_r12_weather_missing_link_apply_command(
     ] = 25,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run/--apply", help="Dry-run by default; --apply requires --backup-first."),
+        typer.Option(
+            "--dry-run/--apply", help="Dry-run by default; --apply requires --backup-first."
+        ),
     ] = True,
     backup_first: Annotated[
         bool,
@@ -7627,10 +7648,7 @@ def phase3bb_r3_composite_preview_gate_command(
     console.print("Market-leg/link/settlement writes: blocked")
     console.print("Single-market remediation: blocked")
     console.print(f"Rows reviewed: {artifacts.rows_reviewed}")
-    console.print(
-        "Verified component evidence rows: "
-        f"{artifacts.verified_component_evidence_rows}"
-    )
+    console.print(f"Verified component evidence rows: {artifacts.verified_component_evidence_rows}")
     console.print(f"True composite rows: {artifacts.true_composite_rows}")
     console.print(f"Wrote JSON: {artifacts.json_path}")
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
@@ -7678,8 +7696,7 @@ def phase3bb_r3_composite_operator_preflight_command(
     console.print("Paper trade creation: blocked")
     console.print("Market-leg/link/settlement writes: blocked")
     console.print(
-        "Paper composite review ready rows: "
-        f"{artifacts.paper_composite_review_ready_rows}"
+        f"Paper composite review ready rows: {artifacts.paper_composite_review_ready_rows}"
     )
     console.print(f"Blocked rows: {artifacts.blocked_rows}")
     console.print(f"Wrote JSON: {artifacts.json_path}")
@@ -9227,7 +9244,9 @@ def phase3bb_r26_cloud_ui_access_control_gate_command(
     ] = None,
     auth_mode: Annotated[
         str,
-        typer.Option(help="Auth mode to evaluate: none, basic_auth, oauth_proxy, cloudflare_access, tailscale_funnel_auth."),
+        typer.Option(
+            help="Auth mode to evaluate: none, basic_auth, oauth_proxy, cloudflare_access, tailscale_funnel_auth."
+        ),
     ] = "none",
     max_public_route_seconds: Annotated[
         float,
@@ -9287,7 +9306,9 @@ def phase3bb_r27_cloud_ui_private_access_auth_draft_command(
     ] = Path("reports"),
     preferred_access: Annotated[
         str,
-        typer.Option(help="Preferred private access mode: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."),
+        typer.Option(
+            help="Preferred private access mode: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."
+        ),
     ] = "private_vpn",
     operator_email: Annotated[
         str | None,
@@ -9350,7 +9371,9 @@ def phase3bb_r28_cloud_ui_private_access_operator_review_command(
     ] = Path("reports"),
     selected_access: Annotated[
         str | None,
-        typer.Option(help="Optional selected access override: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."),
+        typer.Option(
+            help="Optional selected access override: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."
+        ),
     ] = None,
 ) -> None:
     """Review the private access draft and generate a no-install dry run."""
@@ -9845,24 +9868,22 @@ def phase3bb_r34_cloud_multicategory_refresh_scheduler_review_command(
     session_factory = get_session_factory(engine)
     try:
         with session_factory() as session:
-            artifacts = (
-                write_phase3bb_r34_cloud_multicategory_refresh_scheduler_review_report(
-                    session,
-                    output_dir=output_dir,
-                    reports_dir=reports_dir,
-                    settings=settings,
-                    command_args=sys.argv[1:],
-                    private_base_url=private_base_url,
-                    ui_timeout_seconds=ui_timeout_seconds,
-                    max_dashboard_age_seconds=max_dashboard_age_seconds,
-                    ssh_target=ssh_target,
-                    identity_file=identity_file,
-                    app_path=app_path,
-                    env_path=env_path,
-                    db_path=db_path,
-                    service_name=service_name,
-                    per_probe_timeout_seconds=per_probe_timeout_seconds,
-                )
+            artifacts = write_phase3bb_r34_cloud_multicategory_refresh_scheduler_review_report(
+                session,
+                output_dir=output_dir,
+                reports_dir=reports_dir,
+                settings=settings,
+                command_args=sys.argv[1:],
+                private_base_url=private_base_url,
+                ui_timeout_seconds=ui_timeout_seconds,
+                max_dashboard_age_seconds=max_dashboard_age_seconds,
+                ssh_target=ssh_target,
+                identity_file=identity_file,
+                app_path=app_path,
+                env_path=env_path,
+                db_path=db_path,
+                service_name=service_name,
+                per_probe_timeout_seconds=per_probe_timeout_seconds,
             )
             session.rollback()
     finally:
@@ -9908,15 +9929,13 @@ def phase3bb_r35_cloud_multicategory_scheduler_no_start_dry_run_command(
     session_factory = get_session_factory(engine)
     try:
         with session_factory() as session:
-            artifacts = (
-                write_phase3bb_r35_cloud_multicategory_scheduler_no_start_dry_run_report(
-                    session,
-                    output_dir=output_dir,
-                    reports_dir=reports_dir,
-                    settings=settings,
-                    command_args=sys.argv[1:],
-                    r34_max_age_minutes=r34_max_age_minutes,
-                )
+            artifacts = write_phase3bb_r35_cloud_multicategory_scheduler_no_start_dry_run_report(
+                session,
+                output_dir=output_dir,
+                reports_dir=reports_dir,
+                settings=settings,
+                command_args=sys.argv[1:],
+                r34_max_age_minutes=r34_max_age_minutes,
             )
             session.rollback()
     finally:
@@ -10592,7 +10611,9 @@ def phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_command(
     ] = False,
     reset_failed: Annotated[
         bool,
-        typer.Option(help="Clear the failed systemd service marker after installing; does not start the service."),
+        typer.Option(
+            help="Clear the failed systemd service marker after installing; does not start the service."
+        ),
     ] = False,
     per_probe_timeout_seconds: Annotated[
         int,
@@ -10701,7 +10722,9 @@ def phase3bb_r47_weather_current_window_series_discovery_linkability_repair_comm
     ] = 3,
     apply: Annotated[
         bool,
-        typer.Option(help="Install the repaired weather source/feature refresh hook on the cloud host."),
+        typer.Option(
+            help="Install the repaired weather source/feature refresh hook on the cloud host."
+        ),
     ] = False,
     backup_first: Annotated[
         bool,
@@ -11013,7 +11036,10 @@ def phase3bb_r50_weather_post_link_ranking_fast_lane_recheck_command(
     ] = 3,
     run_fast_lane: Annotated[
         bool,
-        typer.Option("--run-fast-lane/--no-run-fast-lane", help="Run the cloud weather fast-lane when gates are clear."),
+        typer.Option(
+            "--run-fast-lane/--no-run-fast-lane",
+            help="Run the cloud weather fast-lane when gates are clear.",
+        ),
     ] = True,
     fast_lane_timeout_seconds: Annotated[
         int,
@@ -11115,7 +11141,10 @@ def phase3bb_r51_weather_ranking_path_repair_command(
     ] = 3,
     run_repair: Annotated[
         bool,
-        typer.Option("--run-repair/--no-run-repair", help="Run cloud snapshot, forecast, and fast-lane repair when gates are clear."),
+        typer.Option(
+            "--run-repair/--no-run-repair",
+            help="Run cloud snapshot, forecast, and fast-lane repair when gates are clear.",
+        ),
     ] = True,
     repair_timeout_seconds: Annotated[
         int,
@@ -11156,7 +11185,9 @@ def phase3bb_r51_weather_ranking_path_repair_command(
     console.print("Phase 3BB-R51 weather ranking path repair")
     console.print("Mode: PAPER ONLY cloud weather ranking path repair")
     console.print("Missing-link apply executed by this phase: 0")
-    console.print("Snapshot/forecast/fast-lane executed only if writer gate and live-window gates were clear")
+    console.print(
+        "Snapshot/forecast/fast-lane executed only if writer gate and live-window gates were clear"
+    )
     console.print("Paper trade creation: blocked")
     console.print("Live/demo execution: blocked")
     console.print("Order submission/cancel/replace: blocked")
@@ -11426,7 +11457,9 @@ def phase3bb_r54_weather_missing_link_apply_deferral_command(
     ] = 24,
     match_tolerance_hours: Annotated[
         int,
-        typer.Option(help="Maximum target-time mismatch allowed between market text and weather feature."),
+        typer.Option(
+            help="Maximum target-time mismatch allowed between market text and weather feature."
+        ),
     ] = 3,
     max_records: Annotated[
         int,
@@ -11548,7 +11581,9 @@ def phase3bb_r55_weather_ranking_path_retry_command(
     ] = 30,
     min_minutes_before_target: Annotated[
         int,
-        typer.Option(help="Minimum lead time before weather target expiry before running R51 repair."),
+        typer.Option(
+            help="Minimum lead time before weather target expiry before running R51 repair."
+        ),
     ] = 10,
     fresh_window_hours: Annotated[
         int,
@@ -11556,7 +11591,9 @@ def phase3bb_r55_weather_ranking_path_retry_command(
     ] = 24,
     match_tolerance_hours: Annotated[
         int,
-        typer.Option(help="Maximum target-time mismatch allowed between market text and weather feature."),
+        typer.Option(
+            help="Maximum target-time mismatch allowed between market text and weather feature."
+        ),
     ] = 3,
     current_window_lookback_hours: Annotated[
         int,
@@ -11626,7 +11663,9 @@ def phase3bb_r55_weather_ranking_path_retry_command(
 def phase3bb_r57_weather_selected_window_pipeline_command(
     output_dir: Annotated[
         Path,
-        typer.Option(help="Directory for Phase 3BB-R57 selected-window weather pipeline artifacts."),
+        typer.Option(
+            help="Directory for Phase 3BB-R57 selected-window weather pipeline artifacts."
+        ),
     ] = Path("reports/phase3bb_r57"),
     reports_dir: Annotated[
         Path,
@@ -11670,7 +11709,9 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
     ] = 30,
     min_minutes_before_target: Annotated[
         int,
-        typer.Option(help="Minimum lead time before weather target expiry before running the selected-window pipeline."),
+        typer.Option(
+            help="Minimum lead time before weather target expiry before running the selected-window pipeline."
+        ),
     ] = 10,
     fresh_window_hours: Annotated[
         int,
@@ -11678,11 +11719,15 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
     ] = 24,
     match_tolerance_hours: Annotated[
         int,
-        typer.Option(help="Maximum target-time mismatch allowed between market text and weather feature."),
+        typer.Option(
+            help="Maximum target-time mismatch allowed between market text and weather feature."
+        ),
     ] = 3,
     max_records: Annotated[
         int,
-        typer.Option(help="Maximum R12 missing-link rows to apply if the current-window gate says it is safe."),
+        typer.Option(
+            help="Maximum R12 missing-link rows to apply if the current-window gate says it is safe."
+        ),
     ] = 25,
     limit: Annotated[
         int,
@@ -11690,7 +11735,9 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
     ] = 2000,
     forecast_limit: Annotated[
         int,
-        typer.Option(help="Per-ticker weather forecast row limit; keep at 1 for selected-window speed."),
+        typer.Option(
+            help="Per-ticker weather forecast row limit; keep at 1 for selected-window speed."
+        ),
     ] = 1,
     per_ticker_timeout_seconds: Annotated[
         int,
@@ -11763,7 +11810,9 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
 def phase3bb_r58_weather_selected_window_alignment_command(
     output_dir: Annotated[
         Path,
-        typer.Option(help="Directory for Phase 3BB-R58 weather selected-window alignment artifacts."),
+        typer.Option(
+            help="Directory for Phase 3BB-R58 weather selected-window alignment artifacts."
+        ),
     ] = Path("reports/phase3bb_r58"),
     reports_dir: Annotated[
         Path,
@@ -11791,7 +11840,9 @@ def phase3bb_r58_weather_selected_window_alignment_command(
     ] = None,
     match_tolerance_hours: Annotated[
         int,
-        typer.Option(help="Maximum target-time mismatch allowed when comparing selected weather rows."),
+        typer.Option(
+            help="Maximum target-time mismatch allowed when comparing selected weather rows."
+        ),
     ] = 3,
     per_probe_timeout_seconds: Annotated[
         int,
@@ -11842,7 +11893,9 @@ def phase3bb_r58_weather_selected_window_alignment_command(
 def phase3bb_r59_weather_catalog_refresh_r57_retry_command(
     output_dir: Annotated[
         Path,
-        typer.Option(help="Directory for Phase 3BB-R59 weather catalog refresh and R57 retry artifacts."),
+        typer.Option(
+            help="Directory for Phase 3BB-R59 weather catalog refresh and R57 retry artifacts."
+        ),
     ] = Path("reports/phase3bb_r59"),
     reports_dir: Annotated[
         Path,
@@ -11878,7 +11931,9 @@ def phase3bb_r59_weather_catalog_refresh_r57_retry_command(
     ] = None,
     expected_writer_pid: Annotated[
         int | None,
-        typer.Option(help="Expected active writer PID to wait on before refreshing weather catalog."),
+        typer.Option(
+            help="Expected active writer PID to wait on before refreshing weather catalog."
+        ),
     ] = None,
     max_wait_seconds: Annotated[
         int,
@@ -11890,7 +11945,9 @@ def phase3bb_r59_weather_catalog_refresh_r57_retry_command(
     ] = 15,
     min_minutes_before_target: Annotated[
         int,
-        typer.Option(help="Minimum lead time before weather target expiry before running patched R57."),
+        typer.Option(
+            help="Minimum lead time before weather target expiry before running patched R57."
+        ),
     ] = 10,
     fresh_window_hours: Annotated[
         int,
@@ -11898,7 +11955,9 @@ def phase3bb_r59_weather_catalog_refresh_r57_retry_command(
     ] = 24,
     match_tolerance_hours: Annotated[
         int,
-        typer.Option(help="Maximum target-time mismatch allowed between market text and weather feature."),
+        typer.Option(
+            help="Maximum target-time mismatch allowed between market text and weather feature."
+        ),
     ] = 3,
     catalog_limit: Annotated[
         int,
@@ -11926,7 +11985,9 @@ def phase3bb_r59_weather_catalog_refresh_r57_retry_command(
     ] = 2000,
     forecast_limit: Annotated[
         int,
-        typer.Option(help="Per-ticker weather forecast row limit; keep at 1 for selected-window speed."),
+        typer.Option(
+            help="Per-ticker weather forecast row limit; keep at 1 for selected-window speed."
+        ),
     ] = 1,
     per_ticker_timeout_seconds: Annotated[
         int,
@@ -12024,7 +12085,9 @@ def phase3bb_r60_weather_next_window_lead_time_scheduler_repair_command(
     ] = Path("reports/phase3bb_r57"),
     r59_output_dir: Annotated[
         Path,
-        typer.Option(help="Directory where the delegated R59 report should be written if triggered."),
+        typer.Option(
+            help="Directory where the delegated R59 report should be written if triggered."
+        ),
     ] = Path("reports/phase3bb_r59"),
     ssh_target: Annotated[
         str | None,
@@ -12048,11 +12111,15 @@ def phase3bb_r60_weather_next_window_lead_time_scheduler_repair_command(
     ] = None,
     expected_writer_pid: Annotated[
         int | None,
-        typer.Option(help="Expected active writer PID to wait on before refreshing weather catalog."),
+        typer.Option(
+            help="Expected active writer PID to wait on before refreshing weather catalog."
+        ),
     ] = None,
     max_wait_seconds: Annotated[
         int,
-        typer.Option(help="Maximum bounded wait time for the writer gate to clear when R59 is triggered."),
+        typer.Option(
+            help="Maximum bounded wait time for the writer gate to clear when R59 is triggered."
+        ),
     ] = 120,
     poll_interval_seconds: Annotated[
         int,
@@ -12060,11 +12127,15 @@ def phase3bb_r60_weather_next_window_lead_time_scheduler_repair_command(
     ] = 10,
     min_minutes_before_target: Annotated[
         int,
-        typer.Option(help="Minimum lead time before weather target expiry before triggering R59/R57."),
+        typer.Option(
+            help="Minimum lead time before weather target expiry before triggering R59/R57."
+        ),
     ] = 20,
     max_minutes_before_target: Annotated[
         int,
-        typer.Option(help="Maximum lead time before weather target expiry before waiting for a later scheduler tick."),
+        typer.Option(
+            help="Maximum lead time before weather target expiry before waiting for a later scheduler tick."
+        ),
     ] = 90,
     fresh_window_hours: Annotated[
         int,
@@ -12072,7 +12143,9 @@ def phase3bb_r60_weather_next_window_lead_time_scheduler_repair_command(
     ] = 24,
     match_tolerance_hours: Annotated[
         int,
-        typer.Option(help="Maximum target-time mismatch allowed between market text and weather feature."),
+        typer.Option(
+            help="Maximum target-time mismatch allowed between market text and weather feature."
+        ),
     ] = 3,
     catalog_limit: Annotated[
         int,
@@ -12100,7 +12173,9 @@ def phase3bb_r60_weather_next_window_lead_time_scheduler_repair_command(
     ] = 2000,
     forecast_limit: Annotated[
         int,
-        typer.Option(help="Per-ticker weather forecast row limit; keep at 1 for selected-window speed."),
+        typer.Option(
+            help="Per-ticker weather forecast row limit; keep at 1 for selected-window speed."
+        ),
     ] = 1,
     per_ticker_timeout_seconds: Annotated[
         int,
@@ -12277,7 +12352,9 @@ def phase3bb_r61_cloud_dashboard_db_writer_api_reachability_repair_command(
     console.print(f"Wrote private UI API probes: {artifacts.ui_api_probe_csv_path}")
     console.print(f"Wrote repair checks: {artifacts.checks_csv_path}")
     console.print(f"Wrote UI start handoff: {artifacts.ui_start_handoff_path}")
-    console.print(f"Wrote R60 scheduler no-start handoff: {artifacts.scheduler_no_start_handoff_path}")
+    console.print(
+        f"Wrote R60 scheduler no-start handoff: {artifacts.scheduler_no_start_handoff_path}"
+    )
     console.print(f"Wrote operator next command: {artifacts.operator_command_path}")
     console.print(f"Wrote Next Actions: {artifacts.next_actions_path}")
     console.print(f"Wrote manifest: {artifacts.manifest_path}")
@@ -13093,8 +13170,10 @@ def phase3bc_r5_crypto_freshness_watch_command(
     session_factory = get_session_factory(engine)
     artifacts = None
     for cycle_number in range(1, cycles + 1):
+        cycle_session = None
         try:
             with session_factory() as session:
+                cycle_session = session
                 artifacts = write_phase3bc_r5_crypto_freshness_watch_report(
                     session,
                     output_dir=output_dir,
@@ -13133,7 +13212,7 @@ def phase3bc_r5_crypto_freshness_watch_command(
                 )
                 session.commit()
         finally:
-            engine.dispose()
+            _release_phase3bc_r5_cycle_resources(cycle_session, engine)
         console.print(
             f"Completed Phase 3BC-R5 crypto freshness watch cycle {cycle_number}/{cycles}"
         )
@@ -13150,6 +13229,24 @@ def phase3bc_r5_crypto_freshness_watch_command(
     console.print(f"Wrote JSON: {artifacts.json_path}")
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
     console.print(f"Wrote preflight rows: {artifacts.preflight_rows_path}")
+
+
+def _release_phase3bc_r5_cycle_resources(session: Any, engine: Any) -> None:
+    """Drop ORM identity state and return free native heap pages between R5 cycles."""
+    if session is not None:
+        expunge_all = getattr(session, "expunge_all", None)
+        if callable(expunge_all):
+            expunge_all()
+    engine.dispose()
+    gc.collect()
+    try:
+        import ctypes
+
+        malloc_trim = getattr(ctypes.CDLL(None), "malloc_trim", None)
+        if malloc_trim is not None:
+            malloc_trim(0)
+    except (AttributeError, OSError):
+        pass
 
 
 @app.command("phase3bc-r16-crypto-paper-ready-edge-hunt")
@@ -16580,6 +16677,829 @@ def snapshot_command(
     console.print(f"Captured {len(snapshots)} snapshots.")
 
 
+@app.command("gh1-websocket-orderbook")
+def gh1_websocket_orderbook_command(
+    tickers: Annotated[str, typer.Option(help="Comma-separated exact market tickers.")],
+    connect: Annotated[
+        bool,
+        typer.Option("--connect/--dry-run", help="Open the read-only stream; dry-run by default."),
+    ] = False,
+    max_messages: Annotated[int, typer.Option(help="Bounded messages before disconnecting.")] = 100,
+    max_seconds: Annotated[
+        float, typer.Option(help="Wall-clock stream limit, including quiet periods.")
+    ] = 30.0,
+    persist_every_deltas: Annotated[
+        int,
+        typer.Option(help="Stage a filesystem checkpoint after this many applied deltas."),
+    ] = 25,
+) -> None:
+    """Stage authenticated orderbook updates; never place or manage orders."""
+    selected = [ticker.strip() for ticker in tickers.split(",") if ticker.strip()]
+    if not selected:
+        raise typer.BadParameter("At least one exact ticker is required.")
+    if max_messages < 1 or persist_every_deltas < 1 or max_seconds <= 0:
+        raise typer.BadParameter(
+            "max-messages, max-seconds, and persist-every-deltas must be positive."
+        )
+    settings = get_settings()
+    console.print("Phase GH-1 read-only WebSocket orderbook adapter")
+    console.print("Execution enabled: false")
+    console.print("Order submission/cancel/replace: unavailable")
+    console.print(f"Configured enabled: {settings.kalshi_websocket_enabled}")
+    console.print(f"Tickers: {len(selected)}")
+    if not connect:
+        console.print("Status: DRY_RUN_NO_CONNECTION")
+        return
+    import asyncio
+
+    with KalshiClient(settings=settings) as client:
+        adapter = adapter_from_settings(
+            settings=settings,
+            tickers=selected,
+            rest_client=client,
+            persist_every_deltas=persist_every_deltas,
+        )
+        summary = asyncio.run(adapter.run(max_messages=max_messages, max_seconds=max_seconds))
+    console.print(f"Messages seen: {summary.messages_seen}")
+    console.print(f"Snapshots seen: {summary.snapshots_seen}")
+    console.print(f"Deltas applied: {summary.deltas_applied}")
+    console.print(f"Sequence recoveries: {summary.sequence_recoveries}")
+    console.print(f"Staged files: {len(summary.staged_files)}")
+    console.print(f"Errors: {len(summary.errors)}")
+    console.print(f"Wall-clock timeout reached: {summary.timed_out}")
+
+
+@app.command("gh1-websocket-orderbook-drain")
+def gh1_websocket_orderbook_drain_command(
+    staging_dir: Annotated[
+        Path | None,
+        typer.Option(help="Staging directory; defaults to KALSHI_WEBSOCKET_STAGING_DIR."),
+    ] = None,
+    apply: Annotated[
+        bool,
+        typer.Option("--apply/--diagnose-only", help="Persist through one guarded writer."),
+    ] = False,
+) -> None:
+    """Inspect or drain GH-1 staged snapshots through the existing writer guard."""
+    settings = get_settings()
+    resolved_dir = staging_dir or Path(settings.kalshi_websocket_staging_dir)
+    files = sorted(resolved_dir.glob("*.json")) if resolved_dir.exists() else []
+    writer = db_writer_monitor(settings=settings)
+    console.print("Phase GH-1 single-writer snapshot drain")
+    console.print("Execution enabled: false")
+    console.print("Paper/live orders: blocked")
+    console.print(f"Staged files: {len(files)}")
+    console.print(f"Writer safe: {bool(writer.get('safe_to_start_write', False))}")
+    if not apply:
+        console.print("Status: DIAGNOSE_ONLY")
+        return
+    engine = init_db(database_url_from_settings(settings))
+    result = drain_staged_websocket_orderbooks(
+        session_factory=get_session_factory(engine),
+        staging_dir=resolved_dir,
+        settings=settings,
+    )
+    console.print(f"Status: {result['status']}")
+    console.print(f"Snapshots inserted: {result['snapshots_inserted']}")
+
+
+@app.command("gh1-websocket-orderbook-watch")
+def gh1_websocket_orderbook_watch_command(
+    series: Annotated[
+        str, typer.Option(help="Comma-separated exact market series to monitor.")
+    ] = ",".join(DEFAULT_WATCH_SERIES),
+    connect: Annotated[
+        bool,
+        typer.Option("--connect/--dry-run", help="Run the staging-only watch."),
+    ] = False,
+    max_markets_per_series: Annotated[
+        int, typer.Option(help="Bounded open markets checked per series refresh.")
+    ] = 30,
+    max_quoted_per_series: Annotated[
+        int, typer.Option(help="Quoted tickers retained per series.")
+    ] = 2,
+    stream_max_seconds: Annotated[
+        float, typer.Option(help="Maximum duration of each signed stream connection.")
+    ] = 60.0,
+    discovery_refresh_seconds: Annotated[
+        float, typer.Option(help="Seconds between bounded quoted-book discovery refreshes.")
+    ] = 900.0,
+    healthy_cycle_delay_seconds: Annotated[
+        float, typer.Option(help="Delay after a healthy bounded stream cycle.")
+    ] = 2.0,
+    reconnect_initial_seconds: Annotated[
+        float, typer.Option(help="Initial reconnect backoff after disconnect/error.")
+    ] = 5.0,
+    reconnect_max_seconds: Annotated[
+        float, typer.Option(help="Maximum reconnect backoff.")
+    ] = 120.0,
+    persist_every_deltas: Annotated[
+        int, typer.Option(help="Stage a checkpoint after this many applied deltas.")
+    ] = 25,
+    status_path: Annotated[
+        Path, typer.Option(help="Filesystem heartbeat/status artifact.")
+    ] = Path("reports/phase_gh1/watch/status.json"),
+    max_cycles: Annotated[
+        int, typer.Option(help="Finite cycles for verification; 0 runs until stopped.")
+    ] = 0,
+) -> None:
+    """Keep a reconnecting GH-1 producer staging files outside the database."""
+    selected = [item.strip() for item in series.split(",") if item.strip()]
+    if not selected or max_cycles < 0:
+        raise typer.BadParameter("Exact series and a nonnegative max-cycles value are required.")
+    settings = get_settings().model_copy(
+        update={
+            "execution_enabled": False,
+            "execution_dry_run": True,
+            "autopilot_dry_run": True,
+        }
+    )
+    console.print("Phase GH-1 reconnecting filesystem-stage-only watch")
+    console.print("Execution enabled: false")
+    console.print("Database writes: none (guarded drain is separate)")
+    console.print(f"Configured enabled: {settings.kalshi_websocket_enabled}")
+    console.print(f"Series: {len(selected)}")
+    if not connect:
+        console.print("Status: DRY_RUN_NO_CONNECTION")
+        return
+    try:
+        result = run_reconnecting_websocket_watch(
+            settings=settings,
+            series=selected,
+            max_markets_per_series=max_markets_per_series,
+            max_quoted_per_series=max_quoted_per_series,
+            stream_max_seconds=stream_max_seconds,
+            discovery_refresh_seconds=discovery_refresh_seconds,
+            healthy_cycle_delay_seconds=healthy_cycle_delay_seconds,
+            reconnect_initial_seconds=reconnect_initial_seconds,
+            reconnect_max_seconds=reconnect_max_seconds,
+            persist_every_deltas=persist_every_deltas,
+            status_path=status_path,
+            max_cycles=max_cycles or None,
+        )
+    except (RuntimeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    console.print(f"Status: {result['state']}")
+    console.print(f"Stream cycles: {result['stream_cycles_completed']}")
+    console.print(f"Reconnects: {result['reconnect_count']}")
+    console.print(f"Staged files: {result['staged_files']}")
+    console.print(f"Heartbeat: {status_path}")
+
+
+@app.command("gh1d-liquidity-truth")
+def gh1d_liquidity_truth_command(
+    artifacts: Annotated[
+        str, typer.Option(help="Comma-separated staged or archived GH-1 JSON files.")
+    ],
+    output_dir: Annotated[Path, typer.Option(help="GH-1D report directory.")] = Path(
+        "reports/phase_gh1d"
+    ),
+    rest_base_url: Annotated[str, typer.Option(help="Read-only REST API base URL.")] = (
+        "https://demo-api.kalshi.co/trade-api/v2"
+    ),
+) -> None:
+    """Compare exact WebSocket and REST books without changing rankings or execution."""
+    from kalshi_predictor.phase_gh1d import write_gh1d_report
+
+    selected = [Path(item.strip()) for item in artifacts.split(",") if item.strip()]
+    if not selected:
+        raise typer.BadParameter("At least one exact GH-1 artifact is required.")
+    missing = [str(path) for path in selected if not path.is_file()]
+    if missing:
+        raise typer.BadParameter(f"Missing artifacts: {', '.join(missing)}")
+    path = write_gh1d_report(
+        artifacts=selected,
+        output_dir=output_dir,
+        rest_base_url=rest_base_url,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1D WebSocket liquidity truth comparison")
+    console.print("Execution enabled: false")
+    console.print("Database writes: none")
+    console.print(f"Tickers compared: {payload['summary']['tickers_compared']}")
+    console.print(f"Weather tickers: {payload['summary']['weather_tickers']}")
+    console.print(f"Crypto tickers: {payload['summary']['crypto_tickers']}")
+    console.print(
+        f"Ranking classification changes: {payload['summary']['ranking_classification_changes']}"
+    )
+    console.print(f"Risk gate changes: {payload['summary']['risk_gate_changes']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1e-discover-quoted")
+def gh1e_discover_quoted_command(
+    series: Annotated[
+        str, typer.Option(help="Comma-separated exact demo series tickers.")
+    ] = "KXBTC,KXETH,KXTEMPNYCH",
+    max_markets_per_series: Annotated[
+        int, typer.Option(help="Bounded orderbook checks per series.")
+    ] = 30,
+    max_quoted_per_category: Annotated[
+        int, typer.Option(help="Maximum selected quoted tickers per category.")
+    ] = 3,
+    output_dir: Annotated[Path, typer.Option(help="GH-1E report directory.")] = Path(
+        "reports/phase_gh1e"
+    ),
+) -> None:
+    """Find visibly quoted demo books without changing local or exchange state."""
+    from kalshi_predictor.phase_gh1e import write_gh1e_discovery_report
+
+    selected = [item.strip() for item in series.split(",") if item.strip()]
+    if not selected or max_markets_per_series < 1 or max_quoted_per_category < 1:
+        raise typer.BadParameter("series and positive discovery bounds are required.")
+    path = write_gh1e_discovery_report(
+        output_dir=output_dir,
+        series=selected,
+        max_markets_per_series=max_markets_per_series,
+        max_quoted_per_category=max_quoted_per_category,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1E bounded quoted-ticker discovery")
+    console.print("Execution enabled: false")
+    console.print("Database writes: none")
+    console.print(f"Quoted total: {payload['summary']['quoted_total']}")
+    console.print(f"Weather quoted: {payload['summary']['weather_quoted']}")
+    console.print(f"Crypto quoted: {payload['summary']['crypto_quoted']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1f-demo-quote-monitor")
+def gh1f_demo_quote_monitor_command(
+    series: Annotated[str, typer.Option(help="Comma-separated exact demo series.")] = (
+        "KXBTC,KXETH,KXTEMPNYCH"
+    ),
+    cycles: Annotated[int, typer.Option(help="Finite discovery cycles.")] = 4,
+    interval_seconds: Annotated[float, typer.Option(help="Pause between cycles.")] = 60.0,
+    max_markets_per_series: Annotated[int, typer.Option(help="REST checks per series.")] = 30,
+    max_quoted_per_category: Annotated[
+        int, typer.Option(help="Quoted selections per category.")
+    ] = 3,
+    stream_max_seconds: Annotated[float, typer.Option(help="WebSocket wall-clock limit.")] = 15.0,
+    output_dir: Annotated[Path, typer.Option(help="GH-1F report directory.")] = Path(
+        "reports/phase_gh1f"
+    ),
+) -> None:
+    """Monitor demo quotes and compare only when visible depth appears."""
+    from kalshi_predictor.phase_gh1f import run_gh1f_monitor
+
+    selected = [item.strip() for item in series.split(",") if item.strip()]
+    if (
+        not selected
+        or cycles < 1
+        or interval_seconds < 0
+        or max_markets_per_series < 1
+        or max_quoted_per_category < 1
+        or stream_max_seconds <= 0
+    ):
+        raise typer.BadParameter("Series and positive finite bounds are required.")
+    settings = get_settings()
+    path = run_gh1f_monitor(
+        settings=settings,
+        output_dir=output_dir,
+        series=selected,
+        cycles=cycles,
+        interval_seconds=interval_seconds,
+        max_markets_per_series=max_markets_per_series,
+        max_quoted_per_category=max_quoted_per_category,
+        stream_max_seconds=stream_max_seconds,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1F scheduled demo quote monitor")
+    console.print("Execution enabled: false")
+    console.print("Database writes: 0")
+    console.print(f"Cycles completed: {payload['cycles_completed']}")
+    console.print(f"Comparisons triggered: {payload['comparisons_triggered']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1g-liquidity-census")
+def gh1g_liquidity_census_command(
+    series: Annotated[str, typer.Option(help="Comma-separated exact demo series.")] = (
+        "KXBTC,KXETH,KXSOLE,KXXRP,KXDOGE,KXTEMPNYCH,KXTEMPCHI,KXTEMPMIA,KXTEMPAUS,KXTEMPLAX"
+    ),
+    windows_utc: Annotated[str, typer.Option(help="Comma-separated UTC HH:MM-HH:MM windows.")] = (
+        "13:00-15:00,17:00-19:00,21:00-23:30"
+    ),
+    poll_cycles: Annotated[int, typer.Option(help="Finite census polls.")] = 3,
+    poll_interval_seconds: Annotated[float, typer.Option(help="Pause between polls.")] = 60.0,
+    max_markets_per_series: Annotated[int, typer.Option(help="REST checks per series.")] = 20,
+    max_quoted_per_category: Annotated[
+        int, typer.Option(help="Quoted selections per category.")
+    ] = 3,
+    stream_max_seconds: Annotated[float, typer.Option(help="Triggered stream deadline.")] = 15.0,
+    output_dir: Annotated[Path, typer.Option(help="GH-1G report directory.")] = Path(
+        "reports/phase_gh1g"
+    ),
+) -> None:
+    """Run a finite liquidity census only inside explicit UTC windows."""
+    from kalshi_predictor.phase_gh1g import run_gh1g_census
+
+    selected_series = [item.strip() for item in series.split(",") if item.strip()]
+    selected_windows = [item.strip() for item in windows_utc.split(",") if item.strip()]
+    if not selected_series or not selected_windows or poll_cycles < 1 or poll_interval_seconds < 0:
+        raise typer.BadParameter("Exact series, windows, and finite positive bounds are required.")
+    path = run_gh1g_census(
+        settings=get_settings(),
+        output_dir=output_dir,
+        series=selected_series,
+        windows_utc=selected_windows,
+        poll_cycles=poll_cycles,
+        poll_interval_seconds=poll_interval_seconds,
+        max_markets_per_series=max_markets_per_series,
+        max_quoted_per_category=max_quoted_per_category,
+        stream_max_seconds=stream_max_seconds,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1G time-windowed demo liquidity census")
+    console.print("Execution enabled: false")
+    console.print("Database writes: 0")
+    console.print(f"Polls completed: {payload['poll_cycles_completed']}")
+    console.print(f"Certification triggered: {payload['certification_triggered']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1h-production-liquidity-calibration")
+def gh1h_production_liquidity_calibration_command(
+    series: Annotated[str, typer.Option(help="Comma-separated public production series.")] = (
+        "KXBTC,KXETH,KXSOLE,KXXRP,KXDOGE,KXTEMPNYCH,KXTEMPCHI,KXTEMPMIA,KXTEMPAUS,KXTEMPLAX"
+    ),
+    max_markets_per_series: Annotated[
+        int, typer.Option(help="Bounded public books per series.")
+    ] = 30,
+    max_quoted_per_category: Annotated[
+        int, typer.Option(help="Quoted books retained per category.")
+    ] = 3,
+    output_dir: Annotated[Path, typer.Option(help="GH-1H report directory.")] = Path(
+        "reports/phase_gh1h"
+    ),
+) -> None:
+    """Calibrate liquidity truth using unauthenticated production public REST data."""
+    from kalshi_predictor.phase_gh1h import write_gh1h_report
+
+    selected = [item.strip() for item in series.split(",") if item.strip()]
+    if not selected or max_markets_per_series < 1 or max_quoted_per_category < 1:
+        raise typer.BadParameter("Exact series and positive scan bounds are required.")
+    path = write_gh1h_report(
+        output_dir=output_dir,
+        series=selected,
+        max_markets_per_series=max_markets_per_series,
+        max_quoted_per_category=max_quoted_per_category,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1H production public liquidity calibration")
+    console.print("Authentication used: none")
+    console.print("Execution enabled: false")
+    console.print("Database writes: 0")
+    console.print(f"Quoted total: {payload['summary']['quoted_total']}")
+    console.print(f"Weather quoted: {payload['summary']['weather_quoted']}")
+    console.print(f"Crypto quoted: {payload['summary']['crypto_quoted']}")
+    console.print(f"Risk gate pass: {payload['summary']['risk_gate_pass']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1i-two-sided-calibration")
+def gh1i_two_sided_calibration_command(
+    series: Annotated[str, typer.Option(help="Comma-separated public production series.")] = (
+        "KXBTC,KXETH,KXSOLE,KXXRP,KXDOGE,KXTEMPNYCH,KXTEMPCHI,KXTEMPMIA,KXTEMPAUS,KXTEMPLAX"
+    ),
+    max_markets_per_series: Annotated[
+        int, typer.Option(help="Bounded public books per series.")
+    ] = 50,
+    max_two_sided_per_category: Annotated[
+        int, typer.Option(help="Two-sided books retained per category.")
+    ] = 10,
+    output_dir: Annotated[Path, typer.Option(help="GH-1I report directory.")] = Path(
+        "reports/phase_gh1i"
+    ),
+) -> None:
+    """Measure two-sided liquidity using current unchanged ranking and risk thresholds."""
+    from kalshi_predictor.phase_gh1i import write_gh1i_report
+
+    selected = [item.strip() for item in series.split(",") if item.strip()]
+    if not selected or max_markets_per_series < 1 or max_two_sided_per_category < 1:
+        raise typer.BadParameter("Exact series and positive scan bounds are required.")
+    path = write_gh1i_report(
+        settings=get_settings(),
+        output_dir=output_dir,
+        series=selected,
+        max_markets_per_series=max_markets_per_series,
+        max_two_sided_per_category=max_two_sided_per_category,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1I two-sided liquidity calibration")
+    console.print("Authentication used: none")
+    console.print("Execution enabled: false")
+    console.print("Database writes: 0")
+    console.print("Thresholds changed: false")
+    console.print(f"Two-sided books: {payload['summary']['two_sided_total']}")
+    console.print(f"Ranking advance: {payload['summary']['ranking_advance']}")
+    console.print(f"Risk executable advance: {payload['summary']['risk_executable_advance']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1j-ranking-wiring-audit")
+def gh1j_ranking_wiring_audit_command(
+    gh1i_report: Annotated[Path, typer.Option(help="Exact GH-1I calibration JSON.")] = Path(
+        "reports/phase_gh1i/gh1i_two_sided_liquidity_calibration.json"
+    ),
+    output_dir: Annotated[Path, typer.Option(help="GH-1J report directory.")] = Path(
+        "reports/phase_gh1j"
+    ),
+) -> None:
+    """Join calibrated liquidity to local funnel evidence using read-only SQLite."""
+    from kalshi_predictor.data.backend import database_url_from_settings, sqlite_path_from_url
+    from kalshi_predictor.phase_gh1j import write_gh1j_report
+
+    if not gh1i_report.is_file():
+        raise typer.BadParameter(f"Missing GH-1I report: {gh1i_report}")
+    database_path = sqlite_path_from_url(database_url_from_settings(get_settings()))
+    if database_path is None or not database_path.is_file():
+        raise typer.BadParameter("GH-1J currently requires the existing SQLite database file.")
+    path = write_gh1j_report(
+        gh1i_report=gh1i_report, database_path=database_path, output_dir=output_dir
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1J liquidity truth-to-ranking wiring audit")
+    console.print("Database mode: read only")
+    console.print("Execution enabled: false")
+    console.print(f"Tickers audited: {payload['summary']['tickers_audited']}")
+    console.print(f"Local snapshots: {payload['summary']['local_snapshots']}")
+    console.print(f"Local rankings: {payload['summary']['local_rankings']}")
+    console.print(f"Local opportunities: {payload['summary']['local_opportunities']}")
+    console.print(f"Risk decisions: {payload['summary']['local_risk_decisions']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1k-liquidity-repair-preview")
+def gh1k_liquidity_repair_preview_command(
+    gh1j_report: Annotated[Path, typer.Option(help="Exact GH-1J audit JSON.")] = Path(
+        "reports/phase_gh1j/gh1j_liquidity_truth_ranking_wiring_audit.json"
+    ),
+    output_dir: Annotated[Path, typer.Option(help="GH-1K preview directory.")] = Path(
+        "reports/phase_gh1k"
+    ),
+) -> None:
+    """Stage exact weather payloads and preview crypto liquidity repair without DB writes."""
+    from kalshi_predictor.data.backend import database_url_from_settings, sqlite_path_from_url
+    from kalshi_predictor.phase_gh1k import write_gh1k_report
+
+    database_path = sqlite_path_from_url(database_url_from_settings(get_settings()))
+    if not gh1j_report.is_file() or database_path is None or not database_path.is_file():
+        raise typer.BadParameter("GH-1J report and existing SQLite database are required.")
+    path = write_gh1k_report(
+        gh1j_report=gh1j_report, database_path=database_path, output_dir=output_dir
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1K exact snapshot staging and liquidity repair preview")
+    console.print("Database writes: 0")
+    console.print("Execution enabled: false")
+    console.print(f"Crypto rows previewed: {payload['summary']['crypto_rows_previewed']}")
+    console.print(f"Weather rows staged: {payload['summary']['weather_rows_staged']}")
+    console.print(
+        f"Preview score changes: {payload['summary']['crypto_scores_changed_in_preview']}"
+    )
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1l-guarded-activation")
+def gh1l_guarded_activation_command(
+    gh1j_report: Annotated[Path, typer.Option(help="Exact GH-1J audit JSON.")] = Path(
+        "reports/phase_gh1j/gh1j_liquidity_truth_ranking_wiring_audit.json"
+    ),
+    gh1k_report: Annotated[Path, typer.Option(help="Exact GH-1K preview JSON.")] = Path(
+        "reports/phase_gh1k/gh1k_snapshot_staging_liquidity_repair_preview.json"
+    ),
+    apply: Annotated[bool, typer.Option("--apply/--diagnose-only")] = False,
+) -> None:
+    """Apply the exact GH-1L snapshot/ranking set through one guarded writer."""
+    from kalshi_predictor.data.backend import database_url_from_settings
+    from kalshi_predictor.data.db import get_session_factory, make_engine
+    from kalshi_predictor.phase_gh1l import apply_gh1l
+
+    settings = get_settings()
+    writer = db_writer_monitor(settings=settings)
+    console.print("Phase GH-1L depth-aware liquidity guarded activation")
+    console.print("Execution enabled: false")
+    console.print(f"Writer safe: {bool(writer.get('safe_to_start_write', False))}")
+    if not apply:
+        console.print("Status: DIAGNOSE_ONLY")
+        return
+    result = apply_gh1l(
+        session_factory=get_session_factory(make_engine(database_url_from_settings(settings))),
+        settings=settings,
+        gh1j_report=gh1j_report,
+        gh1k_report=gh1k_report,
+    )
+    console.print(f"Status: {result['status']}")
+    console.print(f"Weather snapshots inserted: {result.get('weather_snapshots_inserted', 0)}")
+    console.print(f"Forecasts inserted: {result.get('forecasts_inserted', 0)}")
+    console.print(f"Rankings inserted: {result.get('rankings_inserted', 0)}")
+
+
+@app.command("gh1m-opportunity-attribution")
+def gh1m_opportunity_attribution_command(
+    gh1j_report: Annotated[Path, typer.Option(help="Exact GH-1J ticker audit.")] = Path(
+        "reports/phase_gh1j/gh1j_liquidity_truth_ranking_wiring_audit.json"
+    ),
+    output_dir: Annotated[Path, typer.Option(help="GH-1M report directory.")] = Path(
+        "reports/phase_gh1m"
+    ),
+) -> None:
+    """Attribute exact opportunity scores and recheck gates without writes."""
+    from kalshi_predictor.data.backend import database_url_from_settings, sqlite_path_from_url
+    from kalshi_predictor.phase_gh1m import write_gh1m_report
+
+    settings = get_settings()
+    database_path = sqlite_path_from_url(database_url_from_settings(settings))
+    if not gh1j_report.is_file() or database_path is None or not database_path.is_file():
+        raise typer.BadParameter("GH-1J report and existing SQLite database are required.")
+    path = write_gh1m_report(
+        gh1j_report=gh1j_report,
+        database_path=database_path,
+        settings=settings,
+        output_dir=output_dir,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1M opportunity score attribution and gate recheck")
+    console.print("Database mode: read only")
+    console.print("Thresholds changed: false")
+    console.print("Execution enabled: false")
+    console.print(f"Tickers attributed: {payload['summary']['tickers_attributed']}")
+    console.print(f"Opportunity gate pass: {payload['summary']['opportunity_gate_pass']}")
+    console.print(f"Risk gate pass: {payload['summary']['risk_gate_pass']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1n-timing-audit")
+def gh1n_timing_audit_command(
+    gh1m_report: Annotated[Path, typer.Option(help="Exact GH-1M attribution JSON.")] = Path(
+        "reports/phase_gh1m/gh1m_opportunity_score_attribution.json"
+    ),
+    output_dir: Annotated[Path, typer.Option(help="GH-1N report directory.")] = Path(
+        "reports/phase_gh1n"
+    ),
+) -> None:
+    """Audit synchronized market-implied edges without DB or execution writes."""
+    from kalshi_predictor.data.backend import database_url_from_settings, sqlite_path_from_url
+    from kalshi_predictor.phase_gh1n import write_gh1n_report
+
+    database_path = sqlite_path_from_url(database_url_from_settings(get_settings()))
+    if not gh1m_report.is_file() or database_path is None or not database_path.is_file():
+        raise typer.BadParameter("GH-1M report and existing SQLite database are required.")
+    path = write_gh1n_report(
+        gh1m_report=gh1m_report, database_path=database_path, output_dir=output_dir
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1N forecast and executable-price timing audit")
+    console.print("Database mode: read only")
+    console.print("Thresholds changed: false")
+    console.print("Execution enabled: false")
+    console.print(f"Tickers audited: {payload['summary']['tickers_audited']}")
+    console.print(
+        f"Positive synchronized edges: {payload['summary']['positive_synchronized_edges']}"
+    )
+    console.print(f"Candidate set status: {payload['summary']['candidate_set_status']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1o-independent-edge-discovery")
+def gh1o_independent_edge_discovery_command(
+    models: Annotated[
+        str, typer.Option(help="Comma-separated independent forecast models.")
+    ] = "crypto_v2,weather_v2",
+    max_forecasts: Annotated[int, typer.Option(help="Bounded latest forecasts per model.")] = 100,
+    max_forecast_age_minutes: Annotated[
+        str, typer.Option(help="Maximum synchronized forecast age.")
+    ] = "120",
+    output_dir: Annotated[Path, typer.Option(help="GH-1O report directory.")] = Path(
+        "reports/phase_gh1o"
+    ),
+) -> None:
+    """Discover independent-model executable edge without writes or execution."""
+    from kalshi_predictor.data.backend import database_url_from_settings, sqlite_path_from_url
+    from kalshi_predictor.phase_gh1o import write_gh1o_report
+
+    settings = get_settings()
+    database_path = sqlite_path_from_url(database_url_from_settings(settings))
+    selected = [item.strip() for item in models.split(",") if item.strip()]
+    if database_path is None or not database_path.is_file() or not selected or max_forecasts < 1:
+        raise typer.BadParameter(
+            "Existing SQLite database, models, and a positive bound are required."
+        )
+    path = write_gh1o_report(
+        database_path=database_path,
+        settings=settings,
+        output_dir=output_dir,
+        models=selected,
+        max_forecasts=max_forecasts,
+        max_forecast_age_minutes=Decimal(max_forecast_age_minutes),
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1O independent-model executable edge discovery")
+    console.print("Database mode: read only")
+    console.print("Thresholds changed: false")
+    console.print("Execution enabled: false")
+    console.print(f"Live markets evaluated: {payload['summary']['live_markets_evaluated']}")
+    console.print(f"Positive executable edge: {payload['summary']['positive_executable_edge']}")
+    console.print(f"Advanced candidates: {payload['summary']['advanced_candidates']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("nyc-w3-live-alignment-preview")
+def nyc_w3_live_alignment_preview_command(
+    market_limit: Annotated[int, typer.Option(help="Maximum current NYC markets to inspect.")] = 20,
+    tolerance_minutes: Annotated[
+        int, typer.Option(help="Strict maximum observation-to-target offset.")
+    ] = 15,
+    output_dir: Annotated[Path, typer.Option(help="NYC-W3 report directory.")] = Path(
+        "reports/phase_nyc_w3"
+    ),
+    tickers: Annotated[
+        str | None, typer.Option(help="Optional exact comma-separated ticker certification set.")
+    ] = None,
+) -> None:
+    """Preview exact NYC market/observation alignment without database writes."""
+    from kalshi_predictor.phase_nyc_w3 import write_nyc_w3_report
+
+    settings = get_settings()
+    path = write_nyc_w3_report(
+        output_dir=output_dir,
+        user_agent=settings.kalshi_user_agent,
+        market_limit=market_limit,
+        tolerance_minutes=tolerance_minutes,
+        exact_tickers=[item.strip() for item in tickers.split(",") if item.strip()]
+        if tickers
+        else None,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase NYC-W3 live point-temperature alignment preview")
+    console.print("Database mode: no writes")
+    console.print("Execution enabled: false")
+    console.print("weather_v2 connected: false")
+    console.print(f"Metadata passed: {payload['summary']['metadata_passed']}")
+    console.print(f"Alignment passed: {payload['summary']['alignment_passed']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("nyc-w4-observation-feature-preview")
+def nyc_w4_observation_feature_preview_command(
+    certification_path: Annotated[
+        Path, typer.Option(help="Exact passing NYC-W3B certification JSON.")
+    ] = Path("reports/phase_nyc_w3b_exact/nyc_w3_live_alignment_preview.json"),
+    market_limit: Annotated[int, typer.Option(help="Maximum certified rows to preview.")] = 20,
+    output_dir: Annotated[Path, typer.Option(help="NYC-W4 report directory.")] = Path(
+        "reports/phase_nyc_w4"
+    ),
+) -> None:
+    """Preview certified KNYC observations as weather_v2 inputs without writes."""
+    from kalshi_predictor.phase_nyc_w4 import write_nyc_w4_report
+
+    settings = get_settings()
+    path = write_nyc_w4_report(
+        certification_path=certification_path,
+        output_dir=output_dir,
+        max_adjustment=settings.weather_v2_max_adjustment,
+        market_limit=market_limit,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase NYC-W4 non-settlement observation feature preview")
+    console.print("Database writes: 0")
+    console.print("Execution enabled: false")
+    console.print("Runtime weather_v2 changed: false")
+    console.print(f"Rows previewed: {payload['summary']['rows_previewed']}")
+    console.print(f"Rows blocked: {payload['summary']['rows_blocked']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("nyc-w5-multi-window-shadow-calibration")
+def nyc_w5_multi_window_shadow_calibration_command(
+    reports_dir: Annotated[
+        Path, typer.Option(help="Root directory containing NYC reports.")
+    ] = Path("reports"),
+    output_dir: Annotated[Path, typer.Option(help="NYC-W5 report directory.")] = Path(
+        "reports/phase_nyc_w5"
+    ),
+) -> None:
+    """Census certified NYC windows and public settlements without writes."""
+    from kalshi_predictor.phase_nyc_w5 import write_nyc_w5_report
+
+    path = write_nyc_w5_report(reports_dir=reports_dir, output_dir=output_dir)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase NYC-W5 multi-window shadow calibration")
+    console.print("Database writes: 0")
+    console.print("Execution enabled: false")
+    console.print("Runtime weather_v2 changed: false")
+    console.print(f"Certified windows: {payload['summary']['certified_windows']}")
+    console.print(f"Settled windows: {payload['summary']['settled_windows']}")
+    console.print(f"Status: {payload['summary']['status']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("nyc-w8-live-shadow-drift-certification")
+def nyc_w8_live_shadow_drift_certification_command(
+    reports_dir: Annotated[
+        Path, typer.Option(help="Root directory containing NYC-W7 reports.")
+    ] = Path("reports"),
+    output_dir: Annotated[Path, typer.Option(help="NYC-W8 report directory.")] = Path(
+        "reports/phase_nyc_w8"
+    ),
+) -> None:
+    """Census scheduled KNYC shadow windows and certify provenance drift."""
+    from kalshi_predictor.phase_nyc_w8 import write_nyc_w8_report
+
+    path = write_nyc_w8_report(reports_dir=reports_dir, output_dir=output_dir)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase NYC-W8 live shadow cadence and drift certification")
+    console.print("Database writes: 0")
+    console.print("Execution enabled: false")
+    console.print("Feature flag: WEATHER_V2_KNYC_OBSERVATION_ENABLED=false")
+    console.print(f"Live windows: {payload['summary']['distinct_live_windows']}")
+    console.print(f"Status: {payload['summary']['status']}")
+    console.print(f"Report: {path}")
+
+
+@app.command("pmb-regression-benchmark")
+def pmb_regression_benchmark_command(
+    output_dir: Annotated[Path, typer.Option(help="Synthetic PMB report directory.")] = Path(
+        "reports/phase_pmb"
+    ),
+) -> None:
+    """Run clean-room deterministic synthetic prediction-market benchmarks."""
+    from kalshi_predictor.benchmarking.reports import write_regression_benchmark
+
+    path = write_regression_benchmark(output_dir)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("PMB deterministic regression benchmark")
+    console.print("Data mode: local synthetic only")
+    console.print("Database writes: 0")
+    console.print("Execution enabled: false")
+    console.print(f"Benchmark runs: {len(payload['results'])}")
+    console.print(f"Report: {path}")
+
+
+@app.command("gh1p-current-window-refresh")
+def gh1p_current_window_refresh_command(
+    max_markets_per_category: Annotated[
+        int, typer.Option(help="Bounded current markets per category.")
+    ] = 20,
+    apply: Annotated[bool, typer.Option("--apply/--diagnose-only")] = False,
+) -> None:
+    """Refresh current independent forecasts through one guarded writer session."""
+    from kalshi_predictor.data.backend import database_url_from_settings
+    from kalshi_predictor.data.db import get_session_factory, make_engine
+    from kalshi_predictor.phase_gh1p import apply_gh1p_refresh
+
+    if max_markets_per_category < 1:
+        raise typer.BadParameter("A positive category bound is required.")
+    settings = get_settings()
+    writer = db_writer_monitor(settings=settings)
+    console.print("Phase GH-1P current-window independent forecast refresh")
+    console.print("Execution enabled: false")
+    console.print(f"Writer safe: {bool(writer.get('safe_to_start_write', False))}")
+    if not apply:
+        console.print("Status: DIAGNOSE_ONLY")
+        return
+    result = apply_gh1p_refresh(
+        session_factory=get_session_factory(make_engine(database_url_from_settings(settings))),
+        settings=settings,
+        max_markets_per_category=max_markets_per_category,
+    )
+    console.print(f"Status: {result['status']}")
+    console.print(f"Snapshots inserted: {result.get('snapshots_inserted', 0)}")
+    console.print(f"Forecasts inserted: {result.get('forecasts_inserted', 0)}")
+    console.print(f"Forecasts skipped: {result.get('forecasts_skipped', 0)}")
+
+
+@app.command("gh1q-forecast-skip-attribution")
+def gh1q_forecast_skip_attribution_command(
+    skip_limit: Annotated[int, typer.Option(help="Latest bounded independent-model skips.")] = 30,
+    output_dir: Annotated[Path, typer.Option(help="GH-1Q report directory.")] = Path(
+        "reports/phase_gh1q"
+    ),
+) -> None:
+    """Attribute GH-1P forecast skips and preview exact eligibility repairs."""
+    from kalshi_predictor.data.backend import database_url_from_settings, sqlite_path_from_url
+    from kalshi_predictor.phase_gh1q import write_gh1q_report
+
+    database_path = sqlite_path_from_url(database_url_from_settings(get_settings()))
+    if database_path is None or not database_path.is_file() or skip_limit < 1:
+        raise typer.BadParameter(
+            "An existing SQLite database and positive skip limit are required."
+        )
+    path = write_gh1q_report(
+        database_path=database_path, output_dir=output_dir, skip_limit=skip_limit
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    console.print("Phase GH-1Q independent forecast skip attribution")
+    console.print("Database mode: read only")
+    console.print("Thresholds changed: false")
+    console.print("Execution enabled: false")
+    console.print(f"Skip rows attributed: {payload['summary']['skip_rows_attributed']}")
+    console.print(f"Likely adapter defect: {payload['summary']['likely_adapter_defect']}")
+    console.print(f"Safe to repeat refresh: {payload['summary']['safe_to_repeat_refresh']}")
+    console.print(f"Report: {path}")
+
+
 @app.command("forecast")
 def forecast_command(
     model: Annotated[
@@ -17067,8 +17987,7 @@ def phase3bd_r4_verified_consensus_source_command(
     )
     console.print(f"Consensus observations: {summary['consensus_value_observations']}")
     console.print(
-        "Actual + consensus observations: "
-        f"{summary['actual_and_consensus_observations']}"
+        f"Actual + consensus observations: {summary['actual_and_consensus_observations']}"
     )
     console.print(f"Value observations inserted: {summary['value_observations_inserted']}")
     console.print(f"Features inserted: {summary['features_inserted']}")
@@ -17200,8 +18119,7 @@ def phase3bd_r5_consensus_feed_watch_command(
         console.print(f"R4 status: {summary['r4_status'] or 'n/a'}")
         console.print(f"Consensus observations: {summary['consensus_value_observations']}")
         console.print(
-            "Actual + consensus observations: "
-            f"{summary['actual_and_consensus_observations']}"
+            f"Actual + consensus observations: {summary['actual_and_consensus_observations']}"
         )
         console.print(f"Features inserted: {summary['features_inserted']}")
         console.print(f"Forecasts inserted: {summary['forecasts_inserted']}")
@@ -17294,8 +18212,7 @@ def phase3bd_r7_economic_opportunity_quality_gate_command(
     console.print(f"Rankings scanned: {summary['economic_rankings_scanned']}")
     console.print(f"Preflight-ready rows: {summary['preflight_ready_rows']}")
     console.print(
-        "Phase 3M/3N preflight recorded: "
-        f"{summary['phase3m_phase3n_preflight_recorded']}"
+        f"Phase 3M/3N preflight recorded: {summary['phase3m_phase3n_preflight_recorded']}"
     )
     console.print(f"Primary gap: {summary['primary_gap']}")
     console.print(f"Wrote JSON: {artifacts.json_path}")
@@ -17466,8 +18383,7 @@ def phase3bd_r8_economic_evidence_activation_command(
     console.print(f"Source mode: {summary['source_mode']}")
     console.print(f"R5 ran: {summary['r5_ran']}")
     console.print(
-        "Actual + consensus observations: "
-        f"{summary['actual_and_consensus_observations']}"
+        f"Actual + consensus observations: {summary['actual_and_consensus_observations']}"
     )
     console.print(f"R7 final status: {summary['final_r7_status']}")
     console.print(f"R7 primary gap: {summary['final_r7_primary_gap']}")
@@ -18216,11 +19132,15 @@ def link_crypto_markets_command(
     ] = 1000,
     checkpoint_every: Annotated[
         int,
-        typer.Option(help="Commit and write a checkpoint every N processed markets. Use 0 to disable."),
+        typer.Option(
+            help="Commit and write a checkpoint every N processed markets. Use 0 to disable."
+        ),
     ] = 1000,
     stop_after_minutes: Annotated[
         int,
-        typer.Option(help="Stop cleanly after N minutes and keep committed checkpoint batches. Use 0 for no limit."),
+        typer.Option(
+            help="Stop cleanly after N minutes and keep committed checkpoint batches. Use 0 for no limit."
+        ),
     ] = 0,
     heartbeat_dir: Annotated[
         Path,
@@ -18258,12 +19178,15 @@ def link_crypto_markets_command(
 
     def _write_json(path: Path, payload: dict[str, object]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+        path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+        )
 
     def _should_stop() -> bool:
         return deadline is not None and time.monotonic() >= deadline
 
     with session_factory() as session:
+
         def _progress(progress: dict[str, object]) -> None:
             state = _state_payload(progress)
             _write_json(heartbeat_path, state)
@@ -18278,7 +19201,9 @@ def link_crypto_markets_command(
                 session.commit()
                 _write_json(checkpoint_path, state)
             if status in {"COMPLETE", "STOPPED_EARLY"} or (
-                progress_every >= 0 and processed > 0 and (progress_every == 0 or processed % progress_every == 0)
+                progress_every >= 0
+                and processed > 0
+                and (progress_every == 0 or processed % progress_every == 0)
             ):
                 console.print(
                     "Crypto link progress: "
@@ -18347,7 +19272,9 @@ def phase3bb_r43_single_writer_coordinator_command(
     ] = "coinbase",
     staging_dir: Annotated[
         Path | None,
-        typer.Option(help="Existing staging directory to drain, or omitted for a fresh run directory."),
+        typer.Option(
+            help="Existing staging directory to drain, or omitted for a fresh run directory."
+        ),
     ] = None,
     max_workers: Annotated[
         int,
@@ -18359,7 +19286,9 @@ def phase3bb_r43_single_writer_coordinator_command(
     ] = True,
     drain_staged: Annotated[
         bool,
-        typer.Option("--drain-staged/--stage-only", help="Drain staged files through one DB writer."),
+        typer.Option(
+            "--drain-staged/--stage-only", help="Drain staged files through one DB writer."
+        ),
     ] = False,
     build_features_after_drain: Annotated[
         bool,
@@ -18405,9 +19334,7 @@ def phase3bb_r43_single_writer_coordinator_command(
         output_dir=output_dir,
         symbols=parse_symbols(symbols),
         crypto_sources=[
-            source.strip().lower()
-            for source in crypto_sources.split(",")
-            if source.strip()
+            source.strip().lower() for source in crypto_sources.split(",") if source.strip()
         ],
         stage_fetches=stage_fetches,
         drain_staged=drain_staged,

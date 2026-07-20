@@ -11,7 +11,10 @@ from kalshi_predictor.utils.decimals import decimal_to_str
 from kalshi_predictor.utils.time import utc_now
 
 
-def insert_market_ranking(session: Session, ranking: Mapping[str, Any]) -> MarketRanking:
+def insert_market_ranking(
+    session: Session, ranking: Mapping[str, Any], *,
+    attribution_enabled: bool | None = None,
+) -> MarketRanking:
     record = MarketRanking(
         ticker=str(ranking["ticker"]),
         ranked_at=ranking.get("ranked_at") or utc_now(),
@@ -40,6 +43,15 @@ def insert_market_ranking(session: Session, ranking: Mapping[str, Any]) -> Marke
     )
     session.add(record)
     session.flush()
+    if attribution_enabled is None:
+        from kalshi_predictor.config import get_settings
+
+        attribution_enabled = get_settings().runtime_provenance_dual_write_enabled
+    from kalshi_predictor.provenance.dual_write import capture_ranking_provenance
+
+    capture_ranking_provenance(
+        session, record, ranking, enabled=attribution_enabled,
+    )
     from kalshi_predictor.memory.capture import capture_market_ranking
 
     capture_market_ranking(session, record)

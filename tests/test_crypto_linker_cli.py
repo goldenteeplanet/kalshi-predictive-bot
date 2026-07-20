@@ -32,7 +32,10 @@ def test_link_crypto_markets_cli_writes_heartbeat_and_checkpoint(tmp_path) -> No
             "--heartbeat-dir",
             str(heartbeat_dir),
         ],
-        env={"KALSHI_DB_URL": f"sqlite:///{db_path}"},
+        env={
+            "DATABASE_URL": f"sqlite:///{db_path}",
+            "KALSHI_DB_URL": f"sqlite:///{db_path}",
+        },
     )
 
     get_settings.cache_clear()

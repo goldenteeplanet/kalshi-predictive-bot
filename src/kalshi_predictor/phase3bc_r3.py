@@ -47,6 +47,7 @@ from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3ar import write_phase3ar_report
 from kalshi_predictor.phase3at import CURRENT_PAPER_SCAN, current_crypto_opportunity_scope
 from kalshi_predictor.phase3bc import write_phase3bc_crypto_clean_opportunity_report
+from kalshi_predictor.runtime_stage_heartbeat import AtomicStageHeartbeat
 from kalshi_predictor.utils.decimals import to_decimal
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
@@ -105,7 +106,6 @@ def write_phase3bc_r3_active_crypto_refresh_report(
     requested_series = _parse_csv(crypto_series_tickers)
     output_dir.mkdir(parents=True, exist_ok=True)
     generated_at = utc_now()
-    stage_timer = _StageTimer(output_dir)
     active_watch_blocker = (
         _active_crypto_watch_blocker() if refresh_open_markets else None
     )
@@ -128,6 +128,7 @@ def write_phase3bc_r3_active_crypto_refresh_report(
             lock_info=refresh_lock_blocker,
             blocker="ACTIVE_KALSHI_REFRESH_ALREADY_RUNNING",
         )
+    stage_timer = _StageTimer(output_dir)
 
     ingest_summary = None
     if external_crypto_ingest and refresh_open_markets and near_money_only:
@@ -209,6 +210,7 @@ def write_phase3bc_r3_active_crypto_refresh_report(
         session,
         settings=resolved,
         limit=crypto_link_limit,
+        ticker_scope=link_tickers,
     )
     if generate_opportunity_report:
         opportunities_path, opportunity_summary = generate_opportunities_report(
@@ -284,52 +286,16 @@ def write_phase3bc_r3_active_crypto_refresh_report(
     return Phase3BCR3ArtifactSet(output_dir, json_path, markdown_path)
 
 
-class _StageTimer:
+class _StageTimer(AtomicStageHeartbeat):
     def __init__(self, output_dir: Path) -> None:
-        self.output_dir = output_dir
-        self.timings: list[dict[str, Any]] = []
-        self._current_stage: str | None = None
-        self._current_started_at: Any | None = None
-
-    def mark(self, stage: str) -> None:
-        now = utc_now()
-        if self._current_stage is not None and self._current_started_at is not None:
-            self.timings.append(
-                {
-                    "stage": self._current_stage,
-                    "started_at": self._current_started_at.isoformat(),
-                    "completed_at": now.isoformat(),
-                    "duration_seconds": round(
-                        (now - self._current_started_at).total_seconds(),
-                        3,
-                    ),
-                }
-            )
-        self._current_stage = stage
-        self._current_started_at = now
-        _write_stage_marker(self.output_dir, stage, stage_timings=self.timings)
-
-
-def _write_stage_marker(
-    output_dir: Path,
-    stage: str,
-    *,
-    stage_timings: list[dict[str, Any]] | None = None,
-) -> None:
-    payload = {
-        "generated_at": utc_now().isoformat(),
-        "phase": "3BC-R3",
-        "stage": stage,
-        "completed_stage_timings": stage_timings or [],
-        "paper_only_safety": PAPER_ONLY_SAFETY,
-        "live_or_demo_execution": False,
-    }
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "phase3bc_r3_stage.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
-    print(f"Phase 3BC-R3 stage: {stage}", flush=True)
+        super().__init__(
+            output_dir / "phase3bc_r3_stage.json",
+            phase="3BC-R3",
+            metadata={
+                "paper_only_safety": PAPER_ONLY_SAFETY,
+                "live_or_demo_execution": False,
+            },
+        )
 
 
 def _acquire_refresh_lock(output_dir: Path) -> tuple[Path | None, dict[str, Any] | None]:

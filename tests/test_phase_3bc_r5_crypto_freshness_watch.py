@@ -1855,6 +1855,25 @@ def test_phase3bc_r5_status_reports_stale_pid_after_empty_process_scan(
     assert "stale PID metadata can be overwritten" in payload["recommended_next_action"]
 
 
+def test_phase3bc_r5_pid_exists_treats_permission_error_as_live(monkeypatch) -> None:
+    def deny_signal(_pid: int, _signal: int) -> None:
+        raise PermissionError(1, "Operation not permitted")
+
+    monkeypatch.setattr(phase3bc_r6.os, "kill", deny_signal)
+    monkeypatch.setattr(phase3bc_r6, "_posix_pid_is_zombie", lambda _pid: False)
+
+    assert phase3bc_r6._pid_exists(5151) is True
+
+
+def test_phase3bc_r5_pid_exists_rejects_missing_process(monkeypatch) -> None:
+    def missing_process(_pid: int, _signal: int) -> None:
+        raise ProcessLookupError(3, "No such process")
+
+    monkeypatch.setattr(phase3bc_r6.os, "kill", missing_process)
+
+    assert phase3bc_r6._pid_exists(5151) is False
+
+
 def test_phase3bc_r5_unattended_guard_can_stop_overrun(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(phase3bc_r6, "_pid_matches_phase3bc_r5_watch", lambda pid: pid == 5151)

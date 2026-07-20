@@ -47,6 +47,7 @@ PHASE3BC_VERSION = "phase3bc_r2_pure_crypto_parser_hygiene"
 MODEL_NAME = "crypto_v2"
 MIN_EXECUTABLE_LIQUIDITY_SCORE = Decimal("30")
 MIN_EXECUTABLE_CONFIDENCE_SCORE = Decimal("40")
+ROUTER_QUERY_BATCH_SIZE = 100
 
 
 @dataclass(frozen=True)
@@ -505,23 +506,29 @@ def _final_action(status: str) -> str:
 def _markets_by_ticker(session: Session, tickers: list[str]) -> dict[str, Market]:
     if not tickers:
         return {}
-    return {
-        row.ticker: row
-        for row in session.scalars(select(Market).where(Market.ticker.in_(tickers)))
-    }
+    rows: dict[str, Market] = {}
+    for batch in _ticker_batches(tickers):
+        rows.update(
+            {
+                row.ticker: row
+                for row in session.scalars(select(Market).where(Market.ticker.in_(batch)))
+            }
+        )
+    return rows
 
 
 def _legs_by_ticker(session: Session, tickers: list[str]) -> dict[str, list[MarketLeg]]:
     if not tickers:
         return {}
     grouped: dict[str, list[MarketLeg]] = {}
-    statement = (
-        select(MarketLeg)
-        .where(MarketLeg.ticker.in_(tickers))
-        .order_by(MarketLeg.ticker, MarketLeg.leg_index)
-    )
-    for leg in session.scalars(statement):
-        grouped.setdefault(leg.ticker, []).append(leg)
+    for batch in _ticker_batches(tickers):
+        statement = (
+            select(MarketLeg)
+            .where(MarketLeg.ticker.in_(batch))
+            .order_by(MarketLeg.ticker, MarketLeg.leg_index)
+        )
+        for leg in session.scalars(statement):
+            grouped.setdefault(leg.ticker, []).append(leg)
     return grouped
 
 
@@ -564,22 +571,34 @@ def _latest_rows_by_ticker(
 ) -> dict[str, Any]:
     if not tickers:
         return {}
-    row_number = (
-        func.row_number()
-        .over(partition_by=model.ticker, order_by=[desc(time_column), desc(model.id)])
-        .label("row_number")
-    )
-    subquery = (
-        select(model.id.label("id"), model.ticker.label("ticker"), row_number)
-        .where(model.ticker.in_(tickers), *filters)
-        .subquery()
-    )
-    rows = session.scalars(
-        select(model)
-        .join(subquery, model.id == subquery.c.id)
-        .where(subquery.c.row_number == 1)
-    )
-    return {row.ticker: row for row in rows}
+    latest: dict[str, Any] = {}
+    for batch in _ticker_batches(tickers):
+        row_number = (
+            func.row_number()
+            .over(partition_by=model.ticker, order_by=[desc(time_column), desc(model.id)])
+            .label("row_number")
+        )
+        subquery = (
+            select(model.id.label("id"), model.ticker.label("ticker"), row_number)
+            .where(model.ticker.in_(batch), *filters)
+            .subquery()
+        )
+        rows = session.scalars(
+            select(model)
+            .join(subquery, model.id == subquery.c.id)
+            .where(subquery.c.row_number == 1)
+        )
+        latest.update({row.ticker: row for row in rows})
+    return latest
+
+
+def _ticker_batches(
+    tickers: list[str], *, batch_size: int = ROUTER_QUERY_BATCH_SIZE
+) -> list[list[str]]:
+    if batch_size < 1:
+        raise ValueError("batch_size must be at least 1")
+    unique = list(dict.fromkeys(tickers))
+    return [unique[index : index + batch_size] for index in range(0, len(unique), batch_size)]
 
 
 def _row_market_status(*, market: Market | None, snapshot: MarketSnapshot | None) -> str | None:

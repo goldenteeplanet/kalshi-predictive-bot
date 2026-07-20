@@ -884,6 +884,13 @@ def _pid_exists(pid: int) -> bool:
         return completed.returncode == 0
     try:
         os.kill(pid, 0)
+    except PermissionError:
+        # A process owned by another user is still alive even when this
+        # operator cannot signal it. The command-line check that follows
+        # decides whether it is the expected R5 watcher.
+        return not _posix_pid_is_zombie(pid)
+    except ProcessLookupError:
+        return False
     except OSError:
         return False
     return not _posix_pid_is_zombie(pid)

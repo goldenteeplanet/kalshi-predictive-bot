@@ -1206,6 +1206,19 @@ def _select_next_codex_task(
             "Make NEXT_ACTIONS and dashboard operator guidance reference only "
             "registered commands."
         )
+    elif _source_task_completed_by_sports_r3(source_status, sports_status):
+        phase = str(
+            sports_status.get("next_codex_task_phase_name")
+            or "Phase 3AN Economic/News Compatibility Watch"
+        )
+        reason = str(
+            sports_status.get("next_codex_task_reason")
+            or "The requested Sports R3 diagnostic completed without safe repair rows."
+        )
+        problem = str(
+            sports_status.get("next_codex_task_problem")
+            or "Advance to the next source gap without repeating completed sports repair work."
+        )
     elif guarded_refresh_status and guarded_refresh_status.get(
         "complete"
     ) and _source_evidence_r5_has_exact_evidence(

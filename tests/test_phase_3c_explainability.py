@@ -62,18 +62,17 @@ def test_model_explainer_explains_ensemble_v2() -> None:
     assert "63.0%" in explanation
 
 
-def test_ui_dashboard_renders_human_labels(tmp_path) -> None:
+def test_ui_opportunity_detail_renders_human_labels(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
     client = TestClient(create_app(session_factory=session_factory, settings=Settings()))
 
-    response = client.get("/")
+    response = client.get("/opportunities/UI-TEST")
 
     assert response.status_code == 200
-    assert "Decision Cockpit" in response.text
-    assert "Best Opportunities Right Now" in response.text
+    assert "UI-TEST" in response.text
     assert "Why This Looks Interesting" in response.text
-    assert "Bot would buy YES" in response.text
+    assert "BUY YES" in response.text
 
 
 def test_raw_json_hidden_by_default_behind_advanced_section(tmp_path) -> None:

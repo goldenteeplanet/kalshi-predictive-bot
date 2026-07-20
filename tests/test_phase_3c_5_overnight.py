@@ -176,7 +176,7 @@ def test_dashboard_still_renders_with_overnight_card(tmp_path) -> None:
         )
     )
 
-    response = client.get("/")
+    response = client.get("/dashboard")
 
     assert response.status_code == 200
     assert "Decision Cockpit" in response.text

@@ -9,6 +9,7 @@ from kalshi_predictor.data.repositories import insert_forecast, insert_market_sn
 from kalshi_predictor.data.schema import MarketOpportunity
 from kalshi_predictor.forecasting.base import ForecastOutput
 from kalshi_predictor.opportunities.scanner import scan_opportunities
+from kalshi_predictor.paper.ledger import get_latest_forecast_per_ticker
 from kalshi_predictor.opportunities.scoring import (
     calculate_opportunity_score,
     score_liquidity,
@@ -63,6 +64,8 @@ def test_scanner_detects_buy_yes_opportunity(tmp_path) -> None:
 
         assert summary.opportunities_detected == 1
         assert summary.opportunities[0]["side"] == BUY_YES
+        assert summary.rankings[0]["forecast_id"] is not None
+        assert summary.rankings[0]["market_snapshot_id"] is not None
         assert session.scalar(select(MarketOpportunity)).side == BUY_YES
 
 
@@ -108,6 +111,28 @@ def test_scanner_skips_low_edge_market(tmp_path) -> None:
 
         assert summary.rankings_inserted == 1
         assert summary.opportunities_detected == 0
+
+
+def test_latest_forecasts_pushes_exact_ticker_scope_into_query(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        for index in range(25):
+            _seed_market(
+                session,
+                ticker=f"SCOPE-{index}",
+                probability=Decimal("0.55"),
+                yes_bid="0.40",
+                no_bid="0.50",
+            )
+        session.expunge_all()
+        forecasts = get_latest_forecast_per_ticker(
+            session,
+            model_name="market_implied_v1",
+            ticker_scope={"SCOPE-7"},
+        )
+
+        assert [forecast.ticker for forecast in forecasts] == ["SCOPE-7"]
+        assert len(session.identity_map) == 1
 
 
 def _session_factory(tmp_path):
@@ -170,4 +195,3 @@ def _seed_market(
         ),
     )
     session.flush()
-

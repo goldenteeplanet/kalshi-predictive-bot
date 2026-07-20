@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 import csv
 import hashlib
+import json
 import subprocess
 from collections import Counter
 from dataclasses import dataclass
@@ -43,10 +43,6 @@ from kalshi_predictor.data.schema import (
     PositionSizingDecisionLog,
 )
 from kalshi_predictor.opportunities.market_identity import VERIFIED, verify_market_identity
-from kalshi_predictor.opportunities.scanner import (
-    OpportunityScanSummary,
-    build_market_ranking,
-)
 from kalshi_predictor.opportunities.window_eligibility import (
     EXPIRED_WINDOW_EXCLUDED,
     MARKET_CLOSED_OR_SETTLED,
@@ -908,12 +904,18 @@ def current_crypto_opportunity_scope(
     settings: Settings | None = None,
     limit: int = 500,
     freshness_minutes: int = DEFAULT_FRESHNESS_MINUTES,
+    ticker_scope: set[str] | list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     resolved = settings or get_settings()
     now = utc_now()
     rows: list[dict[str, Any]] = []
     excluded_rows: list[dict[str, Any]] = []
-    links = latest_links_for_table(session, CryptoMarketLink, limit=None)
+    links = latest_links_for_table(
+        session,
+        CryptoMarketLink,
+        limit=None,
+        ticker_scope=ticker_scope,
+    )
     tickers = [link.ticker for link in links]
     markets = _markets_by_ticker(session, tickers)
     snapshots = _latest_snapshots_for_tickers(session, tickers)
@@ -995,6 +997,11 @@ def current_crypto_opportunity_scope(
             "current_active_crypto_markets": len(returned_rows),
             "current_active_crypto_markets_total": len(rows),
             "current_scope_limit": limit,
+            "exact_ticker_scope_count": (
+                len({str(ticker).strip() for ticker in ticker_scope if str(ticker).strip()})
+                if ticker_scope is not None
+                else None
+            ),
             "current_snapshots": sum(1 for row in returned_rows if row.get("fresh_snapshot")),
             "current_snapshot_total": sum(1 for row in rows if row.get("fresh_snapshot")),
             "paper_scan_tickers": sum(

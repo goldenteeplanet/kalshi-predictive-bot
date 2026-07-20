@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from pathlib import Path
 
 from typer.testing import CliRunner
+from sqlalchemy import event
 
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
@@ -16,6 +18,8 @@ from kalshi_predictor.data.schema import (
     WeatherMarketLink,
 )
 from kalshi_predictor.phase3bb_r8_unified_paper_gate import (
+    _batched_evidence,
+    _latest_by_ticker,
     build_phase3bb_r8_unified_paper_gate,
     write_phase3bb_r8_unified_paper_gate_report,
 )
@@ -149,6 +153,86 @@ def test_phase3bb_r8_cli_help_registered() -> None:
     assert result.exit_code == 0
     assert "phase3bb-r8-unified-paper-gate" in result.output
     assert "--limit-per-category" in result.output
+
+
+def test_phase3bb_r8_latest_lookup_materializes_only_one_row_per_ticker(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = utc_now()
+    tickers = ["KXBTC-R8-WINDOW", "KXTEMPNY-R8-WINDOW"]
+
+    with session_factory() as session:
+        for ticker in tickers:
+            _seed_market(session, ticker=ticker, title=f"{ticker} test market")
+            for offset in range(100):
+                session.add(MarketSnapshot(
+                    ticker=ticker,
+                    captured_at=now + timedelta(seconds=offset),
+                    status="open",
+                    raw_market_json="{}",
+                ))
+        session.flush()
+        expected = {
+            ticker: session.query(MarketSnapshot.id)
+            .filter(MarketSnapshot.ticker == ticker)
+            .order_by(MarketSnapshot.captured_at.desc(), MarketSnapshot.id.desc())
+            .first()[0]
+            for ticker in tickers
+        }
+        session.expunge_all()
+
+        latest = _latest_by_ticker(
+            session, MarketSnapshot, tickers, MarketSnapshot.captured_at,
+        )
+
+        assert {ticker: row.id for ticker, row in latest.items()} == expected
+        assert len(session.identity_map) == len(tickers)
+
+
+def test_phase3bb_r8_evidence_queries_are_constant_for_repeated_exact_keys(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    counts = []
+    with session_factory() as session:
+        def count_queries(_conn, _cursor, _statement, _parameters, _context, _many):
+            counts.append(1)
+
+        event.listen(session.bind, "before_cursor_execute", count_queries)
+        contexts = [
+            {"category": "crypto", "ticker": f"KXBTC-R8-{index}", "symbol": "BTC"}
+            for index in range(100)
+        ]
+        evidence = _batched_evidence(session, contexts)
+        event.remove(session.bind, "before_cursor_execute", count_queries)
+
+    assert len(counts) == 2
+    assert len(evidence["features"]) == 100
+    assert all(value is False for value in evidence["features"].values())
+
+
+def test_phase3bb_r8_recent_decision_window_is_bounded_and_conservative(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = utc_now()
+    with session_factory() as session:
+        session.add(MarketSnapshot(
+            ticker="OLD-DECISION", captured_at=now, status="open", raw_market_json="{}"
+        ))
+        for index in range(20):
+            session.add(MarketSnapshot(
+                ticker=f"RECENT-{index}",
+                captured_at=now + timedelta(seconds=index + 1),
+                status="open",
+                raw_market_json="{}",
+            ))
+        session.flush()
+        latest = _latest_by_ticker(
+            session,
+            MarketSnapshot,
+            ["OLD-DECISION", "RECENT-19"],
+            MarketSnapshot.captured_at,
+            recent_row_limit=10,
+        )
+
+    assert "OLD-DECISION" not in latest
+    assert "RECENT-19" in latest
 
 
 def _session_factory(tmp_path: Path):

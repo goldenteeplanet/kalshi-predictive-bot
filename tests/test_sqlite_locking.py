@@ -55,7 +55,7 @@ def test_ui_route_handles_locked_database_operational_error(monkeypatch, tmp_pat
         )
     )
 
-    response = client.get("/")
+    response = client.get("/dashboard")
 
     assert response.status_code == 503
     assert "Database is busy. Try refreshing in a few seconds." in response.text
@@ -212,7 +212,8 @@ def test_db_writer_monitor_marks_stale_old_heartbeat_as_orphan(monkeypatch) -> N
     )
 
     assert payload["status"] == "WRITER_ACTIVE"
-    assert payload["long_job_heartbeat_status"] == "STALE"
+    assert payload["long_job_heartbeat_raw_status"] == "STALE"
+    assert payload["long_job_heartbeat_status"] == "STALE_ORPHANED"
     assert payload["long_job_heartbeat_display_status"] == "STALE_ORPHANED"
     assert payload["long_job_heartbeat_matches_current_writer"] is False
     assert payload["long_job_heartbeat_stale_orphaned"] is True

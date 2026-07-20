@@ -43,11 +43,11 @@ def test_phase3ak_marks_unsupported_multileg_and_blocks_learning(tmp_path) -> No
         payload = build_multi_leg_component_provenance(session, tickers=[ticker])
         gate = multi_leg_learning_eligibility(session, ticker)
 
-    assert payload["summary"]["blocked_multi_leg_markets"] == 1
+    assert payload["summary"]["multi_leg_rows"] == 1
     assert payload["rows"][0]["learning_eligible"] is False
-    assert payload["rows"][0]["component_status_counts"]["unsupported"] == 2
+    assert payload["rows"][0]["blocking_reason"] == "multi_leg_component_provenance_required"
     assert gate["eligible"] is False
-    assert gate["reason"] == "unsupported_component"
+    assert gate["reason"] == "multi_leg_component_provenance_required"
 
 
 def test_phase3ak_allows_verified_multileg_with_usable_snapshot(tmp_path) -> None:
@@ -58,9 +58,9 @@ def test_phase3ak_allows_verified_multileg_with_usable_snapshot(tmp_path) -> Non
         payload = build_multi_leg_component_provenance(session, tickers=[ticker])
 
     row = payload["rows"][0]
-    assert row["learning_eligible"] is True
-    assert row["component_status_counts"]["verified"] == 2
-    assert row["snapshot_status"]["status"] == "usable_snapshot"
+    assert row["learning_eligible"] is False
+    assert row["learning_eligibility"] == "MULTILEG_REQUIRES_COMPONENT_PROVENANCE"
+    assert row["snapshot_status"]["status"] == "not_checked"
 
 
 def test_learning_targets_reject_phase3ak_blocked_multileg(tmp_path) -> None:
@@ -78,8 +78,11 @@ def test_learning_targets_reject_phase3ak_blocked_multileg(tmp_path) -> None:
 
     assert result.inserted == 0
     assert rejection is not None
-    assert rejection.reason == "multi_leg_component_not_verified"
-    assert json.loads(rejection.raw_json)["phase3ak_gate"]["status"] == "INELIGIBLE"
+    assert rejection.reason == "multi_leg_component_provenance_required"
+    assert (
+        json.loads(rejection.raw_json)["phase3ak_gate"]["status"]
+        == "MULTILEG_REQUIRES_COMPONENT_PROVENANCE"
+    )
 
 
 def test_paper_strategy_blocks_phase3ak_multileg_even_with_edge(tmp_path) -> None:
@@ -100,7 +103,7 @@ def test_paper_strategy_blocks_phase3ak_multileg_even_with_edge(tmp_path) -> Non
     assert result.decisions == []
     assert result.skipped_due_to_risk_limits == 1
     assert rejection is not None
-    assert rejection.reason == "multi_leg_component_not_verified"
+    assert rejection.reason == "multi_leg_component_provenance_required"
 
 
 def test_phase3al_report_and_phase3an_crypto_completeness_render(tmp_path) -> None:

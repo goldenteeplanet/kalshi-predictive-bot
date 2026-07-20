@@ -38,6 +38,21 @@ Phase 2.7 adds public crypto price ingestion, crypto-specific features, crypto-m
 
 Phase 2.8 adds public NOAA/NWS weather ingestion, weather-specific features, weather-market linking, a `weather_v2` forecaster, and weather reports/backtests. It remains read-only and simulated.
 
+Phase GH-1 adds a disabled-by-default, read-only Kalshi WebSocket orderbook
+adapter. It reconstructs snapshots and deltas, detects sequence gaps, recovers
+from the public REST orderbook, calculates depth/imbalance/executable prices,
+stages snapshots on disk, and persists them only through a guarded single
+writer. Kalshi requires authenticated WebSocket handshakes, but this adapter
+has no order, cancel, portfolio, or execution methods.
+
+```bash
+# No connection is made unless --connect is supplied and the feature is enabled.
+kalshi-bot gh1-websocket-orderbook --tickers TICKER1,TICKER2 --dry-run
+
+# Inspect staged files and the writer gate without writing.
+kalshi-bot gh1-websocket-orderbook-drain --diagnose-only
+```
+
 Phase 2.9 adds a model tournament, model diagnostics, category-specific model weights, and `ensemble_v2`. It compares local models from stored forecasts/backtests only and keeps Phase 3 blocked until the tournament evidence is strong enough.
 
 Phase 3A adds a local decision review UI for inspecting opportunities before any future demo execution path. It runs only on localhost and stays demo-only.

@@ -84,6 +84,7 @@ def test_phase3bd_r7_writes_json_markdown_and_rows(tmp_path) -> None:
             session,
             output_dir=tmp_path / "reports",
             freshness_minutes=1440,
+            now=_now(),
         )
 
     assert artifacts.json_path.exists()

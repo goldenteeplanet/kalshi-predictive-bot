@@ -150,10 +150,10 @@ def test_phase_3w_r_local_integration_captures_dynamic_and_negative_evidence(
 
 
 def test_phase_3w_r_alembic_ancestry_classification(tmp_path) -> None:
-    diagnostics = alembic_graph_diagnostics(["20260624_0011"], root=_repo_root())
+    diagnostics = alembic_graph_diagnostics(["20260716_0012"], root=_repo_root())
     assert diagnostics["status"] == ALEMBIC_AT_HEAD
 
-    behind = alembic_graph_diagnostics(["20260623_0010"], root=_repo_root())
+    behind = alembic_graph_diagnostics(["20260624_0011"], root=_repo_root())
     assert behind["status"] == ALEMBIC_UPGRADE_REQUIRED
 
     orphan = alembic_graph_diagnostics(["missing_revision"], root=_repo_root())
@@ -163,7 +163,7 @@ def test_phase_3w_r_alembic_ancestry_classification(tmp_path) -> None:
     with session_factory() as session:
         status = migration_status(session=session, settings=_settings(tmp_path))
     assert status["graph_status"] in {ALEMBIC_UPGRADE_REQUIRED, ALEMBIC_AT_HEAD}
-    assert status["head_revision"] == "20260624_0011"
+    assert status["head_revision"] == "20260716_0012"
 
 
 def test_phase_3w_r_golden_trace_is_deterministic_and_no_exchange_write() -> None:

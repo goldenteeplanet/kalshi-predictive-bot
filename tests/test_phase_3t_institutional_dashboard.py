@@ -130,7 +130,8 @@ def test_phase_3t_ui_and_api_contracts(tmp_path) -> None:
     assert "demo-execute" not in page.text
     assert current.status_code == 200
     assert current.json()["schema_version"] == API_SCHEMA_VERSION
-    assert current.json()["data"]["read_only_boundary"]["read_only"] is True
+    assert current.json()["read_only_boundary"]["read_only"] is True
+    assert current.json()["data"]["read_only"] is True
     assert opportunities.status_code == 200
     assert opportunities.json()["data"][0]["ticker"] == "P3T-TEST"
     assert bad_schema.status_code == 400
