@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ trace.ticker }} Provenance Trace{% endblock %}
+{% block content %}
+<section class="today-hero" aria-labelledby="trace-title">
+  <div>
+    <p class="page-kicker">PROV-12 Decision Trace</p>
+    <h1 id="trace-title">{{ trace.ticker }}</h1>
+    <p class="muted">Exact forecast → observation → feature → snapshot → ranking attribution.</p>
+  </div>
+  <div class="today-hero-actions">
+    <span class="status-pill {{ 'status-healthy' if trace.status == 'HEALTHY' else 'status-degraded' }}">{{ trace.status }}</span>
+    <a class="button" href="/system/provenance">All provenance</a>
+  </div>
+</section>
+
+<section class="section-band">
+  <div class="metric-row four">
+    <div><span>Model</span><strong>{{ trace.model_name }}</strong></div>
+    <div><span>Version</span><strong>{{ trace.model_version }}</strong></div>
+    <div><span>Latest event</span><strong>{{ trace.latest_event_at }}</strong></div>
+    <div><span>Alerts</span><strong>{{ trace.alerts | length }}</strong></div>
+    <div><span>Database writes</span><strong>0</strong></div>
+    <div><span>Execution enabled</span><strong>NO</strong></div>
+  </div>
+  {% if trace.alerts %}<p class="muted">{{ trace.alerts | join(', ') }}</p>{% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Attribution Stages</h2><p class="muted">Immutable event order with exact persisted references.</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Stage</th><th>Time</th><th>Forecast</th><th>Observation</th><th>Feature</th><th>Snapshot</th><th>Ranking</th><th>Integrity</th></tr></thead>
+      <tbody>
+      {% for stage in trace.stages %}
+        <tr>
+          <td>{{ stage.stage }}</td>
+          <td>{{ stage.event_at }}</td>
+          <td>#{{ stage.forecast_id }} / {{ stage.forecast_probability or 'n/a' }}</td>
+          <td><code>{{ stage.observation }}</code></td>
+          <td>{{ stage.feature_source_table or 'missing' }} #{{ stage.feature_source_id or 'n/a' }} / {{ 'found' if stage.feature_exists else 'missing' }}</td>
+          <td>#{{ stage.snapshot_id or 'n/a' }} / {{ stage.snapshot_at or 'missing' }}</td>
+          <td>#{{ stage.ranking_id or 'n/a' }} / score {{ stage.opportunity_score or 'n/a' }} / edge {{ stage.estimated_edge or 'n/a' }}</td>
+          <td>{{ 'VALID' if stage.digest_valid else 'INVALID' }}{% if stage.alerts %}<br>{{ stage.alerts | join(', ') }}{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

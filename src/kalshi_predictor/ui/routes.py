@@ -119,6 +119,11 @@ from kalshi_predictor.professional_ux.service import (
     DEFAULT_SHELL_STATUS_SNAPSHOT_PATH,
     load_shell_status_context,
 )
+from kalshi_predictor.provenance.diagnostics import (
+    build_market_decision_trace,
+    build_provenance_diagnostics,
+    build_provenance_drift_alerts,
+)
 from kalshi_predictor.research.assistant import (
     research_dashboard,
     research_opportunity,
@@ -140,11 +145,21 @@ from kalshi_predictor.system_certification.reports import (
 )
 from kalshi_predictor.system_readiness.long_jobs import build_long_job_monitor
 from kalshi_predictor.tonight.control import tonight_card
+from kalshi_predictor.ui.evidence_viewer import (
+    EvidenceRejected,
+    get_cached_evidence_catalog,
+    load_evidence_artifact,
+)
+from kalshi_predictor.ui.progress import (
+    certification_reports_root,
+    get_cached_progress_dashboard,
+)
 from kalshi_predictor.ui.service import (
     REPORT_LINKS,
     DecisionUiService,
     _opportunity_links_health_summary,
 )
+from kalshi_predictor.ui.timeline_export_status import timeline_export_path
 from kalshi_predictor.utils.time import utc_now
 from kalshi_predictor.workspace_guard import build_workspace_consistency_guard
 from kalshi_predictor.workstation.reports import (
@@ -316,6 +331,13 @@ def _fast_system_health_payload(
             "This page is bounded for speed; open the monitor API/page for live DB holder detail."
         ),
     }
+    provenance = None
+    if settings.prov11_dashboard_preview_enabled:
+        provenance = build_provenance_diagnostics(
+            session,
+            event_limit=50,
+            execution_enabled=settings.execution_enabled,
+        )
     return {
         "shell_context": shell_context,
         "phase_3x_status": {
@@ -376,6 +398,7 @@ def _fast_system_health_payload(
         "audit": {
             "routes": list(ROUTE_INVENTORY),
         },
+        "provenance_diagnostics": provenance,
     }
 
 
@@ -814,6 +837,151 @@ def create_router(
                 "monitor": build_long_job_monitor(settings=resolved_settings),
             },
         )
+
+    @router.get("/system/progress", response_class=HTMLResponse)
+    def process_progress_dashboard(
+        request: Request,
+        service: Annotated[DecisionUiService, Depends(get_service)],
+    ) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "progress_dashboard.html",
+            {
+                "request": request,
+                "shell_context": shell_context_for(service),
+                "progress": get_cached_progress_dashboard(),
+            },
+        )
+
+    @router.get("/api/system/progress")
+    def process_progress_api() -> dict[str, Any]:
+        return jsonable_encoder(get_cached_progress_dashboard())
+
+    @router.get("/system/progress/certification-export/{kind}")
+    def certification_timeline_export(kind: str) -> FileResponse:
+        path = timeline_export_path(certification_reports_root(), kind)
+        if path is None:
+            raise HTTPException(status_code=404, detail="Certified timeline export unavailable")
+        media_type = "application/json" if kind == "json" else "text/csv"
+        return FileResponse(path, media_type=media_type, filename=path.name)
+
+    @router.get("/system/evidence", response_class=HTMLResponse)
+    def evidence_catalog_dashboard(request: Request, service: Annotated[DecisionUiService, Depends(get_service)]) -> HTMLResponse:
+        return templates.TemplateResponse(request, "evidence_catalog.html", {"request":request,"shell_context":shell_context_for(service),"catalog":get_cached_evidence_catalog()})
+
+    @router.get("/system/evidence/{artifact_id}", response_class=HTMLResponse)
+    def evidence_artifact_dashboard(artifact_id: str, request: Request, service: Annotated[DecisionUiService, Depends(get_service)]) -> HTMLResponse:
+        try:
+            artifact = load_evidence_artifact(artifact_id)
+        except EvidenceRejected as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return templates.TemplateResponse(request, "evidence_detail.html", {"request":request,"shell_context":shell_context_for(service),"artifact":artifact})
+
+    @router.get("/api/system/evidence")
+    def evidence_catalog_api() -> dict[str, Any]:
+        return jsonable_encoder(get_cached_evidence_catalog())
+
+    @router.get("/api/system/evidence/{artifact_id}")
+    def evidence_artifact_api(artifact_id: str) -> dict[str, Any]:
+        try:
+            return jsonable_encoder(load_evidence_artifact(artifact_id))
+        except EvidenceRejected as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @router.get("/system/provenance", response_class=HTMLResponse)
+    def provenance_diagnostics_dashboard(
+        request: Request,
+        service: Annotated[DecisionUiService, Depends(get_service)],
+    ) -> HTMLResponse:
+        if not resolved_settings.prov11_dashboard_preview_enabled:
+            raise HTTPException(status_code=404, detail="PROV-11 preview is disabled")
+        diagnostics = build_provenance_diagnostics(
+            service.session,
+            event_limit=250,
+            execution_enabled=resolved_settings.execution_enabled,
+        )
+        drift_alerts = build_provenance_drift_alerts(
+            service.session,
+            ticker_limit=50,
+            stale_after_minutes=resolved_settings.prov12_provenance_stale_after_minutes,
+        ) if resolved_settings.prov12_decision_trace_preview_enabled else None
+        return templates.TemplateResponse(
+            request,
+            "provenance_diagnostics.html",
+            {
+                "request": request,
+                "diagnostics": diagnostics,
+                "drift_alerts": drift_alerts,
+                "shell_context": shell_context_for(service),
+            },
+        )
+
+    @router.get("/api/provenance/diagnostics")
+    def provenance_diagnostics_api(
+        service: Annotated[DecisionUiService, Depends(get_service)],
+    ) -> dict[str, Any]:
+        if not resolved_settings.prov11_dashboard_preview_enabled:
+            raise HTTPException(status_code=404, detail="PROV-11 preview is disabled")
+        return jsonable_encoder(
+            build_provenance_diagnostics(
+                service.session,
+                event_limit=250,
+                execution_enabled=resolved_settings.execution_enabled,
+            )
+        )
+
+    @router.get("/system/provenance/{ticker}", response_class=HTMLResponse)
+    def market_provenance_trace_dashboard(
+        ticker: str,
+        request: Request,
+        service: Annotated[DecisionUiService, Depends(get_service)],
+    ) -> HTMLResponse:
+        if not resolved_settings.prov12_decision_trace_preview_enabled:
+            raise HTTPException(status_code=404, detail="PROV-12 preview is disabled")
+        trace = build_market_decision_trace(
+            service.session,
+            ticker,
+            stale_after_minutes=resolved_settings.prov12_provenance_stale_after_minutes,
+        )
+        if trace["status"] == "NOT_FOUND":
+            raise HTTPException(status_code=404, detail="Ticker provenance trace not found")
+        return templates.TemplateResponse(
+            request,
+            "provenance_trace.html",
+            {
+                "request": request,
+                "trace": trace,
+                "shell_context": shell_context_for(service),
+            },
+        )
+
+    @router.get("/api/provenance/traces/{ticker}")
+    def market_provenance_trace_api(
+        ticker: str,
+        service: Annotated[DecisionUiService, Depends(get_service)],
+    ) -> dict[str, Any]:
+        if not resolved_settings.prov12_decision_trace_preview_enabled:
+            raise HTTPException(status_code=404, detail="PROV-12 preview is disabled")
+        trace = build_market_decision_trace(
+            service.session,
+            ticker,
+            stale_after_minutes=resolved_settings.prov12_provenance_stale_after_minutes,
+        )
+        if trace["status"] == "NOT_FOUND":
+            raise HTTPException(status_code=404, detail="Ticker provenance trace not found")
+        return jsonable_encoder(trace)
+
+    @router.get("/api/provenance/drift-alerts")
+    def provenance_drift_alerts_api(
+        service: Annotated[DecisionUiService, Depends(get_service)],
+    ) -> dict[str, Any]:
+        if not resolved_settings.prov12_decision_trace_preview_enabled:
+            raise HTTPException(status_code=404, detail="PROV-12 preview is disabled")
+        return jsonable_encoder(build_provenance_drift_alerts(
+            service.session,
+            ticker_limit=50,
+            stale_after_minutes=resolved_settings.prov12_provenance_stale_after_minutes,
+        ))
 
     @router.get("/api/db-writer-monitor")
     def db_writer_monitor_api() -> dict:

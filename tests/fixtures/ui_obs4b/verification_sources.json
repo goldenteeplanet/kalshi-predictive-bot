@@ -1,0 +1,10 @@
+{
+  "sources": {
+    "process": {"pid":367918,"running":true,"elapsed_seconds":5640,"command":"sqlite3 backup.db PRAGMA integrity_check;"},
+    "database": {"path":"/mnt/kalshi-backup/r5_recovery3/fresh/backup.db","bytes":22318972928,"read_bytes_start":0},
+    "proc_io": "rchar: 1024\nread_bytes: 11159486464\n",
+    "integrity_output": "",
+    "sha256_output": "",
+    "execution": "EXECUTION_ENABLED=false"
+  }
+}

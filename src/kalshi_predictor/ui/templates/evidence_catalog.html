@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Certification Evidence{% endblock %}
+{% block content %}
+<section class="section-band">
+  <div class="section-head"><div><p class="page-kicker">Operations · Read only</p><h1>Certification evidence</h1><p class="muted">Allow-listed reports with SHA-256 verification. No filesystem controls are exposed.</p></div><span class="badge badge-info">{{ catalog.count }} artifacts</span></div>
+  <div class="table-wrap"><table><caption class="sr-only">Allow-listed certification evidence</caption><thead><tr><th scope="col">Phase</th><th scope="col">Status</th><th scope="col">Report</th><th scope="col">Integrity</th><th scope="col">Open</th></tr></thead><tbody>
+  {% for item in catalog["items"] %}<tr><td>{{ item.phase or 'unknown' }}</td><td><span class="state-chip state-{{ item.state_class }}">{{ item.status }}</span></td><td><code>{{ item.path }}</code></td><td><code>{{ item.sha256[:16] }}…</code></td><td><a class="button" href="/system/evidence/{{ item.id }}">View evidence</a></td></tr>{% else %}<tr><td colspan="5">No allow-listed evidence available.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

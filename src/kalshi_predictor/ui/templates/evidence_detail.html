@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Evidence {{ artifact.phase or artifact.id }}{% endblock %}
+{% block content %}
+<section class="section-band">
+  <p><a href="/system/evidence">← Evidence catalog</a></p>
+  <div class="section-head"><div><p class="page-kicker">Verified read-only artifact</p><h1>{{ artifact.phase or artifact.path }}</h1><p><code>{{ artifact.path }}</code></p></div><span class="state-chip state-{{ artifact.state_class }}">{{ artifact.status }}</span></div>
+  <dl class="evidence-meta"><div><dt>SHA-256</dt><dd><code>{{ artifact.verified_sha256 }}</code></dd></div><div><dt>Bytes</dt><dd>{{ artifact.bytes }}</dd></div><div><dt>Gate failures</dt><dd>{{ artifact.gate_failures | length }}</dd></div><div><dt>Rollback evidence</dt><dd>{{ artifact.rollback or 'not present' }}</dd></div></dl>
+  {% if artifact.gate_failures %}<div class="alert-stack">{% for failure in artifact.gate_failures %}<div class="ops-alert severity-warning"><strong>Gate evidence</strong><span>{{ failure }}</span></div>{% endfor %}</div>{% endif %}
+  <h2>Bounded content preview</h2><pre class="evidence-content">{{ artifact.content }}</pre>{% if artifact.content_truncated %}<p class="muted">Preview truncated at the certified display limit.</p>{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,29 @@
+[Unit]
+Description=Kalshi Bot operator UI (paper/read-only)
+Wants=network-online.target kalshi-ui-status-collector.timer
+After=network-online.target
+ConditionPathExists=/etc/kalshi-bot/kalshi-bot.env
+ConditionPathExists=/var/lib/kalshi-bot/kalshi_phase1.db
+
+[Service]
+Type=simple
+User=kalshi
+WorkingDirectory=/opt/kalshi-predictive-bot
+EnvironmentFile=/etc/kalshi-bot/kalshi-bot.env
+Environment=PYTHONUNBUFFERED=1
+Environment=UI_READ_ONLY=true
+Environment=EXECUTION_ENABLED=false
+Environment=EXECUTION_DRY_RUN=true
+Environment=EXECUTION_KILL_SWITCH=true
+ExecStart=/opt/kalshi-predictive-bot/.venv/bin/kalshi-bot ui --host 127.0.0.1 --port 8080
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/kalshi-predictive-bot/reports /var/lib/kalshi-bot
+
+[Install]
+WantedBy=multi-user.target

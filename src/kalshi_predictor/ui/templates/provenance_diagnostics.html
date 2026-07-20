@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Runtime Provenance Diagnostics{% endblock %}
+{% block content %}
+<section class="today-hero" aria-labelledby="provenance-title">
+  <div>
+    <p class="page-kicker">PROV-11 Preview</p>
+    <h1 id="provenance-title">Runtime Provenance Diagnostics</h1>
+    <p class="muted">Read-only attribution, chain health, scheduler certification, and model coverage.</p>
+  </div>
+  <div class="today-hero-actions">
+    <span class="status-pill {{ 'status-healthy' if diagnostics.status == 'HEALTHY' else 'status-failed' }}">{{ diagnostics.status }}</span>
+    <a class="button" href="/system">System</a>
+  </div>
+</section>
+
+{% if drift_alerts %}
+<section class="section-band">
+  <div class="section-head">
+    <div><h2>Per-Market Drift Preview</h2><p class="muted">Newest exact ticker traces; alerts do not change thresholds or execution.</p></div>
+    <span class="status-pill {{ 'status-healthy' if drift_alerts.summary.alert_tickers == 0 else 'status-degraded' }}">{{ drift_alerts.summary.alert_tickers }} alerts</span>
+  </div>
+  <div class="metric-row four">
+    <div><span>Tickers checked</span><strong>{{ drift_alerts.summary.tickers_checked }}</strong></div>
+    <div><span>Healthy</span><strong>{{ drift_alerts.summary.healthy_tickers }}</strong></div>
+    <div><span>Alerting</span><strong>{{ drift_alerts.summary.alert_tickers }}</strong></div>
+    <div><span>Stale after</span><strong>{{ drift_alerts.summary.stale_after_minutes }}m</strong></div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ticker</th><th>Model</th><th>Latest stage</th><th>Age</th><th>Status</th><th>Alerts</th></tr></thead>
+      <tbody>
+      {% for row in drift_alerts.rows %}
+        <tr>
+          <td><a href="/system/provenance/{{ row.ticker }}">{{ row.ticker }}</a></td>
+          <td>{{ row.model_name }} {{ row.model_version }}</td>
+          <td>{{ row.latest_stage }}</td>
+          <td>{{ row.age_minutes }}m</td>
+          <td>{{ row.status }}</td>
+          <td>{{ row.alerts | join(', ') or 'none' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="today-grid">
+  <article class="today-panel">
+    <h2>Chain Health</h2>
+    <div class="metric-row two">
+      <div><span>Total events</span><strong>{{ diagnostics.summary.total_events }}</strong></div>
+      <div><span>Verified sample</span><strong>{{ diagnostics.summary.events_verified }}</strong></div>
+      <div><span>Chain valid</span><strong>{{ 'YES' if diagnostics.summary.chain_valid else 'NO' }}</strong></div>
+      <div><span>Failures</span><strong>{{ diagnostics.summary.failure_count }}</strong></div>
+      <div><span>Latest event</span><strong>{{ diagnostics.summary.latest_event_at or 'none' }}</strong></div>
+      <div><span>Database writes</span><strong>0</strong></div>
+    </div>
+  </article>
+  <article class="today-panel">
+    <h2>Scheduler Certification</h2>
+    <div class="metric-row two">
+      <div><span>Status</span><strong>{{ diagnostics.scheduler_certification.status }}</strong></div>
+      <div><span>Cycles</span><strong>{{ diagnostics.scheduler_certification.cycles_passed }} / {{ diagnostics.scheduler_certification.cycles_required }}</strong></div>
+      <div><span>New OOM</span><strong>{{ 'YES' if diagnostics.scheduler_certification.new_oom else 'NO' }}</strong></div>
+      <div><span>Execution enabled</span><strong>NO</strong></div>
+    </div>
+  </article>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Model Attribution</h2><p class="muted">Counts are grouped in SQL; verification is bounded to the newest {{ diagnostics.summary.event_limit }} events.</p></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Model</th><th>Events</th><th>Forecasts</th><th>Rankings</th><th>Versions in sample</th></tr></thead>
+      <tbody>
+      {% for model_name, model in diagnostics.models | dictsort %}
+        <tr>
+          <td>{{ model_name }}</td>
+          <td>{{ model.events }}</td>
+          <td>{{ model.forecast_events }}</td>
+          <td>{{ model.ranking_events }}</td>
+          <td>{{ model.versions_in_sample | join(', ') or 'none' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">{{ diagnostics.next_action }}</p>
+</section>
+{% endblock %}

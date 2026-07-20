@@ -1,0 +1,33 @@
+[Unit]
+Description=Kalshi UI read-only status collector
+After=network-online.target
+ConditionPathExists=/etc/kalshi-bot/kalshi-bot.env
+
+[Service]
+Type=oneshot
+User=kalshi
+WorkingDirectory=/opt/kalshi-predictive-bot
+EnvironmentFile=/etc/kalshi-bot/kalshi-bot.env
+Environment=UI_READ_ONLY=true
+Environment=EXECUTION_ENABLED=false
+Environment=EXECUTION_DRY_RUN=true
+Environment=EXECUTION_KILL_SWITCH=true
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/kalshi-predictive-bot/.venv/bin/python /opt/kalshi-predictive-bot/scripts/ui_obs3b_live_status_collector.py --output /opt/kalshi-predictive-bot/reports/ui_obs_live/progress_snapshot.json --backup-root /opt/kalshi-predictive-bot/reports/backup_metadata --service kalshi-r5-bounded.service --timer kalshi-r5-bounded.timer --legacy-service kalshi-r5-watcher.service --roadmap /opt/kalshi-predictive-bot/reports/phase_ui_obs5f/inputs/objective_20_phase_status_20260719.json --r5-certification /opt/kalshi-predictive-bot/reports/phase_ui_obs5f/inputs/r5_recovery9_deployment_certification.json --verification-db /mnt/kalshi-backup/r5_recovery3/fresh/kalshi_phase1_pre_r5_recovery3_20260718T222000Z.db --integrity-output /mnt/kalshi-backup/r5_recovery3/fresh/integrity_check.txt --sha256-output /mnt/kalshi-backup/r5_recovery3/fresh/kalshi_phase1_pre_r5_recovery3_20260718T222000Z.db.sha256
+TimeoutStartSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=192M
+TasksMax=32
+ReadWritePaths=/opt/kalshi-predictive-bot/reports/ui_obs_live
+ReadOnlyPaths=/opt/kalshi-predictive-bot /etc/kalshi-bot /mnt/kalshi-backup/r5_recovery3/fresh /proc
+
+[Install]
+WantedBy=multi-user.target

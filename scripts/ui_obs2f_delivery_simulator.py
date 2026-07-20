@@ -1,0 +1,14 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from kalshi_predictor.ui.notification_delivery_simulator import write_delivery_simulator_preview
+
+
+parser = argparse.ArgumentParser(description="Run local UI-OBS-2F delivery simulator")
+parser.add_argument("--routing", type=Path, default=Path("reports/ui_obs2e/ui_obs2e_notification_routing_preview.json"))
+parser.add_argument("--receipts", type=Path, default=Path("tests/fixtures/ui_obs2f/prior_receipts.json"))
+parser.add_argument("--output-dir", type=Path, default=Path("reports/ui_obs2f"))
+args = parser.parse_args()
+print(write_delivery_simulator_preview(args.routing, args.receipts, args.output_dir, delivered_at="2026-07-18T09:10:00Z"))

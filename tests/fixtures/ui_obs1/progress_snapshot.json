@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-07-18T05:00:00Z",
+  "execution_enabled": false,
+  "paper_enabled": false,
+  "active_process": {
+    "name": "phase3bc-r5-crypto-freshness-watch",
+    "pid": 336539,
+    "runtime": "3h 21m",
+    "stage": "cycle 14 of 32 · ranking repair",
+    "state": "RUNNING",
+    "progress_percent": 43.75,
+    "estimated_remaining": "about 4h 30m",
+    "completion_evidence": null
+  },
+  "writer": {"state":"RUNNING","pid":336539,"safe_to_start_write":false,"lock_status":"BUSY_WRITER"},
+  "backup": {"state":"PASSED","integrity":"ok","path":"/mnt/kalshi-backup/prov14/kalshi_phase1_pre_prov14_20260718T012914Z.db","bytes":21493698560,"sha256_status":"VERIFIED"},
+  "scheduler": {"state":"RUNNING","cycle":"14 / 32","stage":"ranking repair","estimated_remaining":"about 4h 30m"},
+  "alerts": [{"severity":"WARNING","code":"WRITER_CONTENTION","message":"PROV-14B is waiting for the scheduler writer to finish."}],
+  "reports": [
+    {"phase":"PMB-34F","state":"PASSED","path":"reports/phase_pmb34f/pmb34f_offline_multi_bundle_drift_trend.json","generated_at":"2026-07-18T04:55:00Z"},
+    {"phase":"PROV-14B","state":"BLOCKED","path":"reports/phase_prov14/prov14_certification.json","generated_at":"2026-07-18T04:40:00Z"}
+  ],
+  "workstreams": [
+    {"name":"PMB evaluation","state":"PASSED","current_phase":"PMB-34F","completed":["PMB-30","PMB-31","PMB-32","PMB-33","PMB-34A","PMB-34B","PMB-34C","PMB-34D","PMB-34E","PMB-34F"],"blocked":["PMB-35"],"next_safe_phase":"UI-OBS-1"},
+    {"name":"PROV attribution","state":"BLOCKED","current_phase":"PROV-14B","completed":["PROV-10","PROV-11","PROV-12","PROV-13","PROV-14A"],"blocked":["PROV-14B"],"next_safe_phase":"Retry after sole-writer clearance"},
+    {"name":"NYC weather","state":"WAITING","current_phase":"NYC-W10","completed":["NYC-W5","NYC-W8","NYC-W9"],"blocked":[],"next_safe_phase":"Read-only stability review"},
+    {"name":"GH liquidity","state":"WAITING","current_phase":"GH-1V","completed":["GH-1U"],"blocked":[],"next_safe_phase":"Collect remaining distinct windows"},
+    {"name":"Paper readiness","state":"BLOCKED","current_phase":"READINESS-1","completed":[],"blocked":["READINESS-1"],"next_safe_phase":"Guarded recheck after attribution passes"}
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "collected_at":"2026-07-18T08:00:00Z",
+  "source_timestamps":{"db_writer_monitor":"2026-07-18T07:59:50Z","db_locks":"2026-07-18T07:59:52Z","scheduler":"2026-07-18T07:59:45Z","execution":"2026-07-18T07:59:55Z"},
+  "sources":{
+    "db_writer_monitor":{"database_path":"/var/lib/kalshi-bot/kalshi_phase1.db","current_writer_pid":336539,"current_writer_command":"phase3bc-r5-crypto-freshness-watch","current_writer_elapsed":"3h 21m","safe_to_start_write":false,"diagnostics_status":"BUSY_WRITER","long_job_stage":"ranking repair"},
+    "db_locks":{"status":"BUSY_WRITER","writer_active":true,"writer_pid":336539},
+    "backup_report":{"backup_path":"/mnt/kalshi-backup/prov14/kalshi_phase1_pre_prov14_20260718T012914Z.db","bytes":21493698560,"integrity_check":"ok","sha256":"5320e8bb327f69b40c1aa4780af98cd38e50af49462e58404d79c5388ec4ebff"},
+    "scheduler":{"state":"RUNNING","current_cycle":14,"total_cycles":32,"stage":"ranking repair","estimated_remaining":"about 4h 30m"},
+    "execution":{"execution_enabled":false,"paper_enabled":false},
+    "process":{"name":"phase3bc-r5-crypto-freshness-watch","pid":336539,"runtime":"3h 21m","stage":"cycle 14 of 32 · ranking repair","state":"RUNNING","progress_percent":43.75,"estimated_remaining":"about 4h 30m"}
+  },
+  "alerts":[{"severity":"WARNING","code":"WRITER_CONTENTION","message":"PROV-14B remains blocked by the active scheduler writer."}],
+  "reports":[
+    {"phase":"PMB-34F","state":"PASSED","path":"reports/phase_pmb34f/pmb34f_offline_multi_bundle_drift_trend.json","generated_at":"2026-07-18T07:50:00Z","verified":true},
+    {"phase":"PROV-14B","state":"BLOCKED","path":"reports/phase_prov14/prov14_certification.json","generated_at":"2026-07-18T04:40:00Z","verified":false}
+  ],
+  "workstreams":[
+    {"name":"PMB evaluation","state":"PASSED","current_phase":"PMB-34F","completed":["PMB-34F"],"blocked":["PMB-35"],"next_safe_phase":"UI-OBS-2"},
+    {"name":"PROV attribution","state":"BLOCKED","current_phase":"PROV-14B","completed":["PROV-14A"],"blocked":["PROV-14B"],"next_safe_phase":"Retry after sole-writer clearance"},
+    {"name":"NYC weather","state":"WAITING","current_phase":"NYC-W10","completed":["NYC-W9"],"blocked":[],"next_safe_phase":"Read-only stability review"},
+    {"name":"GH liquidity","state":"WAITING","current_phase":"GH-1V","completed":["GH-1U"],"blocked":[],"next_safe_phase":"Collect remaining windows"},
+    {"name":"Paper readiness","state":"BLOCKED","current_phase":"READINESS-1","completed":[],"blocked":["READINESS-1"],"next_safe_phase":"Recheck after attribution passes"}
+  ]
+}

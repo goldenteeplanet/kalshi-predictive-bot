@@ -1,0 +1,9 @@
+{
+  "acknowledgments":[
+    {"incident_id":"feadeff673c63204","acknowledged_at":"2026-07-18T08:05:00Z","acknowledged_by":"local-operator","note":"Investigating the missing completion report."}
+  ],
+  "resolutions":[
+    {"incident_id":"c0380bce52dabf85","resolved_at":"2026-07-18T08:03:00Z","verified":true,"evidence_path":"reports/ui_obs2d/collector_recovery.json","evidence_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    {"incident_id":"dbe5ab24fc042027","resolved_at":"2026-07-18T08:04:00Z","verified":false,"evidence_path":"reports/unverified.json","evidence_sha256":"short"}
+  ]
+}

@@ -9,10 +9,33 @@
   </div>
   <div class="today-hero-actions">
     <span class="status-pill status-incomplete">{{ phase_3x_status.decision }}</span>
+    <a class="button" href="/system/progress">Process progress</a>
     <a class="button" href="/system/long-jobs">Long jobs</a>
     <a class="button" href="{{ report_links.system_certification_report }}">3W report</a>
   </div>
 </section>
+
+{% if provenance_diagnostics %}
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h2>Runtime Provenance</h2>
+      <p class="muted">Bounded, read-only forecast and ranking attribution health.</p>
+    </div>
+    <a class="button" href="/system/provenance">Open diagnostics</a>
+  </div>
+  <div class="metric-row four">
+    <div><span>Status</span><strong>{{ provenance_diagnostics.status }}</strong></div>
+    <div><span>Total events</span><strong>{{ provenance_diagnostics.summary.total_events }}</strong></div>
+    <div><span>Verified sample</span><strong>{{ provenance_diagnostics.summary.events_verified }}</strong></div>
+    <div><span>Chain valid</span><strong>{{ 'YES' if provenance_diagnostics.summary.chain_valid else 'NO' }}</strong></div>
+    <div><span>Models</span><strong>{{ provenance_diagnostics.summary.models | length }}</strong></div>
+    <div><span>Scheduler cycles</span><strong>{{ provenance_diagnostics.scheduler_certification.cycles_passed }} / {{ provenance_diagnostics.scheduler_certification.cycles_required }}</strong></div>
+    <div><span>Execution enabled</span><strong>NO</strong></div>
+    <div><span>DB writes</span><strong>0</strong></div>
+  </div>
+</section>
+{% endif %}
 
 <section class="today-grid">
   <article class="today-panel">
