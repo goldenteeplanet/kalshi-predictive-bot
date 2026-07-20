@@ -1,0 +1,53 @@
+{
+  "events": [
+    {
+      "event_at": "2026-07-17T22:00:00+00:00",
+      "event_key": "crypto",
+      "market_snapshot_ref": null,
+      "model_name": "crypto_v2",
+      "model_version": "2.0.0",
+      "source_observation_ref": null,
+      "ticker": "KXBTC-SYNTHETIC"
+    },
+    {
+      "event_at": "2026-07-17T22:00:00+00:00",
+      "event_key": "weather",
+      "market_snapshot_ref": null,
+      "model_name": "weather_v2",
+      "model_version": "2.0.0",
+      "source_observation_ref": null,
+      "ticker": "KXTEMPNYCH-SYNTHETIC"
+    }
+  ],
+  "expected_model_versions": {
+    "crypto_v2": ["2.0.0"],
+    "weather_v2": ["2.0.0"]
+  },
+  "generated_at": "2026-07-17T22:00:00+00:00",
+  "repairs_by_event_key": {
+    "crypto": {
+      "market_snapshot_ref": {
+        "captured_at": "2026-07-17T21:59:30+00:00",
+        "id": 11,
+        "table": "market_snapshots"
+      },
+      "source_observation_ref": {
+        "id": 1,
+        "observed_at": "2026-07-17T21:59:00+00:00",
+        "table": "crypto_prices"
+      }
+    },
+    "weather": {
+      "market_snapshot_ref": {
+        "captured_at": "2026-07-17T21:59:30+00:00",
+        "id": 12,
+        "table": "market_snapshots"
+      },
+      "source_observation_ref": {
+        "forecast_generated_at": "2026-07-17T21:55:00+00:00",
+        "id": 2,
+        "table": "weather_forecasts"
+      }
+    }
+  }
+}

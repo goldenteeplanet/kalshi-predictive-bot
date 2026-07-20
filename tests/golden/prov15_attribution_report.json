@@ -1,0 +1,69 @@
+{
+  "database_access": false,
+  "execution_enabled": false,
+  "generated_at": "2026-07-17T20:00:00+00:00",
+  "mode": "SYNTHETIC_ATTRIBUTION_DRIFT_REGRESSION",
+  "phase": "PROV-15",
+  "rows": [
+    {
+      "event_at": "2026-07-17T20:00:00+00:00",
+      "event_key": "crypto-20",
+      "failures": [],
+      "model_name": "crypto_v2",
+      "model_version": "2.0.0",
+      "observation_age_seconds": 60.0,
+      "passed": true,
+      "snapshot_age_seconds": 10.0,
+      "ticker": ""
+    },
+    {
+      "event_at": "2026-07-17T20:00:00+00:00",
+      "event_key": "crypto-21",
+      "failures": [],
+      "model_name": "crypto_v2",
+      "model_version": "2.1.0",
+      "observation_age_seconds": 120.0,
+      "passed": true,
+      "snapshot_age_seconds": 15.0,
+      "ticker": ""
+    },
+    {
+      "event_at": "2026-07-17T20:00:00+00:00",
+      "event_key": "weather-20",
+      "failures": [],
+      "model_name": "weather_v2",
+      "model_version": "2.0.0",
+      "observation_age_seconds": 600.0,
+      "passed": true,
+      "snapshot_age_seconds": 30.0,
+      "ticker": ""
+    },
+    {
+      "event_at": "2026-07-17T20:00:00+00:00",
+      "event_key": "weather-21",
+      "failures": [],
+      "model_name": "weather_v2",
+      "model_version": "2.1.0",
+      "observation_age_seconds": 300.0,
+      "passed": true,
+      "snapshot_age_seconds": 20.0,
+      "ticker": ""
+    }
+  ],
+  "summary": {
+    "coverage_ratio": 1.0,
+    "covered_revision_count": 4,
+    "events_examined": 4,
+    "events_failed": 0,
+    "events_passed": 4,
+    "failure_counts": {},
+    "missing_revisions": [],
+    "passed": true,
+    "required_revision_count": 4
+  },
+  "thresholds": {
+    "maximum_observation_age_seconds": 900.0,
+    "maximum_snapshot_age_seconds": 120.0,
+    "minimum_coverage_ratio": 1.0
+  }
+}

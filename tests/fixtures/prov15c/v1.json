@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "rows": [{
+    "digest": "FORECAST_CREATED:7:-",
+    "attribution": {
+      "model_name": "crypto_v2",
+      "model_version": "2.0.0",
+      "forecast_generated_at": "2026-07-17T21:00:00+00:00",
+      "ranking_generated_at": "2026-07-17T21:00:00+00:00",
+      "observation_id": "observation:7",
+      "observation_timestamp": "2026-07-17T20:58:00+00:00",
+      "orderbook_snapshot_id": "snapshot:8",
+      "orderbook_timestamp": "2026-07-17T20:59:30+00:00"
+    }
+  }]
+}

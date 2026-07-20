@@ -1,0 +1,12 @@
+{
+  "schema_version": "2",
+  "rows": [{
+    "event_key": "FORECAST_CREATED:7:-",
+    "model_name": "crypto_v2",
+    "model_version": "2.0.0",
+    "event_at": "2026-07-17T21:00:00+00:00",
+    "source_observation_ref_json": "{\"table\":\"runtime_observations\",\"id\":7,\"observed_at\":\"2026-07-17T20:58:00+00:00\"}",
+    "market_snapshot_id": 8,
+    "market_snapshot_at": "2026-07-17T20:59:30+00:00"
+  }]
+}

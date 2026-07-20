@@ -1,0 +1,17 @@
+{
+  "event_at": "2026-07-17T21:00:00+00:00",
+  "event_key": "FORECAST_CREATED:7:-",
+  "market_snapshot_ref": {
+    "captured_at": "2026-07-17T20:59:30+00:00",
+    "id": 8,
+    "table": "market_snapshots"
+  },
+  "model_name": "crypto_v2",
+  "model_version": "2.0.0",
+  "ticker": "",
+  "source_observation_ref": {
+    "id": 7,
+    "observed_at": "2026-07-17T20:58:00+00:00",
+    "table": "runtime_observations"
+  }
+}

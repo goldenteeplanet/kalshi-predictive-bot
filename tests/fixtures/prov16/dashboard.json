@@ -1,0 +1,8 @@
+{
+  "complete_reference_count": 2,
+  "event_count": 2,
+  "model_counts": {
+    "crypto_v2": 1,
+    "weather_v2": 1
+  }
+}
