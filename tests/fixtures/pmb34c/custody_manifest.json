@@ -1,0 +1,14 @@
+{
+  "attestation_type":"offline-sha256-manifest-attestation-v1",
+  "signer_id":"user-owned-export-fixture",
+  "signed_at":"2026-07-18T08:00:00Z",
+  "signature_digest":"8abe80515e445b17ab7660f7154dbc9a32e356c2e7f0d3b6f19c12e36527ef81",
+  "export_manifest":{"path":"manifest.json","sha256":"6c6b431210d2b7e300f73bbf5cbe912f166c4cf1ee9923b627d2f172f7615977"},
+  "artifacts":[
+    {"dataset":"decisions","path":"decisions.json","sha256":"025c9989fc64037c5e6c04eea6d6174c1d6ad09229afc7a51bab94c5658bd2ab","source_timestamp":"2026-07-18T07:55:00Z"},
+    {"dataset":"rankings","path":"rankings.json","sha256":"3ae6f769ba4f24cdce4c3a1fb6f5fbb50f4527da4428bc6e0d221d3c381c457b","source_timestamp":"2026-07-18T07:55:00Z"},
+    {"dataset":"risks","path":"risks.json","sha256":"1c6484612b95ac71cc71184f3213f66ab49277141644cbd1af614fd78c5d7ec1","source_timestamp":"2026-07-18T07:55:00Z"},
+    {"dataset":"forecasts","path":"forecasts.csv","sha256":"62c8a3d1582a27635ab4180bcf76a06f8213ee3f95e5785d37b6cf8984ff3541","source_timestamp":"2026-07-18T07:54:00Z"},
+    {"dataset":"books","path":"books.csv","sha256":"9bd8d28e576e0d7cc000c4b463d75ba0bd8ea8c1d60738620e8995b506c52bb5","source_timestamp":"2026-07-18T07:56:00Z"}
+  ]
+}

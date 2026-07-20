@@ -1,0 +1,22 @@
+{
+  "artifact_hashes": {
+    "PMB-22": "46e188a77b2528d964d54a87bb6248805462be7beeb6d6e12e0a021125454eaa",
+    "PMB-23": "07c71b809f0f1aa12a32d38965cee505ac36297546067db224691b5bf296198a",
+    "PMB-24": "5335ea8d7e35286d38aa6d1b49ffe4a080f33c6bc36cf81096fffb180bc818b7",
+    "PMB-25": "90284efd24db3f102cfee1d3e6581722fd778b98c6efd4b1b4963c6bd8672827",
+    "PMB-26": "4b9e250219de84ee161591377db24c98ad93375d8153af9878180e6f0afcef98"
+  },
+  "bundle_digest": "4285b559c0d12dc8c32db33c77ebe1b1b11d790765b5ba02bd8114a03645de72",
+  "certification": {
+    "certified_buffer": {
+      "forecast_bias_magnitude": "0.008",
+      "spread_addition": "0.008"
+    },
+    "certified_position_scale": "0.95",
+    "passed": true,
+    "runtime_activation_authorized": false
+  },
+  "checks_passed": 13,
+  "checks_total": 13,
+  "phase": "PMB-27"
+}

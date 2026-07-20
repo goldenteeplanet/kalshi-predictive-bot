@@ -1,0 +1,67 @@
+[
+  {
+    "fixture_id": "complete-current",
+    "ranking": {
+      "ticker": "PMB34-COMPLETE",
+      "category": "crypto",
+      "opportunity_score": "78.5",
+      "forecast_model": "crypto_v2",
+      "forecast_id": 101,
+      "feature_ref": "crypto_features:11",
+      "observation_ref": "crypto_prices:21",
+      "market_snapshot_id": 31,
+      "model_version": "2.0.0"
+    },
+    "risk": {
+      "ticker": "PMB34-COMPLETE",
+      "risk_gate_passed": true,
+      "requested_capital": "10"
+    },
+    "shadow_context": {
+      "forecast_bias": "-0.004",
+      "spread_addition": "0.006"
+    }
+  },
+  {
+    "fixture_id": "legacy-missing-shadow-context",
+    "ranking": {
+      "ticker": "PMB34-LEGACY",
+      "category": "weather",
+      "opportunity_score": "74",
+      "forecast_model": "weather_v2",
+      "forecast_id": 102,
+      "feature_ref": "weather_features:12",
+      "observation_ref": "weather_forecasts:22",
+      "market_snapshot_id": 32,
+      "model_version": "2.0.0"
+    },
+    "risk": {
+      "ticker": "PMB34-LEGACY",
+      "risk_gate_passed": true,
+      "requested_capital": "10"
+    }
+  },
+  {
+    "fixture_id": "malformed-risk-export",
+    "ranking": {
+      "ticker": "PMB34-MALFORMED",
+      "category": "sports",
+      "opportunity_score": "not-a-number",
+      "forecast_model": "sports_v1",
+      "forecast_id": 103,
+      "feature_ref": "sports_features:13",
+      "observation_ref": "sports_observations:23",
+      "market_snapshot_id": 33,
+      "model_version": "1.0.0"
+    },
+    "risk": {
+      "ticker": "PMB34-DIFFERENT",
+      "risk_gate_passed": true,
+      "requested_capital": "bad"
+    },
+    "shadow_context": {
+      "forecast_bias": "bad",
+      "spread_addition": "0.002"
+    }
+  }
+]

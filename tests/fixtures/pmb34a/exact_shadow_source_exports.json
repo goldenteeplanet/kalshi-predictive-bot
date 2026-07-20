@@ -1,0 +1,38 @@
+[
+  {
+    "fixture_id": "crypto-exact",
+    "ranking": {"ticker":"PMB34A-CRYPTO","category":"crypto","opportunity_score":"78","forecast_model":"crypto_v2","forecast_id":201,"feature_ref":"crypto_features:41","observation_ref":"crypto_prices:51","market_snapshot_id":61,"model_version":"2.1.0"},
+    "risk": {"ticker":"PMB34A-CRYPTO","risk_gate_passed":true,"requested_capital":"10"},
+    "candidate_forecast": {"ticker":"PMB34A-CRYPTO","category":"crypto","forecast_id":201,"model_version":"2.1.0","probability":"0.604"},
+    "reference_forecast": {"ticker":"PMB34A-CRYPTO","category":"crypto","forecast_id":191,"model_version":"2.0.0","probability":"0.600"},
+    "current_book": {"ticker":"PMB34A-CRYPTO","category":"crypto","market_snapshot_id":61,"executable_spread":"0.026"},
+    "reference_book": {"ticker":"PMB34A-CRYPTO","category":"crypto","market_snapshot_id":60,"executable_spread":"0.020"}
+  },
+  {
+    "fixture_id": "weather-exact",
+    "ranking": {"ticker":"PMB34A-WEATHER","category":"weather","opportunity_score":"76","forecast_model":"weather_v2","forecast_id":202,"feature_ref":"weather_features:42","observation_ref":"weather_observations:52","market_snapshot_id":62,"model_version":"2.1.0"},
+    "risk": {"ticker":"PMB34A-WEATHER","risk_gate_passed":true,"requested_capital":"8"},
+    "candidate_forecast": {"ticker":"PMB34A-WEATHER","category":"weather","forecast_id":202,"model_version":"2.1.0","probability":"0.492"},
+    "reference_forecast": {"ticker":"PMB34A-WEATHER","category":"weather","forecast_id":192,"model_version":"2.0.0","probability":"0.500"},
+    "current_book": {"ticker":"PMB34A-WEATHER","category":"weather","market_snapshot_id":62,"executable_spread":"0.038"},
+    "reference_book": {"ticker":"PMB34A-WEATHER","category":"weather","market_snapshot_id":59,"executable_spread":"0.030"}
+  },
+  {
+    "fixture_id": "sports-exact",
+    "ranking": {"ticker":"PMB34A-SPORTS","category":"sports","opportunity_score":"73","forecast_model":"sports_v1","forecast_id":203,"feature_ref":"sports_features:43","observation_ref":"sports_observations:53","market_snapshot_id":63,"model_version":"1.1.0"},
+    "risk": {"ticker":"PMB34A-SPORTS","risk_gate_passed":true,"requested_capital":"6"},
+    "candidate_forecast": {"ticker":"PMB34A-SPORTS","category":"sports","forecast_id":203,"model_version":"1.1.0","probability":"0.557"},
+    "reference_forecast": {"ticker":"PMB34A-SPORTS","category":"sports","forecast_id":193,"model_version":"1.0.0","probability":"0.550"},
+    "current_book": {"ticker":"PMB34A-SPORTS","category":"sports","market_snapshot_id":63,"executable_spread":"0.024"},
+    "reference_book": {"ticker":"PMB34A-SPORTS","category":"sports","market_snapshot_id":58,"executable_spread":"0.020"}
+  },
+  {
+    "fixture_id": "weather-reject-missing-reference",
+    "ranking": {"ticker":"PMB34A-WEATHER-MISSING","category":"weather","opportunity_score":"71","forecast_model":"weather_v2","forecast_id":204,"feature_ref":"weather_features:44","observation_ref":"weather_observations:54","market_snapshot_id":64,"model_version":"2.1.0"},
+    "risk": {"ticker":"PMB34A-WEATHER-MISSING","risk_gate_passed":true,"requested_capital":"5"},
+    "candidate_forecast": {"ticker":"PMB34A-WEATHER-MISSING","category":"weather","forecast_id":204,"model_version":"2.1.0","probability":"0.510"},
+    "reference_forecast": {"ticker":"PMB34A-WEATHER-MISSING","category":"weather","forecast_id":194,"model_version":"2.0.0"},
+    "current_book": {"ticker":"PMB34A-WEATHER-MISSING","category":"weather","market_snapshot_id":64,"executable_spread":"0.030"},
+    "reference_book": {"ticker":"PMB34A-WEATHER-MISSING","category":"weather","market_snapshot_id":57,"executable_spread":"0.020"}
+  }
+]

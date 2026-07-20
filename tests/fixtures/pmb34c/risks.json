@@ -1,0 +1,5 @@
+[
+  {"ticker":"PMB34C-CRYPTO","risk_gate_passed":true,"requested_capital":"10"},
+  {"ticker":"PMB34C-WEATHER","risk_gate_passed":true,"requested_capital":"8"},
+  {"ticker":"PMB34C-SPORTS","risk_gate_passed":true,"requested_capital":"6"}
+]

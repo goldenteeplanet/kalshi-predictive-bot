@@ -1,0 +1,5 @@
+[
+  {"ticker":"PMB34C-CRYPTO","category":"crypto","opportunity_score":"79","forecast_model":"crypto_v2","forecast_id":501,"feature_ref":"crypto_features:91","observation_ref":"crypto_prices:101","market_snapshot_id":601,"model_version":"2.1.0"},
+  {"ticker":"PMB34C-WEATHER","category":"weather","opportunity_score":"77","forecast_model":"weather_v2","forecast_id":502,"feature_ref":"weather_features:92","observation_ref":"weather_observations:102","market_snapshot_id":602,"model_version":"2.1.0"},
+  {"ticker":"PMB34C-SPORTS","category":"sports","opportunity_score":"74","forecast_model":"sports_v1","forecast_id":503,"feature_ref":"sports_features:93","observation_ref":"sports_observations:103","market_snapshot_id":603,"model_version":"1.1.0"}
+]

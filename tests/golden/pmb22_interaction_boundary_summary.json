@@ -1,0 +1,19 @@
+{
+  "deterministic_digest": "bfe9adf2b6e4486bc9c8811347b01bc53d071d67cbddc0be680ef7bff6fed6df",
+  "deterministic_safety_buffer": {
+    "boundary_exclusive": true,
+    "certified_cells": 25,
+    "certified_within_grid": true,
+    "grid_step": "0.002",
+    "maximum_forecast_bias_magnitude": "0.008",
+    "maximum_spread_addition": "0.008"
+  },
+  "grid_cells": 36,
+  "joint_only_breaks": 1,
+  "minimum_joint_only_break": {
+    "combined_magnitude_l1": "0.020",
+    "forecast_bias": "-0.010",
+    "spread_addition": "0.010"
+  },
+  "phase": "PMB-22"
+}

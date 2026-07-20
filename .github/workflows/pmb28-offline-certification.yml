@@ -1,0 +1,53 @@
+name: PMB Offline Exposure Certification
+
+on:
+  pull_request:
+    paths:
+      - "src/kalshi_predictor/benchmarking/**"
+      - "scripts/pmb2*.py"
+      - "tests/test_pmb2*.py"
+      - "tests/golden/pmb2*.json"
+      - ".github/workflows/pmb28-offline-certification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pmb28-offline-certification:
+    name: Python ${{ matrix.python-version }} certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install local project
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Run deterministic offline certification gate
+        run: >-
+          python scripts/pmb28_certification_ci.py
+          --project-root .
+          --output-dir reports/phase_pmb28
+
+      - name: Preserve PMB-28 certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmb28-offline-certification-python-${{ matrix.python-version }}
+          path: |
+            reports/phase_pmb28/pmb28_offline_certification_ci_gate.json
+            reports/phase_pmb28/regenerated/reports/phase_pmb27/pmb27_exposure_guard_golden_certification_bundle.json
+          if-no-files-found: error
+          retention-days: 30

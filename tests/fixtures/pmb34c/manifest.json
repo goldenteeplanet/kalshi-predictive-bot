@@ -1,0 +1,1 @@
+{"datasets":{"decisions":{"format":"json","path":"decisions.json"},"rankings":{"format":"json","path":"rankings.json"},"risks":{"format":"json","path":"risks.json"},"forecasts":{"format":"csv","path":"forecasts.csv"},"books":{"format":"csv","path":"books.csv"}}}

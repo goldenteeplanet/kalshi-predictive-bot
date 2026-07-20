@@ -1,0 +1,5 @@
+[
+  {"ticker":"PMB34C-CRYPTO","category":"crypto","target_time":"2026-07-18T05:00:00Z","decision_time":"2026-07-18T04:59:00Z","candidate_forecast_id":501,"reference_forecast_id":491,"current_market_snapshot_id":601,"reference_market_snapshot_id":591},
+  {"ticker":"PMB34C-WEATHER","category":"weather","target_time":"2026-07-18T06:00:00Z","decision_time":"2026-07-18T05:59:00Z","candidate_forecast_id":502,"reference_forecast_id":492,"current_market_snapshot_id":602,"reference_market_snapshot_id":592},
+  {"ticker":"PMB34C-SPORTS","category":"sports","target_time":"2026-07-18T07:00:00Z","decision_time":"2026-07-18T06:59:00Z","candidate_forecast_id":503,"reference_forecast_id":493,"current_market_snapshot_id":603,"reference_market_snapshot_id":593}
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "fixture_id":"crypto-valid",
+    "decision":{"ticker":"PMB34B-CRYPTO","category":"crypto","target_time":"2026-07-18T05:00:00Z","decision_time":"2026-07-18T04:59:00Z","candidate_forecast_id":301,"reference_forecast_id":291,"current_market_snapshot_id":401,"reference_market_snapshot_id":391},
+    "ranking":{"ticker":"PMB34B-CRYPTO","category":"crypto","opportunity_score":"79","forecast_model":"crypto_v2","forecast_id":301,"feature_ref":"crypto_features:71","observation_ref":"crypto_prices:81","market_snapshot_id":401,"model_version":"2.1.0"},
+    "risk":{"ticker":"PMB34B-CRYPTO","risk_gate_passed":true,"requested_capital":"10"},
+    "forecasts":[{"ticker":"PMB34B-CRYPTO","category":"crypto","target_time":"2026-07-18T05:00:00Z","generated_at":"2026-07-18T04:55:00Z","forecast_id":301,"model_version":"2.1.0","probability":"0.604"},{"ticker":"PMB34B-CRYPTO","category":"crypto","target_time":"2026-07-18T05:00:00Z","generated_at":"2026-07-18T04:45:00Z","forecast_id":291,"model_version":"2.0.0","probability":"0.600"}],
+    "books":[{"ticker":"PMB34B-CRYPTO","category":"crypto","target_time":"2026-07-18T05:00:00Z","captured_at":"2026-07-18T04:58:30Z","market_snapshot_id":401,"executable_spread":"0.026"},{"ticker":"PMB34B-CRYPTO","category":"crypto","target_time":"2026-07-18T05:00:00Z","captured_at":"2026-07-18T04:57:00Z","market_snapshot_id":391,"executable_spread":"0.020"}]
+  },
+  {
+    "fixture_id":"weather-valid",
+    "decision":{"ticker":"PMB34B-WEATHER","category":"weather","target_time":"2026-07-18T06:00:00Z","decision_time":"2026-07-18T05:59:00Z","candidate_forecast_id":302,"reference_forecast_id":292,"current_market_snapshot_id":402,"reference_market_snapshot_id":392},
+    "ranking":{"ticker":"PMB34B-WEATHER","category":"weather","opportunity_score":"77","forecast_model":"weather_v2","forecast_id":302,"feature_ref":"weather_features:72","observation_ref":"weather_observations:82","market_snapshot_id":402,"model_version":"2.1.0"},
+    "risk":{"ticker":"PMB34B-WEATHER","risk_gate_passed":true,"requested_capital":"8"},
+    "forecasts":[{"ticker":"PMB34B-WEATHER","category":"weather","target_time":"2026-07-18T06:00:00Z","generated_at":"2026-07-18T05:50:00Z","forecast_id":302,"model_version":"2.1.0","probability":"0.492"},{"ticker":"PMB34B-WEATHER","category":"weather","target_time":"2026-07-18T06:00:00Z","generated_at":"2026-07-18T05:30:00Z","forecast_id":292,"model_version":"2.0.0","probability":"0.500"}],
+    "books":[{"ticker":"PMB34B-WEATHER","category":"weather","target_time":"2026-07-18T06:00:00Z","captured_at":"2026-07-18T05:58:30Z","market_snapshot_id":402,"executable_spread":"0.038"},{"ticker":"PMB34B-WEATHER","category":"weather","target_time":"2026-07-18T06:00:00Z","captured_at":"2026-07-18T05:57:00Z","market_snapshot_id":392,"executable_spread":"0.030"}]
+  },
+  {
+    "fixture_id":"sports-valid",
+    "decision":{"ticker":"PMB34B-SPORTS","category":"sports","target_time":"2026-07-18T07:00:00Z","decision_time":"2026-07-18T06:59:00Z","candidate_forecast_id":303,"reference_forecast_id":293,"current_market_snapshot_id":403,"reference_market_snapshot_id":393},
+    "ranking":{"ticker":"PMB34B-SPORTS","category":"sports","opportunity_score":"74","forecast_model":"sports_v1","forecast_id":303,"feature_ref":"sports_features:73","observation_ref":"sports_observations:83","market_snapshot_id":403,"model_version":"1.1.0"},
+    "risk":{"ticker":"PMB34B-SPORTS","risk_gate_passed":true,"requested_capital":"6"},
+    "forecasts":[{"ticker":"PMB34B-SPORTS","category":"sports","target_time":"2026-07-18T07:00:00Z","generated_at":"2026-07-18T06:50:00Z","forecast_id":303,"model_version":"1.1.0","probability":"0.557"},{"ticker":"PMB34B-SPORTS","category":"sports","target_time":"2026-07-18T07:00:00Z","generated_at":"2026-07-18T06:40:00Z","forecast_id":293,"model_version":"1.0.0","probability":"0.550"}],
+    "books":[{"ticker":"PMB34B-SPORTS","category":"sports","target_time":"2026-07-18T07:00:00Z","captured_at":"2026-07-18T06:58:30Z","market_snapshot_id":403,"executable_spread":"0.024"},{"ticker":"PMB34B-SPORTS","category":"sports","target_time":"2026-07-18T07:00:00Z","captured_at":"2026-07-18T06:57:00Z","market_snapshot_id":393,"executable_spread":"0.020"}]
+  }
+]

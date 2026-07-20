@@ -1,0 +1,8 @@
+{
+  "bundles":[
+    {"observed_at":"2026-07-18T08:00:00Z","custody":"../pmb34c/custody_manifest.json"},
+    {"observed_at":"2026-07-18T09:00:00Z","custody":"../pmb34c/custody_manifest.json"},
+    {"observed_at":"2026-07-18T10:00:00Z","custody":"../pmb34c/custody_manifest.json"}
+  ],
+  "declared_changes":[[],[]]
+}
