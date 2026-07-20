@@ -14,6 +14,17 @@ from kalshi_predictor.weather.repository import (
     get_latest_weather_features,
     get_latest_weather_link_for_ticker,
 )
+from kalshi_predictor.weather.observation_shadow import evaluate_knyc_observation
+from kalshi_predictor.weather.temperature_contracts import (
+    parse_point_temperature_ticker,
+    validate_point_temperature_market,
+)
+from kalshi_predictor.weather.temperature_probability import (
+    HIGH_TEMPERATURE_SIGMA,
+    probability_above,
+    probability_above_with_observed_max,
+    sigma_for_lead_time,
+)
 
 
 class WeatherV2Forecaster:
@@ -94,6 +105,42 @@ class WeatherV2Forecaster:
             )
             return None
         final_probability = _clamp_probability(market_mid + adjustment)
+        feature_json = {
+            "location_key": location_key,
+            "linked_location_key": link.location_key,
+            "weather_metric": link.weather_metric,
+            "target_operator": link.target_operator,
+            "target_value": link.target_value,
+            "target_time": link.target_time.isoformat() if link.target_time else None,
+            "market_mid": str(market_mid),
+            "weather_feature_values": _feature_values(features),
+            "weather_feature_id": features.id,
+            "feature_snapshot_id": features.id,
+            "source_observation_ref": _feature_source_reference(features),
+            "adjustment": str(adjustment),
+            "final_probability": str(final_probability),
+            "skip_reason": None,
+        }
+        notes = "weather_v2 midpoint plus bounded weather adjustment."
+        if self.settings.weather_v2_knyc_observation_enabled:
+            guarded_result = _guarded_knyc_temperature_probability(
+                snapshot=snapshot,
+                link=link,
+                features=features,
+                market_mid=market_mid,
+                baseline_probability=final_probability,
+                max_adjustment=self.settings.weather_v2_max_adjustment,
+            )
+            if guarded_result is not None:
+                final_probability, evidence = guarded_result
+                feature_json["knyc_temperature_probability"] = evidence
+                feature_json["final_probability"] = str(final_probability)
+                if evidence["applied"]:
+                    feature_json["adjustment"] = str(final_probability - market_mid)
+                    notes = (
+                        "weather_v2 exact KNYC probability helper with bounded "
+                        "non-settlement observation evidence."
+                    )
 
         return ForecastOutput(
             ticker=snapshot.ticker,
@@ -103,21 +150,128 @@ class WeatherV2Forecaster:
             market_mid_probability=market_mid,
             best_yes_bid=to_decimal(snapshot.best_yes_bid),
             best_yes_ask=to_decimal(snapshot.best_yes_ask),
-            feature_json={
-                "location_key": location_key,
-                "linked_location_key": link.location_key,
-                "weather_metric": link.weather_metric,
-                "target_operator": link.target_operator,
-                "target_value": link.target_value,
-                "target_time": link.target_time.isoformat() if link.target_time else None,
-                "market_mid": str(market_mid),
-                "weather_feature_values": _feature_values(features),
-                "adjustment": str(adjustment),
-                "final_probability": str(final_probability),
-                "skip_reason": None,
-            },
-            notes="weather_v2 midpoint plus bounded weather adjustment.",
+            feature_json=feature_json,
+            notes=notes,
         )
+
+
+def _guarded_knyc_temperature_probability(
+    *,
+    snapshot: MarketSnapshot,
+    link: WeatherMarketLink,
+    features: WeatherFeature,
+    market_mid: Decimal,
+    baseline_probability: Decimal,
+    max_adjustment: Decimal,
+) -> tuple[Decimal, dict[str, Any]] | None:
+    contract = parse_point_temperature_ticker(snapshot.ticker)
+    if contract is None:
+        return None
+    evidence: dict[str, Any] = {
+        "status": "BLOCKED",
+        "applied": False,
+        "blocker": None,
+        "contract_kind": contract.contract_kind,
+        "station_id": contract.station_id,
+        "settlement_source": contract.settlement_source,
+        "target_utc_time": contract.target_utc_time.isoformat(),
+        "raw_strike": str(contract.raw_strike),
+        "baseline_probability": str(baseline_probability),
+        "thresholds_changed": False,
+        "max_adjustment": str(max_adjustment),
+    }
+
+    def blocked(reason: str) -> tuple[Decimal, dict[str, Any]]:
+        evidence["blocker"] = reason
+        return baseline_probability, evidence
+
+    if contract.contract_kind != "ABOVE":
+        return blocked("CONTRACT_KIND_NOT_ACTIVATED")
+    market_validation = validate_point_temperature_market(
+        contract,
+        decode_json(snapshot.raw_market_json),
+        series_scope=contract.series_ticker,
+    )
+    if not market_validation.passed:
+        evidence["market_metadata_blockers"] = list(market_validation.blockers)
+        return blocked("MARKET_METADATA_NOT_VERIFIED")
+    link_target = to_decimal(link.target_value)
+    valid_targets = {contract.raw_strike, contract.discrete_threshold_f}
+    if (
+        link.location_key != contract.location_key
+        or link.weather_metric != "TEMPERATURE"
+        or link.target_operator not in {"ABOVE", "AT_OR_ABOVE"}
+        or link_target not in valid_targets
+        or parse_datetime(link.target_time) != contract.target_utc_time
+    ):
+        return blocked("WEATHER_LINK_NOT_EXACT")
+    if parse_datetime(features.target_time) != contract.target_utc_time:
+        return blocked("WEATHER_FEATURE_TARGET_MISMATCH")
+
+    raw_features = decode_json(features.raw_json)
+    forecast_generated_at = parse_datetime(raw_features.get("forecast_generated_at"))
+    forecast_temperature = to_decimal(features.temperature_f)
+    observation_evidence = raw_features.get("knyc_observation_evidence")
+    if forecast_generated_at is None:
+        return blocked("FORECAST_GENERATED_AT_MISSING")
+    if forecast_temperature is None:
+        return blocked("FORECAST_TEMPERATURE_MISSING")
+    guard = evaluate_knyc_observation(
+        baseline_probability=baseline_probability,
+        raw_strike=contract.raw_strike,
+        target_time=contract.target_utc_time,
+        evidence=(observation_evidence if isinstance(observation_evidence, dict) else None),
+        max_adjustment=max_adjustment,
+        enabled=False,
+    )
+    evidence["observation_provenance"] = guard.provenance
+    if not guard.passed:
+        return blocked(guard.blocker or "KNYC_OBSERVATION_NOT_VERIFIED")
+
+    observation_temperature = to_decimal(
+        observation_evidence.get("observation_temperature_f")
+    )
+    if observation_temperature is None:
+        return blocked("OBSERVATION_TEMPERATURE_MISSING")
+    lead_time_hours = max(
+        0.0,
+        (contract.target_utc_time - forecast_generated_at).total_seconds() / 3600,
+    )
+    sigma = sigma_for_lead_time(lead_time_hours, HIGH_TEMPERATURE_SIGMA)
+    forecast_only = probability_above(
+        float(forecast_temperature), float(contract.raw_strike), sigma
+    )
+    observation_conditioned = probability_above_with_observed_max(
+        float(forecast_temperature),
+        float(contract.raw_strike),
+        sigma,
+        float(observation_temperature),
+    )
+    raw_probability = Decimal(str(observation_conditioned))
+    bounded_delta = max(-max_adjustment, min(max_adjustment, raw_probability - market_mid))
+    applied_probability = _clamp_probability(market_mid + bounded_delta)
+    evidence.update(
+        {
+            "status": "APPLIED",
+            "applied": True,
+            "blocker": None,
+            "forecast_temperature_f": str(forecast_temperature),
+            "observation_temperature_f": str(observation_temperature),
+            "forecast_generated_at": forecast_generated_at.isoformat(),
+            "lead_time_hours": str(lead_time_hours),
+            "sigma": str(sigma),
+            "forecast_only_probability": str(forecast_only),
+            "observation_conditioned_probability": str(observation_conditioned),
+            "bounded_adjustment": str(bounded_delta),
+            "applied_probability": str(applied_probability),
+            "helpers": [
+                "sigma_for_lead_time",
+                "probability_above",
+                "probability_above_with_observed_max",
+            ],
+        }
+    )
+    return applied_probability, evidence
 
 
 def _weather_adjustment(
@@ -204,6 +358,12 @@ def _feature_values(features: WeatherFeature) -> dict[str, Any]:
         "temp_anomaly_score": features.temp_anomaly_score,
         "weather_confidence_score": features.weather_confidence_score,
     }
+
+
+def _feature_source_reference(features: WeatherFeature) -> dict[str, Any] | None:
+    raw = decode_json(features.raw_json)
+    reference = raw.get("source_observation_ref")
+    return dict(reference) if isinstance(reference, dict) else None
 
 
 def _market_midpoint(snapshot: MarketSnapshot) -> Decimal | None:

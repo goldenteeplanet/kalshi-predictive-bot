@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import sqlite3
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -17,6 +21,76 @@ from kalshi_predictor.phase3bb_r48_weather_feature_refresh_runtime_verification 
     build_phase3bb_r48_weather_feature_refresh_runtime_verification,
     write_phase3bb_r48_weather_feature_refresh_runtime_verification_report,
 )
+from kalshi_predictor.phase3bb_r47_weather_current_window_series_discovery import (
+    _weather_current_window_snapshot_command,
+)
+
+
+def test_r48_exact_new_york_rows_survive_large_fresh_feature_catalog(tmp_path: Path) -> None:
+    db_path = tmp_path / "r48_exact_match.db"
+    now = datetime.now(timezone.utc)
+    target = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    generated = now - timedelta(minutes=5)
+    tickers = [f"KXTEMPNYCH-26JUL1514-T{value}.99" for value in range(88, 98)]
+
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            create table markets (
+                ticker text, series_ticker text, title text, subtitle text, status text,
+                close_time text, expected_expiration_time text, expiration_time text,
+                settlement_ts text
+            );
+            create table weather_market_links (ticker text);
+            create table weather_features (
+                id integer primary key, location_key text, source text, generated_at text,
+                target_time text, temperature_f real, weather_confidence_score real
+            );
+            """
+        )
+        for ticker in tickers:
+            conn.execute(
+                "insert into markets values (?, 'KXTEMPNYCH', ?, '', 'active', ?, null, null, null)",
+                (ticker, "New York City temperature at 2pm EDT", target.replace(tzinfo=None).isoformat(sep=" ")),
+            )
+        # These rows reproduce the old global-LIMIT failure: all are fresher and sort
+        # ahead of the exact target, but none belongs to the candidate-time window.
+        distractor_target = target + timedelta(hours=24)
+        conn.executemany(
+            "insert into weather_features values (?, 'new_york', 'stored_forecasts', ?, ?, 80, 1)",
+            [
+                (
+                    row_id,
+                    (generated + timedelta(seconds=1)).replace(tzinfo=None).isoformat(sep=" "),
+                    distractor_target.replace(tzinfo=None).isoformat(sep=" "),
+                )
+                for row_id in range(1, 6002)
+            ],
+        )
+        conn.execute(
+            "insert into weather_features values (7000, 'new_york', 'stored_forecasts', ?, ?, 82, 1)",
+            (
+                generated.replace(tzinfo=None).isoformat(sep=" "),
+                target.replace(tzinfo=None).isoformat(sep=" "),
+            ),
+        )
+
+    command = _weather_current_window_snapshot_command(
+        str(db_path),
+        current_window_lookback_hours=3,
+        fresh_window_hours=24,
+        match_tolerance_hours=3,
+    )
+    script = command.split("python3 - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
+    result = subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)
+    payload = json.loads(result.stdout)
+    rows = [row for row in payload["linkability_rows"] if row["ticker"] in tickers]
+
+    assert len(rows) == 10
+    assert {row["matched_fresh_feature_id"] for row in rows} == {7000}
+    assert {row["matched_fresh_feature_source"] for row in rows} == {"stored_forecasts"}
+    assert {row["matched_fresh_feature_distance_hours"] for row in rows} == {0.0}
+    assert {row["blocker"] for row in rows} == {"READY_FOR_R12_SAFE_LINK_PREVIEW"}
 
 
 def test_phase3bb_r48_verifies_feature_refresh_and_opens_link_gate(tmp_path: Path) -> None:

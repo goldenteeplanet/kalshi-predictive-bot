@@ -550,45 +550,45 @@ try:
         for row in conn.execute(f"select distinct ticker from weather_market_links where ticker in ({{placeholders}})", tickers):
             links_by_ticker.add(str(row[0]))
     features = []
-    feature_aggregates = []
     if locations:
         placeholders = ",".join("?" for _ in locations)
-        feature_args = [*locations, fresh_since.replace(tzinfo=None).isoformat(sep=" ")]
+        candidate_targets = [target for _, target, location in current_market_candidates if location in locations]
+        feature_target_min = min(candidate_targets) - timedelta(hours=match_tolerance_hours)
+        feature_target_max = max(candidate_targets) + timedelta(hours=match_tolerance_hours)
+        feature_args = [
+            *locations,
+            fresh_since.replace(tzinfo=None).isoformat(sep=" "),
+            feature_target_min.replace(tzinfo=None).isoformat(sep=" "),
+            feature_target_max.replace(tzinfo=None).isoformat(sep=" "),
+        ]
         features = [dict(row) for row in conn.execute(
             f'''
             select id, location_key, source, generated_at, target_time, temperature_f,
                    weather_confidence_score
             from weather_features
-            where location_key in ({{placeholders}}) and generated_at >= ?
+            where location_key in ({{placeholders}})
+              and generated_at >= ?
+              and target_time >= ?
+              and target_time <= ?
             order by generated_at desc, target_time desc
-            limit 5000
             ''',
             feature_args,
-        ).fetchall()]
-        feature_aggregates = [dict(row) for row in conn.execute(
-            f'''
-            select location_key, count(*) feature_rows_sampled, max(generated_at) max_generated_at
-            from weather_features
-            where location_key in ({{placeholders}})
-            group by location_key
-            ''',
-            locations,
         ).fetchall()]
     features_by_location = defaultdict(list)
     feature_max_generated = {{}}
     for feature in features:
-        loc = str(feature.get("location_key") or "unknown")
+        loc = str(feature.get("location_key") or "unknown").strip().lower()
         features_by_location[loc].append(feature)
         generated_at = parse_dt(feature.get("generated_at"))
         if generated_at and (loc not in feature_max_generated or generated_at > feature_max_generated[loc]):
             feature_max_generated[loc] = generated_at
-    feature_locations = Counter()
-    for aggregate in feature_aggregates:
-        loc = str(aggregate.get("location_key") or "unknown")
-        feature_locations[loc] = int(aggregate.get("feature_rows_sampled") or 0)
-        generated_at = parse_dt(aggregate.get("max_generated_at"))
-        if generated_at and (loc not in feature_max_generated or generated_at > feature_max_generated[loc]):
-            feature_max_generated[loc] = generated_at
+    # Keep diagnostics bounded to the same candidate-time window used by the
+    # matcher. Counting the entire location history can scan millions of rows
+    # and cause the read-only verification probe to time out.
+    feature_locations = Counter(
+        str(feature.get("location_key") or "unknown").strip().lower()
+        for feature in features
+    )
     current_rows = []
     series_stats = defaultdict(lambda: Counter())
     series_samples = {{}}
@@ -619,7 +619,9 @@ try:
             "target_time": iso(target_time),
             "has_weather_link": has_link,
             "matched_fresh_feature_id": matched_feature.get("id") if matched_feature else None,
+            "matched_fresh_feature_source": matched_feature.get("source") if matched_feature else None,
             "matched_fresh_feature_target_time": matched_feature.get("target_time") if matched_feature else None,
+            "matched_fresh_feature_distance_hours": round(abs((parse_dt(matched_feature.get("target_time")) - target_time).total_seconds()) / 3600, 6) if matched_feature else None,
             "matched_fresh_feature_generated_at": iso(feature_generated),
             "latest_location_feature_generated_at": iso(latest_generated),
             "latest_location_feature_age_hours": latest_feature_age_hours,

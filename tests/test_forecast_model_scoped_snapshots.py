@@ -112,14 +112,20 @@ def test_run_forecast_models_ensures_signals_once_and_passes_snapshot(monkeypatc
             del session
             return SimpleNamespace(ticker=snapshot.ticker)
 
-    snapshots = [SimpleNamespace(ticker="KXBTC-A"), SimpleNamespace(ticker="KXBTC-B")]
+    snapshots = [
+        SimpleNamespace(id=101, ticker="KXBTC-A"),
+        SimpleNamespace(id=102, ticker="KXBTC-B"),
+    ]
 
     monkeypatch.setattr(registry, "get_forecaster", lambda name: FakeForecaster())
     monkeypatch.setattr(registry, "build_feature_snapshot", lambda session, snapshot: None)
     monkeypatch.setattr(registry, "ensure_builtin_signals", lambda session: ensured.append(session))
 
-    def fake_insert_forecast(session, forecast):
+    passed_snapshot_ids: list[int] = []
+
+    def fake_insert_forecast(session, forecast, *, market_snapshot_id=None):
         del session
+        passed_snapshot_ids.append(market_snapshot_id)
         record = SimpleNamespace(
             id=len(forecasts) + 1,
             ticker=forecast.ticker,
@@ -144,6 +150,7 @@ def test_run_forecast_models_ensures_signals_once_and_passes_snapshot(monkeypatc
     assert ensured == [session]
     assert [row["snapshot"] for row in attributed] == snapshots
     assert [row["ensure_builtin"] for row in attributed] == [False, False]
+    assert passed_snapshot_ids == [snapshots[0].id, snapshots[1].id]
 
 
 def _session_factory(tmp_path):

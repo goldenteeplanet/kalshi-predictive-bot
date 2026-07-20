@@ -62,6 +62,16 @@ def build_crypto_features(
             "source_latest_observed_at": (
                 prices[-1].observed_at.isoformat() if prices else None
             ),
+            "source_observation_ref": (
+                {
+                    "table": "crypto_prices",
+                    "id": prices[-1].id,
+                    "symbol": prices[-1].symbol,
+                    "source": prices[-1].source,
+                    "observed_at": prices[-1].observed_at.isoformat(),
+                }
+                if prices else None
+            ),
         }
         insert_crypto_features(
             session,

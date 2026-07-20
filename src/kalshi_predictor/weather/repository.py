@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -55,6 +55,71 @@ def insert_weather_observation(
     session.add(observation)
     session.flush()
     return observation
+
+
+def insert_weather_observation_if_missing(
+    session: Session,
+    **values: Any,
+) -> tuple[WeatherObservation, bool]:
+    location_key = normalize_location_key(str(values["location_key"]))
+    source = str(values["source"])
+    observed_at = parse_datetime(values["observed_at"])
+    if observed_at is None:
+        raise ValueError("observed_at is required")
+    existing = session.scalar(
+        select(WeatherObservation)
+        .where(
+            WeatherObservation.location_key == location_key,
+            WeatherObservation.source == source,
+            WeatherObservation.observed_at == observed_at,
+        )
+        .order_by(desc(WeatherObservation.id))
+        .limit(1)
+    )
+    if existing is not None:
+        return existing, False
+    return (
+        insert_weather_observation(
+            session,
+            **{**values, "location_key": location_key, "observed_at": observed_at},
+        ),
+        True,
+    )
+
+
+def get_nearest_weather_observation(
+    session: Session,
+    *,
+    location_key: str,
+    target_time: datetime,
+    source: str | None = None,
+    tolerance_minutes: int = 15,
+) -> tuple[WeatherObservation | None, int | None]:
+    if tolerance_minutes < 0:
+        raise ValueError("tolerance_minutes must be non-negative")
+    target = parse_datetime(target_time)
+    if target is None:
+        return None, None
+    tolerance = timedelta(minutes=tolerance_minutes)
+    statement = select(WeatherObservation).where(
+        WeatherObservation.location_key == normalize_location_key(location_key),
+        WeatherObservation.observed_at >= target - tolerance,
+        WeatherObservation.observed_at <= target + tolerance,
+    )
+    if source is not None:
+        statement = statement.where(WeatherObservation.source == source)
+    rows = list(session.scalars(statement.order_by(WeatherObservation.observed_at)))
+    candidates: list[tuple[int, datetime, int, WeatherObservation]] = []
+    for row in rows:
+        observed_at = parse_datetime(row.observed_at)
+        if observed_at is None:
+            continue
+        offset = int(abs((observed_at - target).total_seconds()))
+        candidates.append((offset, observed_at, int(row.id or 0), row))
+    if not candidates:
+        return None, None
+    offset, _, _, observation = min(candidates, key=lambda item: item[:3])
+    return observation, offset
 
 
 def insert_weather_forecast(
@@ -183,20 +248,22 @@ def get_latest_weather_features(
             .order_by(desc(WeatherFeature.generated_at), WeatherFeature.target_time)
             .limit(1)
         )
-    candidates = list(
-        session.scalars(
-            select(WeatherFeature)
-            .where(WeatherFeature.location_key == location)
-            .order_by(
-                desc(WeatherFeature.generated_at),
-                desc(WeatherFeature.created_at),
-                desc(WeatherFeature.id),
-            )
-        )
-    )
-    if not candidates:
+    requested_target = parse_datetime(target_time)
+    if requested_target is None:
         return None
-    return min(candidates, key=lambda feature: _weather_feature_target_sort_key(feature, target_time))
+    return session.scalar(
+        select(WeatherFeature)
+        .where(
+            WeatherFeature.location_key == location,
+            WeatherFeature.target_time == requested_target,
+        )
+        .order_by(
+            desc(WeatherFeature.generated_at),
+            desc(WeatherFeature.created_at),
+            desc(WeatherFeature.id),
+        )
+        .limit(1)
+    )
 
 
 def _weather_feature_target_sort_key(

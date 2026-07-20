@@ -97,6 +97,7 @@ def latest_links_for_table(
     link_table: type[CryptoMarketLink] | type[SportsMarketLink],
     *,
     limit: int | None = None,
+    ticker_scope: Iterable[str] | None = None,
 ) -> list[CryptoMarketLink | SportsMarketLink]:
     timestamp_col = (
         CryptoMarketLink.detected_at
@@ -108,7 +109,15 @@ def latest_links_for_table(
         .over(partition_by=link_table.ticker, order_by=[desc(timestamp_col), desc(link_table.id)])
         .label("row_number")
     )
-    subquery = select(link_table.id.label("id"), row_number).subquery()
+    latest_ids = select(link_table.id.label("id"), row_number)
+    if ticker_scope is not None:
+        exact_tickers = sorted(
+            {str(ticker).strip() for ticker in ticker_scope if str(ticker).strip()}
+        )
+        if not exact_tickers:
+            return []
+        latest_ids = latest_ids.where(link_table.ticker.in_(exact_tickers))
+    subquery = latest_ids.subquery()
     statement = (
         select(link_table)
         .join(subquery, link_table.id == subquery.c.id)
@@ -137,8 +146,10 @@ def linked_market_state(
 ) -> LinkedMarketState:
     market = session.get(Market, link.ticker)
     snapshot = latest_snapshot_for_ticker(session, link.ticker)
-    status = market.status if market is not None and market.status else (
-        snapshot.status if snapshot is not None else None
+    status = (
+        market.status
+        if market is not None and market.status
+        else (snapshot.status if snapshot is not None else None)
     )
     raw = decode_json(link.raw_json)
     return LinkedMarketState(

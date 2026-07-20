@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
@@ -38,6 +39,7 @@ from kalshi_predictor.memory.capture import capture_forecast_attempt
 from kalshi_predictor.paper.ledger import get_latest_snapshot_for_ticker
 from kalshi_predictor.signals.attribution import attribute_forecast_signals
 from kalshi_predictor.signals.registry import ensure_builtin_signals
+from kalshi_predictor.utils.time import utc_now
 
 MODEL_NAMES = (
     "market_implied_v1",
@@ -171,7 +173,9 @@ def run_forecast_models(
                     )
                     skipped += 1
                     continue
-                record = insert_forecast(session, forecast)
+                record = insert_forecast(
+                    session, forecast, market_snapshot_id=snapshot.id,
+                )
                 if not builtin_signals_ensured:
                     ensure_builtin_signals(session)
                     builtin_signals_ensured = True
@@ -212,6 +216,7 @@ def latest_snapshots_for_model(
     *,
     model_name: str,
     limit: int = 100,
+    as_of: datetime | None = None,
 ) -> list[MarketSnapshot] | None:
     """Return latest snapshots scoped to a model's domain links when possible."""
     link_table = _MODEL_LINK_TABLES.get(model_name)
@@ -219,7 +224,17 @@ def latest_snapshots_for_model(
         return None
 
     linked_tickers = select(link_table.ticker).distinct().subquery()
-    market_status = func.lower(func.coalesce(Market.status, MarketSnapshot.status, ""))
+    market_status = func.lower(func.coalesce(Market.status, ""))
+    snapshot_status = func.lower(func.coalesce(MarketSnapshot.status, ""))
+    eligibility = [
+        ~market_status.in_(tuple(sorted(INACTIVE_MARKET_STATUSES))),
+        ~snapshot_status.in_(tuple(sorted(INACTIVE_MARKET_STATUSES))),
+    ]
+    if model_name in {"weather_v1", "weather_v2"}:
+        eligibility.extend((
+            Market.close_time.is_not(None),
+            Market.close_time > (as_of or utc_now()),
+        ))
     latest_per_ticker = (
         select(
             MarketSnapshot.ticker.label("ticker"),
@@ -227,7 +242,7 @@ def latest_snapshots_for_model(
         )
         .join(linked_tickers, MarketSnapshot.ticker == linked_tickers.c.ticker)
         .outerjoin(Market, Market.ticker == MarketSnapshot.ticker)
-        .where(~market_status.in_(tuple(sorted(INACTIVE_MARKET_STATUSES))))
+        .where(*eligibility)
         .group_by(MarketSnapshot.ticker)
         .subquery()
     )

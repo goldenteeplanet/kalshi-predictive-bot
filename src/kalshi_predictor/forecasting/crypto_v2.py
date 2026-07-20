@@ -194,6 +194,10 @@ class CryptoV2Forecaster:
                 "crypto_feature_id": _primary_feature_id(component_rows),
                 "component_feature_ids": _component_feature_ids(component_rows),
                 "feature_snapshot_id": _primary_feature_id(component_rows),
+                "source_observation_ref": _primary_observation_reference(component_rows),
+                "component_observation_refs": _component_observation_references(
+                    component_rows
+                ),
             },
             notes=(
                 "crypto_v2 midpoint plus bounded momentum adjustment using "
@@ -470,6 +474,26 @@ def _primary_feature_id(component_rows: list[dict[str, object]]) -> int | None:
 def _component_feature_ids(component_rows: list[dict[str, object]]) -> dict[str, int | None]:
     return {
         str(row["symbol"]): getattr(row.get("features"), "id", None)
+        for row in component_rows
+    }
+
+
+def _primary_observation_reference(
+    component_rows: list[dict[str, object]],
+) -> dict[str, object] | None:
+    if not component_rows:
+        return None
+    feature = component_rows[0].get("features")
+    raw = decode_json(getattr(feature, "raw_json", None))
+    reference = raw.get("source_observation_ref")
+    return dict(reference) if isinstance(reference, dict) else None
+
+
+def _component_observation_references(
+    component_rows: list[dict[str, object]],
+) -> dict[str, dict[str, object] | None]:
+    return {
+        str(row.get("symbol")): _primary_observation_reference([row])
         for row in component_rows
     }
 

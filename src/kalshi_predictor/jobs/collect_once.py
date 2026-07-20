@@ -136,7 +136,9 @@ def collect_once(
                     )
                     skipped_forecasts += 1
                     continue
-                record = insert_forecast(session, forecast)
+                record = insert_forecast(
+                    session, forecast, market_snapshot_id=snapshot.id
+                )
                 session.flush()
                 attribute_forecast_signals(session, record)
                 forecasts_inserted += 1

@@ -1,10 +1,12 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+from zoneinfo import ZoneInfo
 
+import httpx
 from sqlalchemy.orm import Session
 
-from kalshi_predictor.config import get_settings
+from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.utils.decimals import to_decimal
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 from kalshi_predictor.weather.providers import (
@@ -16,8 +18,10 @@ from kalshi_predictor.weather.providers import (
 from kalshi_predictor.weather.repository import (
     insert_weather_forecast,
     insert_weather_observation,
+    insert_weather_observation_if_missing,
     normalize_location_key,
 )
+from kalshi_predictor.weather.station_observations import fetch_nws_station_observations
 
 
 @dataclass(frozen=True)
@@ -35,6 +39,8 @@ def ingest_weather_location(
     latitude: float,
     longitude: float,
     source: str = "noaa",
+    settings: Settings | None = None,
+    station_client: httpx.Client | None = None,
 ) -> WeatherIngestionSummary:
     if source != "noaa":
         return WeatherIngestionSummary(
@@ -43,15 +49,55 @@ def ingest_weather_location(
             observations_inserted=0,
             errors=[f"Unsupported weather source: {source}"],
         )
-    settings = get_settings()
+    active_settings = settings or get_settings()
     result = fetch_noaa_hourly_forecast(
         location_key=location_key,
         latitude=latitude,
         longitude=longitude,
-        user_agent=settings.kalshi_user_agent,
-        timeout_seconds=settings.kalshi_request_timeout_seconds,
+        user_agent=active_settings.kalshi_user_agent,
+        timeout_seconds=active_settings.kalshi_request_timeout_seconds,
     )
-    return store_weather_fetch_result(session, result)
+    summary = store_weather_fetch_result(session, result)
+    location = normalize_location_key(location_key)
+    if location != "new_york" or not active_settings.weather_v2_knyc_observation_enabled:
+        return summary
+
+    errors = list(summary.errors)
+    observations_inserted = 0
+    target_local_date = utc_now().astimezone(ZoneInfo("America/New_York")).date()
+    try:
+        observations = fetch_nws_station_observations(
+            station_id="KNYC",
+            target_local_date=target_local_date,
+            timezone="America/New_York",
+            user_agent=active_settings.kalshi_user_agent,
+            timeout_seconds=active_settings.kalshi_request_timeout_seconds,
+            client=station_client,
+        )
+        for observation in observations:
+            _, inserted = insert_weather_observation_if_missing(
+                session,
+                location_key=location,
+                source=observation.source,
+                observed_at=observation.observed_at,
+                temperature_f=observation.temperature_f,
+                raw_json={
+                    **dict(observation.raw_json),
+                    "station_id": observation.station_id,
+                    "evidence_role": "NON_SETTLEMENT_POINT_OBSERVATION",
+                    "settlement_source": "the_weather_company",
+                    "target_local_date": observation.local_date.isoformat(),
+                },
+            )
+            observations_inserted += int(inserted)
+    except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+        errors.append(f"KNYC observation ingest deferred: {exc}")
+    return WeatherIngestionSummary(
+        source=summary.source,
+        forecasts_inserted=summary.forecasts_inserted,
+        observations_inserted=observations_inserted,
+        errors=errors,
+    )
 
 
 def store_weather_fetch_result(

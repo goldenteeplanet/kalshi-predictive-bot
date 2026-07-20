@@ -1,0 +1,37 @@
+[Unit]
+Description=Kalshi GH-1 reconnecting orderbook staging producer
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/kalshi-bot/kalshi-bot.env
+
+[Service]
+Type=simple
+User=kalshi
+WorkingDirectory=/opt/kalshi-predictive-bot
+EnvironmentFile=/etc/kalshi-bot/kalshi-bot.env
+Environment=UI_READ_ONLY=true
+Environment=EXECUTION_ENABLED=false
+Environment=EXECUTION_DRY_RUN=true
+Environment=EXECUTION_KILL_SWITCH=true
+Environment=AUTOPILOT_DRY_RUN=true
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/kalshi-predictive-bot/.venv/bin/kalshi-bot gh1-websocket-orderbook-watch --connect --stream-max-seconds 60 --discovery-refresh-seconds 900 --healthy-cycle-delay-seconds 2 --reconnect-initial-seconds 5 --reconnect-max-seconds 120 --status-path reports/phase_gh1/watch/status.json
+Restart=always
+RestartSec=5s
+TimeoutStopSec=20s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=256M
+TasksMax=48
+ReadWritePaths=/opt/kalshi-predictive-bot/reports/phase_gh1
+ReadOnlyPaths=/opt/kalshi-predictive-bot /etc/kalshi-bot
+
+[Install]
+WantedBy=multi-user.target

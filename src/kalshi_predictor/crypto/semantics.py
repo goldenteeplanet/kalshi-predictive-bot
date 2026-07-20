@@ -126,6 +126,15 @@ def parse_crypto_market_terms(
 
     reason_codes: list[str] = []
     unsupported_prices = _unsupported_target_prices(resolved_legs)
+    text_target_price = _decimal_or_none(_first_target_price_from_text(text))
+    if (
+        not components
+        and text_target_price is not None
+        and _looks_like_crypto(text)
+        and symbol_for_target_price(text_target_price) is None
+        and str(text_target_price) not in unsupported_prices
+    ):
+        unsupported_prices.append(str(text_target_price))
     alias_symbol = _contextual_alias_symbol(text)
     event_symbol = symbol_from_event_ticker(market.event_ticker) or symbol_from_event_ticker(
         market.series_ticker

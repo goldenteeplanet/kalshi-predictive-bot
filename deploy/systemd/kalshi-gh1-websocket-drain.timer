@@ -1,0 +1,13 @@
+[Unit]
+Description=Drain GH-1 staged orderbooks through the guarded writer every minute
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=60s
+AccuracySec=5s
+RandomizedDelaySec=3s
+Persistent=false
+Unit=kalshi-gh1-websocket-drain.service
+
+[Install]
+WantedBy=timers.target
