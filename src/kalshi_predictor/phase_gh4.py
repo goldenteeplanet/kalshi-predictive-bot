@@ -1,0 +1,441 @@
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+from kalshi_predictor.config import Settings, get_settings
+from kalshi_predictor.utils.time import utc_now
+
+GH4_VERSION = "GH-4.0"
+GH4_APPROVAL_TOKEN = "I_APPROVE_GH4_PAPER_ORDER_CREATION"
+DEFAULT_GH2_REPORT_PATH = Path("reports/phase_gh2/gh2_active_candidate_refresh.json")
+DEFAULT_GH2_HISTORY_PATH = Path("reports/phase_gh2/gh2_paper_only_soak_history.jsonl")
+DEFAULT_GH1_STATUS_PATH = Path("reports/phase_gh1/watch/status.json")
+PAPER_ONLY_SAFETY = "SIMULATED_PAPER_ORDERS_ONLY_EXCHANGE_EXECUTION_DISABLED"
+
+
+@dataclass(frozen=True)
+class GH4Artifacts:
+    output_dir: Path
+    json_path: Path
+    markdown_path: Path
+
+
+def build_source_reconnect_health(
+    *,
+    gh2_payload: dict[str, Any],
+    gh1_payload: dict[str, Any],
+    now: datetime | None = None,
+    gh1_stale_minutes: int = 5,
+    decision_stale_minutes: int = 35,
+) -> dict[str, Any]:
+    resolved_now = _aware(now or utc_now())
+    gh1_age = _age_minutes(gh1_payload.get("generated_at"), resolved_now)
+    decision_age = _age_minutes(gh2_payload.get("generated_at"), resolved_now)
+    gh1_state = str(gh1_payload.get("state") or "UNKNOWN")
+    gh1_healthy_states = {
+        "CONNECTING",
+        "DISCOVERING_QUOTED_BOOKS",
+        "STREAMING",
+        "STREAM_CYCLE_COMPLETE",
+    }
+    gh1_healthy = (
+        gh1_age is not None
+        and gh1_age <= gh1_stale_minutes
+        and gh1_state in gh1_healthy_states
+        and int(gh1_payload.get("snapshots_seen") or 0) > 0
+        and int(gh1_payload.get("consecutive_failures") or 0) < 3
+    )
+
+    crypto_drain = gh2_payload.get("crypto_quote_drain") or {}
+    crypto_errors = list(crypto_drain.get("errors") or [])
+    coinbase_healthy = (
+        decision_age is not None
+        and decision_age <= decision_stale_minutes
+        and str(crypto_drain.get("status") or "") == "COMPLETE"
+        and int(crypto_drain.get("prices_inserted") or 0) > 0
+        and not crypto_errors
+    )
+
+    decision = gh2_payload.get("decision_refresh") or {}
+    weather_features = list(decision.get("weather_features") or [])
+    weather_forecasts = decision.get("weather_forecasts") or {}
+    weather_healthy = (
+        decision_age is not None
+        and decision_age <= decision_stale_minutes
+        and sum(int(row.get("features_inserted") or 0) for row in weather_features) > 0
+        and int(weather_forecasts.get("forecasts_inserted") or 0) > 0
+    )
+
+    sources = [
+        {
+            "source": "Kalshi WebSocket",
+            "status": "HEALTHY" if gh1_healthy else "NEEDS_ATTENTION",
+            "status_kind": "healthy" if gh1_healthy else "blocked",
+            "age_minutes": gh1_age,
+            "detail": (
+                f"{gh1_state}; {int(gh1_payload.get('snapshots_seen') or 0)} snapshots; "
+                f"{int(gh1_payload.get('reconnect_count') or 0)} reconnects"
+            ),
+            "recovery": (
+                "Automatic bounded reconnect is active."
+                if gh1_healthy
+                else "Reconnect service must recover a fresh streaming snapshot."
+            ),
+        },
+        {
+            "source": "Coinbase",
+            "status": "HEALTHY" if coinbase_healthy else "NEEDS_ATTENTION",
+            "status_kind": "healthy" if coinbase_healthy else "blocked",
+            "age_minutes": decision_age,
+            "detail": (
+                f"{int(crypto_drain.get('prices_inserted') or 0)} prices imported; "
+                f"{len(crypto_errors)} errors"
+            ),
+            "recovery": (
+                "The next bounded stage retries transient fetch failures."
+                if coinbase_healthy
+                else "Retry the filesystem-only quote stage before the next writer drain."
+            ),
+        },
+        {
+            "source": "NOAA weather",
+            "status": "HEALTHY" if weather_healthy else "NEEDS_ATTENTION",
+            "status_kind": "healthy" if weather_healthy else "blocked",
+            "age_minutes": decision_age,
+            "detail": (
+                f"{sum(int(row.get('features_inserted') or 0) for row in weather_features)} "
+                f"features; {int(weather_forecasts.get('forecasts_inserted') or 0)} forecasts"
+            ),
+            "recovery": (
+                "Bounded weather refresh is producing current decisions."
+                if weather_healthy
+                else "Retry NOAA ingest and rebuild the current weather decision window."
+            ),
+        },
+    ]
+    return {
+        "status": "HEALTHY" if all(row["status"] == "HEALTHY" for row in sources) else "DEGRADED",
+        "sources": sources,
+        "gh1_report_age_minutes": gh1_age,
+        "decision_report_age_minutes": decision_age,
+    }
+
+
+def build_gh3_soak_status(
+    *,
+    report_path: Path = DEFAULT_GH2_REPORT_PATH,
+    history_path: Path = DEFAULT_GH2_HISTORY_PATH,
+    gh1_status_path: Path = DEFAULT_GH1_STATUS_PATH,
+    now: datetime | None = None,
+    cadence_minutes: int = 15,
+) -> dict[str, Any]:
+    resolved_now = _aware(now or utc_now())
+    payload = _read_json(report_path)
+    history = _read_json_lines(history_path)
+    gh1_payload = _read_json(gh1_status_path)
+    soak = payload.get("soak") or {}
+    readiness = payload.get("paper_readiness") or {}
+    completed = int(soak.get("consecutive_healthy_cycles") or 0)
+    required = int(soak.get("required_healthy_cycles") or 24)
+    remaining = max(0, required - completed)
+    generated_at = _datetime(payload.get("generated_at"))
+    next_run = generated_at + timedelta(minutes=cadence_minutes) if generated_at else None
+    estimated_completion = resolved_now + timedelta(minutes=remaining * cadence_minutes)
+    reconnect = build_source_reconnect_health(
+        gh2_payload=payload,
+        gh1_payload=gh1_payload,
+        now=resolved_now,
+    )
+    report_age = _age_minutes(payload.get("generated_at"), resolved_now)
+    report_fresh = report_age is not None and report_age <= max(35, cadence_minutes * 2 + 5)
+    soak_complete = bool(soak.get("soak_complete"))
+    current_paper_ready = int(readiness.get("total_paper_ready_candidates") or 0)
+    if not payload:
+        status = "UNAVAILABLE"
+        status_label = "Soak report unavailable"
+        status_kind = "blocked"
+    elif not report_fresh or not bool(soak.get("healthy_cycle")):
+        status = "NEEDS_ATTENTION"
+        status_label = "Soak needs attention"
+        status_kind = "blocked"
+    elif soak_complete:
+        status = "COMPLETE"
+        status_label = "Soak complete"
+        status_kind = "healthy"
+    else:
+        status = "RUNNING"
+        status_label = "Paper-only soak running"
+        status_kind = "incomplete"
+    latest_reset = next(
+        (row for row in reversed(history) if not bool(row.get("healthy"))),
+        None,
+    )
+    return {
+        "status": status,
+        "status_label": status_label,
+        "status_kind": status_kind,
+        "generated_at": payload.get("generated_at") or "n/a",
+        "report_age_minutes": report_age,
+        "completed_cycles": completed,
+        "required_cycles": required,
+        "remaining_cycles": remaining,
+        "progress_percent": round((completed / max(required, 1)) * 100, 1),
+        "eta_label": "complete"
+        if remaining == 0
+        else f"about {remaining * cadence_minutes / 60:.1f}h",
+        "estimated_completion": _format_datetime(estimated_completion),
+        "next_run": _format_datetime(next_run),
+        "healthy_cycle": bool(soak.get("healthy_cycle")),
+        "paper_ready_seen": bool(soak.get("paper_ready_seen_in_required_window")),
+        "current_paper_ready_candidates": current_paper_ready,
+        "positive_ev_rows": int(readiness.get("crypto_positive_ev_rows") or 0)
+        + int(readiness.get("weather_positive_ev_rows") or 0),
+        "fresh_ranked_candidates": int(
+            (payload.get("decision_refresh") or {}).get("fresh_ranked_candidates") or 0
+        ),
+        "soak_complete": soak_complete,
+        "latest_reset_reason": (
+            str(latest_reset.get("reset_reason") or "Unhealthy cycle recorded.")
+            if latest_reset
+            else "No reset recorded in retained history."
+        ),
+        "history": list(reversed(history[-8:])),
+        "reconnect": reconnect,
+        "paper_order_creation_enabled": False,
+        "live_execution_enabled": False,
+    }
+
+
+def build_gh4_paper_activation_preflight(
+    *,
+    settings: Settings | None = None,
+    gh2_report_path: Path = DEFAULT_GH2_REPORT_PATH,
+    gh2_history_path: Path = DEFAULT_GH2_HISTORY_PATH,
+    gh1_status_path: Path = DEFAULT_GH1_STATUS_PATH,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    resolved_settings = settings or get_settings()
+    soak_status = build_gh3_soak_status(
+        report_path=gh2_report_path,
+        history_path=gh2_history_path,
+        gh1_status_path=gh1_status_path,
+        now=now,
+    )
+    report = _read_json(gh2_report_path)
+    safety = report.get("safety") or {}
+    checks = [
+        _check("gh3_soak_complete", soak_status["soak_complete"], "24 healthy cycles completed"),
+        _check(
+            "paper_ready_observed",
+            soak_status["paper_ready_seen"],
+            "At least one paper-ready candidate appeared in the required window",
+        ),
+        _check(
+            "current_candidate_available",
+            soak_status["current_paper_ready_candidates"] > 0,
+            "A paper-ready candidate is available at activation time",
+        ),
+        _check(
+            "latest_cycle_healthy", soak_status["healthy_cycle"], "Latest GH-2 cycle is healthy"
+        ),
+        _check(
+            "source_reconnect_health",
+            soak_status["reconnect"]["status"] == "HEALTHY",
+            "Kalshi, Coinbase, and weather source health is current",
+        ),
+        _check(
+            "cycle_errors_clear", not list(report.get("errors") or []), "Latest cycle has no errors"
+        ),
+        _check(
+            "soak_created_no_orders",
+            int(safety.get("paper_orders_created") or 0) == 0,
+            "The paper-only soak created zero orders",
+        ),
+        _check(
+            "live_execution_disabled",
+            not resolved_settings.execution_enabled,
+            "Exchange execution remains disabled",
+        ),
+        _check(
+            "autopilot_disabled",
+            not resolved_settings.autopilot_enabled,
+            "Autopilot remains disabled",
+        ),
+    ]
+    ready = all(check["passed"] for check in checks)
+    activation_requested = bool(resolved_settings.paper_order_creation_enabled)
+    kill_switch = bool(resolved_settings.paper_order_kill_switch)
+    if activation_requested and not ready:
+        status = "UNSAFE_ACTIVATION_BLOCKED"
+    elif activation_requested and not kill_switch:
+        status = "OPERATOR_ACTIVATED_PAPER_ONLY"
+    elif ready:
+        status = "READY_FOR_OPERATOR_APPROVAL"
+    else:
+        status = "BLOCKED_GH3_OR_SAFETY_GATES"
+    return {
+        "phase": "GH-4",
+        "phase_version": GH4_VERSION,
+        "generated_at": (now or utc_now()).isoformat(),
+        "status": status,
+        "preflight_ready": ready,
+        "paper_only_safety": PAPER_ONLY_SAFETY,
+        "checks": checks,
+        "failed_checks": [check["id"] for check in checks if not check["passed"]],
+        "soak": soak_status,
+        "activation": {
+            "paper_order_creation_enabled": activation_requested,
+            "paper_order_kill_switch": kill_switch,
+            "explicit_approval_token_required": True,
+            "approval_token_value": GH4_APPROVAL_TOKEN,
+        },
+        "lifecycle_capabilities": [
+            "paper decision generation",
+            "simulated order creation",
+            "immediate simulated fills",
+            "position updates and limits",
+            "realized and unrealized P&L",
+            "settlement reconciliation",
+            "paper-order kill switch",
+        ],
+        "safety": {
+            "exchange_orders_enabled": False,
+            "demo_orders_enabled": False,
+            "autopilot_enabled": False,
+            "preflight_writes_database": False,
+            "preflight_creates_paper_orders": False,
+        },
+    }
+
+
+def evaluate_paper_order_activation(
+    *,
+    settings: Settings,
+    preflight: dict[str, Any],
+    approval_token: str,
+) -> dict[str, Any]:
+    blockers: list[str] = []
+    if not bool(preflight.get("preflight_ready")):
+        blockers.append("GH4_PREFLIGHT_NOT_READY")
+    if not settings.paper_order_creation_enabled:
+        blockers.append("PAPER_ORDER_CREATION_DISABLED")
+    if settings.paper_order_kill_switch:
+        blockers.append("PAPER_ORDER_KILL_SWITCH_ACTIVE")
+    if approval_token != GH4_APPROVAL_TOKEN:
+        blockers.append("OPERATOR_APPROVAL_TOKEN_MISMATCH")
+    if settings.execution_enabled:
+        blockers.append("LIVE_EXECUTION_MUST_REMAIN_DISABLED")
+    if settings.autopilot_enabled:
+        blockers.append("AUTOPILOT_MUST_REMAIN_DISABLED")
+    return {"allowed": not blockers, "blockers": blockers}
+
+
+def write_gh4_paper_activation_preflight(
+    *,
+    output_dir: Path = Path("reports/phase_gh4"),
+    settings: Settings | None = None,
+    gh2_report_path: Path = DEFAULT_GH2_REPORT_PATH,
+    gh2_history_path: Path = DEFAULT_GH2_HISTORY_PATH,
+    gh1_status_path: Path = DEFAULT_GH1_STATUS_PATH,
+) -> GH4Artifacts:
+    payload = build_gh4_paper_activation_preflight(
+        settings=settings,
+        gh2_report_path=gh2_report_path,
+        gh2_history_path=gh2_history_path,
+        gh1_status_path=gh1_status_path,
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    json_path = output_dir / "gh4_paper_activation_preflight.json"
+    markdown_path = output_dir / "gh4_paper_activation_preflight.md"
+    _write_json(json_path, payload)
+    markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
+    return GH4Artifacts(output_dir, json_path, markdown_path)
+
+
+def _check(identifier: str, passed: bool, evidence: str) -> dict[str, Any]:
+    return {"id": identifier, "passed": bool(passed), "evidence": evidence}
+
+
+def _render_markdown(payload: dict[str, Any]) -> str:
+    lines = [
+        "# GH-4 Paper Order Activation Preflight",
+        "",
+        f"- Status: `{payload.get('status')}`",
+        f"- Generated: `{payload.get('generated_at')}`",
+        f"- Preflight ready: `{payload.get('preflight_ready')}`",
+        "- Exchange/live orders: `DISABLED`",
+        "- Autopilot: `DISABLED`",
+        "",
+        "## Gates",
+        "",
+    ]
+    for check in payload.get("checks") or []:
+        mark = "PASS" if check.get("passed") else "BLOCKED"
+        lines.append(f"- `{mark}` {check.get('id')}: {check.get('evidence')}")
+    lines.extend(
+        [
+            "",
+            "Paper-order creation requires the environment gate, released kill switch, "
+            "and the exact operator approval token. This preflight performs no database writes.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _read_json_lines(path: Path) -> list[dict[str, Any]]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    rows = []
+    for line in lines:
+        try:
+            payload = json.loads(line)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(payload, dict):
+            rows.append(payload)
+    return rows
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    temporary = path.with_suffix(f"{path.suffix}.tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    temporary.replace(path)
+
+
+def _datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return _aware(datetime.fromisoformat(str(value).replace("Z", "+00:00")))
+    except (TypeError, ValueError):
+        return None
+
+
+def _age_minutes(value: Any, now: datetime) -> float | None:
+    parsed = _datetime(value)
+    if parsed is None:
+        return None
+    return max(0.0, (now - parsed).total_seconds() / 60)
+
+
+def _format_datetime(value: datetime | None) -> str:
+    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC") if value else "n/a"
+
+
+def _aware(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)

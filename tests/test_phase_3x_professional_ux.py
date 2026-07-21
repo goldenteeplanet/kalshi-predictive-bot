@@ -90,6 +90,8 @@ def test_phase_3x_root_uses_bounded_today_workspace(tmp_path) -> None:
     assert "Professional cockpit" in response.text
     assert "Market probability" in response.text
     assert "Crypto Freshness Watch" in response.text
+    assert "Paper-Only Soak" in response.text
+    assert "GH-4 locked" in response.text
     assert "Paper-ready" in response.text
     assert "Progress" in response.text
     assert "ETA" in response.text

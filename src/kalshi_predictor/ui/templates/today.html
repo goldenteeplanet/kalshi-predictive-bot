@@ -61,6 +61,84 @@
   </div>
 </section>
 
+<section class="section-band compact-band" aria-labelledby="gh3-soak-title">
+  <div class="section-head">
+    <div>
+      <h2 id="gh3-soak-title">Paper-Only Soak</h2>
+      <p class="muted">
+        {{ gh3_soak.completed_cycles }} of {{ gh3_soak.required_cycles }} healthy cycles;
+        operator activation remains locked.
+      </p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-{{ gh3_soak.status_kind }}">{{ gh3_soak.status_label }}</span>
+      <span class="badge badge-neutral">GH-4 locked</span>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Healthy cycles</span><strong>{{ gh3_soak.completed_cycles }} / {{ gh3_soak.required_cycles }}</strong></div>
+    <div><span>Remaining</span><strong>{{ gh3_soak.remaining_cycles }}</strong></div>
+    <div><span>Minimum ETA</span><strong>{{ gh3_soak.eta_label }}</strong></div>
+    <div><span>Next cycle</span><strong>{{ gh3_soak.next_run }}</strong></div>
+    <div><span>Paper-ready seen</span><strong>{{ 'Yes' if gh3_soak.paper_ready_seen else 'No' }}</strong></div>
+    <div><span>Paper-ready now</span><strong>{{ gh3_soak.current_paper_ready_candidates }}</strong></div>
+    <div><span>Positive EV</span><strong>{{ gh3_soak.positive_ev_rows }}</strong></div>
+    <div><span>Fresh rankings</span><strong>{{ gh3_soak.fresh_ranked_candidates }}</strong></div>
+    <div><span>Reconnect health</span><strong>{{ gh3_soak.reconnect.status }}</strong></div>
+    <div><span>Latest reset</span><strong>{{ gh3_soak.latest_reset_reason }}</strong></div>
+  </div>
+  <div class="table-wrap professional-table">
+    <table>
+      <caption class="sr-only">Current source freshness and reconnect state</caption>
+      <thead>
+        <tr>
+          <th scope="col">Source</th>
+          <th scope="col">Status</th>
+          <th scope="col">Evidence</th>
+          <th scope="col">Recovery</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for source in gh3_soak.reconnect.sources %}
+        <tr>
+          <td><strong>{{ source.source }}</strong></td>
+          <td><span class="status-pill status-{{ source.status_kind }}">{{ source.status }}</span></td>
+          <td>{{ source.detail }}</td>
+          <td>{{ source.recovery }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if gh3_soak.history %}
+  <div class="table-wrap professional-table">
+    <table>
+      <caption class="sr-only">Recent paper-only soak cycle history</caption>
+      <thead>
+        <tr>
+          <th scope="col">Cycle</th>
+          <th scope="col">Healthy</th>
+          <th scope="col">Paper-ready</th>
+          <th scope="col">Positive EV</th>
+          <th scope="col">Fresh rankings</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for cycle in gh3_soak.history %}
+        <tr>
+          <td>{{ cycle.generated_at }}</td>
+          <td>{{ 'Yes' if cycle.healthy else 'No' }}</td>
+          <td>{{ cycle.paper_ready_candidates|default(0) }}</td>
+          <td>{{ cycle.positive_ev_rows|default('n/a') }}</td>
+          <td>{{ cycle.fresh_ranked_candidates|default('n/a') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+
 <section class="section-band compact-band" aria-labelledby="paper-blockers-title">
   <div class="section-head">
     <div>

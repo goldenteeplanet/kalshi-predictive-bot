@@ -14,6 +14,7 @@ def test_cli_help() -> None:
     assert "collect-once" in result.output
     assert "report-calibration" in result.output
     assert "paper-run" in result.output
+    assert "gh4-paper-activation-preflight" in result.output
     assert "paper-summary" in result.output
     assert "paper-pnl" in result.output
     assert "paper-reset" in result.output

@@ -319,9 +319,7 @@ def run_gh2_single_writer_decision_refresh(
         mark_stage("refresh_crypto_decisions")
         crypto_latest = _latest_snapshots(session, crypto_link_tickers)
         crypto_snapshots = [
-            crypto_latest[ticker]
-            for ticker in crypto_link_tickers
-            if ticker in crypto_latest
+            crypto_latest[ticker] for ticker in crypto_link_tickers if ticker in crypto_latest
         ][:forecast_limit]
         crypto_forecasts = run_forecast_models(
             session,
@@ -439,24 +437,38 @@ def run_gh2_single_writer_decision_refresh(
         >= utc_now() - timedelta(minutes=freshness_minutes)
     )
     paper_orders_created = paper_orders_after - paper_orders_before
-    cycle_healthy = (
-        not stage_errors
-        and rankings_inserted > 0
-        and fresh_candidate_count > 0
-        and paper_orders_created == 0
-    )
+    cycle_failure_reasons = []
+    if stage_errors:
+        cycle_failure_reasons.append("source_or_stage_errors")
+    if rankings_inserted <= 0:
+        cycle_failure_reasons.append("no_rankings_inserted_or_fresh")
+    if fresh_candidate_count <= 0:
+        cycle_failure_reasons.append("no_fresh_ranked_candidates")
+    if paper_orders_created != 0:
+        cycle_failure_reasons.append("paper_orders_created_during_soak")
+    cycle_healthy = not cycle_failure_reasons
     soak = _record_soak_cycle(
         history_path,
         healthy=cycle_healthy,
         paper_ready_candidates=crypto_paper_ready + weather_paper_ready,
+        positive_ev_rows=int(r5_summary.get("positive_ev_rows") or 0)
+        + int(weather_summary.get("positive_executable_ev_rows") or 0),
         rankings_inserted=rankings_inserted,
+        fresh_ranked_candidates=fresh_candidate_count,
+        reset_reason=", ".join(cycle_failure_reasons) if cycle_failure_reasons else None,
         required_cycles=soak_cycles_required,
     )
     payload = {
         "phase": "GH-2",
         "phase_version": PHASE_GH2_VERSION,
         "generated_at": utc_now().isoformat(),
-        "status": "PAPER_ONLY_SOAK_RUNNING" if cycle_healthy else "CYCLE_NEEDS_ATTENTION",
+        "status": (
+            "PAPER_ONLY_SOAK_COMPLETE"
+            if soak["soak_complete"]
+            else "PAPER_ONLY_SOAK_RUNNING"
+            if cycle_healthy
+            else "CYCLE_NEEDS_ATTENTION"
+        ),
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "writer_monitor_at_start": monitor,
         "websocket_drain": websocket_drain,
@@ -631,7 +643,10 @@ def _record_soak_cycle(
     *,
     healthy: bool,
     paper_ready_candidates: int,
+    positive_ev_rows: int,
     rankings_inserted: int,
+    fresh_ranked_candidates: int,
+    reset_reason: str | None,
     required_cycles: int,
 ) -> dict[str, Any]:
     history = _read_json_lines(path)[-95:]
@@ -640,7 +655,10 @@ def _record_soak_cycle(
             "generated_at": utc_now().isoformat(),
             "healthy": healthy,
             "paper_ready_candidates": paper_ready_candidates,
+            "positive_ev_rows": positive_ev_rows,
             "rankings_inserted": rankings_inserted,
+            "fresh_ranked_candidates": fresh_ranked_candidates,
+            "reset_reason": reset_reason,
         }
     )
     path.parent.mkdir(parents=True, exist_ok=True)
