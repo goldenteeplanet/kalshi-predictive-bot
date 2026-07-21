@@ -67,6 +67,9 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "gh2-stage-crypto-quotes" in script
     assert "gh2-single-writer-decision-refresh" in script
     assert "--apply" in script
+    assert "--active-link-limit 80" in script
+    assert "--forecast-limit 60" in script
+    assert "--opportunity-limit 40" in script
     assert "paper-order" not in script.lower()
 
 

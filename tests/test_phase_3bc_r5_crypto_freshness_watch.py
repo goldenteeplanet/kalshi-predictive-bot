@@ -24,6 +24,107 @@ from kalshi_predictor.ui.service import crypto_freshness_watch_status
 from kalshi_predictor.utils.time import utc_now
 
 
+def test_phase3bc_r5_can_reuse_existing_r3_report(monkeypatch, tmp_path: Path) -> None:
+    r3_dir = tmp_path / "phase3bc_r3"
+    r3_dir.mkdir()
+    r3_json = r3_dir / "phase3bc_r3_active_crypto_refresh.json"
+    r3_markdown = r3_dir / "phase3bc_r3_active_crypto_refresh.md"
+    r3_json.write_text(json.dumps({"phase": "3BC-R3", "summary": {}}), encoding="utf-8")
+    r3_markdown.write_text("# Existing R3 report\n", encoding="utf-8")
+
+    def fail_if_r3_runs(*args, **kwargs):
+        raise AssertionError("R3 refresh must be bypassed for the GH-2 bounded cycle")
+
+    def fake_r7(*args, **kwargs):
+        output_dir = kwargs["output_dir"]
+        output_dir.mkdir(parents=True, exist_ok=True)
+        json_path = output_dir / "phase3bc_r7_crypto_ranking_coverage_repair.json"
+        markdown_path = output_dir / "phase3bc_r7_crypto_ranking_coverage_repair.md"
+        rows_path = output_dir / "phase3bc_r7_crypto_ranking_coverage_rows.json"
+        json_path.write_text(json.dumps({"summary": {}}), encoding="utf-8")
+        markdown_path.write_text("# R7\n", encoding="utf-8")
+        rows_path.write_text("[]\n", encoding="utf-8")
+        return SimpleNamespace(
+            output_dir=output_dir,
+            json_path=json_path,
+            markdown_path=markdown_path,
+            rows_path=rows_path,
+        )
+
+    def fake_r4(*args, **kwargs):
+        output_dir = kwargs["output_dir"]
+        phase3bc_output_dir = kwargs["phase3bc_output_dir"]
+        output_dir.mkdir(parents=True, exist_ok=True)
+        phase3bc_output_dir.mkdir(parents=True, exist_ok=True)
+        json_path = output_dir / "phase3bc_r4_crypto_ev_risk_diagnostics.json"
+        markdown_path = output_dir / "phase3bc_r4_crypto_ev_risk_diagnostics.md"
+        phase3bc_json_path = phase3bc_output_dir / "phase3bc_crypto_clean_opportunity.json"
+        phase3bc_rows_path = phase3bc_output_dir / "phase3bc_crypto_clean_rows.json"
+        empty_summary = {
+            "active_pure_crypto_rows": 0,
+            "paper_ready_candidates": 0,
+            "positive_ev_rows": 0,
+            "clean_execution_rows": 0,
+        }
+        json_path.write_text(
+            json.dumps({"summary": empty_summary, "rows": []}),
+            encoding="utf-8",
+        )
+        markdown_path.write_text("# R4\n", encoding="utf-8")
+        phase3bc_json_path.write_text(
+            json.dumps({"summary": {}, "rows": []}),
+            encoding="utf-8",
+        )
+        phase3bc_rows_path.write_text("[]\n", encoding="utf-8")
+        return SimpleNamespace(
+            output_dir=output_dir,
+            json_path=json_path,
+            markdown_path=markdown_path,
+            phase3bc_json_path=phase3bc_json_path,
+            phase3bc_rows_path=phase3bc_rows_path,
+        )
+
+    monkeypatch.setattr(
+        phase3bc_r5,
+        "write_phase3bc_r3_active_crypto_refresh_report",
+        fail_if_r3_runs,
+    )
+    monkeypatch.setattr(
+        phase3bc_r5,
+        "write_phase3bc_r7_crypto_ranking_coverage_repair_report",
+        fake_r7,
+    )
+    monkeypatch.setattr(
+        phase3bc_r5,
+        "write_phase3bc_r4_crypto_ev_risk_diagnostics_report",
+        fake_r4,
+    )
+    monkeypatch.setattr(phase3bc_r5, "_latest_risk_decisions_by_ticker", lambda *args: {})
+    monkeypatch.setattr(
+        phase3bc_r5,
+        "_write_post_refresh_dashboard_truth",
+        lambda *args, **kwargs: {"status": "SKIPPED_TEST"},
+    )
+
+    artifacts = phase3bc_r5.write_phase3bc_r5_crypto_freshness_watch_report(
+        SimpleNamespace(),
+        output_dir=tmp_path / "phase3bc_r5",
+        phase3bc_output_dir=tmp_path / "phase3bc",
+        phase3bc_r3_output_dir=r3_dir,
+        phase3bc_r4_output_dir=tmp_path / "phase3bc_r4",
+        phase3bc_r7_output_dir=tmp_path / "phase3bc_r7",
+        settings=get_settings(),
+        risk_preflight=False,
+        ranking_repair=False,
+        exact_snapshot_refresh=False,
+        skip_phase3bc_r3_refresh=True,
+    )
+
+    payload = json.loads(artifacts.json_path.read_text(encoding="utf-8"))
+    assert payload["options"]["skip_phase3bc_r3_refresh"] is True
+    assert artifacts.phase3bc_r3_json_path == r3_json
+
+
 def test_phase3bc_r5_selector_requires_positive_ev_fresh_pure_ready() -> None:
     now = utc_now()
     fresh = now.isoformat()
