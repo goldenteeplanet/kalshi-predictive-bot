@@ -548,6 +548,72 @@ def test_link_coverage_identifies_unlinked_and_partial_markets(tmp_path) -> None
     assert "KXETH-UNLINKED" in {row["ticker"] for row in coverage["unlinked_examples"]}
 
 
+def test_link_coverage_bottleneck_uses_current_gap_and_keeps_history(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        upsert_market(
+            session,
+            {
+                "ticker": "KXBTC-HISTORICAL-UNLINKED",
+                "title": "yes Target Price: $60,000",
+                "series_ticker": "KXBTC",
+                "status": "active",
+                "close_time": "2020-01-01T00:00:00+00:00",
+            },
+        )
+        upsert_market(
+            session,
+            {
+                "ticker": "KXETH-CURRENT-UNLINKED",
+                "title": "yes Target Price: $2,000",
+                "series_ticker": "KXETH",
+                "status": "active",
+                "close_time": "2100-01-01T00:00:00+00:00",
+            },
+        )
+        parse_and_store_market_legs(session, refresh=True)
+
+        coverage = link_coverage_dashboard(session)
+
+    crypto = _coverage_row(coverage, "crypto")
+    assert crypto["parsed_markets"] == 2
+    assert crypto["unlinked_markets"] == 2
+    assert crypto["current_parsed_markets"] == 1
+    assert crypto["current_unlinked_markets"] == 1
+    assert crypto["historical_unlinked_markets"] == 1
+    assert coverage["bottleneck"]["status"] == "UNLINKED"
+    assert "1 current parsed market(s)" in coverage["bottleneck"]["message"]
+    assert "1 historical market(s)" in coverage["bottleneck"]["message"]
+    assert coverage["unlinked_examples"][0]["ticker"] == "KXETH-CURRENT-UNLINKED"
+    assert coverage["unlinked_examples"][0]["scope"] == "CURRENT"
+
+
+def test_link_coverage_historical_only_gap_does_not_block_current_coverage(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        upsert_market(
+            session,
+            {
+                "ticker": "KXBTC-HISTORICAL-ONLY",
+                "title": "yes Target Price: $60,000",
+                "series_ticker": "KXBTC",
+                "status": "active",
+                "close_time": "2020-01-01T00:00:00+00:00",
+            },
+        )
+        parse_and_store_market_legs(session, refresh=True)
+
+        coverage = link_coverage_dashboard(session)
+
+    crypto = _coverage_row(coverage, "crypto")
+    assert crypto["unlinked_markets"] == 1
+    assert crypto["current_unlinked_markets"] == 0
+    assert crypto["historical_unlinked_markets"] == 1
+    assert coverage["bottleneck"]["status"] == "CONNECTED"
+    assert "historical market(s) remain" in coverage["bottleneck"]["message"]
+    assert coverage["next_commands"] == []
+
+
 def test_link_coverage_partial_sports_bottleneck_uses_evidence_commands(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:

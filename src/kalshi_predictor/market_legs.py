@@ -5,9 +5,10 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import case, delete, desc, func, literal, select, union_all
+from sqlalchemy import and_, case, delete, desc, func, literal, select, union_all
 from sqlalchemy.orm import Session
 
+from kalshi_predictor.active_universe import current_market_predicate
 from kalshi_predictor.crypto.assets import (
     DEFAULT_CRYPTO_SYMBOLS,
     symbol_for_target_price,
@@ -228,6 +229,9 @@ def link_coverage_dashboard(session: Session) -> dict[str, Any]:
         category: {
             "parsed_legs": row["parsed_legs"],
             "parsed_markets": row["parsed_markets"],
+            "current_parsed_legs": row["current_parsed_legs"],
+            "current_parsed_markets": row["current_parsed_markets"],
+            "current_linked_markets": row["current_linked_markets"],
         }
         for category, row in coverage_counts.items()
     }
@@ -262,6 +266,12 @@ def link_coverage_dashboard(session: Session) -> dict[str, Any]:
     )
     unsupported_composite_market_count = sum(
         row["markets"] for row in unsupported_composite_counts.values()
+    )
+    current_parsed_market_count = sum(
+        int(row.get("current_parsed_markets") or 0) for row in category_rows
+    )
+    current_unlinked_market_count = sum(
+        int(row.get("current_unlinked_markets") or 0) for row in category_rows
     )
     bottleneck = _top_bottleneck(category_rows)
     return {
@@ -309,6 +319,22 @@ def link_coverage_dashboard(session: Session) -> dict[str, Any]:
                 "definition": (
                     "KXMVE multi-leg composite markets that require composite support, "
                     "not single-market link rows."
+                ),
+            },
+            {
+                "label": "Current Parsed Markets",
+                "value": current_parsed_market_count,
+                "definition": (
+                    "Parsed markets not explicitly inactive and not past a known close or "
+                    "expiration time."
+                ),
+            },
+            {
+                "label": "Current Unlinked Markets",
+                "value": current_unlinked_market_count,
+                "definition": (
+                    "Current parsed linkable markets without a specialized link row, "
+                    "excluding unsupported composites."
                 ),
             },
         ],
@@ -364,20 +390,22 @@ def generate_link_coverage_report(
             "",
             "## Category Coverage",
             "",
-            "| Category | Parsed legs | Markets | Linked markets | Derived markets | "
-            "Verified markets | Partial markets | Partial legs | Partial link rows | Coverage | "
-            "Unsupported composites | Status | Next action |",
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
+            "| Category | Current markets | Current linked | Current unlinked | "
+            "Current coverage | All parsed markets | All linked markets | Historical unlinked | "
+            "Derived markets | Verified markets | Partial markets | Unsupported composites | "
+            "Current status | Next action |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
             "---: | ---: | --- | --- |",
         ]
     )
     for row in coverage["category_rows"]:
         lines.append(
-            "| {category} | {parsed_legs} | {parsed_markets} | {linked_markets} | "
+            "| {category} | {current_parsed_markets} | {current_linked_markets} | "
+            "{current_unlinked_markets} | {current_coverage_percent} | {parsed_markets} | "
+            "{linked_markets} | {historical_unlinked_markets} | "
             "{derived_usable_markets} | {verified_schedule_markets} | {partial_markets} | "
-            "{partial_legs} | {partial_link_rows} | {coverage_percent} | "
-            "{unsupported_multileg_markets} | {status_label} | "
-            "{next_action} |".format(**row)
+            "{current_unsupported_multileg_markets} | {current_status_label} | "
+            "{current_next_action} |".format(**row)
         )
     lines.extend(["", "## Count Definitions", ""])
     for item in coverage["count_definitions"]:
@@ -392,7 +420,8 @@ def generate_link_coverage_report(
     if coverage["unlinked_examples"]:
         for example in coverage["unlinked_examples"]:
             lines.append(
-                f"- {example['category']} {example['ticker']}: {example['title']} "
+                f"- [{example.get('scope', 'UNKNOWN')}] {example['category']} "
+                f"{example['ticker']}: {example['title']} "
                 f"({example['raw_text']}) -> {example['next_action']}"
             )
     else:
@@ -401,7 +430,8 @@ def generate_link_coverage_report(
     if coverage["partial_examples"]:
         for example in coverage["partial_examples"]:
             lines.append(
-                f"- {example['category']} {example['ticker']}: {example['title']} "
+                f"- [{example.get('scope', 'UNKNOWN')}] {example['category']} "
+                f"{example['ticker']}: {example['title']} "
                 f"({example['raw_text']}) -> {example['next_action']}"
             )
     else:
@@ -796,6 +826,20 @@ def _market_leg_coverage_counts(session: Session) -> dict[str, dict[str, int]]:
         else_=None,
     )
     linked_leg = case((distinct_link_pairs.c.ticker.is_not(None), 1), else_=0)
+    current_market = current_market_predicate(now=utc_now())
+    current_ticker = case((current_market, MarketLeg.ticker), else_=None)
+    current_leg = case((current_market, 1), else_=0)
+    current_linked_ticker = case(
+        (
+            and_(current_market, distinct_link_pairs.c.ticker.is_not(None)),
+            MarketLeg.ticker,
+        ),
+        else_=None,
+    )
+    current_linked_leg = case(
+        (and_(current_market, distinct_link_pairs.c.ticker.is_not(None)), 1),
+        else_=0,
+    )
     rows = session.execute(
         select(
             MarketLeg.category,
@@ -803,7 +847,14 @@ def _market_leg_coverage_counts(session: Session) -> dict[str, dict[str, int]]:
             func.count(func.distinct(MarketLeg.ticker)).label("parsed_markets"),
             func.coalesce(func.sum(linked_leg), 0).label("linked_legs"),
             func.count(func.distinct(linked_ticker)).label("linked_markets"),
+            func.coalesce(func.sum(current_leg), 0).label("current_parsed_legs"),
+            func.count(func.distinct(current_ticker)).label("current_parsed_markets"),
+            func.coalesce(func.sum(current_linked_leg), 0).label("current_linked_legs"),
+            func.count(func.distinct(current_linked_ticker)).label(
+                "current_linked_markets"
+            ),
         )
+        .join(Market, Market.ticker == MarketLeg.ticker)
         .outerjoin(
             distinct_link_pairs,
             (MarketLeg.category == distinct_link_pairs.c.category)
@@ -812,9 +863,21 @@ def _market_leg_coverage_counts(session: Session) -> dict[str, dict[str, int]]:
         .group_by(MarketLeg.category)
     )
     counts: dict[str, dict[str, int]] = {}
-    for category, parsed_legs, parsed_markets, linked_legs, linked_markets in rows:
+    for (
+        category,
+        parsed_legs,
+        parsed_markets,
+        linked_legs,
+        linked_markets,
+        current_parsed_legs,
+        current_parsed_markets,
+        current_linked_legs,
+        current_linked_markets,
+    ) in rows:
         parsed_leg_count = int(parsed_legs or 0)
         linked_leg_count = int(linked_legs or 0)
+        current_parsed_leg_count = int(current_parsed_legs or 0)
+        current_linked_leg_count = int(current_linked_legs or 0)
         counts[str(category)] = {
             "parsed_legs": parsed_leg_count,
             "parsed_markets": int(parsed_markets or 0),
@@ -822,6 +885,15 @@ def _market_leg_coverage_counts(session: Session) -> dict[str, dict[str, int]]:
             "linked_markets": int(linked_markets or 0),
             "unlinked_legs": (
                 max(parsed_leg_count - linked_leg_count, 0)
+                if category in LINKED_CATEGORIES
+                else 0
+            ),
+            "current_parsed_legs": current_parsed_leg_count,
+            "current_parsed_markets": int(current_parsed_markets or 0),
+            "current_linked_legs": current_linked_leg_count,
+            "current_linked_markets": int(current_linked_markets or 0),
+            "current_unlinked_legs": (
+                max(current_parsed_leg_count - current_linked_leg_count, 0)
                 if category in LINKED_CATEGORIES
                 else 0
             ),
@@ -1057,6 +1129,7 @@ def _sports_partial_tickers_excluded_from_repair(
 
 def _unsupported_composite_counts_by_category(session: Session) -> dict[str, dict[str, int]]:
     counts: dict[str, dict[str, int]] = {}
+    current_market = current_market_predicate(now=utc_now())
     for category in DISPLAY_CATEGORIES:
         table = LINK_TABLE_BY_CATEGORY.get(category)
         link_tickers = select(table.ticker).distinct() if table is not None else None
@@ -1070,12 +1143,21 @@ def _unsupported_composite_counts_by_category(session: Session) -> dict[str, dic
             select(
                 func.count(func.distinct(MarketLeg.ticker)),
                 func.count(MarketLeg.id),
+                func.count(
+                    func.distinct(case((current_market, MarketLeg.ticker), else_=None))
+                ),
+                func.coalesce(func.sum(case((current_market, 1), else_=0)), 0),
             )
             .join(Market, Market.ticker == MarketLeg.ticker)
             .where(*filters)
         )
-        markets, legs = session.execute(statement).one()
-        counts[category] = {"markets": int(markets or 0), "legs": int(legs or 0)}
+        markets, legs, current_markets, current_legs = session.execute(statement).one()
+        counts[category] = {
+            "markets": int(markets or 0),
+            "legs": int(legs or 0),
+            "current_markets": int(current_markets or 0),
+            "current_legs": int(current_legs or 0),
+        }
     return counts
 
 
@@ -1247,6 +1329,9 @@ def _category_row(
     parsed_legs = stats.get("parsed_legs", 0)
     parsed_markets = stats.get("parsed_markets", 0)
     linked_markets = linked_market_counts.get(category, 0)
+    current_parsed_legs = stats.get("current_parsed_legs", 0)
+    current_parsed_markets = stats.get("current_parsed_markets", 0)
+    current_linked_markets = stats.get("current_linked_markets", 0)
     partial_markets = 0
     partial_legs = 0
     partial_link_rows = 0
@@ -1257,6 +1342,10 @@ def _category_row(
     unsupported_composite = unsupported_composite_counts.get(category, {})
     unsupported_multileg_markets = int(unsupported_composite.get("markets") or 0)
     unsupported_multileg_legs = int(unsupported_composite.get("legs") or 0)
+    current_unsupported_multileg_markets = int(
+        unsupported_composite.get("current_markets") or 0
+    )
+    current_unsupported_multileg_legs = int(unsupported_composite.get("current_legs") or 0)
     if category == CATEGORY_SPORTS:
         partial_markets = sports_reconciliation["unresolved_partial_markets"]
         partial_legs = sports_reconciliation["unresolved_partial_legs"]
@@ -1274,6 +1363,20 @@ def _category_row(
         if category in LINKED_CATEGORIES
         else 0
     )
+    current_raw_unlinked_markets = (
+        max(current_parsed_markets - current_linked_markets, 0)
+        if category in LINKED_CATEGORIES
+        else 0
+    )
+    current_unlinked_markets = max(
+        current_raw_unlinked_markets - current_unsupported_multileg_markets,
+        0,
+    )
+    current_linkable_markets = (
+        max(current_parsed_markets - current_unsupported_multileg_markets, 0)
+        if category in LINKED_CATEGORIES
+        else 0
+    )
     status = _category_status(
         category,
         parsed_markets,
@@ -1284,11 +1387,28 @@ def _category_row(
         derived_markets,
         table_counts,
     )
+    current_status = _category_status(
+        category,
+        current_parsed_markets,
+        current_linkable_markets,
+        current_linked_markets,
+        current_unlinked_markets,
+        0,
+        derived_markets,
+        table_counts,
+    )
     row = {
         "category": category,
         "parsed_legs": parsed_legs,
         "parsed_markets": parsed_markets,
         "linked_markets": linked_markets,
+        "current_parsed_legs": current_parsed_legs,
+        "current_parsed_markets": current_parsed_markets,
+        "current_linked_markets": current_linked_markets,
+        "current_raw_unlinked_markets": current_raw_unlinked_markets,
+        "current_unlinked_markets": current_unlinked_markets,
+        "current_linkable_markets": current_linkable_markets,
+        "historical_unlinked_markets": max(unlinked_markets - current_unlinked_markets, 0),
         "partial_markets": partial_markets,
         "partial_legs": partial_legs,
         "partial_link_rows": partial_link_rows,
@@ -1302,10 +1422,24 @@ def _category_row(
         "unlinked_markets": unlinked_markets,
         "unsupported_multileg_markets": unsupported_multileg_markets,
         "unsupported_multileg_legs": unsupported_multileg_legs,
+        "current_unsupported_multileg_markets": current_unsupported_multileg_markets,
+        "current_unsupported_multileg_legs": current_unsupported_multileg_legs,
         "coverage_percent": _percent(linked_markets, linkable_markets),
+        "current_coverage_percent": _percent(
+            current_linked_markets,
+            current_linkable_markets,
+        ),
         "status": status,
         "status_label": _status_label(status),
         "status_class": _status_class(status),
+        "current_status": current_status,
+        "current_status_label": _current_status_label(current_status),
+        "current_status_class": _status_class(current_status),
+        "current_next_action": _current_category_next_action(
+            category,
+            current_status,
+            unsupported_multileg_markets=current_unsupported_multileg_markets,
+        ),
         "next_action": _category_next_action(
             category,
             status,
@@ -1448,6 +1582,42 @@ def _category_next_action(
     return "Coverage is connected; rerun forecasts after new data ingestion."
 
 
+def _current_category_next_action(
+    category: str,
+    status: str,
+    *,
+    unsupported_multileg_markets: int = 0,
+) -> str:
+    if status in {"CONNECTED", "DERIVED_CONNECTED"}:
+        return (
+            "Current coverage is complete; keep linking inside the guarded single-writer "
+            "refresh cycle."
+        )
+    if status == "NO_PARSED_MARKETS":
+        return "No current parsed market requires link repair."
+    if status == "UNSUPPORTED_MULTI_LEG":
+        return _category_next_action(
+            category,
+            status,
+            unsupported_multileg_markets=unsupported_multileg_markets,
+        )
+    if category == CATEGORY_CRYPTO:
+        return (
+            "After the writer gate clears, run bounded checkpointed crypto linking for "
+            "current markets; keep historical backfill in a separate writer window."
+        )
+    if category == CATEGORY_WEATHER:
+        return (
+            "After the writer gate clears, run bounded current-market weather linking "
+            "through the single writer."
+        )
+    return _category_next_action(
+        category,
+        status,
+        unsupported_multileg_markets=unsupported_multileg_markets,
+    )
+
+
 def _top_bottleneck(category_rows: list[dict[str, Any]]) -> dict[str, str]:
     actionable = [row for row in category_rows if row["category"] in LINKED_CATEGORIES]
     if not actionable:
@@ -1457,18 +1627,32 @@ def _top_bottleneck(category_rows: list[dict[str, Any]]) -> dict[str, str]:
             "message": "No parsed linkable categories are available yet.",
             "next_action": "Run kalshi-bot market-legs-parse --refresh.",
         }
-    row = max(actionable, key=lambda item: (item["unlinked_markets"], item["partial_markets"]))
-    if row["unlinked_markets"] > 0:
+    row = max(
+        actionable,
+        key=lambda item: (
+            item.get("current_unlinked_markets", item["unlinked_markets"]),
+            item["partial_markets"],
+        ),
+    )
+    current_unlinked = int(row.get("current_unlinked_markets", row["unlinked_markets"]))
+    if current_unlinked > 0:
+        historical_unlinked = int(row.get("historical_unlinked_markets") or 0)
+        history_note = (
+            f" An additional {historical_unlinked} historical market(s) remain in the "
+            "backfill inventory."
+            if historical_unlinked > 0
+            else ""
+        )
         return {
             "category": row["category"],
             "status": "UNLINKED",
             "message": (
-                f"{row['category']} has {row['unlinked_markets']} parsed market(s) without "
-                "a matching link table row."
+                f"{row['category']} has {current_unlinked} current parsed market(s) without "
+                f"a matching link table row.{history_note}"
             ),
-            "next_action": row["next_action"],
+            "next_action": row.get("current_next_action", row["next_action"]),
         }
-    if row["partial_markets"] > 0:
+    if row["partial_markets"] > 0 and int(row.get("current_parsed_markets") or 0) > 0:
         return {
             "category": row["category"],
             "status": "PARTIAL",
@@ -1479,7 +1663,13 @@ def _top_bottleneck(category_rows: list[dict[str, Any]]) -> dict[str, str]:
             "next_action": row["next_action"],
         }
     unsupported_markets = sum(
-        int(row.get("unsupported_multileg_markets") or 0) for row in category_rows
+        int(
+            row.get(
+                "current_unsupported_multileg_markets",
+                row.get("unsupported_multileg_markets") or 0,
+            )
+        )
+        for row in category_rows
     )
     if unsupported_markets > 0:
         return {
@@ -1495,6 +1685,45 @@ def _top_bottleneck(category_rows: list[dict[str, Any]]) -> dict[str, str]:
                 "preview/preflight after fresh component evidence, and proceed only "
                 "if paper_composite_review_ready_rows or safe_to_apply_rows is greater "
                 "than 0."
+            ),
+        }
+    current_linkable_markets = sum(
+        int(row.get("current_linkable_markets") or 0) for row in actionable
+    )
+    historical_unlinked_markets = sum(
+        int(row.get("historical_unlinked_markets") or 0) for row in actionable
+    )
+    if current_linkable_markets > 0:
+        history_note = (
+            f" {historical_unlinked_markets} historical market(s) remain queued for "
+            "non-urgent backfill."
+            if historical_unlinked_markets > 0
+            else ""
+        )
+        return {
+            "category": "",
+            "status": "CONNECTED",
+            "message": (
+                f"All {current_linkable_markets} current parsed linkable market(s) are "
+                f"covered by link tables.{history_note}"
+            ),
+            "next_action": (
+                "Keep current-market linking in the guarded single-writer cycle; "
+                "historical backfill does not block paper readiness."
+            ),
+        }
+    if historical_unlinked_markets > 0:
+        return {
+            "category": "",
+            "status": "CONNECTED",
+            "message": (
+                "No current parsed linkable market has an actionable link gap; "
+                f"{historical_unlinked_markets} historical market(s) remain for bounded "
+                "backfill."
+            ),
+            "next_action": (
+                "Do not run an unbounded repair for historical inventory. Backfill it only "
+                "through a checkpointed writer window."
             ),
         }
     return {
@@ -1517,11 +1746,25 @@ def _next_commands(category_rows: list[dict[str, Any]], bottleneck: dict[str, st
             ),
             "kalshi-bot link-coverage --output reports/link_coverage_report.md",
         ]
-    if any(row["unlinked_markets"] > 0 for row in category_rows):
+    if any(
+        int(row.get("current_unlinked_markets", row["unlinked_markets"])) > 0
+        for row in category_rows
+    ):
+        if bottleneck.get("category") == CATEGORY_CRYPTO:
+            return [
+                "kalshi-bot db-writer-monitor --json",
+                "kalshi-bot db-locks",
+                (
+                    "kalshi-bot link-crypto-markets --limit 2500 --progress-every 500 "
+                    "--checkpoint-every 500 --stop-after-minutes 10 "
+                    "--heartbeat-dir reports/crypto_link"
+                ),
+                "kalshi-bot link-coverage --output reports/link_coverage_report.md",
+            ]
         return [
-            "kalshi-bot market-legs-parse --refresh",
+            "kalshi-bot db-writer-monitor --json",
+            "kalshi-bot db-locks",
             "kalshi-bot link-remediate",
-            "kalshi-bot derive-sports-schedule --build-features",
             "kalshi-bot link-coverage --output reports/link_coverage_report.md",
         ]
     if bottleneck.get("status") == "CONNECTED":
@@ -1587,14 +1830,26 @@ def _unlinked_example_rows_for_category(
     if limit <= 0:
         return []
     link_tickers = select(table.ticker).distinct()
+    current_market = current_market_predicate(now=utc_now())
+    coverage_scope = case(
+        (current_market, "CURRENT"),
+        else_="HISTORICAL",
+    ).label("coverage_scope")
+    scope_order = case((current_market, 0), else_=1)
     statement = (
-        select(MarketLeg.ticker, MarketLeg.category, MarketLeg.raw_text, Market.title)
+        select(
+            MarketLeg.ticker,
+            MarketLeg.category,
+            MarketLeg.raw_text,
+            Market.title,
+            coverage_scope,
+        )
         .join(Market, Market.ticker == MarketLeg.ticker)
         .where(
             MarketLeg.category == category,
             ~MarketLeg.ticker.in_(link_tickers),
         )
-        .order_by(MarketLeg.category, MarketLeg.ticker, MarketLeg.leg_index)
+        .order_by(scope_order, MarketLeg.category, MarketLeg.ticker, MarketLeg.leg_index)
         .limit(limit)
     )
     if category in LINKED_CATEGORIES:
@@ -1611,8 +1866,19 @@ def _linked_example_rows_for_ticker_chunk(
 ) -> list[dict[str, str]]:
     if limit <= 0 or not tickers:
         return []
+    current_market = current_market_predicate(now=utc_now())
+    coverage_scope = case(
+        (current_market, "CURRENT"),
+        else_="HISTORICAL",
+    ).label("coverage_scope")
     statement = (
-        select(MarketLeg.ticker, MarketLeg.category, MarketLeg.raw_text, Market.title)
+        select(
+            MarketLeg.ticker,
+            MarketLeg.category,
+            MarketLeg.raw_text,
+            Market.title,
+            coverage_scope,
+        )
         .join(Market, Market.ticker == MarketLeg.ticker)
         .where(
             MarketLeg.category == category,
@@ -1625,13 +1891,19 @@ def _linked_example_rows_for_ticker_chunk(
 
 
 def _coverage_example_payload(row: Any) -> dict[str, str]:
-    ticker, category, raw_text, title = row
+    ticker, category, raw_text, title, coverage_scope = row
+    next_action = (
+        _current_category_next_action(category, "PARTIAL")
+        if coverage_scope == "CURRENT"
+        else "Retain for bounded historical backfill; it does not block paper readiness."
+    )
     return {
         "ticker": ticker,
         "category": category,
         "title": title or ticker,
         "raw_text": raw_text,
-        "next_action": _category_next_action(category, "PARTIAL"),
+        "scope": coverage_scope,
+        "next_action": next_action,
     }
 
 
@@ -1706,6 +1978,20 @@ def _link_counts(
 
 def _count_definitions() -> list[dict[str, str]]:
     return [
+        {
+            "label": "Current markets",
+            "definition": (
+                "Markets not explicitly inactive and not past a known close or expiration "
+                "time. Current gaps drive the operational bottleneck."
+            ),
+        },
+        {
+            "label": "Historical unlinked markets",
+            "definition": (
+                "Expired or inactive parsed markets without a link row. They remain visible "
+                "for bounded backfill but do not block paper readiness."
+            ),
+        },
         {
             "label": "Partial legs",
             "definition": (
@@ -1794,6 +2080,12 @@ def _status_label(status: str) -> str:
     if status in labels:
         return labels[status]
     return status.replace("_", " ").title()
+
+
+def _current_status_label(status: str) -> str:
+    if status == "NO_PARSED_MARKETS":
+        return "No Current Markets"
+    return _status_label(status)
 
 
 def _status_class(status: str) -> str:

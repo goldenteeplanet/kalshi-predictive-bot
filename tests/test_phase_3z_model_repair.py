@@ -89,6 +89,29 @@ def test_market_coverage_doctor_runs_parser_before_reporting(tmp_path) -> None:
     assert "Parser Pass" in markdown
 
 
+def test_market_coverage_doctor_counts_active_status_as_current(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+
+    with session_factory() as session:
+        upsert_market(
+            session,
+            {
+                "ticker": "KXBTC-ACTIVE-CURRENT",
+                "title": "yes Target Price: $62,000",
+                "series_ticker": "KXBTC",
+                "status": "active",
+                "close_time": "2100-01-01T00:00:00+00:00",
+            },
+        )
+        doctor = build_market_coverage_doctor(session, deep_checks=False)
+
+    crypto = next(row for row in doctor["coverage_rows"] if row["scope_key"] == "crypto")
+    assert doctor["stage_counts"]["active_eligible_markets"] == 1
+    assert crypto["current_parsed_markets"] == 1
+    assert crypto["current_unlinked_markets"] == 1
+    assert crypto["health"] == "LINKER_NOT_RUN"
+
+
 def test_market_coverage_doctor_cli_defaults_to_fast_bounded_refresh(tmp_path) -> None:
     get_settings.cache_clear()
     runner = CliRunner()

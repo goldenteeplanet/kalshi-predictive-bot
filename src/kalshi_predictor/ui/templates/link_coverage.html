@@ -63,7 +63,7 @@
   <div class="section-head compact-head">
     <div>
       <h2>Category Coverage</h2>
-      <p>Connected means parsed markets have backing link rows. Derived means usable Kalshi-event-derived rows exist, but external schedule evidence can still upgrade them. Partial markets are unresolved distinct tickers, while partial link rows are the raw fallback rows.</p>
+      <p>Current coverage drives operations. All-time counts retain expired and inactive inventory for bounded backfill.</p>
     </div>
   </div>
   <div class="table-wrap">
@@ -71,17 +71,18 @@
       <thead>
         <tr>
           <th>Category</th>
-          <th>Status</th>
-          <th class="numeric">Parsed Legs</th>
-          <th class="numeric">Markets</th>
-          <th class="numeric">Linked</th>
+          <th>Current Status</th>
+          <th class="numeric">Current Markets</th>
+          <th class="numeric">Current Linked</th>
+          <th class="numeric">Current Unlinked</th>
+          <th class="numeric">Current Coverage</th>
+          <th class="numeric">All Parsed</th>
+          <th class="numeric">All Linked</th>
+          <th class="numeric">Historical Unlinked</th>
           <th class="numeric">Derived Markets</th>
           <th class="numeric">Verified Markets</th>
           <th class="numeric">Partial Markets</th>
-          <th class="numeric">Partial Legs</th>
-          <th class="numeric">Partial Link Rows</th>
-          <th class="numeric">Unsupported Composites</th>
-          <th class="numeric">Coverage</th>
+          <th class="numeric">Current Unsupported</th>
           <th>Next Action</th>
         </tr>
       </thead>
@@ -89,18 +90,19 @@
       {% for row in coverage.category_rows %}
         <tr>
           <td>{{ row.category }}</td>
-          <td><span class="status-pill {{ row.status_class }}">{{ row.status_label }}</span></td>
-          <td class="numeric">{{ row.parsed_legs }}</td>
+          <td><span class="status-pill {{ row.current_status_class | default(row.status_class) }}">{{ row.current_status_label | default(row.status_label) }}</span></td>
+          <td class="numeric">{{ row.current_parsed_markets | default(row.parsed_markets) }}</td>
+          <td class="numeric">{{ row.current_linked_markets | default(row.linked_markets) }}</td>
+          <td class="numeric">{{ row.current_unlinked_markets | default(row.unlinked_markets) }}</td>
+          <td class="numeric">{{ row.current_coverage_percent | default(row.coverage_percent) }}</td>
           <td class="numeric">{{ row.parsed_markets }}</td>
           <td class="numeric">{{ row.linked_markets }}</td>
+          <td class="numeric">{{ row.historical_unlinked_markets | default(0) }}</td>
           <td class="numeric">{{ row.derived_usable_markets }}</td>
           <td class="numeric">{{ row.verified_schedule_markets }}</td>
           <td class="numeric">{{ row.partial_markets }}</td>
-          <td class="numeric">{{ row.partial_legs }}</td>
-          <td class="numeric">{{ row.partial_link_rows }}</td>
-          <td class="numeric">{{ row.unsupported_multileg_markets | default(0) }}</td>
-          <td class="numeric">{{ row.coverage_percent }}</td>
-          <td class="wide">{{ row.next_action }}</td>
+          <td class="numeric">{{ row.current_unsupported_multileg_markets | default(row.unsupported_multileg_markets) }}</td>
+          <td class="wide">{{ row.current_next_action | default(row.next_action) }}</td>
         </tr>
       {% endfor %}
       </tbody>
@@ -166,6 +168,7 @@
         <thead>
           <tr>
             <th>Ticker</th>
+            <th>Scope</th>
             <th>Category</th>
             <th>Leg</th>
             <th>Next Action</th>
@@ -175,6 +178,7 @@
         {% for example in coverage.unlinked_examples %}
           <tr>
             <td>{{ example.ticker }}</td>
+            <td>{{ example.scope | default('UNKNOWN') }}</td>
             <td>{{ example.category }}</td>
             <td class="wide">{{ example.raw_text }}</td>
             <td class="wide">{{ example.next_action }}</td>
@@ -201,6 +205,7 @@
         <thead>
           <tr>
             <th>Ticker</th>
+            <th>Scope</th>
             <th>Category</th>
             <th>Leg</th>
             <th>Next Action</th>
@@ -210,6 +215,7 @@
         {% for example in coverage.partial_examples %}
           <tr>
             <td>{{ example.ticker }}</td>
+            <td>{{ example.scope | default('UNKNOWN') }}</td>
             <td>{{ example.category }}</td>
             <td class="wide">{{ example.raw_text }}</td>
             <td class="wide">{{ example.next_action }}</td>

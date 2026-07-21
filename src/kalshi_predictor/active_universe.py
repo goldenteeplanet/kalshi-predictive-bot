@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.data.repositories import decode_json, encode_json
@@ -81,6 +81,21 @@ def is_ticker_eligible_for_new_forecasts(session: Session, ticker: str) -> bool:
     gaps, while exact closed/settled markets stay out of new forecasts and trades.
     """
     return not is_inactive_market_status(market_status_for_ticker(session, ticker))
+
+
+def current_market_predicate(*, now: Any | None = None) -> Any:
+    """SQL predicate for markets that remain eligible for current decisions."""
+    resolved_now = now or utc_now()
+    normalized_status = func.lower(func.trim(func.coalesce(Market.status, "")))
+    return and_(
+        ~normalized_status.in_(tuple(sorted(INACTIVE_MARKET_STATUSES))),
+        or_(Market.close_time.is_(None), Market.close_time > resolved_now),
+        or_(
+            Market.expected_expiration_time.is_(None),
+            Market.expected_expiration_time > resolved_now,
+        ),
+        or_(Market.expiration_time.is_(None), Market.expiration_time > resolved_now),
+    )
 
 
 def latest_snapshot_for_ticker(session: Session, ticker: str) -> MarketSnapshot | None:
