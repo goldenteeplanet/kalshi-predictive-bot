@@ -177,6 +177,11 @@ def run_reconnecting_websocket_watch(
     preferred_selected = 0
     state = "STARTING"
     next_retry_seconds: float | None = None
+    consecutive_failures = 0
+    last_discovery_success_at: str | None = None
+    last_stream_success_at: str | None = None
+    last_message_at: str | None = None
+    last_snapshot_at: str | None = None
 
     def status_payload() -> dict[str, Any]:
         return {
@@ -202,6 +207,11 @@ def run_reconnecting_websocket_watch(
             "sequence_recoveries": sequence_recoveries,
             "staged_files": staged_files,
             "next_retry_seconds": next_retry_seconds,
+            "consecutive_failures": consecutive_failures,
+            "last_discovery_success_at": last_discovery_success_at,
+            "last_stream_success_at": last_stream_success_at,
+            "last_message_at": last_message_at,
+            "last_snapshot_at": last_snapshot_at,
             "recent_errors": recent_errors[-20:],
             "staging_dir": settings.kalshi_websocket_staging_dir,
             "safety": {
@@ -268,6 +278,7 @@ def run_reconnecting_websocket_watch(
                                     if row.get("selection_source") == "ACTIONABLE_RANKING"
                                 )
                                 discovery_refreshes += 1
+                                last_discovery_success_at = utc_now().isoformat()
                                 next_discovery_at = now_monotonic + discovery_refresh_seconds
                             elif not cached_tickers:
                                 raise RuntimeError(
@@ -292,17 +303,27 @@ def run_reconnecting_websocket_watch(
                 sequence_recoveries += summary.sequence_recoveries
                 staged_files += len(summary.staged_files)
                 recent_errors.extend(str(error) for error in summary.errors)
+                completed_at = utc_now().isoformat()
+                if summary.messages_seen > 0:
+                    last_message_at = completed_at
+                if summary.snapshots_seen > 0:
+                    last_snapshot_at = completed_at
+                if summary.timed_out or summary.messages_seen > 0 or summary.snapshots_seen > 0:
+                    last_stream_success_at = completed_at
                 if summary.timed_out:
                     state = "STREAM_CYCLE_COMPLETE"
                     backoff_seconds = reconnect_initial_seconds
+                    consecutive_failures = 0
                 else:
                     state = "RECONNECT_BACKOFF"
                     reconnect_count += 1
+                    consecutive_failures += 1
                     delay_seconds = backoff_seconds
                     next_retry_seconds = delay_seconds
                     backoff_seconds = min(backoff_seconds * 2, reconnect_max_seconds)
             except Exception as exc:
                 reconnect_count += 1
+                consecutive_failures += 1
                 recent_errors.append(f"stream: {exc}")
                 state = "RECONNECT_BACKOFF"
                 delay_seconds = backoff_seconds

@@ -33,6 +33,34 @@ def test_stage_crypto_quote_fetches_writes_stage_files_without_db(tmp_path) -> N
     assert payload["quote_count"] == 1
 
 
+def test_stage_crypto_quote_fetches_retries_transient_empty_result(tmp_path) -> None:
+    attempts = 0
+
+    def flaky_fetch(symbols, *, source="coinbase", timeout_seconds=10.0):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return CryptoFetchResult(source=source, quotes=[], errors=["temporary failure"])
+        return _fake_fetch_crypto_quotes(
+            symbols,
+            source=source,
+            timeout_seconds=timeout_seconds,
+        )
+
+    result = stage_crypto_quote_fetches(
+        symbols=["BTC"],
+        sources=["coinbase"],
+        staging_dir=tmp_path / "staging",
+        max_attempts=3,
+        retry_delay_seconds=0,
+        fetch_crypto_quotes_fn=flaky_fetch,
+    )
+
+    assert result["status"] == "COMPLETE"
+    assert result["jobs"][0]["attempts"] == 2
+    assert attempts == 2
+
+
 def test_coordinator_drains_staged_quotes_through_single_writer(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     output_dir = tmp_path / "reports"
@@ -99,6 +127,28 @@ def test_drain_staged_crypto_quotes_imports_existing_stage_dir(tmp_path) -> None
     assert result["prices_inserted"] == 1
     assert result["features_inserted"] == 1
     assert result["symbols"] == ["SOL"]
+
+
+def test_drain_ignores_files_in_drained_archive(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    staging_dir = tmp_path / "staging"
+    stage_crypto_quote_fetches(
+        symbols=["BTC"],
+        sources=["coinbase"],
+        staging_dir=staging_dir,
+        fetch_crypto_quotes_fn=_fake_fetch_crypto_quotes,
+    )
+    source = next(staging_dir.glob("crypto_quotes_*.json"))
+    archive_dir = staging_dir / "drained"
+    archive_dir.mkdir()
+    (archive_dir / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    with session_factory() as session:
+        result = drain_staged_crypto_quotes(session, staging_dir=staging_dir)
+        session.commit()
+
+    assert result["files_seen"] == 1
+    assert result["prices_inserted"] == 1
 
 
 def _fake_fetch_crypto_quotes(

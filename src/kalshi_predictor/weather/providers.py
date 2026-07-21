@@ -1,4 +1,6 @@
 import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -45,37 +47,45 @@ def fetch_noaa_hourly_forecast(
     longitude: float,
     user_agent: str,
     timeout_seconds: float = 10.0,
+    max_attempts: int = 3,
+    retry_backoff_seconds: float = 1.0,
+    sleep_fn: Callable[[float], None] = time.sleep,
 ) -> WeatherFetchResult:
     headers = {"User-Agent": user_agent}
-    try:
-        with httpx.Client(timeout=timeout_seconds, headers=headers) as client:
-            point_response = client.get(
-                f"https://api.weather.gov/points/{latitude:.4f},{longitude:.4f}"
-            )
-            point_response.raise_for_status()
-            point_payload = point_response.json()
-            properties = point_payload.get("properties")
-            if not isinstance(properties, dict):
-                raise ValueError("NOAA point response missing properties.")
-            forecast_url = properties.get("forecastHourly") or properties.get("forecast")
-            if not forecast_url:
-                raise ValueError("NOAA point response missing forecast URL.")
-            forecast_response = client.get(str(forecast_url))
-            forecast_response.raise_for_status()
-            forecast_payload = forecast_response.json()
-    except Exception as exc:
-        return WeatherFetchResult(source="noaa", forecasts=[], errors=[str(exc)])
-
-    try:
-        forecasts = parse_noaa_hourly_forecast(
-            location_key=location_key,
-            latitude=latitude,
-            longitude=longitude,
-            payload=forecast_payload,
-        )
-    except Exception as exc:
-        return WeatherFetchResult(source="noaa", forecasts=[], errors=[str(exc)])
-    return WeatherFetchResult(source="noaa", forecasts=forecasts, errors=[])
+    attempts = max(1, max_attempts)
+    last_error = "NOAA fetch did not run."
+    for attempt in range(1, attempts + 1):
+        try:
+            with httpx.Client(timeout=timeout_seconds, headers=headers) as client:
+                point_response = client.get(
+                    f"https://api.weather.gov/points/{latitude:.4f},{longitude:.4f}"
+                )
+                point_response.raise_for_status()
+                point_payload = point_response.json()
+                properties = point_payload.get("properties")
+                if not isinstance(properties, dict):
+                    raise ValueError("NOAA point response missing properties.")
+                forecast_url = properties.get("forecastHourly") or properties.get("forecast")
+                if not forecast_url:
+                    raise ValueError("NOAA point response missing forecast URL.")
+                forecast_response = client.get(str(forecast_url))
+                forecast_response.raise_for_status()
+                forecasts = parse_noaa_hourly_forecast(
+                    location_key=location_key,
+                    latitude=latitude,
+                    longitude=longitude,
+                    payload=forecast_response.json(),
+                )
+            return WeatherFetchResult(source="noaa", forecasts=forecasts, errors=[])
+        except Exception as exc:
+            last_error = str(exc)
+            if attempt < attempts and retry_backoff_seconds > 0:
+                sleep_fn(retry_backoff_seconds * attempt)
+    return WeatherFetchResult(
+        source="noaa",
+        forecasts=[],
+        errors=[f"NOAA failed after {attempts} attempt(s): {last_error}"],
+    )
 
 
 def parse_noaa_hourly_forecast(
@@ -121,12 +131,8 @@ def parse_noaa_hourly_forecast(
                 humidity=_unit_value(period.get("relativeHumidity")),
                 wind_speed_mph=_speed_to_mph(period.get("windSpeed")),
                 wind_gust_mph=_speed_to_mph(period.get("windGust")),
-                precipitation_probability=_unit_value(
-                    period.get("probabilityOfPrecipitation")
-                ),
-                precipitation_inches=_precipitation_inches(
-                    period.get("quantitativePrecipitation")
-                ),
+                precipitation_probability=_unit_value(period.get("probabilityOfPrecipitation")),
+                precipitation_inches=_precipitation_inches(period.get("quantitativePrecipitation")),
                 short_forecast=_str_or_none(period.get("shortForecast")),
                 detailed_forecast=_str_or_none(period.get("detailedForecast")),
                 raw_json=period,

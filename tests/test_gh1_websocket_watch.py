@@ -89,6 +89,11 @@ def test_watch_reconnects_uses_cached_discovery_and_stages_only(tmp_path: Path) 
     assert result["selected_tickers"] == ["KXBTC-QUOTED"]
     assert result["messages_seen"] == 3
     assert result["staged_files"] == 1
+    assert result["consecutive_failures"] == 0
+    assert result["last_discovery_success_at"] is not None
+    assert result["last_stream_success_at"] is not None
+    assert result["last_message_at"] is not None
+    assert result["last_snapshot_at"] is not None
     assert result["safety"]["filesystem_stage_only"] is True
     assert result["safety"]["database_writes"] == 0
     assert result["safety"]["orders_submitted"] == 0
