@@ -54,7 +54,7 @@ jobs:
           python -m pytest
           tests/test_gh1_websocket_watch.py
           tests/test_phase_gh2.py
-          tests/test_phase_3bc_r5_crypto_freshness_watch.py
+          tests/test_phase_3bc_r5_crypto_freshness_watch.py::test_phase3bc_r5_can_reuse_existing_r3_report
           tests/test_phase_2_8_weather.py
           tests/test_phase_3d_workstation.py
           -q
