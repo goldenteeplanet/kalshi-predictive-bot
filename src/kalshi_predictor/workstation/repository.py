@@ -31,13 +31,13 @@ from kalshi_predictor.data.schema import (
     Watchlist,
     WatchlistMarket,
 )
+from kalshi_predictor.opportunities.market_identity import annotated_opportunity_row
 from kalshi_predictor.paper.ledger import (
     get_latest_snapshot_for_ticker,
     get_paper_summary,
 )
 from kalshi_predictor.paper.models import ORDER_OPEN
 from kalshi_predictor.paper.pnl import calculate_unrealized_pnl
-from kalshi_predictor.opportunities.market_identity import annotated_opportunity_row
 from kalshi_predictor.utils.decimals import decimal_to_str, midpoint, to_decimal
 from kalshi_predictor.utils.time import utc_now
 
@@ -554,13 +554,48 @@ def market_monitor_rows(
         statement = statement.where(MarketRanking.forecast_model == model)
     rankings = []
     candidate_limit = max(limit * 5, limit + 250)
+    ranking_scan_limit = max(candidate_limit * 10, 2_000)
+    candidate_unique_limit = (
+        ranking_scan_limit
+        if any(
+            value is not None
+            for value in (category, search, min_score, min_liquidity, min_confidence)
+        )
+        else candidate_limit
+    )
     seen: set[str] = set()
-    for ranking in session.scalars(statement):
+    candidates: list[MarketRanking] = []
+    for ranking in session.scalars(statement.limit(ranking_scan_limit)):
         if ranking.ticker in seen:
             continue
         seen.add(ranking.ticker)
-        market = session.get(Market, ranking.ticker)
-        snapshot = _latest_market_snapshot(session, ranking.ticker)
+        candidates.append(ranking)
+        if len(candidates) >= candidate_unique_limit:
+            break
+
+    tickers = [ranking.ticker for ranking in candidates]
+    markets_by_ticker = _markets_by_ticker(session, tickers)
+    snapshots_by_ticker = _latest_market_snapshots(session, tickers)
+    multileg_tickers = [
+        ranking.ticker
+        for ranking in candidates
+        if _looks_like_multileg_sports_market(
+            ranking.title
+            or (
+                markets_by_ticker[ranking.ticker].title
+                if ranking.ticker in markets_by_ticker
+                else None
+            )
+            or ranking.ticker,
+            ranking=ranking,
+            category=market_category(markets_by_ticker.get(ranking.ticker), ranking=ranking),
+        )
+    ]
+    leg_labels_by_ticker = _market_monitor_leg_labels_by_ticker(session, multileg_tickers)
+
+    for ranking in candidates:
+        market = markets_by_ticker.get(ranking.ticker)
+        snapshot = snapshots_by_ticker.get(ranking.ticker)
         row_category = market_category(market, ranking=ranking)
         if category and category.lower() != row_category.lower():
             continue
@@ -592,6 +627,7 @@ def market_monitor_rows(
                     market=market,
                     ranking=ranking,
                     category=row_category,
+                    leg_labels=leg_labels_by_ticker.get(ranking.ticker),
                 ),
                 "category": row_category,
                 "current_price": current_price,
@@ -1088,6 +1124,42 @@ def _latest_market_snapshot(session: Session, ticker: str) -> MarketSnapshot | N
     )
 
 
+def _markets_by_ticker(session: Session, tickers: list[str]) -> dict[str, Market]:
+    if not tickers:
+        return {}
+    return {
+        market.ticker: market
+        for market in session.scalars(select(Market).where(Market.ticker.in_(tickers)))
+    }
+
+
+def _latest_market_snapshots(
+    session: Session,
+    tickers: list[str],
+) -> dict[str, MarketSnapshot]:
+    if not tickers:
+        return {}
+    ranked_snapshots = (
+        select(
+            MarketSnapshot.id.label("snapshot_id"),
+            func.row_number()
+            .over(
+                partition_by=MarketSnapshot.ticker,
+                order_by=(desc(MarketSnapshot.captured_at), desc(MarketSnapshot.id)),
+            )
+            .label("snapshot_rank"),
+        )
+        .where(MarketSnapshot.ticker.in_(tickers))
+        .subquery()
+    )
+    rows = session.scalars(
+        select(MarketSnapshot)
+        .join(ranked_snapshots, MarketSnapshot.id == ranked_snapshots.c.snapshot_id)
+        .where(ranked_snapshots.c.snapshot_rank == 1)
+    )
+    return {snapshot.ticker: snapshot for snapshot in rows}
+
+
 def _display_market_price(ranking: MarketRanking, snapshot: MarketSnapshot | None) -> str:
     ranking_price = _first_nonzero_decimal(ranking.best_price, ranking.midpoint)
     if ranking_price is not None:
@@ -1207,22 +1279,25 @@ def _market_monitor_title(
     market: Market | None,
     ranking: MarketRanking,
     category: str,
+    leg_labels: list[str] | None = None,
 ) -> str:
     raw_title = ranking.title or (market.title if market else None) or ranking.ticker
     if not _looks_like_multileg_sports_market(raw_title, ranking=ranking, category=category):
         return raw_title
 
-    leg_labels = _market_monitor_leg_labels(session, ranking.ticker)
-    if not leg_labels:
-        leg_labels = _split_multileg_title(raw_title)
-    if len(leg_labels) < 2:
+    resolved_leg_labels = (
+        _market_monitor_leg_labels(session, ranking.ticker) if leg_labels is None else leg_labels
+    )
+    if not resolved_leg_labels:
+        resolved_leg_labels = _split_multileg_title(raw_title)
+    if len(resolved_leg_labels) < 2:
         return raw_title
 
-    preview = "; ".join(leg_labels[:3])
-    remaining = len(leg_labels) - 3
+    preview = "; ".join(resolved_leg_labels[:3])
+    remaining = len(resolved_leg_labels) - 3
     suffix = f" +{remaining} more" if remaining > 0 else ""
     kind = "sports market" if category == "Sports" or _has_sports_terms(raw_title) else "market"
-    return f"Multi-leg {kind} ({len(leg_labels)} legs): {preview}{suffix}"
+    return f"Multi-leg {kind} ({len(resolved_leg_labels)} legs): {preview}{suffix}"
 
 
 def _looks_like_multileg_sports_market(
@@ -1279,6 +1354,28 @@ def _market_monitor_leg_labels(session: Session, ticker: str) -> list[str]:
         if label and label not in labels:
             labels.append(label)
     return labels
+
+
+def _market_monitor_leg_labels_by_ticker(
+    session: Session,
+    tickers: list[str],
+) -> dict[str, list[str]]:
+    if not tickers:
+        return {}
+    grouped: dict[str, list[str]] = {}
+    legs = session.scalars(
+        select(MarketLeg)
+        .where(MarketLeg.ticker.in_(tickers))
+        .order_by(MarketLeg.ticker, MarketLeg.leg_index)
+    )
+    for leg in legs:
+        labels = grouped.setdefault(leg.ticker, [])
+        if len(labels) >= 12:
+            continue
+        label = _clean_multileg_label(leg.raw_text or leg.entity_name or "")
+        if label and label not in labels:
+            labels.append(label)
+    return grouped
 
 
 def _split_multileg_title(title: str) -> list[str]:

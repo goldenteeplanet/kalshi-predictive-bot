@@ -3,7 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -458,6 +458,52 @@ def test_market_monitor_groups_and_deprioritizes_missing_multileg_sports_rows(tm
     assert "Team A; Team B; Team C" in grouped["market"]
     assert grouped["data_quality"] == "Missing market data"
     assert grouped["recommended_action"] == "Collect fresh snapshots before ranking"
+
+
+def test_market_monitor_batches_related_market_reads(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = utc_now()
+    with session_factory() as session:
+        for ticker_index in range(40):
+            for ranking_index in range(3):
+                insert_market_ranking(
+                    session,
+                    {
+                        "ticker": f"PHASE3D-BATCH-{ticker_index}",
+                        "ranked_at": now - timedelta(minutes=ranking_index),
+                        "title": f"Will batch market {ticker_index} resolve yes?",
+                        "status": "open",
+                        "forecast_model": "ensemble_v2",
+                        "forecast_probability": "0.66",
+                        "best_side": "BUY_YES",
+                        "best_price": "0.40",
+                        "estimated_edge": "0.18",
+                        "liquidity_score": "85",
+                        "spread_score": "90",
+                        "time_score": "80",
+                        "model_confidence_score": "82",
+                        "opportunity_score": "88",
+                        "spread": "0.05",
+                        "liquidity": "1000",
+                        "time_to_close_minutes": "120",
+                        "reason": "Seeded batch-query regression ranking.",
+                    },
+                )
+        session.flush()
+
+        statements: list[str] = []
+
+        def count_statements(*args) -> None:  # noqa: ANN002
+            statements.append(args[2])
+
+        event.listen(session.bind, "before_cursor_execute", count_statements)
+        try:
+            rows = market_monitor_rows(session, limit=20)
+        finally:
+            event.remove(session.bind, "before_cursor_execute", count_statements)
+
+    assert len(rows) == 20
+    assert len(statements) <= 4
 
 
 def _session_factory(tmp_path):
