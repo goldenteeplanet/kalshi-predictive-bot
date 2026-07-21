@@ -1,0 +1,27 @@
+{
+  "actual_notifications_sent": 0,
+  "checks": {
+    "artifact_retained_always": true,
+    "bounded_retention": true,
+    "bounded_runtime": true,
+    "fails_on_gate_exit_code": true,
+    "golden_manifest_supplied": true,
+    "missing_artifact_fails": true,
+    "no_deployment": true,
+    "no_real_notifications": true,
+    "no_secrets": true,
+    "read_only_permissions": true,
+    "runs_ui_obs2h_gate": true,
+    "workflow_present": true
+  },
+  "cloud_access": false,
+  "database_access": false,
+  "database_writes": 0,
+  "deployment_connected": false,
+  "execution_changed": false,
+  "mode": "LOCAL_CI_WORKFLOW_AND_ARTIFACT_RETENTION_PREVIEW",
+  "phase": "UI-OBS-2I",
+  "status": "PASSED",
+  "workflow": ".github/workflows/ui-obs2h-notification-pipeline.yml",
+  "workflow_sha256": "df35e6337f06da198b7298a52a5130177dbb25a5cc84918d6c562b3e582a8483"
+}

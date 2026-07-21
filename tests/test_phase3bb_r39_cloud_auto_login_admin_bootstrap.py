@@ -45,10 +45,10 @@ def test_phase3bb_r39_writes_auto_login_and_admin_bootstrap(tmp_path: Path) -> N
     assert decision["admin_helper_present"] is False
     assert "Host kalshi-cloud" in ssh_script
     assert "BatchMode yes" in ssh_script
-    assert "scp \"$ROOT_HELPER_LOCAL\" kalshi-cloud" in ssh_script
+    assert 'scp "$ROOT_HELPER_LOCAL" kalshi-cloud' in ssh_script
     assert "NOPASSWD: $HELPER" in root_script
-    assert "sudo -n \"$HELPER\"" in root_script
-    assert "systemctl enable \"${TIMER}\"" in root_script
+    assert 'sudo -n "$HELPER"' in root_script
+    assert 'systemctl enable "${TIMER}"' in root_script
     assert "systemctl start" not in root_script
     assert payload["safety_flags"]["ssh_config_modified_by_codex"] is False
     assert payload["safety_flags"]["root_bootstrap_executed_by_codex"] is False
@@ -117,6 +117,8 @@ def _session_factory(tmp_path: Path):
 
 
 def _write_context(reports_dir: Path) -> None:
+    identity_file = reports_dir.parent / "id_ed25519_test"
+    identity_file.write_text("test-only-private-key-placeholder\n", encoding="utf-8")
     r11_dir = reports_dir / "phase3bb_r11"
     r11_dir.mkdir(parents=True, exist_ok=True)
     (r11_dir / "codex_cloud_context.json").write_text(
@@ -125,7 +127,7 @@ def _write_context(reports_dir: Path) -> None:
                 "ssh_profile": {
                     "host": "203.0.113.10",
                     "user": "kalshi",
-                    "identity_file": "~/.ssh/id_ed25519_do",
+                    "identity_file": str(identity_file),
                 },
                 "remote_paths": {
                     "app_path": "/opt/kalshi-predictive-bot",

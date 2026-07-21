@@ -1,0 +1,198 @@
+{
+  "cloud_access": false,
+  "database_access": false,
+  "database_writes": 0,
+  "default_or_fabricated_values_allowed": false,
+  "diagnostic_counts": {
+    "REFERENCE_FORECAST_FIELD_MISSING:probability": 1,
+    "SHADOW_CONTEXT_MISSING:forecast_bias": 1,
+    "SHADOW_CONTEXT_MISSING:spread_addition": 1
+  },
+  "execution_enabled": false,
+  "mode": "LOCAL_EXACT_SHADOW_FIELD_SOURCE_MAPPING_PREVIEW",
+  "phase": "PMB-34A",
+  "rows": [
+    {
+      "category": "crypto",
+      "compatible": true,
+      "diagnostics": [],
+      "fixture_id": "crypto-exact",
+      "mapped": true,
+      "mapping_provenance": {
+        "forecast_bias": {
+          "candidate_forecast_id": 201,
+          "candidate_model_version": "2.1.0",
+          "formula": "candidate_probability-reference_probability",
+          "reference_forecast_id": 191,
+          "reference_model_version": "2.0.0"
+        },
+        "spread_addition": {
+          "current_market_snapshot_id": 61,
+          "formula": "current_executable_spread-reference_executable_spread",
+          "reference_market_snapshot_id": 60
+        }
+      },
+      "shadow_context": {
+        "forecast_bias": "0.004",
+        "spread_addition": "0.006"
+      },
+      "shadow_preview": {
+        "attribution": {
+          "feature_ref": "crypto_features:41",
+          "forecast_id": 201,
+          "market_snapshot_id": 61,
+          "model_version": "2.1.0",
+          "observation_ref": "crypto_prices:51"
+        },
+        "baseline": {
+          "eligible": true,
+          "opportunity_score": "78",
+          "requested_capital": "10"
+        },
+        "category": "crypto",
+        "policy_enabled": false,
+        "runtime_effect": "NONE_DISABLED_SHADOW",
+        "shadow": {
+          "allocated_capital": "9.50",
+          "blocker": null,
+          "eligible": true,
+          "inside_certified_buffer": true,
+          "position_scale": "0.95"
+        },
+        "source_unchanged": true,
+        "ticker": "PMB34A-CRYPTO"
+      }
+    },
+    {
+      "category": "weather",
+      "compatible": true,
+      "diagnostics": [],
+      "fixture_id": "weather-exact",
+      "mapped": true,
+      "mapping_provenance": {
+        "forecast_bias": {
+          "candidate_forecast_id": 202,
+          "candidate_model_version": "2.1.0",
+          "formula": "candidate_probability-reference_probability",
+          "reference_forecast_id": 192,
+          "reference_model_version": "2.0.0"
+        },
+        "spread_addition": {
+          "current_market_snapshot_id": 62,
+          "formula": "current_executable_spread-reference_executable_spread",
+          "reference_market_snapshot_id": 59
+        }
+      },
+      "shadow_context": {
+        "forecast_bias": "-0.008",
+        "spread_addition": "0.008"
+      },
+      "shadow_preview": {
+        "attribution": {
+          "feature_ref": "weather_features:42",
+          "forecast_id": 202,
+          "market_snapshot_id": 62,
+          "model_version": "2.1.0",
+          "observation_ref": "weather_observations:52"
+        },
+        "baseline": {
+          "eligible": true,
+          "opportunity_score": "76",
+          "requested_capital": "8"
+        },
+        "category": "weather",
+        "policy_enabled": false,
+        "runtime_effect": "NONE_DISABLED_SHADOW",
+        "shadow": {
+          "allocated_capital": "7.60",
+          "blocker": null,
+          "eligible": true,
+          "inside_certified_buffer": true,
+          "position_scale": "0.95"
+        },
+        "source_unchanged": true,
+        "ticker": "PMB34A-WEATHER"
+      }
+    },
+    {
+      "category": "sports",
+      "compatible": true,
+      "diagnostics": [],
+      "fixture_id": "sports-exact",
+      "mapped": true,
+      "mapping_provenance": {
+        "forecast_bias": {
+          "candidate_forecast_id": 203,
+          "candidate_model_version": "1.1.0",
+          "formula": "candidate_probability-reference_probability",
+          "reference_forecast_id": 193,
+          "reference_model_version": "1.0.0"
+        },
+        "spread_addition": {
+          "current_market_snapshot_id": 63,
+          "formula": "current_executable_spread-reference_executable_spread",
+          "reference_market_snapshot_id": 58
+        }
+      },
+      "shadow_context": {
+        "forecast_bias": "0.007",
+        "spread_addition": "0.004"
+      },
+      "shadow_preview": {
+        "attribution": {
+          "feature_ref": "sports_features:43",
+          "forecast_id": 203,
+          "market_snapshot_id": 63,
+          "model_version": "1.1.0",
+          "observation_ref": "sports_observations:53"
+        },
+        "baseline": {
+          "eligible": true,
+          "opportunity_score": "73",
+          "requested_capital": "6"
+        },
+        "category": "sports",
+        "policy_enabled": false,
+        "runtime_effect": "NONE_DISABLED_SHADOW",
+        "shadow": {
+          "allocated_capital": "5.70",
+          "blocker": null,
+          "eligible": true,
+          "inside_certified_buffer": true,
+          "position_scale": "0.95"
+        },
+        "source_unchanged": true,
+        "ticker": "PMB34A-SPORTS"
+      }
+    },
+    {
+      "category": "weather",
+      "compatible": false,
+      "diagnostics": [
+        "REFERENCE_FORECAST_FIELD_MISSING:probability",
+        "SHADOW_CONTEXT_MISSING:forecast_bias",
+        "SHADOW_CONTEXT_MISSING:spread_addition"
+      ],
+      "fixture_id": "weather-reject-missing-reference",
+      "mapped": false,
+      "mapping_provenance": null,
+      "shadow_context": null,
+      "shadow_preview": null
+    }
+  ],
+  "runtime_policy_changed": false,
+  "source_mapping": {
+    "forecast_bias": "candidate forecast probability minus independent reference forecast probability",
+    "spread_addition": "current executable spread minus distinct reference executable spread"
+  },
+  "summary": {
+    "compatible": 3,
+    "deterministic_digest": "1e9509f350cc8b17e8e23212d2f417e94798c9f1bff3525f4d7625a8c3b29548",
+    "fixtures": 4,
+    "mapped": 3,
+    "pmb35_deployment_unblocked": false,
+    "rejected": 1,
+    "required_categories_pass": true
+  },
+  "thresholds_changed": false
+}

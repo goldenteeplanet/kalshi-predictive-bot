@@ -5,9 +5,8 @@ from pathlib import Path
 
 from kalshi_predictor.ui.notification_pipeline_ci import STAGES, run_notification_pipeline_ci
 
-
 ROOT = Path(__file__).resolve().parents[1]
-REPORTS = ROOT / "reports"
+REPORTS = ROOT / "tests/fixtures/ci_report_inputs"
 GOLDEN = ROOT / "tests/golden/ui_obs2h_notification_pipeline_golden.json"
 
 

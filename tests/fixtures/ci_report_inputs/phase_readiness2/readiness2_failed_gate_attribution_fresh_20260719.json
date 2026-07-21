@@ -1,0 +1,187 @@
+{
+  "blocker_attribution": [
+    {
+      "affected_rows": 10,
+      "blocker": "VERIFIED_LINK_MISSING",
+      "categories": [
+        "agriculture_general"
+      ],
+      "models": [
+        "agriculture_general"
+      ],
+      "next_actions": [
+        "kalshi-bot phase3bb-r5-usda-source-activation --output-dir reports/phase3bb_r5 --reports-dir reports"
+      ],
+      "priority": 10,
+      "threshold_change_required": false
+    },
+    {
+      "affected_rows": 47,
+      "blocker": "SNAPSHOT_MISSING",
+      "categories": [
+        "economic"
+      ],
+      "models": [
+        "economic_v1"
+      ],
+      "next_actions": [
+        "capture current snapshots/orderbooks for verified linked rows, then rerun R8"
+      ],
+      "priority": 30,
+      "threshold_change_required": false
+    },
+    {
+      "affected_rows": 128,
+      "blocker": "SNAPSHOT_STALE",
+      "categories": [
+        "crypto",
+        "economic",
+        "sports",
+        "weather"
+      ],
+      "models": [
+        "crypto_v2",
+        "economic_v1",
+        "sports_v1",
+        "weather_v2"
+      ],
+      "next_actions": [
+        "capture current snapshots/orderbooks for verified linked rows, then rerun R8"
+      ],
+      "priority": 40,
+      "threshold_change_required": false
+    },
+    {
+      "affected_rows": 0,
+      "blocker": "NO_CURRENT_ROWS",
+      "categories": [
+        "news"
+      ],
+      "models": [
+        "news_v1"
+      ],
+      "next_actions": [
+        "refresh active market inventory and rerun R8"
+      ],
+      "priority": 60,
+      "threshold_change_required": false
+    }
+  ],
+  "decision": "REMEDIATE_IN_PRIORITY_ORDER_WITH_UNCHANGED_GATES",
+  "guardrails": {
+    "database_writes": 0,
+    "execution_enabled": false,
+    "live_orders_created": 0,
+    "paper_orders_created": 0,
+    "stale_evidence_can_authorize_activation": false,
+    "threshold_changes": 0
+  },
+  "mode": "LOCAL_READ_ONLY_FAILED_GATE_ATTRIBUTION",
+  "next_phase": "READINESS-1 \u2014 Fresh Consolidated Paper-Readiness Gate Recheck",
+  "observed": {
+    "categories": [
+      {
+        "blockers": [
+          {
+            "affected_rows": 10,
+            "blocker": "VERIFIED_LINK_MISSING"
+          }
+        ],
+        "category": "agriculture_general",
+        "current_rows": 10,
+        "first_blocker": "VERIFIED_LINK_MISSING",
+        "model_name": "agriculture_general",
+        "paper_ready_rows": 0,
+        "positive_ev_rows": 0
+      },
+      {
+        "blockers": [
+          {
+            "affected_rows": 50,
+            "blocker": "SNAPSHOT_STALE"
+          }
+        ],
+        "category": "crypto",
+        "current_rows": 50,
+        "first_blocker": "SNAPSHOT_STALE",
+        "model_name": "crypto_v2",
+        "paper_ready_rows": 0,
+        "positive_ev_rows": 0
+      },
+      {
+        "blockers": [
+          {
+            "affected_rows": 47,
+            "blocker": "SNAPSHOT_MISSING"
+          },
+          {
+            "affected_rows": 3,
+            "blocker": "SNAPSHOT_STALE"
+          }
+        ],
+        "category": "economic",
+        "current_rows": 50,
+        "first_blocker": "SNAPSHOT_MISSING",
+        "model_name": "economic_v1",
+        "paper_ready_rows": 0,
+        "positive_ev_rows": 0
+      },
+      {
+        "blockers": [
+          {
+            "affected_rows": 0,
+            "blocker": "NO_CURRENT_ROWS"
+          }
+        ],
+        "category": "news",
+        "current_rows": 0,
+        "first_blocker": "NO_CURRENT_ROWS",
+        "model_name": "news_v1",
+        "paper_ready_rows": 0,
+        "positive_ev_rows": 0
+      },
+      {
+        "blockers": [
+          {
+            "affected_rows": 25,
+            "blocker": "SNAPSHOT_STALE"
+          }
+        ],
+        "category": "sports",
+        "current_rows": 25,
+        "first_blocker": "SNAPSHOT_STALE",
+        "model_name": "sports_v1",
+        "paper_ready_rows": 0,
+        "positive_ev_rows": 0
+      },
+      {
+        "blockers": [
+          {
+            "affected_rows": 50,
+            "blocker": "SNAPSHOT_STALE"
+          }
+        ],
+        "category": "weather",
+        "current_rows": 50,
+        "first_blocker": "SNAPSHOT_STALE",
+        "model_name": "weather_v2",
+        "paper_ready_rows": 0,
+        "positive_ev_rows": 2
+      }
+    ],
+    "current_rows": 185,
+    "paper_ready_open": false,
+    "paper_ready_rows": 0
+  },
+  "phase": "READINESS-2",
+  "report_sha256": "7ba2266e1884a61941a699a2fef84cf5ec853478748d2b451d5f308f0f72d9b0",
+  "source": {
+    "age_hours": 0.054,
+    "blockers_path": "reports/phase_readiness1_20260719/category_blockers.csv",
+    "generated_at": "2026-07-19T01:27:43.967784Z",
+    "stale": false,
+    "stale_after_hours": 24,
+    "summary_path": "reports/phase_readiness1_20260719/EXECUTIVE_SUMMARY.md"
+  },
+  "status": "PASSED_READ_ONLY_PREVIEW"
+}

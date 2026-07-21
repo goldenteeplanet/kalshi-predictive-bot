@@ -1,0 +1,33 @@
+{
+  "scenarios": {
+    "normal": [
+      {"event_id":"n1","kind":"timer","run_id":"normal-1","writer_safe":true,"locks_clear":true,"execution_enabled":false},
+      {"event_id":"n2","kind":"complete","run_id":"normal-1","output_valid":true}
+    ],
+    "overlap": [
+      {"event_id":"o1","kind":"timer","run_id":"overlap-1","writer_safe":true,"locks_clear":true,"execution_enabled":false},
+      {"event_id":"o2","kind":"timer","run_id":"overlap-2","writer_safe":true,"locks_clear":true,"execution_enabled":false}
+    ],
+    "writer_busy": [
+      {"event_id":"w1","kind":"timer","run_id":"writer-1","writer_safe":false,"locks_clear":false,"execution_enabled":false}
+    ],
+    "missed_schedule": [
+      {"event_id":"m1","kind":"missed_timer_replay","run_id":"missed-1","writer_safe":true,"locks_clear":true,"execution_enabled":false}
+    ],
+    "restart": [
+      {"event_id":"r1","kind":"restart_recovery","run_id":"restart-1","writer_safe":true,"locks_clear":true,"heartbeat_age_seconds":15,"execution_enabled":false},
+      {"event_id":"r2","kind":"complete","run_id":"restart-1","output_valid":true}
+    ],
+    "stale_restart": [
+      {"event_id":"s1","kind":"restart_recovery","run_id":"stale-1","writer_safe":true,"locks_clear":true,"heartbeat_age_seconds":31,"execution_enabled":false}
+    ],
+    "timeout": [
+      {"event_id":"t1","kind":"timer","run_id":"timeout-1","writer_safe":true,"locks_clear":true,"execution_enabled":false},
+      {"event_id":"t2","kind":"timeout","run_id":"timeout-1"}
+    ],
+    "oom": [
+      {"event_id":"x1","kind":"timer","run_id":"oom-1","writer_safe":true,"locks_clear":true,"execution_enabled":false},
+      {"event_id":"x2","kind":"oom","run_id":"oom-1"}
+    ]
+  }
+}

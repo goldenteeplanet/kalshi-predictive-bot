@@ -111,7 +111,7 @@ def test_crypto_ready_no_forecasts_when_inputs_exist(tmp_path) -> None:
 
 
 def test_economic_sample_path_and_commands_are_visible(tmp_path) -> None:
-    assert Path("data/economic_sample.json").exists()
+    assert Path("examples/economic_sample.json").exists()
     session_factory = _session_factory(tmp_path)
 
     with session_factory() as session:
@@ -137,9 +137,10 @@ def test_economic_sample_path_and_commands_are_visible(tmp_path) -> None:
         economic = _row(model_status_rows(session), "economic_v1")
 
     assert economic["status"] == STATUS_READY_NO_FORECASTS
-    assert "kalshi-bot ingest-economic --input-file data/economic_sample.json" in economic[
-        "next_commands"
-    ]
+    assert (
+        "kalshi-bot ingest-economic --input-file examples/economic_sample.json"
+        in economic["next_commands"]
+    )
 
 
 def test_model_readiness_cli_and_report_smoke(tmp_path) -> None:

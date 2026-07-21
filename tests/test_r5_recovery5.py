@@ -76,7 +76,9 @@ def test_execution_enablement_always_blocks() -> None:
 
 
 def test_full_fixture_passes_deterministically() -> None:
-    path = Path("reports/phase_r5_recovery5/synthetic_scheduler_scenarios.json")
+    path = Path(
+        "tests/fixtures/ci_report_inputs/phase_r5_recovery5/synthetic_scheduler_scenarios.json"
+    )
     scenarios = json.loads(path.read_text(encoding="utf-8"))["scenarios"]
     first = build_certification_report(scenarios)
     second = build_certification_report(scenarios)

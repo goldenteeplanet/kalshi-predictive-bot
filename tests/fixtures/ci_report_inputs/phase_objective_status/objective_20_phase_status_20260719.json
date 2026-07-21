@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-07-19T12:00:00Z",
+  "execution_enabled": false,
+  "phase_count": 20,
+  "phases": [
+    {"number": 1, "phase": "R5-RECOVERY-3 Completion", "status": "PASSED", "evidence": "R5-RECOVERY-3B backup, rollback, bounded deployment, and one-cycle certification passed with execution disabled."},
+    {"number": 2, "phase": "R5-RECOVERY-6", "status": "PASSED", "evidence": "Three distinct guarded cycles completed successfully; post-cycle writer and lock checks were clear."},
+    {"number": 3, "phase": "R5-RECOVERY-8", "status": "PASSED", "evidence": "Real three-cycle census passed runtime, memory, heartbeat, OOM, structural-output, row-count, writer, lock, and execution gates."},
+    {"number": 4, "phase": "R5-RECOVERY-9 Preview", "status": "PASSED_LOCAL_PREVIEW", "evidence": "Permanent bounded service/timer and inert rollback preview passed all configured gates."},
+    {"number": 5, "phase": "R5-RECOVERY-9 Deployment", "status": "PASSED", "evidence": "Permanent bounded timer deployed with a safe 15-minute activation delay; legacy watcher and superseded timer are disabled, rollback verified, and execution remains disabled."},
+    {"number": 6, "phase": "STORAGE-CAP-1", "status": "PASSED", "evidence": "Capacity and retention model identified cold archive candidates and reserve requirements."},
+    {"number": 7, "phase": "STORAGE-CAP-2", "status": "PASSED", "evidence": "Cold backup archival was verified and a persistent 100 GB backup volume now provides about 98 GB free."},
+    {"number": 8, "phase": "PROV-14B Resume", "status": "WAITING", "evidence": "Previously approved exact attribution retry is queued after the bounded-scheduler cutover; repair preview and tests exist."},
+    {"number": 9, "phase": "PROV-14C", "status": "WAITING", "evidence": "Authorized read-only census needs real PROV-14B attribution cycles."},
+    {"number": 10, "phase": "PROV-14D", "status": "WAITING", "evidence": "Previously approved guarded integration remains gated by successful PROV-14B/14C evidence."},
+    {"number": 11, "phase": "PROV-16", "status": "PASSED_LOCAL_PREVIEW", "evidence": "Retention, query-performance, and dashboard-parity preview passed."},
+    {"number": 12, "phase": "PMB-35", "status": "BLOCKED", "evidence": "PMB-34A still reports pmb35_deployment_unblocked=false because a weather row lacks an exact reference forecast; fabricated defaults remain forbidden."},
+    {"number": 13, "phase": "PMB-36", "status": "WAITING", "evidence": "Synthetic multi-cycle harness passed; real shadow comparisons require PMB-35 deployment."},
+    {"number": 14, "phase": "GH-1V Completion", "status": "PASSED", "evidence": "Three distinct windows produced 90 rows and 24 positive-edge rows; none cleared every unchanged gate."},
+    {"number": 15, "phase": "GH-1X Census", "status": "PASSED", "evidence": "Read-only forecast, executable-edge, liquidity, and risk census passed."},
+    {"number": 16, "phase": "NYC-W10", "status": "PASSED", "evidence": "Three of three live shadow windows passed stability review; no automatic activation occurred."},
+    {"number": 17, "phase": "NYC-W11 Preview", "status": "PASSED_LOCAL_PREVIEW", "evidence": "Guarded weather-observation activation and rollback design passed locally; feature remains disabled."},
+    {"number": 18, "phase": "UI-OBS-5", "status": "PASSED_LOCAL_PREVIEW", "evidence": "R5, provenance, liquidity, weather, and readiness summary preview passed locally."},
+    {"number": 19, "phase": "READINESS-1", "status": "PASSED_CLOSED", "evidence": "Manifest verified with zero paper-ready rows; no paper/live activation occurred."},
+    {"number": 20, "phase": "READINESS-2 Preview", "status": "PASSED_LOCAL_PREVIEW", "evidence": "Exact remaining failed-gate attribution and remediation preview passed locally."}
+  ],
+  "summary": {
+    "passed_or_passed_preview": 15,
+    "running": 0,
+    "waiting": 4,
+    "blocked": 1,
+    "approval_required": 0,
+    "current_critical_path": [
+      "PROV-14B bounded future-attribution certification",
+      "PROV-14C real attribution stability census",
+      "PROV-14D guarded scheduler attribution integration",
+      "PMB-35 exact weather-reference unblock and disabled shadow deployment",
+      "PMB-36 real shadow census"
+    ]
+  }
+}

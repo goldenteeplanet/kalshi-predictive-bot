@@ -1,0 +1,332 @@
+{
+  "advanced_candidates": [],
+  "blocker_counts_unique_candidates": {
+    "EDGE_BELOW_MINIMUM": 14,
+    "LIQUIDITY_SCORE_BELOW_EXECUTABLE": 12,
+    "OPPORTUNITY_SCORE_BELOW_MINIMUM": 15,
+    "SPREAD_NOT_EXECUTABLE": 8,
+    "TWO_SIDED_DEPTH_MISSING": 8
+  },
+  "counts": {
+    "duplicate_positive_edge_rows": 9,
+    "naturally_advanced_candidates": 0,
+    "reported_evaluations": 90,
+    "reported_positive_edge_evaluations": 24,
+    "unique_positive_edge_candidates": 15,
+    "window_positive_edge_sum": 14
+  },
+  "decision": "CLOSE_CANDIDATE_SET_AND_RETURN_TO_BOUNDED_DISCOVERY",
+  "gates": {
+    "execution_disabled": true,
+    "multi_window_complete": true,
+    "three_distinct_windows": true,
+    "thresholds_unchanged": true,
+    "window_sources_present": true
+  },
+  "guardrails": {
+    "cloud_access": false,
+    "database_writes": 0,
+    "execution_enabled": false,
+    "threshold_changes": 0
+  },
+  "mode": "READ_ONLY_MULTI_WINDOW_GATE_CENSUS",
+  "phase": "GH-1X",
+  "report_sha256": "ecde65cb3cb70aca9a17a996dcce167429712b12a880135129583c9c769a3e1f",
+  "source_generated_at": "2026-07-16T17:27:21.098645+00:00",
+  "status": "PASSED",
+  "unique_positive_edge_candidates": [
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM"
+      ],
+      "executable_edge": "0.0050",
+      "liquidity_score": "0.62872000",
+      "model_name": "weather_v2",
+      "opportunity_score": "13.67791882842592591666666667",
+      "remaining_blocker_count": 3,
+      "spread": "0.1000",
+      "ticker": "KXTEMPNYCH-26JUL1611-T78.99",
+      "time_to_close_minutes": "42.19979646666666",
+      "window_id": "KXTEMPNYCH-26JUL1611"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM"
+      ],
+      "executable_edge": "0.0100",
+      "liquidity_score": "4.662504000",
+      "model_name": "weather_v2",
+      "opportunity_score": "19.80799148967592593055555556",
+      "remaining_blocker_count": 3,
+      "spread": "0.0600",
+      "ticker": "KXTEMPNYCH-26JUL1611-T81.99",
+      "time_to_close_minutes": "42.20344056666667",
+      "window_id": "KXTEMPNYCH-26JUL1611"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM",
+        "SPREAD_NOT_EXECUTABLE",
+        "TWO_SIDED_DEPTH_MISSING"
+      ],
+      "executable_edge": "0.0300",
+      "liquidity_score": "4.47544000",
+      "model_name": "weather_v2",
+      "opportunity_score": "25.52993345733796295833333333",
+      "remaining_blocker_count": 4,
+      "spread": null,
+      "ticker": "KXTEMPNYCH-26JUL1611-T82.99",
+      "time_to_close_minutes": "42.20456928333333",
+      "window_id": "KXTEMPNYCH-26JUL1611"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM",
+        "SPREAD_NOT_EXECUTABLE",
+        "TWO_SIDED_DEPTH_MISSING"
+      ],
+      "executable_edge": "0.0250",
+      "liquidity_score": "4.86756000",
+      "model_name": "weather_v2",
+      "opportunity_score": "24.46375326428240740277777778",
+      "remaining_blocker_count": 5,
+      "spread": null,
+      "ticker": "KXTEMPNYCH-26JUL1611-T83.99",
+      "time_to_close_minutes": "42.20587028333333",
+      "window_id": "KXTEMPNYCH-26JUL1611"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM",
+        "SPREAD_NOT_EXECUTABLE",
+        "TWO_SIDED_DEPTH_MISSING"
+      ],
+      "executable_edge": "0.0200",
+      "liquidity_score": "5.09724000",
+      "model_name": "weather_v2",
+      "opportunity_score": "23.37320740127314814583333333",
+      "remaining_blocker_count": 5,
+      "spread": null,
+      "ticker": "KXTEMPNYCH-26JUL1611-T84.99",
+      "time_to_close_minutes": "42.207408916666665",
+      "window_id": "KXTEMPNYCH-26JUL1611"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM"
+      ],
+      "executable_edge": "0.0050",
+      "liquidity_score": "2.61396000",
+      "model_name": "weather_v2",
+      "opportunity_score": "15.87517662296296296527777778",
+      "remaining_blocker_count": 3,
+      "spread": "0.0900",
+      "ticker": "KXTEMPNYCH-26JUL1613-T80.99",
+      "time_to_close_minutes": "41.819488533333335",
+      "window_id": "KXTEMPNYCH-26JUL1613"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM"
+      ],
+      "executable_edge": "0.0050",
+      "liquidity_score": "5.4129816000",
+      "model_name": "weather_v2",
+      "opportunity_score": "16.795031104675925925000",
+      "remaining_blocker_count": 3,
+      "spread": "0.0800",
+      "ticker": "KXTEMPNYCH-26JUL1613-T81.99",
+      "time_to_close_minutes": "41.820382566666666",
+      "window_id": "KXTEMPNYCH-26JUL1613"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM",
+        "SPREAD_NOT_EXECUTABLE",
+        "TWO_SIDED_DEPTH_MISSING"
+      ],
+      "executable_edge": "0.0200",
+      "liquidity_score": "54.1439424000",
+      "model_name": "weather_v2",
+      "opportunity_score": "30.72968064173611111111111111",
+      "remaining_blocker_count": 4,
+      "spread": null,
+      "ticker": "KXTEMPNYCH-26JUL1613-T85.99",
+      "time_to_close_minutes": "41.82428285",
+      "window_id": "KXTEMPNYCH-26JUL1613"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM",
+        "SPREAD_NOT_EXECUTABLE",
+        "TWO_SIDED_DEPTH_MISSING"
+      ],
+      "executable_edge": "0.0150",
+      "liquidity_score": "12.3954104000",
+      "model_name": "weather_v2",
+      "opportunity_score": "23.34240241372685184722222222",
+      "remaining_blocker_count": 5,
+      "spread": null,
+      "ticker": "KXTEMPNYCH-26JUL1613-T86.99",
+      "time_to_close_minutes": "41.82541468333333",
+      "window_id": "KXTEMPNYCH-26JUL1613"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM",
+        "SPREAD_NOT_EXECUTABLE",
+        "TWO_SIDED_DEPTH_MISSING"
+      ],
+      "executable_edge": "0.0100",
+      "liquidity_score": "4.81956000",
+      "model_name": "weather_v2",
+      "opportunity_score": "21.08102608680555555555555556",
+      "remaining_blocker_count": 5,
+      "spread": null,
+      "ticker": "KXTEMPNYCH-26JUL1613-T87.99",
+      "time_to_close_minutes": "41.8263025",
+      "window_id": "KXTEMPNYCH-26JUL1613"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM",
+        "SPREAD_NOT_EXECUTABLE",
+        "TWO_SIDED_DEPTH_MISSING"
+      ],
+      "executable_edge": "0.0050",
+      "liquidity_score": "4.81760000",
+      "model_name": "weather_v2",
+      "opportunity_score": "19.95573319837962963194444444",
+      "remaining_blocker_count": 5,
+      "spread": null,
+      "ticker": "KXTEMPNYCH-26JUL1613-T88.99",
+      "time_to_close_minutes": "41.827102833333335",
+      "window_id": "KXTEMPNYCH-26JUL1613"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM"
+      ],
+      "executable_edge": "0.0100",
+      "liquidity_score": "40.3864392000",
+      "model_name": "weather_v2",
+      "opportunity_score": "24.55397127916666666666666667",
+      "remaining_blocker_count": 2,
+      "spread": "0.0400",
+      "ticker": "KXTEMPNYCH-26JUL1614-T82.99",
+      "time_to_close_minutes": "33.1238874",
+      "window_id": "KXTEMPNYCH-26JUL1614"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM"
+      ],
+      "executable_edge": "0.0150",
+      "liquidity_score": "39.42715000",
+      "model_name": "weather_v2",
+      "opportunity_score": "31.33507938664351852222222222",
+      "remaining_blocker_count": 2,
+      "spread": "0.0200",
+      "ticker": "KXTEMPNYCH-26JUL1614-T83.99",
+      "time_to_close_minutes": "33.124958383333336",
+      "window_id": "KXTEMPNYCH-26JUL1614"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM"
+      ],
+      "executable_edge": "0.0050",
+      "liquidity_score": "25.530174000",
+      "model_name": "weather_v2",
+      "opportunity_score": "27.50053435081018518055555556",
+      "remaining_blocker_count": 3,
+      "spread": "0.0300",
+      "ticker": "KXTEMPNYCH-26JUL1614-T84.99",
+      "time_to_close_minutes": "33.12594058333333",
+      "window_id": "KXTEMPNYCH-26JUL1614"
+    },
+    {
+      "advance": false,
+      "blockers": [
+        "EDGE_BELOW_MINIMUM",
+        "LIQUIDITY_SCORE_BELOW_EXECUTABLE",
+        "OPPORTUNITY_SCORE_BELOW_MINIMUM",
+        "SPREAD_NOT_EXECUTABLE",
+        "TWO_SIDED_DEPTH_MISSING"
+      ],
+      "executable_edge": "0.0050",
+      "liquidity_score": "11.9356552000",
+      "model_name": "weather_v2",
+      "opportunity_score": "21.01135931958333332638888889",
+      "remaining_blocker_count": 5,
+      "spread": null,
+      "ticker": "KXTEMPNYCH-26JUL1614-T86.99",
+      "time_to_close_minutes": "33.127948499999995",
+      "window_id": "KXTEMPNYCH-26JUL1614"
+    }
+  ],
+  "windows": [
+    {
+      "advanced": 0,
+      "evaluated": 30,
+      "minimum_time_to_close_minutes": "42.196352266666665",
+      "positive_edge": 5,
+      "source_path": "reports/phase_gh1u_kxtempnych_26jul1611_retry_1524/gh1u_lead_time_atomic_activation.json",
+      "window_id": "KXTEMPNYCH-26JUL1611"
+    },
+    {
+      "advanced": 0,
+      "evaluated": 30,
+      "minimum_time_to_close_minutes": "33.22957995",
+      "positive_edge": 5,
+      "source_path": "reports/phase_gh1u_kxtempnych_26jul1613_retry_1625/gh1u_lead_time_atomic_activation.json",
+      "window_id": "KXTEMPNYCH-26JUL1613"
+    },
+    {
+      "advanced": 0,
+      "evaluated": 30,
+      "minimum_time_to_close_minutes": "33.1218022",
+      "positive_edge": 4,
+      "source_path": "reports/phase_gh1u_kxtempnych_26jul1614/gh1u_lead_time_atomic_activation.json",
+      "window_id": "KXTEMPNYCH-26JUL1614"
+    }
+  ]
+}
