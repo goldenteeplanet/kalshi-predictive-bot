@@ -219,6 +219,22 @@ def run_gh2_single_writer_decision_refresh(
     json_path = output_dir / "gh2_active_candidate_refresh.json"
     markdown_path = output_dir / "gh2_active_candidate_refresh.md"
     history_path = output_dir / "gh2_paper_only_soak_history.jsonl"
+    stage_path = output_dir / "gh2_stage.json"
+
+    def mark_stage(stage: str) -> None:
+        _write_json(
+            stage_path,
+            {
+                "phase": "GH-2",
+                "generated_at": utc_now().isoformat(),
+                "stage": stage,
+                "paper_order_creation_enabled": False,
+                "live_execution_enabled": False,
+            },
+        )
+        print(f"GH-2 stage: {stage}")
+
+    mark_stage("preflight_writer_gate")
     resolved = (settings or get_settings()).model_copy(
         update={
             "execution_enabled": False,
@@ -229,6 +245,7 @@ def run_gh2_single_writer_decision_refresh(
     )
     monitor = (writer_monitor_fn or (lambda: db_writer_monitor(settings=resolved)))()
     if guard_active_writer and not bool(monitor.get("safe_to_start_write", True)):
+        mark_stage("blocked_active_writer")
         payload = _blocked_payload(monitor)
         _write_cycle_artifacts(json_path, markdown_path, payload)
         return GH2Artifacts(
@@ -236,6 +253,7 @@ def run_gh2_single_writer_decision_refresh(
         )
 
     stage_errors: list[str] = []
+    mark_stage("drain_websocket_stage")
     websocket_drain = drain_staged_websocket_orderbooks(
         session_factory=session_factory,
         staging_dir=gh1_staging_dir or Path(resolved.kalshi_websocket_staging_dir),
@@ -244,6 +262,7 @@ def run_gh2_single_writer_decision_refresh(
     )
     stage_errors.extend(str(item) for item in websocket_drain.get("errors") or [])
 
+    mark_stage("open_single_writer_session")
     with session_factory() as session:
         paper_orders_before = _paper_order_count(session)
         candidates_before = select_actionable_ranked_markets(
@@ -261,6 +280,7 @@ def run_gh2_single_writer_decision_refresh(
             prefixes=WEATHER_TICKER_PREFIXES,
             limit=active_link_limit,
         )
+        mark_stage("drain_crypto_quotes")
         crypto_drain = drain_staged_crypto_quotes(
             session,
             staging_dir=crypto_staging_dir,
@@ -280,6 +300,7 @@ def run_gh2_single_writer_decision_refresh(
             ranked_weather + active_weather,
             active_link_limit,
         )
+        mark_stage("link_active_markets")
         crypto_link = link_crypto_markets(
             session,
             tickers=crypto_link_tickers,
@@ -291,6 +312,7 @@ def run_gh2_single_writer_decision_refresh(
             limit=active_link_limit,
         )
 
+        mark_stage("refresh_crypto_decisions")
         crypto_scope = set(crypto_link_tickers)
         crypto_snapshots = [
             snapshot
@@ -318,6 +340,7 @@ def run_gh2_single_writer_decision_refresh(
             scan_mode="GH2_CURRENT_PAPER_ONLY_REFRESH",
         )
 
+        mark_stage("refresh_weather_decisions")
         weather_features = _build_current_weather_features(
             session,
             weather_link_tickers,
@@ -350,6 +373,7 @@ def run_gh2_single_writer_decision_refresh(
             scan_mode="GH2_CURRENT_PAPER_ONLY_REFRESH",
         )
 
+        mark_stage("refresh_r5_diagnostics")
         r5_artifacts = write_phase3bc_r5_crypto_freshness_watch_report(
             session,
             output_dir=reports_dir / "phase3bc_r5",
@@ -376,6 +400,7 @@ def run_gh2_single_writer_decision_refresh(
             near_money_only=False,
             skip_phase3bc_r3_refresh=True,
         )
+        mark_stage("refresh_weather_gate")
         weather_gate = build_phase3ba_r3_weather_paper_gate(
             session,
             output_dir=reports_dir / "phase3ba_r3",
@@ -384,6 +409,7 @@ def run_gh2_single_writer_decision_refresh(
             limit=forecast_limit,
             current_window_lookback_hours=3,
         )
+        mark_stage("write_candidate_manifest")
         candidates_after = select_actionable_ranked_markets(
             session,
             limit=candidate_limit,
@@ -391,6 +417,7 @@ def run_gh2_single_writer_decision_refresh(
         )
         _write_candidate_manifest(candidate_manifest_path, candidates_after)
         paper_orders_after = _paper_order_count(session)
+        mark_stage("commit_single_writer")
         session.commit()
 
     crypto_drain["files_archived"] = _archive_drained_files(
@@ -487,7 +514,9 @@ def run_gh2_single_writer_decision_refresh(
             "explicit_operator_approval_required_after_soak": True,
         },
     }
+    mark_stage("write_cycle_report")
     _write_cycle_artifacts(json_path, markdown_path, payload)
+    mark_stage("complete")
     return GH2Artifacts(output_dir, json_path, markdown_path, history_path, candidate_manifest_path)
 
 
