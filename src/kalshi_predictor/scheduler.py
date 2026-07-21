@@ -155,7 +155,7 @@ SCHEDULER_PROFILES: dict[str, tuple[SchedulerStep, ...]] = {
         SchedulerStep(
             (
                 "kalshi-bot synthetic-markets-run --enable-research --mode shadow "
-                "--input-file data/synthetic_markets_candidates.json "
+                "--input-file examples/synthetic_markets_candidates.json "
                 "--output reports/synthetic_markets_report.md "
                 "--json-output reports/synthetic_markets_report.json"
             ),

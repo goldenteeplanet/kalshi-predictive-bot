@@ -40,7 +40,7 @@ CRYPTO_NEXT_COMMANDS = (
 )
 
 ECONOMIC_NEXT_COMMANDS = (
-    "kalshi-bot ingest-economic --input-file data/economic_sample.json; "
+    "kalshi-bot ingest-economic --input-file examples/economic_sample.json; "
     "kalshi-bot build-economic-features; "
     "kalshi-bot link-economic-markets"
 )

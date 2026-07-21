@@ -15079,7 +15079,7 @@ def synthetic_markets_run_command(
             console.print("Phase 3R synthetic markets: BLOCKED")
             console.print(str(exc))
             console.print(
-                "Next action: create data/synthetic_markets_candidates.json or rerun without "
+                "Next action: create examples/synthetic_markets_candidates.json or rerun without "
                 "--input-file."
             )
             raise typer.Exit(1) from exc
