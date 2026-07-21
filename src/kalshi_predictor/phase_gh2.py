@@ -48,6 +48,9 @@ from kalshi_predictor.weather.linker import WEATHER_TICKER_PREFIXES, link_weathe
 PHASE_GH2_VERSION = "GH-2.0"
 CRYPTO_TICKER_PREFIXES = ("KXBTC", "KXETH", "KXSOLE", "KXXRP", "KXDOGE")
 ACTIONABLE_MODELS = ("crypto_v2", "weather_v2")
+WEATHER_DECISION_LIMIT = 6
+WEATHER_FEATURE_LOCATION_LIMIT = 2
+WEATHER_FEATURE_FORECAST_LIMIT = 4
 PAPER_ONLY_SAFETY = "PAPER_ONLY_NO_ORDER_CREATION_OR_EXCHANGE_WRITES"
 
 
@@ -232,7 +235,7 @@ def run_gh2_single_writer_decision_refresh(
                 "live_execution_enabled": False,
             },
         )
-        print(f"GH-2 stage: {stage}")
+        print(f"GH-2 stage: {stage}", flush=True)
 
     mark_stage("preflight_writer_gate")
     resolved = (settings or get_settings()).model_copy(
@@ -311,6 +314,10 @@ def run_gh2_single_writer_decision_refresh(
             tickers=weather_link_tickers,
             limit=active_link_limit,
         )
+        weather_decision_tickers = _bounded_unique(
+            ranked_weather + weather_link_tickers,
+            WEATHER_DECISION_LIMIT,
+        )
 
         mark_stage("refresh_crypto_decisions")
         crypto_scope = set(crypto_link_tickers)
@@ -343,10 +350,12 @@ def run_gh2_single_writer_decision_refresh(
         mark_stage("refresh_weather_decisions")
         weather_features = _build_current_weather_features(
             session,
-            weather_link_tickers,
+            weather_decision_tickers,
             settings=resolved,
+            max_locations=WEATHER_FEATURE_LOCATION_LIMIT,
+            forecasts_per_location=WEATHER_FEATURE_FORECAST_LIMIT,
         )
-        weather_scope = set(weather_link_tickers)
+        weather_scope = set(weather_decision_tickers)
         weather_snapshots = [
             snapshot
             for snapshot in (
@@ -472,6 +481,7 @@ def run_gh2_single_writer_decision_refresh(
         "active_linking": {
             "crypto_candidates": len(active_crypto),
             "weather_candidates": len(active_weather),
+            "weather_decision_candidates": len(weather_decision_tickers),
             "crypto": asdict(crypto_link),
             "weather": asdict(weather_link),
         },
@@ -552,6 +562,8 @@ def _build_current_weather_features(
     tickers: list[str],
     *,
     settings: Settings,
+    max_locations: int = WEATHER_FEATURE_LOCATION_LIMIT,
+    forecasts_per_location: int = WEATHER_FEATURE_FORECAST_LIMIT,
 ) -> list[dict[str, Any]]:
     if not tickers:
         return []
@@ -560,16 +572,16 @@ def _build_current_weather_features(
             select(WeatherMarketLink.location_key)
             .where(WeatherMarketLink.ticker.in_(tickers))
             .distinct()
-            .limit(25)
+            .limit(max_locations)
         )
-    )
+    )[:max_locations]
     summaries = []
     for location in locations:
         summary = build_weather_features(
             session,
             location_key=location,
             settings=settings,
-            limit=24,
+            limit=forecasts_per_location,
         )
         summaries.append(asdict(summary))
     return summaries
