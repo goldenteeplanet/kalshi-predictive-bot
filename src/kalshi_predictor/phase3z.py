@@ -15,6 +15,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 import kalshi_predictor
+from kalshi_predictor.active_universe import current_market_predicate
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.backend import (
     database_url_from_settings,
@@ -708,12 +709,11 @@ def _market_coverage_stage_counts(
     deep_checks: bool = True,
 ) -> dict[str, Any]:
     market_count = _count(session, Market)
-    eligible_statuses = ("open", "unopened", "paused")
     active_eligible = int(
         session.scalar(
             select(func.count())
             .select_from(Market)
-            .where(func.lower(Market.status).in_(eligible_statuses))
+            .where(current_market_predicate(now=utc_now()))
         )
         or 0
     )
@@ -812,6 +812,13 @@ def _coverage_contract_row(row: dict[str, Any], stage_counts: dict[str, Any]) ->
     denominator = row["parsed_markets"]
     usable = row["linked_markets"]
     coverage = None if denominator == 0 else round(usable / denominator, 4)
+    current_denominator = int(row.get("current_linkable_markets") or 0)
+    current_usable = int(row.get("current_linked_markets") or 0)
+    current_coverage = (
+        None
+        if current_denominator == 0
+        else round(current_usable / current_denominator, 4)
+    )
     health = _coverage_health(row, stage_counts)
     return {
         "scope_type": "internal_category",
@@ -822,6 +829,11 @@ def _coverage_contract_row(row: dict[str, Any], stage_counts: dict[str, Any]) ->
         "metadata_complete_markets": stage_counts["metadata_complete_markets"],
         "parsed_markets": row["parsed_markets"],
         "parsed_legs": row["parsed_legs"],
+        "current_parsed_markets": int(row.get("current_parsed_markets") or 0),
+        "current_parsed_legs": int(row.get("current_parsed_legs") or 0),
+        "current_linked_markets": current_usable,
+        "current_unlinked_markets": int(row.get("current_unlinked_markets") or 0),
+        "historical_unlinked_markets": int(row.get("historical_unlinked_markets") or 0),
         "parse_failures": 0,
         "external_linked_markets": row["linked_markets"],
         "derived_markets": row["derived_markets"],
@@ -839,6 +851,8 @@ def _coverage_contract_row(row: dict[str, Any], stage_counts: dict[str, Any]) ->
         "fresh_executable_markets": None,
         "coverage": coverage,
         "coverage_denominator": denominator,
+        "current_coverage": current_coverage,
+        "current_coverage_denominator": current_denominator,
         "health": health,
         "reason_codes": _coverage_reason_codes(row, health, stage_counts),
         "next_action": _coverage_next_action(row, health),
@@ -848,11 +862,13 @@ def _coverage_contract_row(row: dict[str, Any], stage_counts: dict[str, Any]) ->
 def _coverage_health(row: dict[str, Any], stage_counts: dict[str, Any]) -> str:
     if stage_counts["catalog_markets"] == 0:
         return "NO_CATALOG_DATA"
-    if row["parsed_markets"] == 0:
+    if int(row.get("current_parsed_markets", row["parsed_markets"])) == 0:
         return "NO_COMPATIBLE_ACTIVE_MARKETS" if row["category"] in LINKED_CATEGORIES else "HEALTHY"
-    if row["linked_markets"] == 0 and row["category"] in LINKED_CATEGORIES:
+    if int(row.get("current_linked_markets", row["linked_markets"])) == 0 and row[
+        "category"
+    ] in LINKED_CATEGORIES:
         return "LINKER_NOT_RUN"
-    if row["partial_markets"] > 0:
+    if int(row.get("current_unlinked_markets") or 0) > 0 or row["partial_markets"] > 0:
         return "LINKER_DEGRADED"
     return "HEALTHY"
 
@@ -869,6 +885,8 @@ def _coverage_reason_codes(
     if health == "LINKER_NOT_RUN":
         return ["NO_EXTERNAL_CANDIDATE"]
     if health == "LINKER_DEGRADED":
+        if int(row.get("current_unlinked_markets") or 0) > 0:
+            return ["CURRENT_MARKET_LINK_GAP"]
         return ["LEGACY_IDENTIFIER"]
     if isinstance(stage_counts.get("orphan_links"), int) and stage_counts["orphan_links"] > 0:
         return ["ORPHAN_MARKET_LINK"]
@@ -892,6 +910,11 @@ def _coverage_next_action(row: dict[str, Any], health: str) -> dict[str, str]:
             "command": "kalshi-bot link-remediate",
         }
     if health == "LINKER_DEGRADED":
+        if int(row.get("current_unlinked_markets") or 0) > 0:
+            return {
+                "summary": "Run bounded current-market link repair",
+                "command": "kalshi-bot db-writer-monitor --json",
+            }
         return {
             "summary": "Review partial or legacy links",
             "command": "kalshi-bot market-coverage-doctor --output-dir reports/market_coverage",
