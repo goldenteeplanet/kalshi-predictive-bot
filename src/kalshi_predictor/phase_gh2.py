@@ -291,19 +291,51 @@ def run_gh2_single_writer_decision_refresh(
             limit=active_link_limit,
         )
 
+        crypto_scope = set(crypto_link_tickers)
+        crypto_snapshots = [
+            snapshot
+            for snapshot in (
+                latest_snapshots_for_model(
+                    session,
+                    model_name="crypto_v2",
+                    limit=forecast_limit,
+                )
+                or []
+            )
+            if snapshot.ticker in crypto_scope
+        ]
+        crypto_forecasts = run_forecast_models(
+            session,
+            model_name="crypto_v2",
+            snapshots=crypto_snapshots,
+        )
+        crypto_opportunities = scan_opportunities(
+            session,
+            model_name="crypto_v2",
+            limit=opportunity_limit,
+            settings=resolved,
+            ticker_scope=[snapshot.ticker for snapshot in crypto_snapshots],
+            scan_mode="GH2_CURRENT_PAPER_ONLY_REFRESH",
+        )
+
         weather_features = _build_current_weather_features(
             session,
             weather_link_tickers,
             settings=resolved,
         )
-        weather_snapshots = (
-            latest_snapshots_for_model(
-                session,
-                model_name="weather_v2",
-                limit=forecast_limit,
+        weather_scope = set(weather_link_tickers)
+        weather_snapshots = [
+            snapshot
+            for snapshot in (
+                latest_snapshots_for_model(
+                    session,
+                    model_name="weather_v2",
+                    limit=forecast_limit,
+                )
+                or []
             )
-            or []
-        )
+            if snapshot.ticker in weather_scope
+        ]
         weather_forecasts = run_forecast_models(
             session,
             model_name="weather_v2",
@@ -330,17 +362,19 @@ def run_gh2_single_writer_decision_refresh(
             external_crypto_ingest=False,
             repair_snapshots=False,
             forecast_current_windows_only=True,
-            generate_opportunity_report=True,
+            generate_opportunity_report=False,
             crypto_market_scan_limit=active_link_limit,
             crypto_link_limit=active_link_limit,
             forecast_limit=forecast_limit,
             opportunity_limit=opportunity_limit,
             phase3bc_limit=forecast_limit,
             freshness_minutes=freshness_minutes,
-            ranking_repair=True,
+            risk_preflight=False,
+            ranking_repair=False,
             ranking_repair_limit=opportunity_limit,
             exact_snapshot_refresh=False,
             near_money_only=False,
+            skip_phase3bc_r3_refresh=True,
         )
         weather_gate = build_phase3ba_r3_weather_paper_gate(
             session,
@@ -368,8 +402,8 @@ def run_gh2_single_writer_decision_refresh(
     weather_summary = weather_gate.get("summary") or {}
     crypto_paper_ready = int(r5_summary.get("paper_ready_candidates") or 0)
     weather_paper_ready = int(weather_summary.get("paper_ready_rows") or 0)
-    rankings_inserted = int(weather_opportunities.rankings_inserted) + int(
-        (r5_payload.get("latest_summary") or {}).get("ranking_rows") or 0
+    rankings_inserted = int(crypto_opportunities.rankings_inserted) + int(
+        weather_opportunities.rankings_inserted
     )
     if rankings_inserted == 0:
         rankings_inserted = sum(
@@ -415,6 +449,9 @@ def run_gh2_single_writer_decision_refresh(
             "weather": asdict(weather_link),
         },
         "decision_refresh": {
+            "crypto_forecasts": asdict(crypto_forecasts),
+            "crypto_rankings_inserted": crypto_opportunities.rankings_inserted,
+            "crypto_opportunities_detected": crypto_opportunities.opportunities_detected,
             "weather_features": weather_features,
             "weather_forecasts": asdict(weather_forecasts),
             "weather_rankings_inserted": weather_opportunities.rankings_inserted,

@@ -37,6 +37,7 @@ from kalshi_predictor.phase3bc_r3 import (
     DEFAULT_NEAR_MONEY_PER_SYMBOL_LIMIT,
     DEFAULT_NEAR_MONEY_WINDOW_LIMIT,
     DEFAULT_SNAPSHOT_FETCH_CONCURRENCY,
+    Phase3BCR3ArtifactSet,
     write_phase3bc_r3_active_crypto_refresh_report,
 )
 from kalshi_predictor.phase3bc_r4 import write_phase3bc_r4_crypto_ev_risk_diagnostics_report
@@ -130,6 +131,7 @@ def write_phase3bc_r5_crypto_freshness_watch_report(
     near_money_per_symbol_limit: int = DEFAULT_NEAR_MONEY_PER_SYMBOL_LIMIT,
     near_money_window_limit: int = DEFAULT_NEAR_MONEY_WINDOW_LIMIT,
     snapshot_fetch_concurrency: int = DEFAULT_SNAPSHOT_FETCH_CONCURRENCY,
+    skip_phase3bc_r3_refresh: bool = False,
     cycle_number: int = 1,
     total_cycles: int = 1,
 ) -> Phase3BCR5ArtifactSet:
@@ -147,33 +149,41 @@ def write_phase3bc_r5_crypto_freshness_watch_report(
         total_cycles=total_cycles,
     )
 
-    stage_timer.mark("phase3bc_r3_refresh")
-    r3_artifacts = write_phase3bc_r3_active_crypto_refresh_report(
-        session,
-        output_dir=phase3bc_r3_output_dir,
-        phase3bc_output_dir=phase3bc_output_dir,
-        settings=resolved,
-        symbols=symbols,
-        crypto_series_tickers=crypto_series_tickers,
-        source=source,
-        refresh_open_markets=refresh_open_markets,
-        external_crypto_ingest=external_crypto_ingest,
-        repair_snapshots=repair_snapshots,
-        forecast_current_windows_only=forecast_current_windows_only,
-        generate_opportunity_report=generate_opportunity_report,
-        market_limit=market_limit,
-        market_max_pages=market_max_pages,
-        crypto_market_scan_limit=crypto_market_scan_limit,
-        crypto_link_limit=crypto_link_limit,
-        forecast_limit=forecast_limit,
-        opportunity_limit=opportunity_limit,
-        phase3bc_limit=phase3bc_limit,
-        cadence_minutes=cadence_minutes,
-        near_money_only=near_money_only,
-        near_money_per_symbol_limit=near_money_per_symbol_limit,
-        near_money_window_limit=near_money_window_limit,
-        snapshot_fetch_concurrency=snapshot_fetch_concurrency,
-    )
+    if skip_phase3bc_r3_refresh:
+        stage_timer.mark("phase3bc_r3_reuse")
+        r3_artifacts = Phase3BCR3ArtifactSet(
+            phase3bc_r3_output_dir,
+            phase3bc_r3_output_dir / "phase3bc_r3_active_crypto_refresh.json",
+            phase3bc_r3_output_dir / "phase3bc_r3_active_crypto_refresh.md",
+        )
+    else:
+        stage_timer.mark("phase3bc_r3_refresh")
+        r3_artifacts = write_phase3bc_r3_active_crypto_refresh_report(
+            session,
+            output_dir=phase3bc_r3_output_dir,
+            phase3bc_output_dir=phase3bc_output_dir,
+            settings=resolved,
+            symbols=symbols,
+            crypto_series_tickers=crypto_series_tickers,
+            source=source,
+            refresh_open_markets=refresh_open_markets,
+            external_crypto_ingest=external_crypto_ingest,
+            repair_snapshots=repair_snapshots,
+            forecast_current_windows_only=forecast_current_windows_only,
+            generate_opportunity_report=generate_opportunity_report,
+            market_limit=market_limit,
+            market_max_pages=market_max_pages,
+            crypto_market_scan_limit=crypto_market_scan_limit,
+            crypto_link_limit=crypto_link_limit,
+            forecast_limit=forecast_limit,
+            opportunity_limit=opportunity_limit,
+            phase3bc_limit=phase3bc_limit,
+            cadence_minutes=cadence_minutes,
+            near_money_only=near_money_only,
+            near_money_per_symbol_limit=near_money_per_symbol_limit,
+            near_money_window_limit=near_money_window_limit,
+            snapshot_fetch_concurrency=snapshot_fetch_concurrency,
+        )
     stage_timer.mark("phase3bc_r7_ranking_repair")
     r7_artifacts = write_phase3bc_r7_crypto_ranking_coverage_repair_report(
         session,
@@ -297,6 +307,7 @@ def write_phase3bc_r5_crypto_freshness_watch_report(
             "near_money_per_symbol_limit": near_money_per_symbol_limit,
             "near_money_window_limit": near_money_window_limit,
             "snapshot_fetch_concurrency": snapshot_fetch_concurrency,
+            "skip_phase3bc_r3_refresh": skip_phase3bc_r3_refresh,
         },
         reports={
             "phase3bc_r3_json": str(r3_artifacts.json_path),
