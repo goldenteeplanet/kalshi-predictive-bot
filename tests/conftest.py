@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
+
+# Typer initializes its Rich console while test modules are imported.
+os.environ.pop("FORCE_COLOR", None)
+os.environ.setdefault("NO_COLOR", "1")
+os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
 
 import pytest
 
@@ -24,6 +30,13 @@ from kalshi_predictor.benchmarking.oos_exposure_guard import (
 from kalshi_predictor.benchmarking.stress_guard import (
     write_stress_aware_allocation_guard_preview,
 )
+
+
+@pytest.fixture(autouse=True)
+def stable_terminal_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep captured CLI help independent of CI terminal color settings."""
+    monkeypatch.delenv("FORCE_COLOR", raising=False)
+    monkeypatch.setenv("NO_COLOR", "1")
 
 
 @pytest.fixture(scope="session")
