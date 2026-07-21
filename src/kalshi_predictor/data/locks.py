@@ -34,6 +34,7 @@ LIKELY_WRITER_MARKERS = (
     "model-link-repair",
     "model-feature-repair",
     "phase3bb-r43-single-writer-coordinator",
+    "gh2-single-writer-decision-refresh",
     "single-writer-coordinator",
 )
 
