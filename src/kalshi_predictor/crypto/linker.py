@@ -456,6 +456,16 @@ def _target_price_asset_match(
     if not prices:
         return None, Decimal("0.0"), "No crypto keyword match."
 
+    event_symbol = symbol_from_event_ticker(market.event_ticker) or symbol_from_event_ticker(
+        market.series_ticker
+    )
+    if event_symbol is not None:
+        return (
+            event_symbol,
+            Decimal("0.95"),
+            f"Explicit {event_symbol} event or series ticker target price match.",
+        )
+
     symbols = {symbol_for_target_price(price) for price in prices}
     supported_symbols = {symbol for symbol in symbols if symbol is not None}
     unsupported_count = sum(1 for symbol in symbols if symbol is None)
