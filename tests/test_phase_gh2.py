@@ -1,11 +1,14 @@
 from datetime import timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
+from kalshi_predictor import phase_gh2
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_market_snapshot
 from kalshi_predictor.opportunities.repository import insert_market_ranking
 from kalshi_predictor.phase_gh2 import select_actionable_ranked_markets
 from kalshi_predictor.utils.time import utc_now
+from kalshi_predictor.weather.features import WeatherFeatureBuildSummary
 
 
 def test_candidate_alignment_prioritizes_fresh_executable_rankings(tmp_path: Path) -> None:
@@ -71,6 +74,35 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "--forecast-limit 24" in script
     assert "--opportunity-limit 20" in script
     assert "paper-order" not in script.lower()
+
+
+def test_weather_feature_refresh_is_strictly_bounded(monkeypatch) -> None:
+    calls = []
+
+    class FakeSession:
+        def scalars(self, statement):
+            return iter(("new_york", "chicago", "miami"))
+
+    def fake_build(session, *, location_key, settings, limit):
+        calls.append((location_key, limit))
+        return WeatherFeatureBuildSummary(
+            location_key=location_key,
+            forecasts_processed=limit,
+            features_inserted=limit,
+        )
+
+    monkeypatch.setattr(phase_gh2, "build_weather_features", fake_build)
+
+    summaries = phase_gh2._build_current_weather_features(
+        FakeSession(),
+        ["KXTEMPNYCH-TEST"],
+        settings=SimpleNamespace(),
+        max_locations=2,
+        forecasts_per_location=4,
+    )
+
+    assert calls == [("new_york", 4), ("chicago", 4)]
+    assert len(summaries) == 2
 
 
 def _session_factory(tmp_path: Path):
