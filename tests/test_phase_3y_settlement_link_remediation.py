@@ -151,6 +151,51 @@ def test_crypto_linker_rejects_unsupported_target_price_assets(tmp_path) -> None
     assert "unsupported" in reason.lower()
 
 
+def test_crypto_linker_trusts_explicit_doge_series_below_heuristic_price_floor(
+    tmp_path,
+) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        market = upsert_market(
+            session,
+            {
+                "ticker": "KXDOGE-26JUL2417-B0.007",
+                "event_ticker": "KXDOGE-26JUL2417",
+                "series_ticker": "KXDOGE",
+                "title": "Dogecoin price range on Jul 24, 2026?",
+            },
+        )
+        session.add(
+            MarketLeg(
+                ticker=market.ticker,
+                leg_index=0,
+                parsed_at=utc_now(),
+                side="YES",
+                category="crypto",
+                market_type="TARGET_PRICE",
+                entity_name="DOGE",
+                operator="ABOVE",
+                threshold_value="0.007",
+                unit="USD",
+                confidence="0.95",
+                raw_text="Dogecoin above $0.007",
+                reason="test DOGE leg",
+                raw_json="{}",
+            )
+        )
+
+        result = link_crypto_markets(session, tickers=[market.ticker])
+        link = session.scalar(
+            select(CryptoMarketLink).where(CryptoMarketLink.ticker == market.ticker)
+        )
+
+    assert result.links_created == 1
+    assert result.exact_semantic_links == 1
+    assert link is not None
+    assert link.symbol == "DOGE"
+    assert "explicit_event_symbol_target_price" in link.raw_json
+
+
 def test_crypto_link_remediation_is_idempotent_for_target_links(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:

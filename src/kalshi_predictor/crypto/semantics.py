@@ -166,6 +166,30 @@ def parse_crypto_market_terms(
             timezone=timezone,
             raw=raw,
         )
+    if unsupported_prices and event_symbol is not None:
+        component = CryptoComponentTerms(
+            symbol=event_symbol,
+            side=None,
+            comparator=_text_comparator(text),
+            threshold_value=(
+                _first_target_price_from_text(text) or unsupported_prices[0]
+            ),
+            reference_price_source=source,
+            source_event=market.event_ticker or market.series_ticker,
+            source_market=market.ticker,
+            raw_text=_compact(text),
+        )
+        return _terms(
+            market,
+            status=EXACT_LINK,
+            symbol=event_symbol,
+            components=(component,),
+            reason_codes=("explicit_event_symbol_target_price",),
+            reference_price_source=source,
+            timezone=timezone,
+            raw=raw,
+            extra={"target_prices_outside_heuristic_range": unsupported_prices},
+        )
     if unsupported_prices:
         return _terms(
             market,
