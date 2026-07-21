@@ -5,8 +5,12 @@ from sqlalchemy import func, select
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
-from kalshi_predictor.data.repositories import insert_market_snapshot, upsert_market
-from kalshi_predictor.data.schema import MarketLeg, WeatherMarketLink
+from kalshi_predictor.data.repositories import (
+    decode_json,
+    insert_market_snapshot,
+    upsert_market,
+)
+from kalshi_predictor.data.schema import MarketLeg, WeatherFeature, WeatherMarketLink
 from kalshi_predictor.forecasting.weather_v2 import WeatherV2Forecaster
 from kalshi_predictor.utils.time import utc_now
 from kalshi_predictor.weather.features import (
@@ -59,6 +63,26 @@ def test_manual_weather_ingestion_stores_json(tmp_path) -> None:
         assert forecasts[0].short_forecast == "Chance Showers"
 
 
+def test_manual_noaa_ingestion_deduplicates_forecast_versions(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        first = ingest_manual_weather_json(
+            session,
+            _sample_noaa_payload(),
+            location_key="kansas_city",
+        )
+        second = ingest_manual_weather_json(
+            session,
+            _sample_noaa_payload(),
+            location_key="kansas_city",
+        )
+        forecasts = get_weather_forecasts(session, "kansas_city")
+
+    assert first.forecasts_inserted == 2
+    assert second.forecasts_inserted == 0
+    assert len(forecasts) == 2
+
+
 def test_weather_feature_builder_handles_missing_fields(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
@@ -76,6 +100,35 @@ def test_weather_feature_builder_handles_missing_fields(tmp_path) -> None:
         assert summary.features_inserted == 1
         assert features[0].freeze_risk_score is None
         assert "Missing temperature" in features[0].raw_json
+
+
+def test_weather_feature_builder_limits_to_newest_forecast_rows(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = utc_now()
+    with session_factory() as session:
+        forecasts = [
+            insert_weather_forecast(
+                session,
+                location_key="kansas_city",
+                source="test",
+                forecast_generated_at=now + timedelta(minutes=index),
+                forecast_time=now + timedelta(hours=index + 1),
+                temperature_f=70 + index,
+            )
+            for index in range(3)
+        ]
+
+        summary = build_weather_features(
+            session,
+            location_key="kansas_city",
+            limit=2,
+        )
+        rows = list(session.scalars(select(WeatherFeature).order_by(WeatherFeature.id)))
+
+    source_ids = {decode_json(row.raw_json)["source_observation_ref"]["id"] for row in rows}
+    assert summary.forecasts_processed == 2
+    assert summary.features_inserted == 2
+    assert source_ids == {forecasts[1].id, forecasts[2].id}
 
 
 def test_weather_rain_risk_scoring_works() -> None:
@@ -391,7 +444,10 @@ def test_weather_v2_uses_freshest_source_feature_for_target_time_ties(tmp_path) 
 
         assert forecast is not None
         assert forecast.feature_json["weather_feature_values"]["temperature_f"] == "80"
-        assert forecast.feature_json["weather_feature_values"]["target_time"] == target_time.isoformat()
+        assert (
+            forecast.feature_json["weather_feature_values"]["target_time"]
+            == target_time.isoformat()
+        )
         assert fresh_feature.id is not None
 
 

@@ -10,6 +10,7 @@ from kalshi_predictor.data.schema import WeatherForecast, WeatherObservation
 from kalshi_predictor.utils.decimals import decimal_to_str, to_decimal
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 from kalshi_predictor.weather.repository import (
+    get_latest_weather_forecasts,
     get_nearest_weather_observation,
     get_weather_forecasts,
     insert_weather_features,
@@ -30,10 +31,17 @@ def build_weather_features(
     location_key: str,
     source: str = "stored_forecasts",
     settings: Settings | None = None,
+    limit: int | None = None,
 ) -> WeatherFeatureBuildSummary:
     location = normalize_location_key(location_key)
+    if limit is not None and limit < 1:
+        raise ValueError("limit must be positive when provided")
     active_settings = settings or get_settings()
-    forecasts = get_weather_forecasts(session, location)
+    forecasts = (
+        get_latest_weather_forecasts(session, location, limit=limit)
+        if limit is not None
+        else get_weather_forecasts(session, location)
+    )
     inserted = 0
     generated_at = utc_now()
     for forecast in forecasts:
