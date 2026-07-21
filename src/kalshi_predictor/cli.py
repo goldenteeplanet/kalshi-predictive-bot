@@ -19166,6 +19166,16 @@ def link_crypto_markets_command(
         Path,
         typer.Option(help="Directory for crypto linker heartbeat/checkpoint artifacts."),
     ] = Path("reports/crypto_link"),
+    current_unlinked_only: Annotated[
+        bool,
+        typer.Option(
+            "--current-unlinked-only/--all-markets",
+            help=(
+                "Scan only current parsed crypto markets without a crypto link. "
+                "The limit is applied after this scope is selected."
+            ),
+        ),
+    ] = False,
 ) -> None:
     engine = init_db()
     session_factory = get_session_factory(engine)
@@ -19190,6 +19200,7 @@ def link_crypto_markets_command(
             "progress_every": progress_every,
             "checkpoint_every": checkpoint_every,
             "stop_after_minutes": stop_after_minutes,
+            "scope": "CURRENT_UNLINKED_CRYPTO" if current_unlinked_only else "ALL_MARKETS",
             "resume": True,
             "resume_mode": "idempotent_skip_matching_latest_link",
             "final": final,
@@ -19235,6 +19246,7 @@ def link_crypto_markets_command(
         summary = link_crypto_markets(
             session,
             limit=limit if limit > 0 else None,
+            current_unlinked_only=current_unlinked_only,
             progress_callback=_progress,
             progress_every=max(progress_every, 0),
             should_stop=_should_stop,
@@ -19257,6 +19269,10 @@ def link_crypto_markets_command(
         ),
     )
     console.print("Crypto market link summary")
+    console.print(
+        "Scope: "
+        + ("current unlinked parsed crypto markets" if current_unlinked_only else "all markets")
+    )
     console.print(f"Markets scanned: {summary.markets_scanned}")
     console.print(f"Markets processed: {summary.markets_processed}")
     console.print(f"Links created: {summary.links_created}")
