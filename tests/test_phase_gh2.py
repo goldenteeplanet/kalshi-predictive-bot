@@ -56,6 +56,7 @@ def test_candidate_alignment_prioritizes_fresh_executable_rankings(tmp_path: Pat
 
 def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     root = Path(__file__).parents[1]
+    implementation = (root / "src/kalshi_predictor/phase_gh2.py").read_text(encoding="utf-8")
     service = (root / "deploy/systemd/kalshi-gh2-decision-refresh.service").read_text(
         encoding="utf-8"
     )
@@ -74,6 +75,9 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "--forecast-limit 24" in script
     assert "--opportunity-limit 20" in script
     assert "paper-order" not in script.lower()
+    assert "latest_snapshots_for_model" not in implementation
+    assert "_latest_snapshots(session, crypto_link_tickers)" in implementation
+    assert "_latest_snapshots(session, weather_decision_tickers)" in implementation
 
 
 def test_weather_feature_refresh_is_strictly_bounded(monkeypatch) -> None:

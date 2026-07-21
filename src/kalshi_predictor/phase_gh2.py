@@ -25,10 +25,7 @@ from kalshi_predictor.data.schema import (
     PaperOrder,
     WeatherMarketLink,
 )
-from kalshi_predictor.forecasting.registry import (
-    latest_snapshots_for_model,
-    run_forecast_models,
-)
+from kalshi_predictor.forecasting.registry import run_forecast_models
 from kalshi_predictor.ingest.websocket_orderbooks import (
     drain_staged_websocket_orderbooks,
 )
@@ -320,19 +317,12 @@ def run_gh2_single_writer_decision_refresh(
         )
 
         mark_stage("refresh_crypto_decisions")
-        crypto_scope = set(crypto_link_tickers)
+        crypto_latest = _latest_snapshots(session, crypto_link_tickers)
         crypto_snapshots = [
-            snapshot
-            for snapshot in (
-                latest_snapshots_for_model(
-                    session,
-                    model_name="crypto_v2",
-                    limit=forecast_limit,
-                )
-                or []
-            )
-            if snapshot.ticker in crypto_scope
-        ]
+            crypto_latest[ticker]
+            for ticker in crypto_link_tickers
+            if ticker in crypto_latest
+        ][:forecast_limit]
         crypto_forecasts = run_forecast_models(
             session,
             model_name="crypto_v2",
@@ -355,19 +345,12 @@ def run_gh2_single_writer_decision_refresh(
             max_locations=WEATHER_FEATURE_LOCATION_LIMIT,
             forecasts_per_location=WEATHER_FEATURE_FORECAST_LIMIT,
         )
-        weather_scope = set(weather_decision_tickers)
+        weather_latest = _latest_snapshots(session, weather_decision_tickers)
         weather_snapshots = [
-            snapshot
-            for snapshot in (
-                latest_snapshots_for_model(
-                    session,
-                    model_name="weather_v2",
-                    limit=forecast_limit,
-                )
-                or []
-            )
-            if snapshot.ticker in weather_scope
-        ]
+            weather_latest[ticker]
+            for ticker in weather_decision_tickers
+            if ticker in weather_latest
+        ][:forecast_limit]
         weather_forecasts = run_forecast_models(
             session,
             model_name="weather_v2",
