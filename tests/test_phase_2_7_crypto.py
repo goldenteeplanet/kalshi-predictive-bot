@@ -5,7 +5,6 @@ from sqlalchemy import select
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.crypto.features import calculate_crypto_features
-
 from kalshi_predictor.crypto.linker import detect_crypto_market, link_crypto_markets
 from kalshi_predictor.crypto.providers import parse_coinbase_spot_response
 from kalshi_predictor.crypto.reports import generate_crypto_backtest_report
@@ -163,6 +162,73 @@ def test_link_crypto_markets_honors_limit(tmp_path) -> None:
     assert summary.markets_scanned == 1
     assert summary.markets_processed == 1
     assert summary.links_created == 1
+
+
+def test_link_crypto_markets_current_unlinked_scope_applies_limit_after_filtering(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    future = (utc_now() + timedelta(days=1)).isoformat()
+    past = (utc_now() - timedelta(days=1)).isoformat()
+    with session_factory() as session:
+        current = upsert_market(
+            session,
+            {
+                "ticker": "BTC-CURRENT-UNLINKED",
+                "title": "Will BTC exceed 70000?",
+                "status": "active",
+                "close_time": future,
+            },
+        )
+        expired = upsert_market(
+            session,
+            {
+                "ticker": "AAA-ETH-EXPIRED",
+                "title": "Will ETH exceed 4000?",
+                "status": "closed",
+                "close_time": past,
+            },
+        )
+        linked = upsert_market(
+            session,
+            {
+                "ticker": "AAB-DOGE-LINKED",
+                "title": "Will DOGE exceed 1?",
+                "status": "active",
+                "close_time": future,
+            },
+        )
+        for market, symbol in ((current, "BTC"), (expired, "ETH"), (linked, "DOGE")):
+            session.add(
+                MarketLeg(
+                    ticker=market.ticker,
+                    leg_index=0,
+                    parsed_at=utc_now(),
+                    side="YES",
+                    category="crypto",
+                    market_type="TARGET_PRICE",
+                    entity_name=symbol,
+                    operator="ABOVE",
+                    threshold_value="1",
+                    unit="USD",
+                    confidence="0.95",
+                    raw_text=f"Will {symbol} exceed 1?",
+                    reason="test crypto leg",
+                    raw_json="{}",
+                )
+            )
+        insert_crypto_market_link(
+            session,
+            ticker=linked.ticker,
+            symbol="DOGE",
+            confidence="1.0",
+            reason="existing test link",
+        )
+
+        summary = link_crypto_markets(session, limit=1, current_unlinked_only=True)
+
+    assert summary.markets_scanned == 1
+    assert summary.markets_processed == 1
+    assert summary.links_created == 1
+    assert summary.last_ticker == current.ticker
 
 
 def test_crypto_v2_skips_without_link(tmp_path) -> None:

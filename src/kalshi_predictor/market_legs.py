@@ -1603,8 +1603,9 @@ def _current_category_next_action(
         )
     if category == CATEGORY_CRYPTO:
         return (
-            "After the writer gate clears, run bounded checkpointed crypto linking for "
-            "current markets; keep historical backfill in a separate writer window."
+            "After the writer gate clears, run link-crypto-markets "
+            "--current-unlinked-only with bounded checkpointing; keep historical backfill "
+            "in a separate writer window."
         )
     if category == CATEGORY_WEATHER:
         return (

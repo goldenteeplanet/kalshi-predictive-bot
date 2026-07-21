@@ -5,9 +5,10 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from kalshi_predictor.active_universe import current_market_predicate
 from kalshi_predictor.crypto.assets import (
     symbol_for_target_price,
     symbol_from_alias_text,
@@ -25,7 +26,7 @@ from kalshi_predictor.crypto.semantics import (
     parse_crypto_market_terms,
 )
 from kalshi_predictor.data.repositories import decode_json
-from kalshi_predictor.data.schema import Market, MarketLeg
+from kalshi_predictor.data.schema import CryptoMarketLink, Market, MarketLeg
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,7 @@ def link_crypto_markets(
     *,
     limit: int | None = None,
     tickers: list[str] | None = None,
+    current_unlinked_only: bool = False,
     progress_callback: Callable[[dict[str, object]], None] | None = None,
     progress_every: int = 0,
     should_stop: Callable[[], bool] | None = None,
@@ -71,24 +73,30 @@ def link_crypto_markets(
     session.flush()
     statement = select(Market).order_by(Market.ticker)
     scoped_tickers = _unique_tickers(tickers or []) if tickers is not None else None
-    if scoped_tickers is not None:
-        if not scoped_tickers:
-            markets = []
-            legs_by_ticker = {}
-        else:
-            statement = statement.where(Market.ticker.in_(scoped_tickers))
-            if limit is not None:
-                statement = statement.limit(limit)
-            markets = list(session.scalars(statement))
-            legs_by_ticker = _crypto_legs_by_ticker(session, tickers=scoped_tickers)
+    if scoped_tickers is not None and not scoped_tickers:
+        markets = []
+        legs_by_ticker = {}
     else:
+        if scoped_tickers is not None:
+            statement = statement.where(Market.ticker.in_(scoped_tickers))
+        if current_unlinked_only:
+            statement = statement.where(
+                Market.ticker.in_(
+                    select(MarketLeg.ticker)
+                    .where(MarketLeg.category == "crypto")
+                    .distinct()
+                ),
+                ~Market.ticker.in_(select(CryptoMarketLink.ticker).distinct()),
+                current_market_predicate(),
+                ~_unsupported_composite_market_predicate(),
+            )
         if limit is not None:
             statement = statement.limit(limit)
         markets = list(session.scalars(statement))
         market_tickers = [market.ticker for market in markets]
         legs_by_ticker = (
             _crypto_legs_by_ticker(session, tickers=market_tickers)
-            if limit is not None
+            if limit is not None or scoped_tickers is not None or current_unlinked_only
             else _crypto_legs_by_ticker(session)
         )
     btc_links = 0
@@ -231,6 +239,18 @@ def link_crypto_markets(
     )
 
 
+def _unsupported_composite_market_predicate() -> Any:
+    columns = (Market.ticker, Market.event_ticker, Market.series_ticker)
+    prefixes = ("KXMVECROSSCATEGORY%", "KXMVESPORTSMULTIGAME%")
+    return or_(
+        *(
+            func.upper(func.coalesce(column, "")).like(prefix)
+            for column in columns
+            for prefix in prefixes
+        )
+    )
+
+
 def detect_crypto_market(
     market: Market,
     *,
@@ -361,7 +381,12 @@ def _emit_progress(
     if progress_callback is None:
         return
     cadence = max(progress_every, 0)
-    if status not in {"COMPLETE", "STOPPED_EARLY"} and cadence and processed % cadence != 0 and processed != total:
+    if (
+        status not in {"COMPLETE", "STOPPED_EARLY"}
+        and cadence
+        and processed % cadence != 0
+        and processed != total
+    ):
         return
     progress_callback(
         {
