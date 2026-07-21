@@ -17,6 +17,7 @@ from kalshi_predictor.weather.providers import (
 )
 from kalshi_predictor.weather.repository import (
     insert_weather_forecast,
+    insert_weather_forecast_if_missing,
     insert_weather_observation,
     insert_weather_observation_if_missing,
     normalize_location_key,
@@ -106,8 +107,7 @@ def store_weather_fetch_result(
 ) -> WeatherIngestionSummary:
     count = 0
     for forecast in result.forecasts:
-        _insert_forecast_period(session, forecast)
-        count += 1
+        count += int(_insert_forecast_period(session, forecast))
     return WeatherIngestionSummary(
         source=result.source,
         forecasts_inserted=count,
@@ -134,8 +134,7 @@ def ingest_manual_weather_json(
         errors.append(str(exc))
         noaa_periods = []
     for period in noaa_periods:
-        _insert_forecast_period(session, period)
-        forecasts_inserted += 1
+        forecasts_inserted += int(_insert_forecast_period(session, period))
 
     if not noaa_periods:
         for record in _extract_records(payload, "forecasts", "periods"):
@@ -202,8 +201,8 @@ def ingest_manual_weather_json(
     )
 
 
-def _insert_forecast_period(session: Session, forecast: WeatherForecastPeriod) -> None:
-    insert_weather_forecast(
+def _insert_forecast_period(session: Session, forecast: WeatherForecastPeriod) -> bool:
+    _, inserted = insert_weather_forecast_if_missing(
         session,
         location_key=forecast.location_key,
         source=forecast.source,
@@ -222,6 +221,7 @@ def _insert_forecast_period(session: Session, forecast: WeatherForecastPeriod) -
         detailed_forecast=forecast.detailed_forecast,
         raw_json=forecast.raw_json,
     )
+    return inserted
 
 
 def _manual_noaa_periods(

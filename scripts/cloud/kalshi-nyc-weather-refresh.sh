@@ -18,4 +18,4 @@ if ! grep -q '"safe_to_start_write": true' <<<"$writer_status"; then
 fi
 
 .venv/bin/kalshi-bot ingest-weather --location-key new_york
-.venv/bin/kalshi-bot build-weather-features --location-key new_york
+.venv/bin/kalshi-bot build-weather-features --location-key new_york --limit 200

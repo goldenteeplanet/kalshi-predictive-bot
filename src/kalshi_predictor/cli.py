@@ -19030,11 +19030,21 @@ def build_weather_features_command(
         str,
         typer.Option(help="Stable location key, for example kansas_city."),
     ],
+    limit: Annotated[
+        int,
+        typer.Option(help="Maximum newest forecast rows to process; 0 processes all rows."),
+    ] = 0,
 ) -> None:
+    if limit < 0:
+        raise typer.BadParameter("limit must be nonnegative")
     engine = init_db()
     session_factory = get_session_factory(engine)
     with session_factory() as session:
-        summary = build_weather_features(session, location_key=location_key)
+        summary = build_weather_features(
+            session,
+            location_key=location_key,
+            limit=limit or None,
+        )
         session.commit()
     console.print(
         f"Processed {summary.forecasts_processed} weather forecast row(s) for "

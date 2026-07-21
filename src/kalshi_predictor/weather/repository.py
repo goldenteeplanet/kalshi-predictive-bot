@@ -166,6 +166,43 @@ def insert_weather_forecast(
     return forecast
 
 
+def insert_weather_forecast_if_missing(
+    session: Session,
+    **values: Any,
+) -> tuple[WeatherForecast, bool]:
+    location_key = normalize_location_key(str(values["location_key"]))
+    source = str(values["source"])
+    forecast_generated_at = parse_datetime(values["forecast_generated_at"])
+    forecast_time = parse_datetime(values["forecast_time"])
+    if forecast_generated_at is None or forecast_time is None:
+        raise ValueError("forecast_generated_at and forecast_time are required")
+    existing = session.scalar(
+        select(WeatherForecast)
+        .where(
+            WeatherForecast.location_key == location_key,
+            WeatherForecast.source == source,
+            WeatherForecast.forecast_generated_at == forecast_generated_at,
+            WeatherForecast.forecast_time == forecast_time,
+        )
+        .order_by(desc(WeatherForecast.id))
+        .limit(1)
+    )
+    if existing is not None:
+        return existing, False
+    return (
+        insert_weather_forecast(
+            session,
+            **{
+                **values,
+                "location_key": location_key,
+                "forecast_generated_at": forecast_generated_at,
+                "forecast_time": forecast_time,
+            },
+        ),
+        True,
+    )
+
+
 def get_weather_forecasts(
     session: Session,
     location_key: str,

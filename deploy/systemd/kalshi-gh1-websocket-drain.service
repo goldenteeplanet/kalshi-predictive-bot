@@ -13,9 +13,12 @@ Environment=EXECUTION_ENABLED=false
 Environment=EXECUTION_DRY_RUN=true
 Environment=EXECUTION_KILL_SWITCH=true
 Environment=AUTOPILOT_DRY_RUN=true
+Environment=KALSHI_WEBSOCKET_STAGING_DIR=/var/lib/kalshi-bot-gh1/staging
 Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/opt/kalshi-predictive-bot/scripts/cloud/kalshi-gh1-drain.sh
 TimeoutStartSec=60s
+StateDirectory=kalshi-bot-gh1
+StateDirectoryMode=0750
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
@@ -27,5 +30,5 @@ RestrictSUIDSGID=true
 LockPersonality=true
 MemoryMax=384M
 TasksMax=48
-ReadWritePaths=/opt/kalshi-predictive-bot/reports/phase_gh1 /var/lib/kalshi-bot
+ReadWritePaths=/var/lib/kalshi-bot
 ReadOnlyPaths=/opt/kalshi-predictive-bot /etc/kalshi-bot
