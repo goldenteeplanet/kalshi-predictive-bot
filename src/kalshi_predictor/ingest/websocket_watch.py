@@ -35,20 +35,46 @@ def discover_quoted_market_tickers(
     series: Sequence[str],
     max_markets_per_series: int,
     max_quoted_per_series: int,
+    preferred_tickers: Sequence[str] = (),
 ) -> list[dict[str, Any]]:
     """Discover bounded open books without writing local or exchange state."""
 
     rows: list[dict[str, Any]] = []
+    selected_tickers: set[str] = set()
+    for ticker in dict.fromkeys(
+        str(item).strip() for item in preferred_tickers if str(item).strip()
+    ):
+        try:
+            orderbook = client.get_orderbook(ticker)
+        except Exception:
+            continue
+        yes_levels, no_levels = _book_levels(orderbook)
+        if not yes_levels and not no_levels:
+            continue
+        rows.append(
+            {
+                "ticker": ticker,
+                "series_ticker": _series_for_ticker(ticker, series),
+                "yes_levels": len(yes_levels),
+                "no_levels": len(no_levels),
+                "selection_source": "ACTIONABLE_RANKING",
+            }
+        )
+        selected_tickers.add(ticker)
+
     for series_ticker in dict.fromkeys(str(item).strip() for item in series if item):
+        already_selected = sum(1 for row in rows if row.get("series_ticker") == series_ticker)
+        if already_selected >= max_quoted_per_series:
+            continue
         payload = client.get_markets(
             status="open",
             limit=max_markets_per_series,
             series_ticker=series_ticker,
         )
-        selected = 0
+        selected = already_selected
         for market in list(payload.get("markets") or [])[:max_markets_per_series]:
             ticker = str(market.get("ticker") or "").strip()
-            if not ticker:
+            if not ticker or ticker in selected_tickers:
                 continue
             orderbook = client.get_orderbook(ticker)
             yes_levels, no_levels = _book_levels(orderbook)
@@ -60,12 +86,31 @@ def discover_quoted_market_tickers(
                     "series_ticker": series_ticker,
                     "yes_levels": len(yes_levels),
                     "no_levels": len(no_levels),
+                    "selection_source": "SERIES_FALLBACK",
                 }
             )
+            selected_tickers.add(ticker)
             selected += 1
             if selected >= max_quoted_per_series:
                 break
     return rows
+
+
+def load_actionable_tickers(path: Path, *, limit: int = 40) -> list[str]:
+    """Load a bounded GH-2 candidate manifest without failing the watch."""
+
+    if limit < 1:
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return []
+    raw_tickers = payload.get("tickers") if isinstance(payload, dict) else None
+    if not isinstance(raw_tickers, list):
+        return []
+    return list(
+        dict.fromkeys(str(ticker).strip() for ticker in raw_tickers if str(ticker).strip())
+    )[:limit]
 
 
 def run_reconnecting_websocket_watch(
@@ -81,6 +126,8 @@ def run_reconnecting_websocket_watch(
     reconnect_max_seconds: float = 120.0,
     persist_every_deltas: int = 25,
     status_path: Path = Path("reports/phase_gh1/watch/status.json"),
+    preferred_tickers_path: Path | None = None,
+    max_preferred_tickers: int = 40,
     max_cycles: int | None = None,
     client_factory: Callable[..., Any] = KalshiClient,
     adapter_factory: Callable[..., Any] = adapter_from_settings,
@@ -106,6 +153,7 @@ def run_reconnecting_websocket_watch(
         or reconnect_initial_seconds <= 0
         or reconnect_max_seconds < reconnect_initial_seconds
         or persist_every_deltas < 1
+        or max_preferred_tickers < 1
         or (max_cycles is not None and max_cycles < 1)
     ):
         raise ValueError("GH-1 watch bounds and reconnect intervals are invalid.")
@@ -125,6 +173,8 @@ def run_reconnecting_websocket_watch(
     sequence_recoveries = 0
     staged_files = 0
     recent_errors: list[str] = []
+    preferred_tickers: list[str] = []
+    preferred_selected = 0
     state = "STARTING"
     next_retry_seconds: float | None = None
 
@@ -136,6 +186,11 @@ def run_reconnecting_websocket_watch(
             "state": state,
             "series": list(series),
             "selected_tickers": list(cached_tickers),
+            "preferred_tickers_path": (
+                str(preferred_tickers_path) if preferred_tickers_path else None
+            ),
+            "preferred_tickers_loaded": len(preferred_tickers),
+            "preferred_tickers_selected": preferred_selected,
             "cycles_started": cycles_started,
             "stream_cycles_completed": stream_cycles_completed,
             "reconnect_count": reconnect_count,
@@ -176,18 +231,25 @@ def run_reconnecting_websocket_watch(
                         state = "DISCOVERING_QUOTED_BOOKS"
                         write_status()
                         try:
+                            preferred_tickers = (
+                                load_actionable_tickers(
+                                    preferred_tickers_path,
+                                    limit=max_preferred_tickers,
+                                )
+                                if preferred_tickers_path is not None
+                                else []
+                            )
                             rows = discovery_fn(
                                 client=client,
                                 series=series,
                                 max_markets_per_series=max_markets_per_series,
                                 max_quoted_per_series=max_quoted_per_series,
+                                preferred_tickers=preferred_tickers,
                             )
                         except Exception as exc:
                             discovery_failures += 1
                             recent_errors.append(f"discovery: {exc}")
-                            next_discovery_at = now_monotonic + min(
-                                60.0, discovery_refresh_seconds
-                            )
+                            next_discovery_at = now_monotonic + min(60.0, discovery_refresh_seconds)
                             if not cached_tickers:
                                 raise
                         else:
@@ -200,13 +262,17 @@ def run_reconnecting_websocket_watch(
                             )
                             if discovered:
                                 cached_tickers = discovered
-                                discovery_refreshes += 1
-                                next_discovery_at = (
-                                    now_monotonic + discovery_refresh_seconds
+                                preferred_selected = sum(
+                                    1
+                                    for row in rows
+                                    if row.get("selection_source") == "ACTIONABLE_RANKING"
                                 )
+                                discovery_refreshes += 1
+                                next_discovery_at = now_monotonic + discovery_refresh_seconds
                             elif not cached_tickers:
                                 raise RuntimeError(
-                                    "No visibly quoted books were discovered for the configured series."
+                                    "No visibly quoted books were discovered for the "
+                                    "configured series."
                                 )
                     state = "STREAMING"
                     write_status()
@@ -266,6 +332,11 @@ def _book_levels(payload: dict[str, Any]) -> tuple[list[Any], list[Any]]:
     yes = container.get("yes_dollars") or container.get("yes") or []
     no = container.get("no_dollars") or container.get("no") or []
     return list(yes) if isinstance(yes, list) else [], list(no) if isinstance(no, list) else []
+
+
+def _series_for_ticker(ticker: str, series: Sequence[str]) -> str | None:
+    matches = [str(item) for item in series if ticker.startswith(str(item))]
+    return max(matches, key=len) if matches else None
 
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:

@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import delete, desc, func, not_, or_, select
 from sqlalchemy.orm import Session, aliased
 
+from kalshi_predictor.active_universe import is_inactive_market_status
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.repositories import decode_json, encode_json
 from kalshi_predictor.data.schema import (
@@ -76,6 +77,8 @@ LOCAL_DERIVED_COMPOSITE_NOTICE = (
     "They stay in the backlog until exact same-composite settlement evidence "
     "has produced realized paper P&L."
 )
+
+MARKET_MONITOR_STALE_AFTER_MINUTES = 15
 
 
 def portfolio_summary(session: Session) -> dict[str, Any]:
@@ -617,6 +620,8 @@ def market_monitor_rows(
             current_price=current_price,
             spread=spread,
             liquidity=display_liquidity,
+            observed_at=snapshot.captured_at if snapshot is not None else ranking.ranked_at,
+            market=market,
         )
         raw_title = ranking.title or (market.title if market else None) or ranking.ticker
         rankings.append(
@@ -639,12 +644,15 @@ def market_monitor_rows(
                 "opportunity_score": ranking.opportunity_score,
                 "best_model": ranking.forecast_model,
                 "model_confidence": ranking.model_confidence_score,
-                "recommended_action": _recommended_action(ranking),
+                "recommended_action": _market_monitor_recommended_action(
+                    ranking,
+                    data_quality=data_quality["label"],
+                ),
                 "_quality_sort": data_quality["sort"],
                 "_score_sort": score,
                 "_ranked_at_sort": _aware_datetime(ranking.ranked_at).timestamp(),
                 "_group_missing_multileg_sports": (
-                    data_quality["sort"] == 2
+                    data_quality["label"] == "Missing market data"
                     and _looks_like_multileg_sports_market(
                         raw_title,
                         ranking=ranking,
@@ -1226,13 +1234,23 @@ def _market_monitor_data_quality(
     current_price: str,
     spread: str,
     liquidity: str,
+    observed_at: datetime,
+    market: Market | None,
 ) -> dict[str, Any]:
+    now = utc_now()
+    if market is not None and (
+        is_inactive_market_status(market.status)
+        or (market.close_time is not None and _aware_datetime(market.close_time) <= now)
+    ):
+        return {"label": "Expired market", "sort": 3}
+    if now - _aware_datetime(observed_at) > timedelta(minutes=MARKET_MONITOR_STALE_AFTER_MINUTES):
+        return {"label": "Stale market data", "sort": 2}
     missing = sum(value == "n/a" for value in (current_price, spread, liquidity))
     if missing == 0:
         return {"label": "Usable market data", "sort": 0}
     if missing < 3:
         return {"label": "Partial market data", "sort": 1}
-    return {"label": "Missing market data", "sort": 2}
+    return {"label": "Missing market data", "sort": 4}
 
 
 def _grouped_missing_multileg_sports_row(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1270,6 +1288,10 @@ def _snapshot_repair_status(data_quality: str) -> str:
         return "Snapshot OK"
     if data_quality == "Partial market data":
         return "Partial snapshot"
+    if data_quality == "Stale market data":
+        return "Refresh required"
+    if data_quality == "Expired market":
+        return "Not active"
     return "Needs repair"
 
 
@@ -1458,6 +1480,20 @@ def _recommended_action(ranking: MarketRanking) -> str:
     if score >= Decimal("60"):
         return "Watch closely"
     return "Monitor"
+
+
+def _market_monitor_recommended_action(
+    ranking: MarketRanking,
+    *,
+    data_quality: str,
+) -> str:
+    if data_quality == "Expired market":
+        return "Exclude expired market"
+    if data_quality == "Stale market data":
+        return "Reconnect or refresh snapshot"
+    if data_quality == "Missing market data":
+        return "Collect market snapshot"
+    return _recommended_action(ranking)
 
 
 def _market_search_text(market: Market | None, ranking: MarketRanking) -> str:

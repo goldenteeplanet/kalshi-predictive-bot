@@ -16799,13 +16799,21 @@ def gh1_websocket_orderbook_watch_command(
     status_path: Annotated[
         Path, typer.Option(help="Filesystem heartbeat/status artifact.")
     ] = Path("reports/phase_gh1/watch/status.json"),
+    preferred_tickers_path: Annotated[
+        Path | None,
+        typer.Option(help="Optional GH-2 actionable-ticker manifest."),
+    ] = None,
+    max_preferred_tickers: Annotated[
+        int,
+        typer.Option(help="Maximum ranked tickers loaded from the GH-2 manifest."),
+    ] = 40,
     max_cycles: Annotated[
         int, typer.Option(help="Finite cycles for verification; 0 runs until stopped.")
     ] = 0,
 ) -> None:
     """Keep a reconnecting GH-1 producer staging files outside the database."""
     selected = [item.strip() for item in series.split(",") if item.strip()]
-    if not selected or max_cycles < 0:
+    if not selected or max_cycles < 0 or max_preferred_tickers < 1:
         raise typer.BadParameter("Exact series and a nonnegative max-cycles value are required.")
     settings = get_settings().model_copy(
         update={
@@ -16835,6 +16843,8 @@ def gh1_websocket_orderbook_watch_command(
             reconnect_max_seconds=reconnect_max_seconds,
             persist_every_deltas=persist_every_deltas,
             status_path=status_path,
+            preferred_tickers_path=preferred_tickers_path,
+            max_preferred_tickers=max_preferred_tickers,
             max_cycles=max_cycles or None,
         )
     except (RuntimeError, ValueError) as exc:
@@ -19364,6 +19374,153 @@ def phase3bb_r43_single_writer_coordinator_command(
     console.print(f"Staging dir: {artifacts.staging_dir}")
     console.print(f"Wrote JSON: {artifacts.json_path}")
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
+@app.command("gh2-stage-crypto-quotes")
+def gh2_stage_crypto_quotes_command(
+    staging_dir: Annotated[
+        Path,
+        typer.Option(help="Filesystem staging directory; this command never opens SQLite."),
+    ] = Path("reports/phase_gh2/crypto_staging"),
+    symbols: Annotated[
+        str,
+        typer.Option(help=f"Comma-separated crypto symbols, for example {DEFAULT_CRYPTO_SYMBOLS}."),
+    ] = DEFAULT_CRYPTO_SYMBOLS,
+    sources: Annotated[
+        str,
+        typer.Option(help="Comma-separated public quote sources."),
+    ] = "coinbase",
+    max_workers: Annotated[
+        int,
+        typer.Option(help="Maximum parallel filesystem-only fetch workers."),
+    ] = 4,
+) -> None:
+    """Stage GH-2 public crypto quotes without writing the main database."""
+    if max_workers < 1:
+        raise typer.BadParameter("max-workers must be at least 1")
+    from kalshi_predictor.phase_gh2 import stage_gh2_crypto_quotes
+
+    payload = stage_gh2_crypto_quotes(
+        staging_dir=staging_dir,
+        symbols=symbols,
+        sources=sources,
+        max_workers=max_workers,
+    )
+    console.print("GH-2 parallel quote staging")
+    console.print("Database writes: 0")
+    console.print("Paper/live order creation: disabled")
+    console.print(f"Status: {payload['status']}")
+    console.print(f"Staged files: {len(payload.get('staged_files') or [])}")
+
+
+@app.command("gh2-single-writer-decision-refresh")
+def gh2_single_writer_decision_refresh_command(
+    apply: Annotated[
+        bool,
+        typer.Option("--apply/--dry-run", help="Run the guarded paper-only writer cycle."),
+    ] = False,
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="GH-2 status and soak artifact directory."),
+    ] = Path("reports/phase_gh2"),
+    reports_dir: Annotated[
+        Path,
+        typer.Option(help="Canonical report root refreshed for the operator UI."),
+    ] = Path("reports"),
+    crypto_staging_dir: Annotated[
+        Path,
+        typer.Option(help="Filesystem directory containing staged crypto quote files."),
+    ] = Path("reports/phase_gh2/crypto_staging"),
+    gh1_staging_dir: Annotated[
+        Path | None,
+        typer.Option(help="GH-1 staged orderbook directory; defaults to configured path."),
+    ] = None,
+    candidate_manifest_path: Annotated[
+        Path,
+        typer.Option(help="Manifest consumed by the reconnecting GH-1 watch."),
+    ] = Path("reports/phase_gh1/watch/actionable_tickers.json"),
+    candidate_limit: Annotated[
+        int,
+        typer.Option(help="Maximum ranked tickers published to GH-1."),
+    ] = 40,
+    active_link_limit: Annotated[
+        int,
+        typer.Option(help="Maximum active crypto/weather markets linked per cycle."),
+    ] = 250,
+    forecast_limit: Annotated[
+        int,
+        typer.Option(help="Maximum model-linked snapshots forecast per category."),
+    ] = 250,
+    opportunity_limit: Annotated[
+        int,
+        typer.Option(help="Maximum rankings/opportunities written per category."),
+    ] = 100,
+    freshness_minutes: Annotated[
+        int,
+        typer.Option(help="Maximum snapshot/ranking age for fresh decision truth."),
+    ] = 15,
+    soak_cycles_required: Annotated[
+        int,
+        typer.Option(help="Consecutive healthy cycles required before operator review."),
+    ] = 24,
+    guard_active_writer: Annotated[
+        bool,
+        typer.Option(
+            "--guard-active-writer/--allow-active-writer",
+            help="Refuse to start when another SQLite writer is active.",
+        ),
+    ] = True,
+) -> None:
+    """Refresh current paper decisions through one bounded SQLite writer owner."""
+    bounds = (
+        candidate_limit,
+        active_link_limit,
+        forecast_limit,
+        opportunity_limit,
+        freshness_minutes,
+        soak_cycles_required,
+    )
+    if any(value < 1 for value in bounds):
+        raise typer.BadParameter("all GH-2 limits must be positive")
+    console.print("GH-2 active candidate alignment and single-writer decision refresh")
+    console.print("Paper-order creation: disabled")
+    console.print("Live/demo execution: disabled")
+    if not apply:
+        console.print("Status: DRY_RUN_NO_DATABASE_WRITES")
+        return
+
+    from kalshi_predictor.phase_gh2 import run_gh2_single_writer_decision_refresh
+
+    settings = get_settings()
+    writer_monitor_at_start = db_writer_monitor(settings=settings)
+    if guard_active_writer and not bool(
+        writer_monitor_at_start.get("safe_to_start_write", True)
+    ):
+        current = writer_monitor_at_start.get("current_writer_command") or "unknown"
+        console.print(f"Status: BLOCKED_ACTIVE_WRITER ({current})")
+        raise typer.Exit(code=2)
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    artifacts = run_gh2_single_writer_decision_refresh(
+        session_factory=session_factory,
+        output_dir=output_dir,
+        reports_dir=reports_dir,
+        crypto_staging_dir=crypto_staging_dir,
+        gh1_staging_dir=gh1_staging_dir,
+        candidate_manifest_path=candidate_manifest_path,
+        settings=settings,
+        candidate_limit=candidate_limit,
+        active_link_limit=active_link_limit,
+        forecast_limit=forecast_limit,
+        opportunity_limit=opportunity_limit,
+        freshness_minutes=freshness_minutes,
+        soak_cycles_required=soak_cycles_required,
+        guard_active_writer=guard_active_writer,
+        writer_monitor_fn=lambda: writer_monitor_at_start,
+    )
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+    console.print(f"Candidate manifest: {artifacts.candidate_manifest_path}")
 
 
 @app.command("crypto-report")

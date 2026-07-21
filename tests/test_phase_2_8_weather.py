@@ -314,6 +314,33 @@ def test_weather_linker_is_idempotent_for_existing_links(tmp_path) -> None:
         assert link_count == 1
 
 
+def test_weather_linker_honors_active_ticker_scope(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        for ticker, city in (
+            ("KXTEMPNYCH-SCOPED", "New York City"),
+            ("KXTEMPCHI-OUTSIDE", "Chicago"),
+        ):
+            upsert_market(
+                session,
+                {
+                    "ticker": ticker,
+                    "series_ticker": ticker.split("-")[0],
+                    "status": "active",
+                    "title": f"Will the temperature in {city} be above 80 degrees?",
+                },
+            )
+
+        result = link_weather_markets(
+            session,
+            tickers=["KXTEMPNYCH-SCOPED"],
+        )
+        linked = list(session.scalars(select(WeatherMarketLink.ticker)))
+
+    assert result.markets_scanned == 1
+    assert linked == ["KXTEMPNYCH-SCOPED"]
+
+
 def test_weather_linker_detects_rain_market(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:

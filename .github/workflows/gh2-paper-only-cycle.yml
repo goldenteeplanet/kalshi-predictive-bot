@@ -1,0 +1,58 @@
+name: GH-2 Paper-Only Decision Cycle
+
+on:
+  pull_request:
+    paths:
+      - "src/kalshi_predictor/phase_gh2.py"
+      - "src/kalshi_predictor/ingest/websocket_watch.py"
+      - "src/kalshi_predictor/weather/linker.py"
+      - "src/kalshi_predictor/workstation/repository.py"
+      - "src/kalshi_predictor/cli.py"
+      - "src/kalshi_predictor/data/locks.py"
+      - "deploy/systemd/kalshi-gh*.service"
+      - "deploy/systemd/kalshi-gh*.timer"
+      - "scripts/cloud/kalshi-gh*.sh"
+      - "tests/test_gh1_websocket_watch.py"
+      - "tests/test_phase_gh2.py"
+      - "tests/test_phase_2_8_weather.py"
+      - "tests/test_phase_3d_workstation.py"
+      - ".github/workflows/gh2-paper-only-cycle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gh2-paper-only-cycle:
+    name: Candidate alignment, freshness truth, and writer safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install local project
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
+
+      - name: Check GH-2 implementation quality
+        run: >-
+          python -m ruff check
+          src/kalshi_predictor/phase_gh2.py
+          src/kalshi_predictor/weather/linker.py
+          src/kalshi_predictor/workstation/repository.py
+          tests/test_phase_gh2.py
+
+      - name: Run GH-2 regression matrix
+        run: >-
+          python -m pytest
+          tests/test_gh1_websocket_watch.py
+          tests/test_phase_gh2.py
+          tests/test_phase_2_8_weather.py
+          tests/test_phase_3d_workstation.py
+          -q

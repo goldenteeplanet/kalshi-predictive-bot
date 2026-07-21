@@ -4,29 +4,34 @@
 
 It collects public market metadata and orderbook snapshots, stores raw JSON locally for auditability, generates a baseline market-implied forecast, and produces calibration/evaluation reports after settlements are synced.
 
-## Current Next Phase: Phase 3AE Fast Market Harvester
+## Current Next Phase: GH-2 Active Candidate Decision Refresh
 
-Status as of 2026-07-14: the next safe phase is to widen fast-settlement coverage before any paper trade creation. The latest bounded harvester run stayed paper-only/read-only and found:
-
-- `ranked_fast_settlement_candidates`: 0
-- `ranked_watch_candidates`: 108
-- `ranked_slow_settlement_avoids`: 54
-- `open_0_24h_markets_seen`: 500
-- `open_0_24h_markets_missing_current_ranking`: 500
-- `open_0_24h_markets_stale_or_missing_ranking`: 500
-- `paper_trade_creation_allowed`: false
-
-The immediate Phase 3AE queue is:
+GH-2 closes the cloud live-data paper-decision loop without creating paper or
+exchange orders. The reconnecting GH-1 watch now prioritizes tickers from
+current actionable rankings, then uses bounded series discovery as a fallback.
+A separate 15-minute service stages public crypto quotes in parallel and drains
+orderbooks, features, links, forecasts, rankings, and opportunities through the
+shared single-writer lock.
 
 ```bash
-kalshi-bot phase3ay-health-refresh --cycles 1 --interval-seconds 0 --all-markets
-kalshi-bot forecast --model ensemble_v2
-kalshi-bot find-opportunities --model-name ensemble_v2
-kalshi-bot phase3ae-fast-market-harvester --model-name ensemble_v2
-kalshi-bot phase3ab-learning-governor --model-name ensemble_v2
+# Filesystem-only parallel fetch stage; does not open SQLite.
+kalshi-bot gh2-stage-crypto-quotes \
+  --staging-dir reports/phase_gh2/crypto_staging
+
+# One bounded writer cycle; paper-order and live execution paths stay disabled.
+kalshi-bot gh2-single-writer-decision-refresh \
+  --apply \
+  --output-dir reports/phase_gh2 \
+  --reports-dir reports \
+  --candidate-manifest-path reports/phase_gh1/watch/actionable_tickers.json
 ```
 
-Do not enable live trading, demo execution, autopilot, sports/news expansion, or learning acceleration until Phase 3AE produces ranked fast-settlement candidates and a human approves the next step.
+The cloud timer definition is
+`deploy/systemd/kalshi-gh2-decision-refresh.timer`. A soak cycle receives credit
+only when it produces a fresh ranked candidate, encounters no stage errors, and
+creates zero paper orders. Even after 24 consecutive healthy cycles with a
+paper-ready candidate, paper-order creation still requires explicit operator
+approval. Live execution and autopilot remain disabled.
 
 Phase 2 adds a paper trading ledger. It creates simulated orders and immediate simulated fills from stored forecasts/snapshots only. It still does not authenticate with Kalshi or place real orders.
 
