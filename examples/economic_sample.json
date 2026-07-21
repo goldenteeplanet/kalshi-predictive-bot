@@ -1,0 +1,44 @@
+{
+  "events": [
+    {
+      "event_key": "cpi",
+      "source": "manual_sample",
+      "event_time": "2026-06-17T13:30:00Z",
+      "category": "cpi",
+      "title": "Consumer Price Index",
+      "actual_value": "3.4",
+      "forecast_value": "3.2",
+      "previous_value": "3.3"
+    },
+    {
+      "event_key": "fed",
+      "source": "manual_sample",
+      "event_time": "2026-06-17T18:00:00Z",
+      "category": "fed",
+      "title": "Federal Reserve Interest Rate Decision",
+      "actual_value": "5.25",
+      "forecast_value": "5.25",
+      "previous_value": "5.25"
+    },
+    {
+      "event_key": "jobs",
+      "source": "manual_sample",
+      "event_time": "2026-06-17T13:30:00Z",
+      "category": "jobs",
+      "title": "Nonfarm Payrolls",
+      "actual_value": "210000",
+      "forecast_value": "190000",
+      "previous_value": "175000"
+    },
+    {
+      "event_key": "gdp",
+      "source": "manual_sample",
+      "event_time": "2026-06-17T13:30:00Z",
+      "category": "gdp",
+      "title": "Gross Domestic Product",
+      "actual_value": "2.1",
+      "forecast_value": "2.0",
+      "previous_value": "1.8"
+    }
+  ]
+}

@@ -286,7 +286,7 @@ def test_synthetic_markets_cli_missing_input_file_is_friendly(tmp_path) -> None:
 
 def test_default_synthetic_candidate_inventory_exists_and_is_valid() -> None:
     payload = json.loads(
-        Path("data/synthetic_markets_candidates.json").read_text(encoding="utf-8")
+        Path("examples/synthetic_markets_candidates.json").read_text(encoding="utf-8")
     )
 
     assert payload["candidates"]

@@ -486,6 +486,14 @@ class Settings(BaseSettings):
     paper_allow_buy_no: bool = Field(default=True, validation_alias="PAPER_ALLOW_BUY_NO")
     paper_allow_selling: bool = Field(default=False, validation_alias="PAPER_ALLOW_SELLING")
     paper_order_ttl_minutes: int = Field(default=120, validation_alias="PAPER_ORDER_TTL_MINUTES")
+    paper_order_creation_enabled: bool = Field(
+        default=False,
+        validation_alias="PAPER_ORDER_CREATION_ENABLED",
+    )
+    paper_order_kill_switch: bool = Field(
+        default=True,
+        validation_alias="PAPER_ORDER_KILL_SWITCH",
+    )
     dynamic_position_sizing_mode: str = Field(
         default="disabled",
         validation_alias="DYNAMIC_POSITION_SIZING_MODE",

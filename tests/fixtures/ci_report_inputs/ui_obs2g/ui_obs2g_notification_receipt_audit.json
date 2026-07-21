@@ -1,0 +1,201 @@
+{
+  "database_access": false,
+  "database_writes": 0,
+  "execution_changed": false,
+  "external_services_contacted": false,
+  "findings": {
+    "duplicate": [],
+    "late": [],
+    "missing": [],
+    "rate_limited": [],
+    "unexpected": []
+  },
+  "max_latency_seconds": 60,
+  "mode": "LOCAL_NOTIFICATION_RECEIPT_AUDIT_RECONCILIATION_PREVIEW",
+  "network_access": false,
+  "phase": "UI-OBS-2G",
+  "rows": [
+    {
+      "channel": "timeline",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "56a0b28bf398c909",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "INFO"
+    },
+    {
+      "channel": "timeline",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "5ef857f59732bda7",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "INFO"
+    },
+    {
+      "channel": "timeline",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "a95152b8e0d30125",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "INFO"
+    },
+    {
+      "channel": "timeline",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "d0f66bec7ff01ac9",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "INFO"
+    },
+    {
+      "channel": "dashboard",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "dbe5ab24fc042027",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "CRITICAL"
+    },
+    {
+      "channel": "local_audible",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "dbe5ab24fc042027",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "CRITICAL"
+    },
+    {
+      "channel": "local_desktop",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "dbe5ab24fc042027",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "CRITICAL"
+    },
+    {
+      "channel": "dashboard",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "ea5ef69a9d34000c",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "CRITICAL"
+    },
+    {
+      "channel": "local_audible",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "ea5ef69a9d34000c",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "CRITICAL"
+    },
+    {
+      "channel": "local_desktop",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "ea5ef69a9d34000c",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "CRITICAL"
+    },
+    {
+      "channel": "dashboard",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "feadeff673c63204",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "CRITICAL"
+    },
+    {
+      "channel": "local_audible",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "feadeff673c63204",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "CRITICAL"
+    },
+    {
+      "channel": "local_desktop",
+      "coverage_passed": true,
+      "delivered_count": 1,
+      "expected": true,
+      "incident_id": "feadeff673c63204",
+      "latency_seconds": [
+        0
+      ],
+      "rate_limited_count": 0,
+      "receipt_count": 1,
+      "severity": "CRITICAL"
+    }
+  ],
+  "summary": {
+    "actual_receipts": 13,
+    "critical_channels_expected": 9,
+    "critical_coverage_complete": true,
+    "deterministic_digest": "378612773c48a258027f5a19fe5ab259ce236810117a8aad621600a9ced489ae",
+    "duplicate": 0,
+    "expected_receipts": 13,
+    "late": 0,
+    "missing": 0,
+    "rate_limited": 0,
+    "reconciliation_passed": true,
+    "unexpected": 0
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "database_access": false,
+  "database_writes": 0,
+  "decisions": [
+    {
+      "acknowledged": false,
+      "action": "TIMELINE_ONLY",
+      "channels": [
+        "timeline"
+      ],
+      "code": "WRITER_STATE_CHANGED",
+      "critical_delivery_guaranteed": false,
+      "duplicate": false,
+      "incident_id": "56a0b28bf398c909",
+      "quiet_hours_active": true,
+      "reason": "BENIGN_OBSERVED_EVENT",
+      "resolution_notification": false,
+      "severity": "INFO",
+      "status": "OBSERVED"
+    },
+    {
+      "acknowledged": false,
+      "action": "DEFER_UNTIL_QUIET_END",
+      "channels": [
+        "dashboard"
+      ],
+      "code": "COLLECTION_GAP",
+      "critical_delivery_guaranteed": false,
+      "duplicate": false,
+      "incident_id": "c0380bce52dabf85",
+      "quiet_hours_active": true,
+      "reason": "NONCRITICAL_QUIET_HOURS",
+      "resolution_notification": true,
+      "severity": "WARNING",
+      "status": "RESOLVED"
+    },
+    {
+      "acknowledged": false,
+      "action": "TIMELINE_ONLY",
+      "channels": [
+        "timeline"
+      ],
+      "code": "SCHEDULER_STATE_CHANGED",
+      "critical_delivery_guaranteed": false,
+      "duplicate": false,
+      "incident_id": "d0f66bec7ff01ac9",
+      "quiet_hours_active": true,
+      "reason": "BENIGN_OBSERVED_EVENT",
+      "resolution_notification": false,
+      "severity": "INFO",
+      "status": "OBSERVED"
+    },
+    {
+      "acknowledged": false,
+      "action": "DELIVER_NOW",
+      "channels": [
+        "local_audible",
+        "local_desktop",
+        "dashboard"
+      ],
+      "code": "ALERT_OPENED",
+      "critical_delivery_guaranteed": true,
+      "duplicate": false,
+      "incident_id": "dbe5ab24fc042027",
+      "quiet_hours_active": true,
+      "reason": "CRITICAL_BYPASSES_QUIET_AND_DEDUPE",
+      "resolution_notification": false,
+      "severity": "CRITICAL",
+      "status": "UNRESOLVED"
+    },
+    {
+      "acknowledged": false,
+      "action": "DELIVER_NOW",
+      "channels": [
+        "local_audible",
+        "local_desktop",
+        "dashboard"
+      ],
+      "code": "PROCESS_STATE_CHANGED",
+      "critical_delivery_guaranteed": true,
+      "duplicate": false,
+      "incident_id": "ea5ef69a9d34000c",
+      "quiet_hours_active": true,
+      "reason": "CRITICAL_BYPASSES_QUIET_AND_DEDUPE",
+      "resolution_notification": false,
+      "severity": "CRITICAL",
+      "status": "UNRESOLVED"
+    },
+    {
+      "acknowledged": true,
+      "action": "DELIVER_NOW",
+      "channels": [
+        "local_audible",
+        "local_desktop",
+        "dashboard"
+      ],
+      "code": "PROCESS_DISAPPEARED_WITHOUT_EVIDENCE",
+      "critical_delivery_guaranteed": true,
+      "duplicate": false,
+      "incident_id": "feadeff673c63204",
+      "quiet_hours_active": true,
+      "reason": "CRITICAL_BYPASSES_QUIET_AND_DEDUPE",
+      "resolution_notification": false,
+      "severity": "CRITICAL",
+      "status": "UNRESOLVED"
+    },
+    {
+      "acknowledged": false,
+      "action": "TIMELINE_ONLY",
+      "channels": [
+        "timeline"
+      ],
+      "code": "PROCESS_STATE_CHANGED",
+      "critical_delivery_guaranteed": false,
+      "duplicate": false,
+      "incident_id": "5ef857f59732bda7",
+      "quiet_hours_active": true,
+      "reason": "BENIGN_OBSERVED_EVENT",
+      "resolution_notification": false,
+      "severity": "INFO",
+      "status": "OBSERVED"
+    },
+    {
+      "acknowledged": false,
+      "action": "TIMELINE_ONLY",
+      "channels": [
+        "timeline"
+      ],
+      "code": "SCHEDULER_STATE_CHANGED",
+      "critical_delivery_guaranteed": false,
+      "duplicate": false,
+      "incident_id": "a95152b8e0d30125",
+      "quiet_hours_active": true,
+      "reason": "BENIGN_OBSERVED_EVENT",
+      "resolution_notification": false,
+      "severity": "INFO",
+      "status": "OBSERVED"
+    }
+  ],
+  "diagnostics": [],
+  "execution_changed": false,
+  "external_services_contacted": false,
+  "mode": "LOCAL_NOTIFICATION_ROUTING_QUIET_HOURS_PREVIEW",
+  "network_access": false,
+  "phase": "UI-OBS-2E",
+  "policy": {
+    "as_of_local": "2026-07-18T04:10:00-05:00",
+    "dedupe_cooldown_seconds": 1800,
+    "quiet_end_hour": 7,
+    "quiet_hours_active": true,
+    "quiet_start_hour": 22,
+    "timezone": "America/Chicago"
+  },
+  "summary": {
+    "all_critical_deliver_now": true,
+    "deduplicated": 0,
+    "deferred": 1,
+    "deliver_now": 3,
+    "deterministic_digest": "310a4016604031a67b4c463be64ef8aeabb455f63817b7391b4ee0d7dbbfc69c",
+    "external_channels": 0,
+    "incidents": 8,
+    "timeline_only": 4
+  }
+}

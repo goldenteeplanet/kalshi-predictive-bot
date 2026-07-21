@@ -1,0 +1,316 @@
+{
+  "actual_audio_played": false,
+  "actual_notifications_sent": 0,
+  "database_access": false,
+  "database_writes": 0,
+  "diagnostics": [],
+  "execution_changed": false,
+  "external_services_contacted": false,
+  "mode": "LOCAL_DESKTOP_NOTIFICATION_DELIVERY_SIMULATOR",
+  "network_access": false,
+  "new_receipts": [
+    {
+      "channel": "timeline",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "56a0b28bf398c909",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "e8f0c17208565d4ef190",
+      "severity": "INFO",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "timeline",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "d0f66bec7ff01ac9",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "b925d3e58089be5983ae",
+      "severity": "INFO",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_audible",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "dbe5ab24fc042027",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "f7225608101906c58fcf",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_desktop",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "dbe5ab24fc042027",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "31e2cbff5eb4fff615f3",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "dashboard",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "dbe5ab24fc042027",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "d515a627f3cdbda9076a",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_audible",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "ea5ef69a9d34000c",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "920204f876f975618cd2",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_desktop",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "ea5ef69a9d34000c",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "2f79c1864b287cfef819",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "dashboard",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "ea5ef69a9d34000c",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "fe765f9c8d58c043bfca",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_audible",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "feadeff673c63204",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "4da499529ded33740912",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_desktop",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "feadeff673c63204",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "5f971523c000f4a016e5",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "dashboard",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "feadeff673c63204",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "2c5e04943ecd3930dd76",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "timeline",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "5ef857f59732bda7",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "12e434e6f83991b36efe",
+      "severity": "INFO",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "timeline",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "a95152b8e0d30125",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "6ac6586c7cfe838fbe18",
+      "severity": "INFO",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    }
+  ],
+  "phase": "UI-OBS-2F",
+  "policy": {
+    "critical_bypasses_normal_limits": true,
+    "per_hour_per_channel": 20,
+    "per_minute_per_channel": 3,
+    "receipt_retention_limit": 500
+  },
+  "retained_receipts": [
+    {
+      "channel": "timeline",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "56a0b28bf398c909",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "e8f0c17208565d4ef190",
+      "severity": "INFO",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "timeline",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "d0f66bec7ff01ac9",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "b925d3e58089be5983ae",
+      "severity": "INFO",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_audible",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "dbe5ab24fc042027",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "f7225608101906c58fcf",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_desktop",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "dbe5ab24fc042027",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "31e2cbff5eb4fff615f3",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "dashboard",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "dbe5ab24fc042027",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "d515a627f3cdbda9076a",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_audible",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "ea5ef69a9d34000c",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "920204f876f975618cd2",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_desktop",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "ea5ef69a9d34000c",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "2f79c1864b287cfef819",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "dashboard",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "ea5ef69a9d34000c",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "fe765f9c8d58c043bfca",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_audible",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "feadeff673c63204",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "4da499529ded33740912",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "local_desktop",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "feadeff673c63204",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "5f971523c000f4a016e5",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "dashboard",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "feadeff673c63204",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "2c5e04943ecd3930dd76",
+      "severity": "CRITICAL",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "timeline",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "5ef857f59732bda7",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "12e434e6f83991b36efe",
+      "severity": "INFO",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    },
+    {
+      "channel": "timeline",
+      "delivered_at": "2026-07-18T09:10:00Z",
+      "external_side_effect": false,
+      "incident_id": "a95152b8e0d30125",
+      "reason": "WITHIN_RATE_LIMIT",
+      "receipt_id": "6ac6586c7cfe838fbe18",
+      "severity": "INFO",
+      "simulated": true,
+      "status": "SIMULATED_DELIVERED"
+    }
+  ],
+  "summary": {
+    "all_critical_deliverable": true,
+    "attempts": 13,
+    "deterministic_digest": "f8ed6bb6b17426bfbfe257d4958eb7afd460c017c01efb38a78b767b720fe224",
+    "retained": 13,
+    "simulated_delivered": 13,
+    "simulated_rate_limited": 0
+  }
+}

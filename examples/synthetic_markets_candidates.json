@@ -1,0 +1,51 @@
+{
+  "candidates": [
+    {
+      "candidate_id": "weather-kc-heat-index-2026-07-01",
+      "category": "WEATHER",
+      "canonical_title": "Kansas City heat index reaches at least 100 on July 1 2026",
+      "plain_language_summary": "Internal research forecast for a public weather threshold.",
+      "generation_source": "APPROVED_USER_RESEARCH_REQUEST",
+      "observation_window": {
+        "start_at": "2026-07-01T00:00:00+00:00",
+        "end_at": "2026-07-01T23:59:59+00:00",
+        "timezone": "America/Chicago"
+      },
+      "settlement_rule": {
+        "primary_source_id": "noaa_public_weather",
+        "primary_source_locator": "https://www.weather.gov/",
+        "source_field": "daily_max_heat_index",
+        "revision_policy": "FIRST_PUBLISHED_VALUE",
+        "rounding_policy": "EXACT_PUBLISHED_VALUE",
+        "cancellation_policy": "MARK_CANCELLED_IF_SOURCE_CANCELS",
+        "postponement_policy": "USE_FIRST_OFFICIAL_PUBLICATION",
+        "rule_text": "Resolve YES if the official public NOAA value is at least 100."
+      },
+      "contracts": [
+        {
+          "canonical_question": "Will Kansas City heat index reach at least 100 on July 1 2026?",
+          "contract_type": "THRESHOLD",
+          "outcome_code": "YES",
+          "condition": {
+            "type": "COMPARE",
+            "operator": ">=",
+            "threshold": "100",
+            "unit": "heat_index_f"
+          }
+        }
+      ],
+      "feature_snapshot_id": "weather-feature-snapshot-manual-seed",
+      "calibration_id": "weather-calibration-seed-v1",
+      "base_probability": "0.56",
+      "assumptions": [
+        "The public NOAA source publishes the value on schedule."
+      ],
+      "drivers": [
+        "Summer heat risk is relevant for Kansas City in early July."
+      ],
+      "counterevidence": [
+        "No exact listed Kalshi market price exists for direct anchoring."
+      ]
+    }
+  ]
+}

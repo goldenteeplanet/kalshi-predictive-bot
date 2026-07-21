@@ -1,0 +1,61 @@
+{
+  "actual_notifications_sent": 0,
+  "bundle": {
+    "artifacts": [
+      {
+        "path": "ui_obs2d/ui_obs2d_incident_resolution_preview.json",
+        "phase": "UI-OBS-2D",
+        "sha256": "537ef153959bff2549ad29861dbb30419656a07595ab16d16b039ec29ab78a46"
+      },
+      {
+        "path": "ui_obs2e/ui_obs2e_notification_routing_preview.json",
+        "phase": "UI-OBS-2E",
+        "sha256": "8b15743082a7a630b9a668589102779050efcbbdc4e21b0bbf2d18df3d244739"
+      },
+      {
+        "path": "ui_obs2f/ui_obs2f_local_delivery_simulator.json",
+        "phase": "UI-OBS-2F",
+        "sha256": "34340b73fcfcb55646abc72bbe9a9636930434099472d3081f6d7c60af6c9ad2"
+      },
+      {
+        "path": "ui_obs2g/ui_obs2g_notification_receipt_audit.json",
+        "phase": "UI-OBS-2G",
+        "sha256": "3a050bcfa8851a2ed2cf388031923921b75a78c44dfdcd65ed24e38a51182b7b"
+      }
+    ],
+    "bundle_digest": "000410043b68dbd7f8ae32eea8ab023e616394c85be74f6b586e5ddcf9b2897e",
+    "cross_stage_checks": {
+      "critical_channel_count": true,
+      "critical_coverage_complete": true,
+      "delivery_receipts_to_audit": true,
+      "execution_unchanged": true,
+      "incident_to_routing_count": true,
+      "no_actual_notifications": true,
+      "no_database_writes": true,
+      "no_external_services": true,
+      "no_network": true,
+      "reconciliation_passed": true,
+      "routing_to_delivery_attempts": true
+    },
+    "diagnostics": [],
+    "phases": [
+      "UI-OBS-2D",
+      "UI-OBS-2E",
+      "UI-OBS-2F",
+      "UI-OBS-2G"
+    ],
+    "pipeline_passed": true,
+    "schema_version": 1
+  },
+  "cloud_access": false,
+  "database_access": false,
+  "database_writes": 0,
+  "diagnostics": [],
+  "execution_changed": false,
+  "exit_code": 0,
+  "golden_match": true,
+  "mode": "OFFLINE_NOTIFICATION_PIPELINE_GOLDEN_CI_GATE",
+  "network_access": false,
+  "phase": "UI-OBS-2H",
+  "status": "PASSED"
+}

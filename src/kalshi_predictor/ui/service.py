@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -65,6 +66,7 @@ from kalshi_predictor.paper.ledger import (
     update_position_for_fill,
 )
 from kalshi_predictor.paper.models import ORDER_OPEN, PaperDecision
+from kalshi_predictor.phase_gh4 import build_gh3_soak_status
 from kalshi_predictor.professional_ux.service import (
     DEFAULT_SHELL_STATUS_SNAPSHOT_PATH,
     load_shell_status_context,
@@ -158,6 +160,24 @@ PHASE3AR_CATALOG_REFRESH_PATH = Path("reports/phase3ar/catalog_refresh_plan.json
 PHASE3BC_R3_REFRESH_PATH = Path("reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json")
 PHASE3AW_DASHBOARD_TRUTH_PATH = Path("reports/phase3aw/dashboard_truth.json")
 PHASE3AY_FREE_SOURCE_SPRINT_PATH = Path("reports/phase3ay/free_source_sprint_report.json")
+GH2_SOAK_REPORT_PATH = Path(
+    os.getenv(
+        "KALSHI_GH2_SOAK_REPORT_PATH",
+        "/var/lib/kalshi-bot-gh2/reports/gh2_active_candidate_refresh.json",
+    )
+)
+GH2_SOAK_HISTORY_PATH = Path(
+    os.getenv(
+        "KALSHI_GH2_SOAK_HISTORY_PATH",
+        "/var/lib/kalshi-bot-gh2/reports/gh2_paper_only_soak_history.jsonl",
+    )
+)
+GH1_WATCH_STATUS_PATH = Path(
+    os.getenv(
+        "KALSHI_GH1_WATCH_STATUS_PATH",
+        "/var/lib/kalshi-bot-gh1/watch/status.json",
+    )
+)
 CRYPTO_FRESHNESS_REPORT_HREF = "/reports/phase3bc_r5/phase3bc_r5_crypto_freshness_watch.md"
 PHASE3AP_EXECUTIVE_SUMMARY_HREF = "/reports/phase3ap/EXECUTIVE_SUMMARY.md"
 PHASE3AP_GATE_HREF = "/reports/phase3ap/paper_ready_gate.json"
@@ -384,6 +404,7 @@ class DecisionUiService:
         shell_context = cached_shell_context(self.session, settings=self.settings)
         logger.debug("today service shell ready in %.2fs", monotonic() - started_at)
         crypto_freshness = crypto_freshness_watch_status()
+        gh3_soak = paper_only_soak_status()
         return {
             "opportunities": opportunities,
             "blocked_opportunities": blocked_opportunities,
@@ -391,6 +412,7 @@ class DecisionUiService:
             "alert_status": alert_status,
             "learning_status": learning,
             "crypto_freshness": crypto_freshness,
+            "gh3_soak": gh3_soak,
             "paper_trade_blockers": paper_trade_blocker_status(
                 crypto_freshness=crypto_freshness
             ),
@@ -1388,6 +1410,21 @@ def _executive_summary(
         "autopilot_status": autopilot_status.get("plain_status", "Autopilot state unavailable."),
         "last_data_refresh": latest_snapshot.captured_at.isoformat() if latest_snapshot else "n/a",
     }
+
+
+def paper_only_soak_status(
+    *,
+    report_path: Path = GH2_SOAK_REPORT_PATH,
+    history_path: Path = GH2_SOAK_HISTORY_PATH,
+    gh1_status_path: Path = GH1_WATCH_STATUS_PATH,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    return build_gh3_soak_status(
+        report_path=report_path,
+        history_path=history_path,
+        gh1_status_path=gh1_status_path,
+        now=now,
+    )
 
 
 def crypto_freshness_watch_status(

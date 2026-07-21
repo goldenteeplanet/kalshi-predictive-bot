@@ -2797,7 +2797,7 @@ def _economic_row(session: Session, coverage: dict[str, Any]) -> dict[str, Any]:
         },
         "examples": _market_examples(session, DOMAIN_ECONOMIC),
         "safe_commands": [
-            "kalshi-bot ingest-economic --input-file data/economic_sample.json",
+            "kalshi-bot ingest-economic --input-file examples/economic_sample.json",
             "kalshi-bot build-economic-features",
             "kalshi-bot link-economic-markets",
         ],

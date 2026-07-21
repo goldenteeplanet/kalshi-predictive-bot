@@ -15079,7 +15079,7 @@ def synthetic_markets_run_command(
             console.print("Phase 3R synthetic markets: BLOCKED")
             console.print(str(exc))
             console.print(
-                "Next action: create data/synthetic_markets_candidates.json or rerun without "
+                "Next action: create examples/synthetic_markets_candidates.json or rerun without "
                 "--input-file."
             )
             raise typer.Exit(1) from exc
@@ -19523,6 +19523,46 @@ def gh2_single_writer_decision_refresh_command(
     console.print(f"Candidate manifest: {artifacts.candidate_manifest_path}")
 
 
+@app.command("gh4-paper-activation-preflight")
+def gh4_paper_activation_preflight_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="GH-4 read-only preflight artifact directory."),
+    ] = Path("reports/phase_gh4"),
+    gh2_report_path: Annotated[
+        Path,
+        typer.Option(help="Latest GH-2 decision refresh JSON path."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.json"),
+    gh2_history_path: Annotated[
+        Path,
+        typer.Option(help="GH-2 paper-only soak history JSONL path."),
+    ] = Path("reports/phase_gh2/gh2_paper_only_soak_history.jsonl"),
+    gh1_status_path: Annotated[
+        Path,
+        typer.Option(help="GH-1 reconnecting WebSocket status JSON path."),
+    ] = Path("reports/phase_gh1/watch/status.json"),
+) -> None:
+    """Evaluate GH-4 activation gates without creating paper or exchange orders."""
+    from kalshi_predictor.phase_gh4 import write_gh4_paper_activation_preflight
+
+    artifacts = write_gh4_paper_activation_preflight(
+        output_dir=output_dir,
+        settings=get_settings(),
+        gh2_report_path=gh2_report_path,
+        gh2_history_path=gh2_history_path,
+        gh1_status_path=gh1_status_path,
+    )
+    payload = json.loads(artifacts.json_path.read_text(encoding="utf-8"))
+    console.print("GH-4 paper-order activation preflight")
+    console.print("Database writes: 0")
+    console.print("Paper orders created: 0")
+    console.print("Live/demo execution: disabled")
+    console.print(f"Status: {payload['status']}")
+    console.print(f"Failed gates: {', '.join(payload['failed_checks']) or 'none'}")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
 @app.command("crypto-report")
 def crypto_report_command(
     symbols: Annotated[
@@ -19551,11 +19591,53 @@ def paper_run_command(
         str | None,
         typer.Option(help="Optional model name filter for latest forecasts."),
     ] = None,
+    approval_token: Annotated[
+        str,
+        typer.Option(
+            "--approval-token",
+            help="Exact GH-4 operator approval phrase for simulated paper orders.",
+        ),
+    ] = "",
+    gh2_report_path: Annotated[
+        Path,
+        typer.Option(help="Latest GH-2 decision refresh JSON path."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.json"),
+    gh2_history_path: Annotated[
+        Path,
+        typer.Option(help="GH-2 paper-only soak history JSONL path."),
+    ] = Path("reports/phase_gh2/gh2_paper_only_soak_history.jsonl"),
+    gh1_status_path: Annotated[
+        Path,
+        typer.Option(help="GH-1 reconnecting WebSocket status JSON path."),
+    ] = Path("reports/phase_gh1/watch/status.json"),
 ) -> None:
+    from kalshi_predictor.phase_gh4 import (
+        build_gh4_paper_activation_preflight,
+        evaluate_paper_order_activation,
+    )
+
+    settings = get_settings()
+    preflight = build_gh4_paper_activation_preflight(
+        settings=settings,
+        gh2_report_path=gh2_report_path,
+        gh2_history_path=gh2_history_path,
+        gh1_status_path=gh1_status_path,
+    )
+    gate = evaluate_paper_order_activation(
+        settings=settings,
+        preflight=preflight,
+        approval_token=approval_token,
+    )
+    if not gate["allowed"]:
+        console.print("Status: BLOCKED_GH4_PAPER_ORDER_ACTIVATION_GATE")
+        console.print(f"Blockers: {', '.join(gate['blockers'])}")
+        console.print("Paper orders created: 0")
+        console.print("Live/demo execution: disabled")
+        raise typer.Exit(code=2)
+
     engine = init_db()
     session_factory = get_session_factory(engine)
     with session_factory() as session:
-        settings = get_settings()
         summary = run_paper_trading(session, settings=settings, model_name=model_name)
         session.commit()
     console.print("Paper trading run summary")

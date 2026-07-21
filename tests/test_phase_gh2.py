@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -107,6 +108,42 @@ def test_weather_feature_refresh_is_strictly_bounded(monkeypatch) -> None:
 
     assert calls == [("new_york", 4), ("chicago", 4)]
     assert len(summaries) == 2
+
+
+def test_soak_history_records_candidate_and_reset_evidence(tmp_path: Path) -> None:
+    history_path = tmp_path / "soak.jsonl"
+    history_path.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "generated_at": utc_now().isoformat(),
+                    "healthy": True,
+                    "paper_ready_candidates": 0,
+                    "rankings_inserted": 2,
+                }
+            )
+            + "\n"
+            for _ in range(23)
+        ),
+        encoding="utf-8",
+    )
+
+    result = phase_gh2._record_soak_cycle(
+        history_path,
+        healthy=True,
+        paper_ready_candidates=1,
+        positive_ev_rows=3,
+        rankings_inserted=2,
+        fresh_ranked_candidates=4,
+        reset_reason=None,
+        required_cycles=24,
+    )
+
+    latest = json.loads(history_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert result["soak_complete"] is True
+    assert latest["positive_ev_rows"] == 3
+    assert latest["fresh_ranked_candidates"] == 4
+    assert latest["reset_reason"] is None
 
 
 def _session_factory(tmp_path: Path):

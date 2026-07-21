@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -129,7 +131,8 @@ def run_phase3bb_r43_single_writer_coordinator(
                     "features_inserted": 0,
                     "links_created": 0,
                     "errors": [
-                        "Active writer detected; coordinator refused to start a second SQLite writer."
+                        "Active writer detected; coordinator refused to start a second "
+                        "SQLite writer."
                     ],
                     "writer_monitor": writer_monitor_payload,
                 }
@@ -217,7 +220,10 @@ def stage_crypto_quote_fetches(
     sources: list[str],
     staging_dir: Path,
     max_workers: int = 4,
+    max_attempts: int = 3,
+    retry_delay_seconds: float = 1.0,
     fetch_crypto_quotes_fn: FetchCryptoQuotesFn = fetch_crypto_quotes,
+    sleep_fn: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
     staging_dir.mkdir(parents=True, exist_ok=True)
     jobs = [
@@ -237,20 +243,23 @@ def stage_crypto_quote_fetches(
     results: list[dict[str, Any]] = []
     errors: list[str] = []
     worker_count = max(1, min(max_workers, len(jobs)))
+    resolved_attempts = max(1, max_attempts)
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
         future_to_job = {
             executor.submit(
-                fetch_crypto_quotes_fn,
-                [job["symbol"]],
-                source=job["source"],
+                _fetch_crypto_job_with_retry,
+                job,
+                fetch_crypto_quotes_fn=fetch_crypto_quotes_fn,
+                max_attempts=resolved_attempts,
+                retry_delay_seconds=max(0.0, retry_delay_seconds),
+                sleep_fn=sleep_fn,
             ): job
             for job in jobs
         }
         for future in as_completed(future_to_job):
             job = future_to_job[future]
             try:
-                fetch_result = future.result()
-                payload = _crypto_fetch_payload(job, fetch_result)
+                payload = future.result()
             except Exception as exc:
                 payload = _failed_fetch_payload(job, str(exc))
             path = staging_dir / _stage_filename(job)
@@ -265,7 +274,34 @@ def stage_crypto_quote_fetches(
         "staged_files": sorted(staged_files),
         "errors": errors,
         "parallel_workers": worker_count,
+        "max_attempts": resolved_attempts,
     }
+
+
+def _fetch_crypto_job_with_retry(
+    job: dict[str, str],
+    *,
+    fetch_crypto_quotes_fn: FetchCryptoQuotesFn,
+    max_attempts: int,
+    retry_delay_seconds: float,
+    sleep_fn: Callable[[float], None],
+) -> dict[str, Any]:
+    payload: dict[str, Any] | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = fetch_crypto_quotes_fn(
+                [job["symbol"]],
+                source=job["source"],
+            )
+            payload = _crypto_fetch_payload(job, result)
+        except Exception as exc:
+            payload = _failed_fetch_payload(job, str(exc))
+        payload["attempts"] = attempt
+        if payload.get("quotes"):
+            return payload
+        if attempt < max_attempts and retry_delay_seconds > 0:
+            sleep_fn(retry_delay_seconds * attempt)
+    return payload or _failed_fetch_payload(job, "Fetch failed without a result.")
 
 
 def drain_staged_crypto_quotes(
@@ -298,9 +334,7 @@ def drain_staged_crypto_quotes(
         inserted += summary.prices_inserted
         errors.extend(summary.errors)
         symbols.update(
-            normalize_symbol(str(item.get("symbol")))
-            for item in quotes
-            if item.get("symbol")
+            normalize_symbol(str(item.get("symbol"))) for item in quotes if item.get("symbol")
         )
         drained_files.append(str(path))
 
@@ -398,7 +432,9 @@ def _quote_payload(quote: CryptoQuote) -> dict[str, Any]:
 
 def _staged_crypto_quote_files(staging_dir: Path) -> list[Path]:
     direct = list(staging_dir.glob("crypto_quotes_*.json"))
-    nested = list(staging_dir.glob("*/crypto_quotes_*.json"))
+    nested = [
+        path for path in staging_dir.glob("*/crypto_quotes_*.json") if path.parent.name != "drained"
+    ]
     return sorted({path for path in direct + nested})
 
 
@@ -446,10 +482,16 @@ def _recommended_next_action(
     if drain_status == "BLOCKED_ACTIVE_WRITER":
         return "Wait for the active writer to finish, then rerun with --drain-staged."
     if not drain_staged:
-        return "Review staged files, run db-writer-monitor, then drain with --drain-staged if no writer is active."
+        return (
+            "Review staged files, run db-writer-monitor, then drain with --drain-staged "
+            "if no writer is active."
+        )
     if stage_result.get("errors") or drain_result.get("errors"):
         return "Review stage/drain errors before scheduling this coordinator."
-    return "Coordinator completed. It is ready to be called by the scheduler as the single writer drain."
+    return (
+        "Coordinator completed. It is ready to be called by the scheduler as the "
+        "single writer drain."
+    )
 
 
 def _run_id() -> str:

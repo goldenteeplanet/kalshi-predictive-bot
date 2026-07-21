@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from click import unstyle
 from typer.testing import CliRunner
 
 import kalshi_predictor.cli as cli_module
@@ -14,6 +15,7 @@ def test_cli_help() -> None:
     assert "collect-once" in result.output
     assert "report-calibration" in result.output
     assert "paper-run" in result.output
+    assert "gh4-paper-activation-preflight" in result.output
     assert "paper-summary" in result.output
     assert "paper-pnl" in result.output
     assert "paper-reset" in result.output
@@ -239,7 +241,7 @@ def test_phase_3c_explain_opportunity_cli_command_help() -> None:
     result = runner.invoke(app, ["explain-opportunity", "--help"])
 
     assert result.exit_code == 0
-    assert "--ticker" in result.output
+    assert "--ticker" in unstyle(result.output)
 
 
 def test_phase_3c_5_overnight_cli_command_help() -> None:

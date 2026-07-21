@@ -38,7 +38,7 @@ Each candidate should include:
 
 ```bash
 kalshi-bot synthetic-markets-status
-kalshi-bot synthetic-markets-run --enable-research --mode shadow --input-file data/synthetic_markets_candidates.json --output reports/synthetic_markets_report.md --json-output reports/synthetic_markets_report.json
+kalshi-bot synthetic-markets-run --enable-research --mode shadow --input-file examples/synthetic_markets_candidates.json --output reports/synthetic_markets_report.md --json-output reports/synthetic_markets_report.json
 kalshi-bot synthetic-markets-report --output reports/synthetic_markets_report.md
 kalshi-bot scheduler-plan --profile synthetic-markets-nightly
 ```

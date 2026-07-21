@@ -295,7 +295,7 @@ kalshi-bot forecast --limit 100
 kalshi-bot collect-once --status open --limit 100 --max-pages 1
 kalshi-bot sync-settlements --lookback-days 30
 kalshi-bot report-calibration --model-name market_implied_v1 --output reports/calibration.md
-kalshi-bot paper-run
+kalshi-bot gh4-paper-activation-preflight
 kalshi-bot paper-summary --output reports/paper_trading.md
 kalshi-bot paper-pnl
 kalshi-bot paper-reset --yes
@@ -426,12 +426,12 @@ Run a collection pass first so paper trading has forecasts and snapshots:
 
 ```bash
 kalshi-bot collect-once --status open --limit 100 --max-pages 1
-kalshi-bot paper-run
+kalshi-bot gh4-paper-activation-preflight
 kalshi-bot paper-summary --output reports/paper_trading.md
 kalshi-bot paper-pnl
 ```
 
-`paper-run` scans the latest forecast per ticker, compares the model probability to stored executable paper prices, creates simulated paper orders when edge clears the configured threshold, immediately fills those simulated orders, and updates paper positions.
+`paper-run` scans the latest forecast per ticker, compares the model probability to stored executable paper prices, creates simulated paper orders when edge clears the configured threshold, immediately fills those simulated orders, and updates paper positions. It is blocked by default and requires a passing GH-4 preflight, `PAPER_ORDER_CREATION_ENABLED=true`, a released `PAPER_ORDER_KILL_SWITCH`, and the exact operator approval token. See [GH-4 Paper Order Activation](docs/GH4_PAPER_ORDER_ACTIVATION.md).
 
 `paper-reset --yes` deletes only paper trading rows. It does not delete market, snapshot, forecast, or settlement data.
 
@@ -698,7 +698,7 @@ Run all local forecast models, paper trading, and reports:
 ```bash
 kalshi-bot collect-once --status open --limit 100 --max-pages 1
 kalshi-bot forecast --model all
-kalshi-bot paper-run
+kalshi-bot gh4-paper-activation-preflight
 kalshi-bot paper-summary --output reports/paper_trading.md
 kalshi-bot backtest --model-name market_implied_v1 --strategy paper_v1 --days 30 --output reports/backtest_market_implied_v1.md
 kalshi-bot compare-strategies --days 30 --output reports/strategy_comparison.md

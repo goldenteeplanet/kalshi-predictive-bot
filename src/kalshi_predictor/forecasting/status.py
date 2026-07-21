@@ -107,7 +107,7 @@ NEXT_COMMANDS = {
         "kalshi-bot forecast --model weather_v2",
     ],
     "economic_v1": [
-        "kalshi-bot ingest-economic --input-file data/economic_sample.json",
+        "kalshi-bot ingest-economic --input-file examples/economic_sample.json",
         "kalshi-bot build-economic-features",
         "kalshi-bot link-economic-markets",
         "kalshi-bot forecast --model economic_v1",
