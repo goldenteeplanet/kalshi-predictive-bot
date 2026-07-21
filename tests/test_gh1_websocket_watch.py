@@ -7,6 +7,7 @@ from kalshi_predictor.config import Settings
 from kalshi_predictor.ingest.websocket_orderbooks import StreamSummary
 from kalshi_predictor.ingest.websocket_watch import (
     discover_quoted_market_tickers,
+    load_actionable_tickers,
     run_reconnecting_websocket_watch,
 )
 
@@ -22,7 +23,34 @@ def test_discovery_keeps_bounded_quoted_books_per_series() -> None:
     )
 
     assert [row["ticker"] for row in rows] == ["KXBTC-QUOTED", "KXTEMPNYCH-QUOTED"]
-    assert client.orderbook_calls == ["KXBTC-EMPTY", "KXBTC-QUOTED", "KXTEMPNYCH-EMPTY", "KXTEMPNYCH-QUOTED"]
+    assert client.orderbook_calls == [
+        "KXBTC-EMPTY",
+        "KXBTC-QUOTED",
+        "KXTEMPNYCH-EMPTY",
+        "KXTEMPNYCH-QUOTED",
+    ]
+
+
+def test_discovery_prioritizes_ranked_manifest_books(tmp_path: Path) -> None:
+    manifest = tmp_path / "actionable.json"
+    manifest.write_text(
+        json.dumps({"tickers": ["KXBTC-RANKED", "KXBTC-RANKED", "KXETH-RANKED"]}),
+        encoding="utf-8",
+    )
+    tickers = load_actionable_tickers(manifest, limit=2)
+    client = _FakeClient()
+
+    rows = discover_quoted_market_tickers(
+        client=client,
+        series=["KXBTC", "KXETH"],
+        max_markets_per_series=5,
+        max_quoted_per_series=1,
+        preferred_tickers=tickers,
+    )
+
+    assert [row["ticker"] for row in rows] == ["KXBTC-RANKED", "KXETH-RANKED"]
+    assert all(row["selection_source"] == "ACTIONABLE_RANKING" for row in rows)
+    assert client.orderbook_calls == ["KXBTC-RANKED", "KXETH-RANKED"]
 
 
 def test_watch_reconnects_uses_cached_discovery_and_stages_only(tmp_path: Path) -> None:

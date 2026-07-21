@@ -65,16 +65,26 @@ def link_weather_markets(
     session: Session,
     *,
     limit: int | None = None,
+    tickers: list[str] | None = None,
     progress_callback: Callable[[dict[str, object]], None] | None = None,
     progress_every: int = 0,
     should_stop: Callable[[], bool] | None = None,
 ) -> WeatherLinkResult:
     session.flush()
     statement = _weather_candidate_statement()
+    scoped_tickers = (
+        list(
+            dict.fromkeys(str(ticker).strip() for ticker in (tickers or []) if str(ticker).strip())
+        )
+        if tickers is not None
+        else None
+    )
+    if scoped_tickers is not None:
+        statement = statement.where(Market.ticker.in_(scoped_tickers))
     if limit is not None:
         statement = statement.limit(limit)
     markets = list(session.scalars(statement))
-    if not markets:
+    if not markets and scoped_tickers is None:
         statement = select(Market).order_by(Market.ticker)
         if limit is not None:
             statement = statement.limit(limit)

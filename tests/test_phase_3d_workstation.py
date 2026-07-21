@@ -343,6 +343,76 @@ def test_market_monitor_shows_na_when_numeric_data_is_missing(tmp_path) -> None:
     assert row["data_freshness"] == now.isoformat()
 
 
+def test_market_monitor_flags_stale_and_expired_rows(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = utc_now()
+    with session_factory() as session:
+        for ticker, captured_at, close_time, status in (
+            (
+                "PHASE3D-STALE",
+                now - timedelta(minutes=16),
+                now + timedelta(hours=2),
+                "open",
+            ),
+            (
+                "PHASE3D-EXPIRED",
+                now,
+                now - timedelta(minutes=1),
+                "closed",
+            ),
+        ):
+            insert_market_snapshot(
+                session,
+                {
+                    "ticker": ticker,
+                    "status": status,
+                    "title": f"Will {ticker} resolve yes?",
+                    "series_ticker": "KXTEST",
+                    "close_time": close_time.isoformat(),
+                    "liquidity_dollars": "1000",
+                },
+                {
+                    "orderbook_fp": {
+                        "yes_dollars": [["0.40", "10"]],
+                        "no_dollars": [["0.50", "10"]],
+                    }
+                },
+                captured_at,
+            )
+            insert_market_ranking(
+                session,
+                {
+                    "ticker": ticker,
+                    "ranked_at": captured_at,
+                    "title": f"Will {ticker} resolve yes?",
+                    "status": status,
+                    "forecast_model": "ensemble_v2",
+                    "forecast_probability": "0.60",
+                    "best_side": "BUY_YES",
+                    "best_price": "0.40",
+                    "estimated_edge": "0.20",
+                    "liquidity_score": "80",
+                    "spread_score": "80",
+                    "time_score": "80",
+                    "model_confidence_score": "80",
+                    "opportunity_score": "80",
+                    "spread": "0.10",
+                    "liquidity": "1000",
+                    "reason": "Freshness truth regression fixture.",
+                },
+            )
+        rows = market_monitor_rows(session)
+
+    stale = next(row for row in rows if row["ticker"] == "PHASE3D-STALE")
+    expired = next(row for row in rows if row["ticker"] == "PHASE3D-EXPIRED")
+    assert stale["data_quality"] == "Stale market data"
+    assert stale["snapshot_repair_status"] == "Refresh required"
+    assert stale["recommended_action"] == "Reconnect or refresh snapshot"
+    assert expired["data_quality"] == "Expired market"
+    assert expired["snapshot_repair_status"] == "Not active"
+    assert expired["recommended_action"] == "Exclude expired market"
+
+
 def test_market_monitor_groups_and_deprioritizes_missing_multileg_sports_rows(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     now = utc_now()
