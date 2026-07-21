@@ -36,9 +36,9 @@ exec .venv/bin/kalshi-bot gh2-single-writer-decision-refresh \
   --gh1-staging-dir "$GH1_ROOT/staging" \
   --candidate-manifest-path "$GH1_ROOT/watch/actionable_tickers.json" \
   --candidate-limit 40 \
-  --active-link-limit 80 \
-  --forecast-limit 60 \
-  --opportunity-limit 40 \
+  --active-link-limit 24 \
+  --forecast-limit 24 \
+  --opportunity-limit 20 \
   --freshness-minutes 15 \
   --soak-cycles-required 24 \
   --guard-active-writer
