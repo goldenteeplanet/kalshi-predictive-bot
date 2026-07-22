@@ -53,6 +53,24 @@ def test_discovery_prioritizes_ranked_manifest_books(tmp_path: Path) -> None:
     assert client.orderbook_calls == ["KXBTC-RANKED", "KXETH-RANKED"]
 
 
+def test_discovery_retains_preferred_ticker_with_empty_initial_book() -> None:
+    client = _FakeClient()
+
+    rows = discover_quoted_market_tickers(
+        client=client,
+        series=["KXXRP"],
+        max_markets_per_series=5,
+        max_quoted_per_series=1,
+        preferred_tickers=["KXXRP-EMPTY"],
+    )
+
+    assert [row["ticker"] for row in rows] == ["KXXRP-EMPTY"]
+    assert rows[0]["selection_source"] == "PREFERRED_SNAPSHOT_RECOVERY"
+    assert rows[0]["yes_levels"] == 0
+    assert rows[0]["no_levels"] == 0
+    assert client.orderbook_calls == ["KXXRP-EMPTY"]
+
+
 def test_watch_reconnects_uses_cached_discovery_and_stages_only(tmp_path: Path) -> None:
     adapter_factory = _AdapterFactory()
     sleeps: list[float] = []
