@@ -7,6 +7,7 @@ UI_URL=${UI_URL:-http://127.0.0.1:8080/today}
 WAIT_SECONDS=${WAIT_SECONDS:-600}
 UI_WAIT_SECONDS=${UI_WAIT_SECONDS:-60}
 TARGET_SHA=${1:-}
+LEGACY_OWNER_TIMER=kalshi-r5-bounded.timer
 
 TIMERS=(
   kalshi-gh1-websocket-drain.timer
@@ -14,11 +15,14 @@ TIMERS=(
   kalshi-gh2-decision-refresh.timer
 )
 WRITER_SERVICES=(
+  kalshi-r5-bounded.service
   kalshi-gh1-websocket-drain.service
   kalshi-nyc-weather-runtime-refresh.service
   kalshi-gh2-decision-refresh.service
 )
 declare -A TIMER_WAS_ACTIVE=()
+LEGACY_TIMER_PRESENT=false
+LEGACY_TIMER_WAS_ACTIVE=false
 PREVIOUS_SHA=""
 DEPLOY_STARTED=false
 
@@ -33,6 +37,12 @@ restore_timers() {
       systemctl start "$timer" || true
     fi
   done
+}
+
+restore_legacy_timer() {
+  if [[ $LEGACY_TIMER_PRESENT == true && $LEGACY_TIMER_WAS_ACTIVE == true ]]; then
+    systemctl start "$LEGACY_OWNER_TIMER" || true
+  fi
 }
 
 wait_for_ui() {
@@ -62,6 +72,7 @@ cleanup() {
   trap - EXIT
   if (( rc != 0 )); then
     rollback_on_error
+    restore_legacy_timer
   fi
   restore_timers
   exit "$rc"
@@ -86,6 +97,13 @@ for timer in "${TIMERS[@]}"; do
   fi
 done
 systemctl stop "${TIMERS[@]}"
+if systemctl cat "$LEGACY_OWNER_TIMER" >/dev/null 2>&1; then
+  LEGACY_TIMER_PRESENT=true
+  if systemctl is-active --quiet "$LEGACY_OWNER_TIMER"; then
+    LEGACY_TIMER_WAS_ACTIVE=true
+  fi
+  systemctl stop "$LEGACY_OWNER_TIMER"
+fi
 
 deadline=$((SECONDS + WAIT_SECONDS))
 while true; do
@@ -137,8 +155,12 @@ systemctl daemon-reload
 systemctl restart kalshi-ui.service
 systemctl restart kalshi-gh1-websocket-watch.service
 wait_for_ui
+if [[ $LEGACY_TIMER_PRESENT == true ]]; then
+  systemctl disable "$LEGACY_OWNER_TIMER"
+fi
 
 DEPLOY_STARTED=false
 echo "Verified commit: $(git -C "$APP_PATH" rev-parse HEAD)"
 echo "UI check: HTTP success at $UI_URL"
+echo "Scheduled decision owner: GH-2; legacy R5 timer retired."
 echo "Writer gate: clear; paper-only safety remains locked."
