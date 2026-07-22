@@ -29,6 +29,7 @@ def test_phase3z_audit_keeps_undefined_metrics_null(tmp_path) -> None:
     assert market_implied["forecast_metrics"]["brier_score"] is None
     assert market_implied["paper_trade_metrics"]["roi"] is None
     assert market_implied["paper_trade_metrics"]["win_rate"] is None
+    assert audit["runtime_identity"]["sqlite"]["path"].endswith("phase3z.db")
 
 
 def test_phase3z_coverage_doctor_uses_null_for_empty_denominator(tmp_path) -> None:

@@ -103,6 +103,9 @@ def create_app(
             settings=settings or get_settings(),
         )
     )
+    # Starlette otherwise assembles this lazily inside the first request.
+    # Finalize it here so concurrent cold readers all see the same route stack.
+    app.middleware_stack = app.build_middleware_stack()
     return app
 
 
