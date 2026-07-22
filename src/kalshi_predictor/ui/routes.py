@@ -154,6 +154,7 @@ from kalshi_predictor.ui.progress import (
     certification_reports_root,
     get_cached_progress_dashboard,
 )
+from kalshi_predictor.ui.refresh_readiness import build_refresh_readiness_dashboard
 from kalshi_predictor.ui.service import (
     REPORT_LINKS,
     DecisionUiService,
@@ -837,6 +838,29 @@ def create_router(
                 "monitor": build_long_job_monitor(settings=resolved_settings),
             },
         )
+
+    @router.get("/system/refresh-readiness", response_class=HTMLResponse)
+    def refresh_readiness_dashboard(
+        request: Request,
+        service: Annotated[DecisionUiService, Depends(get_service)],
+    ) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "refresh_readiness.html",
+            {
+                "request": request,
+                "shell_context": shell_context_for(service),
+                "dashboard": build_refresh_readiness_dashboard(),
+            },
+        )
+
+    @router.get("/api/system/refresh-readiness")
+    def refresh_readiness_api() -> dict[str, Any]:
+        return jsonable_encoder(build_refresh_readiness_dashboard())
+
+    @router.get("/api/system/live-roadmap")
+    def live_roadmap_api() -> dict[str, Any]:
+        return jsonable_encoder(build_refresh_readiness_dashboard()["roadmap"])
 
     @router.get("/system/progress", response_class=HTMLResponse)
     def process_progress_dashboard(
