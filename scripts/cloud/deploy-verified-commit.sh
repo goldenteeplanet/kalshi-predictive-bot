@@ -5,6 +5,7 @@ APP_PATH=${APP_PATH:-/opt/kalshi-predictive-bot}
 ENV_FILE=${ENV_FILE:-/etc/kalshi-bot/kalshi-bot.env}
 UI_URL=${UI_URL:-http://127.0.0.1:8080/today}
 WAIT_SECONDS=${WAIT_SECONDS:-600}
+UI_WAIT_SECONDS=${UI_WAIT_SECONDS:-60}
 TARGET_SHA=${1:-}
 
 TIMERS=(
@@ -32,6 +33,17 @@ restore_timers() {
       systemctl start "$timer" || true
     fi
   done
+}
+
+wait_for_ui() {
+  local deadline=$((SECONDS + UI_WAIT_SECONDS))
+  while (( SECONDS < deadline )); do
+    if curl --fail --silent --max-time 5 "$UI_URL" >/dev/null; then
+      return 0
+    fi
+    sleep 2
+  done
+  die "UI did not become healthy at $UI_URL within ${UI_WAIT_SECONDS}s."
 }
 
 rollback_on_error() {
@@ -124,7 +136,7 @@ grep -q '"writer_count": 0' <<<"$post_install_writer_status" \
 systemctl daemon-reload
 systemctl restart kalshi-ui.service
 systemctl restart kalshi-gh1-websocket-watch.service
-curl --fail --silent --show-error --max-time 20 "$UI_URL" >/dev/null
+wait_for_ui
 
 DEPLOY_STARTED=false
 echo "Verified commit: $(git -C "$APP_PATH" rev-parse HEAD)"

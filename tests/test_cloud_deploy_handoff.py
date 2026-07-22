@@ -17,6 +17,9 @@ def test_guarded_cloud_deploy_handoff_contract() -> None:
     assert "rollback_on_error" in script
     assert "trap cleanup EXIT" in script
     assert "if (( rc != 0 ))" in script
+    assert "UI_WAIT_SECONDS" in script
+    assert "wait_for_ui" in script
+    assert "sleep 2" in script
     assert "kalshi-gh1-websocket-watch.service" in script
     assert "curl --fail" in script
     assert "EXECUTION_ENABLED=true" not in script
