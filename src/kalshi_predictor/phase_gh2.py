@@ -791,19 +791,23 @@ def _merge_manifest_candidates(
     recovery_rows = recovery[:limit]
     ranked_budget = max(limit - len(recovery_rows), 0)
     sticky_rows = list((sticky or [])[: min(STICKY_CANDIDATE_LIMIT, ranked_budget)])
-    selected = sticky_rows + list(ranked) + list(recovery_rows)
     deduped: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for row in selected:
-        ticker = str(row.get("ticker") or "").strip()
-        if not ticker or ticker in seen:
-            continue
-        if row in recovery_rows and len(deduped) < ranked_budget:
-            continue
-        if row not in recovery_rows and len(deduped) >= ranked_budget:
-            continue
-        seen.add(ticker)
-        deduped.append(row)
+
+    def append_unique(rows: list[dict[str, Any]], *, stop_at: int) -> None:
+        for row in rows:
+            if len(deduped) >= stop_at:
+                break
+            ticker = str(row.get("ticker") or "").strip()
+            if not ticker or ticker in seen:
+                continue
+            seen.add(ticker)
+            deduped.append(row)
+
+    ranked_rows = sticky_rows + list(ranked)
+    append_unique(ranked_rows, stop_at=ranked_budget)
+    append_unique(list(recovery_rows), stop_at=limit)
+    append_unique(ranked_rows, stop_at=limit)
     return deduped
 
 

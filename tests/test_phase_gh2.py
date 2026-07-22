@@ -123,6 +123,29 @@ def test_manifest_merge_keeps_fresh_candidates_while_new_rankings_warm_up() -> N
     ]
 
 
+def test_manifest_merge_keeps_recovery_rows_when_ranked_budget_is_not_full() -> None:
+    sticky = [{"ticker": "KXBTC-STICKY", "selection_tier": "STICKY_FRESH"}]
+    ranked = [{"ticker": "KXBTC-NEW"}]
+    recovery = [
+        {"ticker": "KXXRP-RECOVERY-1"},
+        {"ticker": "KXXRP-RECOVERY-2"},
+    ]
+
+    rows = phase_gh2._merge_manifest_candidates(
+        ranked,
+        recovery,
+        sticky=sticky,
+        limit=6,
+    )
+
+    assert [row["ticker"] for row in rows] == [
+        "KXBTC-STICKY",
+        "KXBTC-NEW",
+        "KXXRP-RECOVERY-1",
+        "KXXRP-RECOVERY-2",
+    ]
+
+
 def test_candidate_selection_can_be_scoped_to_prior_manifest(tmp_path: Path) -> None:
     session_factory = _session_factory(tmp_path)
     now = utc_now()
