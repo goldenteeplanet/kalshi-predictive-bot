@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "src/kalshi_predictor/phase_gh2.py"
+      - "src/kalshi_predictor/phase3ba_r2.py"
+      - "src/kalshi_predictor/phase3ba_r3.py"
       - "src/kalshi_predictor/ingest/websocket_watch.py"
       - "src/kalshi_predictor/weather/linker.py"
       - "src/kalshi_predictor/workstation/repository.py"
@@ -12,8 +14,12 @@ on:
       - "deploy/systemd/kalshi-gh*.service"
       - "deploy/systemd/kalshi-gh*.timer"
       - "scripts/cloud/kalshi-gh*.sh"
+      - "scripts/cloud/verify-paper-deployment.sh"
       - "tests/test_gh1_websocket_watch.py"
       - "tests/test_phase_gh2.py"
+      - "tests/test_phase3ba_r2_weather_ranking_activation.py"
+      - "tests/test_phase3ba_r3_weather_paper_gate.py"
+      - "tests/test_cloud_deployment_smoke.py"
       - "tests/test_phase_3bc_r5_crypto_freshness_watch.py"
       - "tests/test_phase_2_8_weather.py"
       - "tests/test_phase_3d_workstation.py"
@@ -45,15 +51,28 @@ jobs:
         run: >-
           python -m ruff check
           src/kalshi_predictor/phase_gh2.py
+          src/kalshi_predictor/phase3ba_r2.py
+          src/kalshi_predictor/phase3ba_r3.py
           src/kalshi_predictor/weather/linker.py
           src/kalshi_predictor/workstation/repository.py
           tests/test_phase_gh2.py
+          tests/test_phase3ba_r2_weather_ranking_activation.py
+          tests/test_phase3ba_r3_weather_paper_gate.py
+
+      - name: Check cloud shell contracts
+        run: >-
+          bash -n
+          scripts/cloud/kalshi-gh2-decision-refresh.sh
+          scripts/cloud/verify-paper-deployment.sh
 
       - name: Run GH-2 regression matrix
         run: >-
           python -m pytest
           tests/test_gh1_websocket_watch.py
           tests/test_phase_gh2.py
+          tests/test_phase3ba_r2_weather_ranking_activation.py
+          tests/test_phase3ba_r3_weather_paper_gate.py
+          tests/test_cloud_deployment_smoke.py
           tests/test_phase_3bc_r5_crypto_freshness_watch.py::test_phase3bc_r5_can_reuse_existing_r3_report
           tests/test_phase_2_8_weather.py
           tests/test_phase_3d_workstation.py

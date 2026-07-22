@@ -156,6 +156,11 @@
     <div><span>Remaining</span><strong>{{ gh3_soak.remaining_cycles }}</strong></div>
     <div><span>Minimum ETA</span><strong>{{ gh3_soak.eta_label }}</strong></div>
     <div><span>Next cycle</span><strong>{{ gh3_soak.next_run }}</strong></div>
+    <div><span>Scheduler</span><strong>{{ gh3_soak.scheduler_status }}</strong></div>
+    <div><span>Lock wait</span><strong>{{ '%.1f'|format(gh3_soak.lock_wait_seconds) }}s</strong></div>
+    <div><span>Writer runtime</span><strong>{{ '%.1f'|format(gh3_soak.writer_runtime_seconds) }}s</strong></div>
+    <div><span>Last success</span><strong>{{ gh3_soak.last_successful_completion }}</strong></div>
+    <div><span>Deferred reason</span><strong>{{ gh3_soak.deferred_cycle_reason }}</strong></div>
     <div><span>Paper-ready seen</span><strong>{{ 'Yes' if gh3_soak.paper_ready_seen else 'No' }}</strong></div>
     <div><span>Paper-ready now</span><strong>{{ gh3_soak.current_paper_ready_candidates }}</strong></div>
     <div><span>Positive EV</span><strong>{{ gh3_soak.positive_ev_rows }}</strong></div>

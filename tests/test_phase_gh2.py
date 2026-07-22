@@ -99,6 +99,78 @@ def test_manifest_merge_reserves_capacity_for_snapshot_recovery() -> None:
     ]
 
 
+def test_manifest_merge_keeps_fresh_candidates_while_new_rankings_warm_up() -> None:
+    sticky = [{"ticker": "KXBTC-STICKY", "selection_tier": "STICKY_FRESH"}]
+    ranked = [
+        {"ticker": "KXBTC-NEW-1"},
+        {"ticker": "KXBTC-NEW-2"},
+        {"ticker": "KXBTC-NEW-3"},
+    ]
+    recovery = [{"ticker": "KXXRP-RECOVERY"}]
+
+    rows = phase_gh2._merge_manifest_candidates(
+        ranked,
+        recovery,
+        sticky=sticky,
+        limit=4,
+    )
+
+    assert [row["ticker"] for row in rows] == [
+        "KXBTC-STICKY",
+        "KXBTC-NEW-1",
+        "KXBTC-NEW-2",
+        "KXXRP-RECOVERY",
+    ]
+
+
+def test_manifest_merge_keeps_recovery_rows_when_ranked_budget_is_not_full() -> None:
+    sticky = [{"ticker": "KXBTC-STICKY", "selection_tier": "STICKY_FRESH"}]
+    ranked = [{"ticker": "KXBTC-NEW"}]
+    recovery = [
+        {"ticker": "KXXRP-RECOVERY-1"},
+        {"ticker": "KXXRP-RECOVERY-2"},
+    ]
+
+    rows = phase_gh2._merge_manifest_candidates(
+        ranked,
+        recovery,
+        sticky=sticky,
+        limit=6,
+    )
+
+    assert [row["ticker"] for row in rows] == [
+        "KXBTC-STICKY",
+        "KXBTC-NEW",
+        "KXXRP-RECOVERY-1",
+        "KXXRP-RECOVERY-2",
+    ]
+
+
+def test_candidate_selection_can_be_scoped_to_prior_manifest(tmp_path: Path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = utc_now()
+    with session_factory() as session:
+        for ticker in ("KXBTC-KEEP", "KXBTC-IGNORE"):
+            _seed_ranked_market(
+                session,
+                ticker=ticker,
+                captured_at=now,
+                close_time=now + timedelta(hours=2),
+                edge="0.04",
+                score="70",
+            )
+
+        rows = select_actionable_ranked_markets(
+            session,
+            limit=10,
+            max_per_series=10,
+            now=now,
+            ticker_scope=["KXBTC-KEEP"],
+        )
+
+    assert [row["ticker"] for row in rows] == ["KXBTC-KEEP"]
+
+
 def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     root = Path(__file__).parents[1]
     implementation = (root / "src/kalshi_predictor/phase_gh2.py").read_text(encoding="utf-8")
@@ -112,6 +184,11 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "AUTOPILOT_ENABLED=false" in service
     assert "OnUnitActiveSec=15min" in timer
     assert "flock -w 45 9" in script
+    assert "gh2_scheduler_status.json" in script
+    assert "write_scheduler_status" in script
+    assert "SHARED_WRITER_LOCK_BUSY" in script
+    assert "DB_WRITER_MONITOR_BUSY" in script
+    assert "GH2_DECISION_REFRESH_FAILED" in script
     assert "TimeoutStartSec=6min" in service
     assert "db-writer-monitor --json" in script
     assert "gh2-stage-crypto-quotes" in script

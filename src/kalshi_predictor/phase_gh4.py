@@ -15,6 +15,7 @@ GH4_APPROVAL_TOKEN = "I_APPROVE_GH4_PAPER_ORDER_CREATION"
 DEFAULT_GH2_REPORT_PATH = Path("reports/phase_gh2/gh2_active_candidate_refresh.json")
 DEFAULT_GH2_HISTORY_PATH = Path("reports/phase_gh2/gh2_paper_only_soak_history.jsonl")
 DEFAULT_GH1_STATUS_PATH = Path("reports/phase_gh1/watch/status.json")
+DEFAULT_GH2_SCHEDULER_STATUS_PATH = Path("reports/phase_gh2/gh2_scheduler_status.json")
 PAPER_ONLY_SAFETY = "SIMULATED_PAPER_ORDERS_ONLY_EXCHANGE_EXECUTION_DISABLED"
 
 
@@ -131,6 +132,7 @@ def build_gh3_soak_status(
     report_path: Path = DEFAULT_GH2_REPORT_PATH,
     history_path: Path = DEFAULT_GH2_HISTORY_PATH,
     gh1_status_path: Path = DEFAULT_GH1_STATUS_PATH,
+    scheduler_status_path: Path = DEFAULT_GH2_SCHEDULER_STATUS_PATH,
     now: datetime | None = None,
     cadence_minutes: int = 15,
 ) -> dict[str, Any]:
@@ -138,13 +140,18 @@ def build_gh3_soak_status(
     payload = _read_json(report_path)
     history = _read_json_lines(history_path)
     gh1_payload = _read_json(gh1_status_path)
+    scheduler = _read_json(scheduler_status_path)
     soak = payload.get("soak") or {}
     readiness = payload.get("paper_readiness") or {}
     completed = int(soak.get("consecutive_healthy_cycles") or 0)
     required = int(soak.get("required_healthy_cycles") or 24)
     remaining = max(0, required - completed)
     generated_at = _datetime(payload.get("generated_at"))
-    next_run = generated_at + timedelta(minutes=cadence_minutes) if generated_at else None
+    scheduler_generated_at = _datetime(scheduler.get("generated_at"))
+    next_run_base = scheduler_generated_at or generated_at
+    next_run = (
+        next_run_base + timedelta(minutes=cadence_minutes) if next_run_base else None
+    )
     estimated_completion = resolved_now + timedelta(minutes=remaining * cadence_minutes)
     reconnect = build_source_reconnect_health(
         gh2_payload=payload,
@@ -157,6 +164,19 @@ def build_gh3_soak_status(
     current_paper_ready = int(readiness.get("total_paper_ready_candidates") or 0)
     weather_gate = payload.get("weather_gate") or {}
     weather_gate_summary = weather_gate.get("summary") or {}
+    cycle_telemetry = payload.get("cycle_telemetry") or {}
+    scheduler_state = str(scheduler.get("status") or "UNAVAILABLE")
+    lock_wait_seconds = _nonnegative_float(
+        scheduler.get("lock_wait_seconds") or cycle_telemetry.get("lock_wait_seconds")
+    )
+    writer_runtime_seconds = _nonnegative_float(
+        scheduler.get("writer_runtime_seconds") or cycle_telemetry.get("runtime_seconds")
+    )
+    if scheduler_state == "RUNNING" and scheduler_generated_at is not None:
+        writer_runtime_seconds = max(
+            writer_runtime_seconds,
+            (resolved_now - scheduler_generated_at).total_seconds(),
+        )
     if not payload:
         status = "UNAVAILABLE"
         status_label = "Soak report unavailable"
@@ -191,7 +211,21 @@ def build_gh3_soak_status(
         if remaining == 0
         else f"about {remaining * cadence_minutes / 60:.1f}h",
         "estimated_completion": _format_datetime(estimated_completion),
-        "next_run": _format_datetime(next_run),
+        "next_run": (
+            "Running now"
+            if scheduler_state in {"STAGING", "WAITING_FOR_WRITER", "RUNNING"}
+            else _format_datetime(next_run)
+        ),
+        "scheduler_status": _enum_label(scheduler_state),
+        "lock_wait_seconds": lock_wait_seconds,
+        "writer_runtime_seconds": writer_runtime_seconds,
+        "deferred_cycle_reason": _enum_label(
+            scheduler.get("deferred_cycle_reason") or "NONE"
+        ),
+        "last_successful_completion": _format_datetime(
+            _datetime(scheduler.get("last_successful_completion"))
+            or (generated_at if bool(soak.get("healthy_cycle")) else None)
+        ),
         "healthy_cycle": bool(soak.get("healthy_cycle")),
         "paper_ready_seen": bool(soak.get("paper_ready_seen_in_required_window")),
         "current_paper_ready_candidates": current_paper_ready,
@@ -518,6 +552,13 @@ def _age_minutes(value: Any, now: datetime) -> float | None:
     if parsed is None:
         return None
     return max(0.0, (now - parsed).total_seconds() / 60)
+
+
+def _nonnegative_float(value: Any) -> float:
+    try:
+        return max(float(value or 0), 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _format_datetime(value: datetime | None) -> str:

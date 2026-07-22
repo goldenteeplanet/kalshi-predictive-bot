@@ -8,7 +8,8 @@ It collects public market metadata and orderbook snapshots, stores raw JSON loca
 
 GH-2 closes the cloud live-data paper-decision loop without creating paper or
 exchange orders. The reconnecting GH-1 watch now prioritizes tickers from
-current actionable rankings, then uses bounded series discovery as a fallback.
+current actionable rankings, retains a bounded fresh cohort while replacements
+warm up, then uses bounded series discovery as a fallback.
 A separate 15-minute service stages public crypto quotes in parallel and drains
 orderbooks, features, links, forecasts, rankings, and opportunities through the
 shared single-writer lock.
@@ -32,6 +33,16 @@ only when it produces a fresh ranked candidate, encounters no stage errors, and
 creates zero paper orders. Even after 24 consecutive healthy cycles with a
 paper-ready candidate, paper-order creation still requires explicit operator
 approval. Live execution and autopilot remain disabled.
+
+Operator checks remain read-only until every GH-4 gate passes:
+
+```bash
+# Local-only simulated order, fill, risk, P&L, settlement, and kill-switch tests.
+scripts/local/gh4-paper-lifecycle-rehearsal.sh
+
+# Cloud post-deployment verification; does not start or stop services.
+sudo scripts/cloud/verify-paper-deployment.sh <40-character-deployed-sha>
+```
 
 Phase 2 adds a paper trading ledger. It creates simulated orders and immediate simulated fills from stored forecasts/snapshots only. It still does not authenticate with Kalshi or place real orders.
 
