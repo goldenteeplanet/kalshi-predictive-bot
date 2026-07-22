@@ -1,0 +1,12 @@
+{
+  "schema_version": "refresh-readiness-visual-baseline-v1",
+  "template_sha256": "337d286b5cdf0f05995a54ba94ef6d31aa442b751acc9a7c20a614ae0e37ba0c",
+  "states": [
+    "NO_SOURCE_DATA",
+    "INVALID_SOURCE",
+    "STALE_INPUT",
+    "CURRENT",
+    "VALID_ZERO_ACTIVE_MARKETS",
+    "NO_ELIGIBLE_ROWS"
+  ]
+}
