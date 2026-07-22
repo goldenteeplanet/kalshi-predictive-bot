@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from kalshi_predictor.refresh_control_plane import verify_authoritative_cloud_snapshot
+from kalshi_predictor.roadmap.artifacts import verify_signed_artifact
 from kalshi_predictor.roadmap.status import build_roadmap_status
 from kalshi_predictor.utils.time import utc_now
 
@@ -16,6 +17,7 @@ DEFAULT_MANIFEST_PATH = Path("reports/phase_gh1/watch/actionable_tickers.json")
 STALE_AFTER_SECONDS = 30 * 60
 DEFAULT_CONTROL_PLANE_ROOT = Path("reports/phase_gh2/control_plane")
 DEFAULT_CLOUD_STATUS_PATH = Path("reports/phase_gh2/authoritative_cloud_status.json")
+DEFAULT_CATEGORY_CENSUS_PATH = Path("reports/roadmap/category_ingestion_census.json")
 
 
 def build_refresh_readiness_dashboard(
@@ -25,6 +27,7 @@ def build_refresh_readiness_dashboard(
     manifest_path: Path = DEFAULT_MANIFEST_PATH,
     control_plane_root: Path = DEFAULT_CONTROL_PLANE_ROOT,
     cloud_status_path: Path = DEFAULT_CLOUD_STATUS_PATH,
+    category_census_path: Path = DEFAULT_CATEGORY_CENSUS_PATH,
 ) -> dict[str, Any]:
     refresh = _read_json(refresh_path)
     history = _read_json_lines(history_path)[-24:]
@@ -53,6 +56,7 @@ def build_refresh_readiness_dashboard(
     scorecard = _read_json(control_plane_root / "data_quality_scorecard.json")
     incidents = _read_json(control_plane_root / "incident_history.json")
     cloud = verify_authoritative_cloud_snapshot(cloud_status_path)
+    category_census = verify_signed_artifact(category_census_path)
     return {
         "read_only": True,
         "source": {
@@ -92,6 +96,21 @@ def build_refresh_readiness_dashboard(
         "incidents": incidents,
         "reports": (refresh.get("control_plane") or {}),
         "roadmap": build_roadmap_status(),
+        "category_census": _category_census_view(category_census),
+    }
+
+
+def _category_census_view(verification: dict[str, Any]) -> dict[str, Any]:
+    payload = verification.get("payload") if verification.get("verified") else {}
+    categories = payload.get("categories") if isinstance(payload, dict) else []
+    return {
+        "state": "VERIFIED" if verification.get("verified") else "MISSING_OR_UNVERIFIED",
+        "path": verification.get("path"),
+        "generated_at": payload.get("generated_at") if isinstance(payload, dict) else None,
+        "categories": categories if isinstance(categories, list) else [],
+        "priority_blockers": (
+            payload.get("priority_blockers", []) if isinstance(payload, dict) else []
+        ),
     }
 
 
