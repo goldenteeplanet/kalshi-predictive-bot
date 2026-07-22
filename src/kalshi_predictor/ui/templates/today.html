@@ -59,6 +59,33 @@
     <div><span>Best EV</span><strong>{{ crypto_freshness.best_current_expected_value_label }}</strong></div>
     <div><span>Gap to positive</span><strong>{{ crypto_freshness.best_ev_gap_to_positive_label }}</strong></div>
   </div>
+  {% if crypto_freshness.gate_failure_examples %}
+  <div class="table-wrap professional-table">
+    <table>
+      <caption class="sr-only">Current crypto candidate gate failures</caption>
+      <thead>
+        <tr>
+          <th scope="col">Market</th>
+          <th scope="col">EV</th>
+          <th scope="col">Book</th>
+          <th scope="col">Failed gate</th>
+          <th scope="col">Next action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for candidate in crypto_freshness.gate_failure_examples %}
+        <tr>
+          <td><a href="{{ candidate.detail_href }}"><strong>{{ candidate.ticker }}</strong></a></td>
+          <td>{{ candidate.expected_value_label }}</td>
+          <td>{{ candidate.book_label }}</td>
+          <td>{{ candidate.failed_gate_label }}</td>
+          <td>{{ candidate.next_action }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 </section>
 
 <section class="section-band compact-band" aria-labelledby="gh3-soak-title">

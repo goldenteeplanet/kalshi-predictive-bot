@@ -30,6 +30,7 @@ UNATTENDED_STDOUT_FILE = "phase3bc_r5_unattended_stdout.log"
 UNATTENDED_STDERR_FILE = "phase3bc_r5_unattended_stderr.log"
 R5_REPORT_FILE = "phase3bc_r5_crypto_freshness_watch.json"
 R5_HISTORY_FILE = "phase3bc_r5_crypto_freshness_watch_history.jsonl"
+R5_OWNER_FILE = "phase3bc_r5_owner.json"
 
 
 @dataclass(frozen=True)
@@ -288,9 +289,18 @@ def build_phase3bc_r5_unattended_guard(
 def build_phase3bc_r5_status(*, output_dir: Path = Path("reports/phase3bc_r5")) -> dict[str, Any]:
     latest = _load_json(output_dir / R5_REPORT_FILE)
     metadata = _load_json(output_dir / UNATTENDED_META_FILE)
+    ownership = _scheduled_owner_status(_load_json(output_dir / R5_OWNER_FILE))
     pid_path = output_dir / UNATTENDED_PID_FILE
     pid = _read_pid(pid_path)
     process = _phase3bc_r5_process_status(pid)
+    if ownership["active"] and not process.get("phase3bc_r5_process_running"):
+        process = {
+            **process,
+            "status": "SCHEDULED_OWNER_IDLE",
+            "discovered_by": "gh2_owner_artifact",
+            "scheduled_owner_active": True,
+            "scheduler_owner": ownership["owner"],
+        }
     stdout_path = Path(str(metadata.get("stdout_path") or output_dir / UNATTENDED_STDOUT_FILE))
     stderr_path = Path(str(metadata.get("stderr_path") or output_dir / UNATTENDED_STDERR_FILE))
     history_path = output_dir / R5_HISTORY_FILE
@@ -300,6 +310,7 @@ def build_phase3bc_r5_status(*, output_dir: Path = Path("reports/phase3bc_r5")) 
         process=process,
         metadata=metadata,
         latest=latest,
+        ownership=ownership,
     )
     summary = latest.get("summary") if isinstance(latest, dict) else {}
     summary = summary if isinstance(summary, dict) else {}
@@ -327,6 +338,7 @@ def build_phase3bc_r5_status(*, output_dir: Path = Path("reports/phase3bc_r5")) 
         "pid": pid,
         "process": process,
         "guard": guard,
+        "ownership": ownership,
         "latest_report_generated_at": latest.get("generated_at"),
         "latest_watch_state": summary.get("watch_state"),
         "latest_summary": summary,
@@ -502,17 +514,36 @@ def _guard_status(
     process: dict[str, Any],
     metadata: dict[str, Any],
     latest: dict[str, Any],
+    ownership: dict[str, Any],
 ) -> dict[str, Any]:
     metadata_pid_stale = _metadata_pid_stale(pid, process)
     live_pid = _single_live_r5_pid(process)
-    guard_pid = live_pid if metadata_pid_stale and live_pid is not None else pid
-    started_at = None if metadata_pid_stale else parse_datetime(metadata.get("started_at"))
-    elapsed_seconds = _elapsed_seconds_since(started_at)
-    timeout_seconds = None if metadata_pid_stale else _int_or_none(metadata.get("timeout_seconds"))
-    duration_budget_seconds = (
-        None if metadata_pid_stale else _int_or_none(metadata.get("duration_budget_seconds"))
-    )
     running = bool(process.get("phase3bc_r5_process_running"))
+    scheduled_owner_active = bool(ownership.get("active")) and not running
+    metadata_superseded = scheduled_owner_active
+    guard_pid = (
+        None
+        if metadata_superseded
+        else live_pid
+        if metadata_pid_stale and live_pid is not None
+        else pid
+    )
+    started_at = (
+        None
+        if metadata_pid_stale or metadata_superseded
+        else parse_datetime(metadata.get("started_at"))
+    )
+    elapsed_seconds = _elapsed_seconds_since(started_at)
+    timeout_seconds = (
+        None
+        if metadata_pid_stale or metadata_superseded
+        else _int_or_none(metadata.get("timeout_seconds"))
+    )
+    duration_budget_seconds = (
+        None
+        if metadata_pid_stale or metadata_superseded
+        else _int_or_none(metadata.get("duration_budget_seconds"))
+    )
     latest_generated_at = parse_datetime(latest.get("generated_at"))
     latest_age_seconds = _elapsed_seconds_since(latest_generated_at)
     summary = latest.get("summary") if isinstance(latest, dict) else {}
@@ -531,7 +562,9 @@ def _guard_status(
     freshness_window_minutes = max(cadence_minutes, freshness_minutes, 1)
 
     status = "NO_UNATTENDED_JOB"
-    if running and metadata_pid_stale:
+    if scheduled_owner_active:
+        status = str(ownership.get("status") or "SCHEDULED_OWNER_HEALTHY")
+    elif running and metadata_pid_stale:
         status = "RUNNING"
     elif running and timeout_seconds is not None and elapsed_seconds is not None:
         status = "OVERRUNNING" if elapsed_seconds > timeout_seconds else "RUNNING"
@@ -552,7 +585,10 @@ def _guard_status(
         "pid": guard_pid,
         "metadata_pid": pid,
         "metadata_pid_stale": metadata_pid_stale,
+        "metadata_superseded_by_scheduled_owner": metadata_superseded,
         "running": running,
+        "scheduled_owner_active": scheduled_owner_active,
+        "scheduler_owner": ownership.get("owner"),
         "pid_file": str(output_dir / UNATTENDED_PID_FILE),
         "metadata_file": str(output_dir / UNATTENDED_META_FILE),
         "stdout_path": str(metadata.get("stdout_path") or output_dir / UNATTENDED_STDOUT_FILE),
@@ -612,6 +648,16 @@ def _guard_next_action(
     snapshot_stale: int | None,
     forecast_stale: int | None,
 ) -> str:
+    if status == "SCHEDULED_OWNER_HEALTHY":
+        return (
+            "GH-2 owns the bounded 15-minute crypto freshness refresh; do not start "
+            "a duplicate R5 watcher."
+        )
+    if status == "SCHEDULED_OWNER_NEEDS_ATTENTION":
+        return (
+            "GH-2 owns the bounded refresh, but its latest cycle needs attention; "
+            "inspect the GH-2 report without starting a duplicate R5 watcher."
+        )
     if status == "OVERRUNNING":
         return (
             "Run phase3bc-r5-unattended-guard --stop-overrun, then restart the "
@@ -645,6 +691,32 @@ def _guard_next_action(
     if watch_state == "WAITING_FOR_POSITIVE_EV":
         return "Crypto data is fresh; keep the watch running until positive EV appears."
     return "Crypto watch status is current; leave the guarded runner active for freshness."
+
+
+def _scheduled_owner_status(payload: dict[str, Any]) -> dict[str, Any]:
+    owner = str(payload.get("owner") or "")
+    generated_at = parse_datetime(payload.get("generated_at"))
+    age_seconds = _elapsed_seconds_since(generated_at)
+    cadence_minutes = _int_or_none(payload.get("cadence_minutes")) or 15
+    freshness_minutes = max(cadence_minutes * 2 + 5, 35)
+    recognized = owner == "GH-2_SINGLE_WRITER_DECISION_REFRESH"
+    active = bool(
+        recognized
+        and age_seconds is not None
+        and age_seconds <= freshness_minutes * 60
+        and payload.get("status") in {"SCHEDULED_OWNER_HEALTHY", "SCHEDULED_OWNER_NEEDS_ATTENTION"}
+    )
+    return {
+        "owner": owner or None,
+        "status": payload.get("status") if recognized else "NO_SCHEDULED_OWNER",
+        "active": active,
+        "generated_at": payload.get("generated_at"),
+        "age_seconds": age_seconds,
+        "cadence_minutes": cadence_minutes,
+        "freshness_minutes": freshness_minutes,
+        "paper_order_creation_enabled": bool(payload.get("paper_order_creation_enabled", False)),
+        "live_execution_enabled": bool(payload.get("live_execution_enabled", False)),
+    }
 
 
 def _status_next_action(
