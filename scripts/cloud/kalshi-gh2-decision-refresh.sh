@@ -17,8 +17,8 @@ mkdir -p "$GH2_ROOT/crypto-staging" "$GH2_ROOT/reports" "$GH1_ROOT/watch"
   --max-workers 4
 
 exec 9>"$WRITER_LOCK"
-if ! flock -w 90 9; then
-  echo "GH-2 refresh deferred after waiting 90 seconds for the shared writer lock."
+if ! flock -w 45 9; then
+  echo "GH-2 refresh deferred after waiting 45 seconds for the shared writer lock."
   exit 0
 fi
 

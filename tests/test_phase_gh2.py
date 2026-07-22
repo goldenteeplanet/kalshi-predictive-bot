@@ -111,7 +111,8 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "EXECUTION_ENABLED=false" in service
     assert "AUTOPILOT_ENABLED=false" in service
     assert "OnUnitActiveSec=15min" in timer
-    assert "flock -w 90 9" in script
+    assert "flock -w 45 9" in script
+    assert "TimeoutStartSec=6min" in service
     assert "db-writer-monitor --json" in script
     assert "gh2-stage-crypto-quotes" in script
     assert "gh2-single-writer-decision-refresh" in script
