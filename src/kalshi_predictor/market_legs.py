@@ -161,9 +161,21 @@ def parse_and_store_market_legs(
     *,
     limit: int | None = None,
     refresh: bool = False,
+    tickers: list[str] | tuple[str, ...] | None = None,
 ) -> MarketLegParseResult:
     session.flush()
+    ticker_scope = (
+        list(
+            dict.fromkeys(
+                str(ticker).strip() for ticker in tickers if str(ticker).strip()
+            )
+        )
+        if tickers is not None
+        else None
+    )
     statement = select(Market).order_by(desc(Market.last_seen_at), Market.ticker)
+    if ticker_scope is not None:
+        statement = statement.where(Market.ticker.in_(ticker_scope))
     if limit is not None and limit > 0:
         statement = statement.limit(limit)
     markets = list(session.scalars(statement))
@@ -171,11 +183,16 @@ def parse_and_store_market_legs(
     existing_tickers: set[str] = set()
     if refresh:
         delete_statement = delete(MarketLeg)
-        if limit is not None and limit > 0:
+        if ticker_scope is not None or (limit is not None and limit > 0):
             delete_statement = delete_statement.where(MarketLeg.ticker.in_(market_tickers))
         session.execute(delete_statement)
     else:
-        existing_tickers = set(session.scalars(select(MarketLeg.ticker).distinct()))
+        existing_statement = select(MarketLeg.ticker).distinct()
+        if ticker_scope is not None or (limit is not None and limit > 0):
+            existing_statement = existing_statement.where(
+                MarketLeg.ticker.in_(market_tickers)
+            )
+        existing_tickers = set(session.scalars(existing_statement))
     parsed_at = utc_now()
     legs_inserted = 0
     markets_with_legs = 0
@@ -1105,6 +1122,7 @@ def _sports_partial_tickers_excluded_from_repair(
     cross_category_tickers = {
         ticker for ticker in tickers if _is_cross_category_composite_ticker(ticker)
     }
+    sports_leg_tickers: set[str]
     if preloaded_legs is not None:
         sports_leg_tickers = {
             leg.ticker
@@ -1112,7 +1130,7 @@ def _sports_partial_tickers_excluded_from_repair(
             if leg.category == CATEGORY_SPORTS and leg.ticker in tickers
         }
     else:
-        sports_leg_tickers: set[str] = set()
+        sports_leg_tickers = set()
         for chunk in _chunks(sorted(tickers), size=500):
             sports_leg_tickers.update(
                 session.scalars(

@@ -29,6 +29,7 @@ from kalshi_predictor.forecasting.registry import run_forecast_models
 from kalshi_predictor.ingest.websocket_orderbooks import (
     drain_staged_websocket_orderbooks,
 )
+from kalshi_predictor.market_legs import parse_and_store_market_legs
 from kalshi_predictor.opportunities.scanner import scan_opportunities
 from kalshi_predictor.phase3ba_r3 import build_phase3ba_r3_weather_paper_gate
 from kalshi_predictor.phase3bc_r5 import (
@@ -302,6 +303,15 @@ def run_gh2_single_writer_decision_refresh(
             ranked_weather + active_weather,
             active_link_limit,
         )
+        mark_stage("parse_active_market_legs")
+        active_leg_parse = parse_and_store_market_legs(
+            session,
+            tickers=_bounded_unique(
+                crypto_link_tickers + weather_link_tickers,
+                active_link_limit * 2,
+            ),
+            refresh=False,
+        )
         mark_stage("link_active_markets")
         crypto_link = link_crypto_markets(
             session,
@@ -488,6 +498,7 @@ def run_gh2_single_writer_decision_refresh(
             "crypto_candidates": len(active_crypto),
             "weather_candidates": len(active_weather),
             "weather_decision_candidates": len(weather_decision_tickers),
+            "market_legs": asdict(active_leg_parse),
             "crypto": asdict(crypto_link),
             "weather": asdict(weather_link),
         },
@@ -521,6 +532,13 @@ def run_gh2_single_writer_decision_refresh(
                 weather_summary.get("positive_executable_ev_rows") or 0
             ),
             "total_paper_ready_candidates": crypto_paper_ready + weather_paper_ready,
+        },
+        "weather_gate": {
+            "generated_at": weather_gate.get("generated_at"),
+            "status": weather_gate.get("status"),
+            "summary": weather_summary,
+            "weather_rows": list(weather_gate.get("weather_rows") or []),
+            "next_action": weather_gate.get("next_action") or {},
         },
         "soak": soak,
         "errors": stage_errors,

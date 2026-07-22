@@ -88,6 +88,55 @@
   {% endif %}
 </section>
 
+{% if gh3_soak.weather_gate.candidate_rows %}
+<section class="section-band compact-band" aria-labelledby="weather-gate-title">
+  <div class="section-head">
+    <div>
+      <h2 id="weather-gate-title">Weather Decision Gate</h2>
+      <p class="muted">Raw edge and executable EV are shown separately for the current bounded weather window.</p>
+    </div>
+    <div class="hero-status">
+      <span class="badge badge-neutral">{{ gh3_soak.weather_gate.status_label }}</span>
+    </div>
+  </div>
+  <div class="status-grid">
+    <div><span>Current links</span><strong>{{ gh3_soak.weather_gate.current_weather_links }}</strong></div>
+    <div><span>Positive raw EV</span><strong>{{ gh3_soak.weather_gate.positive_raw_ev_rows }}</strong></div>
+    <div><span>Positive executable EV</span><strong>{{ gh3_soak.weather_gate.positive_executable_ev_rows }}</strong></div>
+    <div><span>Paper-ready</span><strong>{{ gh3_soak.weather_gate.paper_ready_rows }}</strong></div>
+  </div>
+  <div class="table-wrap professional-table">
+    <table>
+      <caption class="sr-only">Current weather candidate gate failures</caption>
+      <thead>
+        <tr>
+          <th scope="col">Market</th>
+          <th scope="col">Raw EV</th>
+          <th scope="col">Executable EV</th>
+          <th scope="col">Liquidity score</th>
+          <th scope="col">Book</th>
+          <th scope="col">Failed gate</th>
+          <th scope="col">Next action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for candidate in gh3_soak.weather_gate.candidate_rows %}
+        <tr>
+          <td><a href="{{ candidate.detail_href }}"><strong>{{ candidate.ticker }}</strong></a></td>
+          <td>{{ candidate.raw_ev_label }}</td>
+          <td>{{ candidate.executable_ev_label }}</td>
+          <td>{{ candidate.liquidity_score }}</td>
+          <td>{{ candidate.book_label }}</td>
+          <td>{{ candidate.failed_gate_label }}</td>
+          <td>{{ candidate.next_action }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
 <section class="section-band compact-band" aria-labelledby="gh3-soak-title">
   <div class="section-head">
     <div>

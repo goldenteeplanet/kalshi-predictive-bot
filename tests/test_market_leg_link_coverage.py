@@ -614,6 +614,30 @@ def test_link_coverage_historical_only_gap_does_not_block_current_coverage(tmp_p
     assert coverage["next_commands"] == []
 
 
+def test_market_leg_parser_can_scope_active_writer_work_to_exact_tickers(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        for ticker in ("KXBTC-SCOPED", "KXTEMPNYCH-NOT-SCOPED"):
+            upsert_market(
+                session,
+                {
+                    "ticker": ticker,
+                    "title": "yes Target Price: 75",
+                    "series_ticker": ticker.split("-")[0],
+                },
+            )
+
+        result = parse_and_store_market_legs(
+            session,
+            tickers=["KXBTC-SCOPED"],
+        )
+        parsed_tickers = set(session.scalars(select(MarketLeg.ticker).distinct()))
+
+    assert result.markets_scanned == 1
+    assert result.markets_with_legs == 1
+    assert parsed_tickers == {"KXBTC-SCOPED"}
+
+
 def test_link_coverage_partial_sports_bottleneck_uses_evidence_commands(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:

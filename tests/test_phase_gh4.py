@@ -24,6 +24,12 @@ def test_gh3_soak_status_reports_progress_eta_and_source_health(tmp_path: Path) 
     assert status["eta_label"] == "about 3.2h"
     assert status["paper_ready_seen"] is False
     assert status["reconnect"]["status"] == "HEALTHY"
+    assert status["weather_gate"]["positive_raw_ev_rows"] == 1
+    assert status["weather_gate"]["positive_executable_ev_rows"] == 0
+    assert status["weather_gate"]["candidate_rows"][0]["raw_ev_label"] == "0.51c"
+    assert (
+        status["weather_gate"]["candidate_rows"][0]["failed_gate"] == "EXECUTABLE_EV_NOT_POSITIVE"
+    )
     assert status["paper_order_creation_enabled"] is False
     assert status["live_execution_enabled"] is False
 
@@ -155,6 +161,26 @@ def _write_inputs(
             "fresh_ranked_candidates": 6,
             "weather_features": [{"features_inserted": 4}],
             "weather_forecasts": {"forecasts_inserted": 2},
+        },
+        "weather_gate": {
+            "status": "WEATHER_PAPER_GATE_BLOCKED",
+            "summary": {
+                "current_weather_links": 1,
+                "positive_raw_ev_rows": 1,
+                "positive_executable_ev_rows": 0,
+                "paper_ready_rows": 0,
+                "first_hard_blocker": "EXECUTABLE_EV_NOT_POSITIVE",
+            },
+            "weather_rows": [
+                {
+                    "ticker": "KXTEMPNYCH-TEST",
+                    "raw_ev": "0.00505",
+                    "executable_ev": "-0.00995",
+                    "liquidity_score": "0.085",
+                    "executable_book": True,
+                    "first_blocker": "EXECUTABLE_EV_NOT_POSITIVE",
+                }
+            ],
         },
         "safety": {"paper_orders_created": 0},
     }

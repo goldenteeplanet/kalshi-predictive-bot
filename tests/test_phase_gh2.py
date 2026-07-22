@@ -123,6 +123,8 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "latest_snapshots_for_model" not in implementation
     assert "_latest_snapshots(session, crypto_link_tickers)" in implementation
     assert "_latest_snapshots(session, weather_decision_tickers)" in implementation
+    assert "parse_and_store_market_legs(" in implementation
+    assert "tickers=_bounded_unique(" in implementation
 
 
 def test_weather_feature_refresh_is_strictly_bounded(monkeypatch) -> None:
