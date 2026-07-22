@@ -1455,6 +1455,7 @@ def crypto_freshness_watch_status(
         else {}
     )
     guard_status = str(guard.get("status") or "UNKNOWN")
+    scheduled_owner_active = bool(guard.get("scheduled_owner_active"))
     guard_recommended_next_action = str(
         guard.get("recommended_next_action")
         or status_payload.get("recommended_next_action")
@@ -1543,8 +1544,12 @@ def crypto_freshness_watch_status(
         "description": description,
         "generated_at": generated_at.isoformat() if generated_at else "n/a",
         "age_label": _format_age_minutes(age_minutes),
-        "auto_refresh_seconds": 60 if bool(guard.get("running")) else 0,
-        "auto_refresh_label": "60s" if bool(guard.get("running")) else "off",
+        "auto_refresh_seconds": (
+            60 if bool(guard.get("running")) or scheduled_owner_active else 0
+        ),
+        "auto_refresh_label": (
+            "60s" if bool(guard.get("running")) or scheduled_owner_active else "off"
+        ),
         "cadence_minutes": cadence,
         "freshness_minutes": freshness,
         "freshness_window_minutes": freshness_window,
@@ -1553,6 +1558,8 @@ def crypto_freshness_watch_status(
         "runner_status": guard_status,
         "runner_status_label": _format_enum_label(guard_status),
         "runner_running": bool(guard.get("running")),
+        "scheduled_owner_active": scheduled_owner_active,
+        "scheduler_owner": guard.get("scheduler_owner"),
         "runner_pid": guard.get("pid"),
         "runner_next_action": guard_recommended_next_action,
         "r5_latest_report_generated_at": status_payload.get("latest_report_generated_at"),
@@ -1637,6 +1644,11 @@ def crypto_freshness_watch_status(
         ),
         "primary_gap_scope": summary.get("primary_gap_scope") or "UNKNOWN",
         "snapshot_stale_rows": summary.get("snapshot_stale_rows", 0),
+        "snapshot_missing_rows": summary.get("snapshot_missing_rows", 0),
+        "missing_executable_price_rows": summary.get(
+            "missing_executable_price_rows",
+            0,
+        ),
         "forecast_stale_rows": summary.get("forecast_stale_rows", 0),
         "ranking_missing_rows": summary.get("ranking_missing_rows", 0),
         "ranking_stale_rows": summary.get("ranking_stale_rows", 0),
@@ -1705,6 +1717,7 @@ def crypto_freshness_watch_status(
         ),
         "near_miss_summary": _crypto_near_miss_summary(summary),
         "near_miss_examples": _crypto_near_miss_examples(payload),
+        "gate_failure_examples": _crypto_gate_failure_examples(payload),
         "command": CRYPTO_WATCH_COMMAND,
         "scheduler_command": "kalshi-bot scheduler-plan --profile crypto-watch",
         "report_href": CRYPTO_FRESHNESS_REPORT_HREF,
@@ -3373,8 +3386,16 @@ def _crypto_actionability_note(summary: dict[str, Any], actionability_gap: str) 
     positive_ev = int(summary.get("positive_ev_rows") or 0)
     no_book = int(summary.get("positive_ev_no_executable_book_rows") or 0)
     stale = int(summary.get("snapshot_stale_rows") or 0)
+    missing = int(summary.get("snapshot_missing_rows") or 0)
     best_ticker = str(summary.get("best_ev_candidate_ticker") or "n/a")
     best_ev = _format_cents(summary.get("best_current_expected_value_cents"))
+    if actionability_gap == "SNAPSHOT_MISSING" or missing > 0:
+        row_word = "row has" if missing == 1 else "rows have"
+        return (
+            f"{missing} active crypto {row_word} no snapshot. GH-2 adds them to "
+            "GH-1's bounded recovery manifest; no order action is allowed until "
+            "a market snapshot arrives."
+        )
     if actionability_gap == "POSITIVE_EV_NO_EXECUTABLE_BOOK":
         row_word = "row is" if no_book == 1 else "rows are"
         return (
@@ -3403,6 +3424,101 @@ def _crypto_actionability_note(summary: dict[str, Any], actionability_gap: str) 
     if positive_ev <= 0:
         return "No current crypto row has strictly positive EV yet."
     return "Positive-EV crypto rows exist, but one or more paper-readiness gates remain blocked."
+
+
+def _crypto_gate_failure_examples(
+    payload: dict[str, Any],
+    *,
+    limit: int = 12,
+) -> list[dict[str, Any]]:
+    if limit <= 0:
+        return []
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for section in (
+        "blocked_active_pure_examples",
+        "liquidity_watch_rows",
+        "best_ev_candidates",
+    ):
+        raw_rows = payload.get(section)
+        if not isinstance(raw_rows, list):
+            continue
+        for raw in raw_rows:
+            if not isinstance(raw, dict):
+                continue
+            ticker = str(raw.get("ticker") or "").strip()
+            if not ticker or ticker in seen:
+                continue
+            blockers = _crypto_candidate_blockers(raw)
+            if not blockers:
+                continue
+            seen.add(ticker)
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "title": str(raw.get("clean_title") or raw.get("title") or ticker),
+                    "detail_href": f"/opportunities/{ticker}",
+                    "expected_value_label": _format_cents(
+                        raw.get("expected_value_cents")
+                    ),
+                    "book_label": _crypto_candidate_book_label(raw, blockers),
+                    "failed_gate_label": ", ".join(
+                        _format_enum_label(blocker) for blocker in blockers
+                    ),
+                    "next_action": _crypto_candidate_next_action(raw, blockers),
+                }
+            )
+            if len(rows) >= limit:
+                return rows
+    return rows
+
+
+def _crypto_candidate_blockers(row: dict[str, Any]) -> list[str]:
+    raw_blockers = row.get("preflight_blockers") or row.get("blocking_gates") or []
+    blockers = [str(item) for item in raw_blockers if str(item).strip()]
+    blocked_reason = str(row.get("blocked_reason") or row.get("readiness_status") or "")
+    if blocked_reason == "BLOCKED_MISSING_ACTIVE_SNAPSHOT":
+        blockers.insert(0, "snapshot_missing")
+    elif row.get("freshness_issue") and row.get("freshness_issue") != "FRESH":
+        blockers.insert(0, str(row["freshness_issue"]).lower())
+    if "best_price" in row and row.get("best_price") is None:
+        blockers.append("missing_executable_price")
+    expected_value = _coerce_nonnegative_float(row.get("expected_value"))
+    if expected_value is None:
+        try:
+            expected_value = float(row.get("expected_value"))
+        except (TypeError, ValueError):
+            expected_value = None
+    if expected_value is not None and expected_value <= 0:
+        blockers.append("ev_not_positive")
+    return list(dict.fromkeys(blockers))
+
+
+def _crypto_candidate_book_label(row: dict[str, Any], blockers: list[str]) -> str:
+    if "snapshot_missing" in blockers:
+        return "Snapshot missing"
+    if "missing_executable_price" in blockers:
+        return "No executable price"
+    try:
+        liquidity = float(row.get("liquidity_score"))
+    except (TypeError, ValueError):
+        liquidity = None
+    if liquidity is not None and liquidity <= 0:
+        return "No visible liquidity"
+    return "Visible executable book"
+
+
+def _crypto_candidate_next_action(row: dict[str, Any], blockers: list[str]) -> str:
+    reported = _first_text(row.get("what_would_make_paper_ready"))
+    if reported:
+        return reported
+    if "snapshot_missing" in blockers:
+        return "Keep the ticker in GH-1 snapshot recovery until a snapshot arrives."
+    if "missing_executable_price" in blockers:
+        return "Wait for a visible bid or ask; paper-order creation remains disabled."
+    if "ev_not_positive" in blockers:
+        return "Wait for market price or model probability to produce strictly positive EV."
+    return "Re-evaluate after the next guarded GH-2 refresh."
 
 
 def _crypto_book_probe(

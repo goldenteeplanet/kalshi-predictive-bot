@@ -55,6 +55,50 @@ def test_candidate_alignment_prioritizes_fresh_executable_rankings(tmp_path: Pat
     assert rows[1]["fresh"] is False
 
 
+def test_snapshot_recovery_candidates_break_ranked_only_selection_loop() -> None:
+    payload = {
+        "generated_at": "2026-07-21T12:00:00+00:00",
+        "blocked_active_pure_examples": [
+            {
+                "ticker": "KXXRP-RECOVERY",
+                "series_ticker": "KXXRP",
+                "blocked_reason": "BLOCKED_MISSING_ACTIVE_SNAPSHOT",
+                "latest_snapshot_at": None,
+            },
+            {
+                "ticker": "KXBTC-BOOK",
+                "series_ticker": "KXBTC",
+                "blocked_reason": "BLOCKED_NO_EXECUTABLE_BOOK",
+            },
+            {
+                "ticker": "KXTEMPNYCH-OTHER",
+                "series_ticker": "KXTEMPNYCH",
+                "blocked_reason": "BLOCKED_MISSING_ACTIVE_SNAPSHOT",
+            },
+        ],
+    }
+
+    rows = phase_gh2._snapshot_recovery_candidates(payload, limit=10)
+
+    assert [row["ticker"] for row in rows] == ["KXXRP-RECOVERY"]
+    assert rows[0]["selection_tier"] == "MISSING_SNAPSHOT_RECOVERY"
+    assert rows[0]["blocking_gates"] == ["snapshot_missing"]
+
+
+def test_manifest_merge_reserves_capacity_for_snapshot_recovery() -> None:
+    ranked = [{"ticker": f"KXBTC-RANKED-{index}"} for index in range(5)]
+    recovery = [{"ticker": f"KXXRP-RECOVERY-{index}"} for index in range(2)]
+
+    rows = phase_gh2._merge_manifest_candidates(ranked, recovery, limit=4)
+
+    assert [row["ticker"] for row in rows] == [
+        "KXBTC-RANKED-0",
+        "KXBTC-RANKED-1",
+        "KXXRP-RECOVERY-0",
+        "KXXRP-RECOVERY-1",
+    ]
+
+
 def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     root = Path(__file__).parents[1]
     implementation = (root / "src/kalshi_predictor/phase_gh2.py").read_text(encoding="utf-8")

@@ -48,6 +48,8 @@ ACTIONABLE_MODELS = ("crypto_v2", "weather_v2")
 WEATHER_DECISION_LIMIT = 6
 WEATHER_FEATURE_LOCATION_LIMIT = 2
 WEATHER_FEATURE_FORECAST_LIMIT = 4
+SNAPSHOT_RECOVERY_LIMIT = 20
+R5_OWNER_FILE = "phase3bc_r5_owner.json"
 PAPER_ONLY_SAFETY = "PAPER_ONLY_NO_ORDER_CREATION_OR_EXCHANGE_WRITES"
 
 
@@ -390,6 +392,11 @@ def run_gh2_single_writer_decision_refresh(
             near_money_only=False,
             skip_phase3bc_r3_refresh=True,
         )
+        r5_payload = _read_json(r5_artifacts.json_path)
+        snapshot_recovery_candidates = _snapshot_recovery_candidates(
+            r5_payload,
+            limit=min(candidate_limit, SNAPSHOT_RECOVERY_LIMIT),
+        )
         mark_stage("refresh_weather_gate")
         weather_gate = build_phase3ba_r3_weather_paper_gate(
             session,
@@ -405,7 +412,12 @@ def run_gh2_single_writer_decision_refresh(
             limit=candidate_limit,
             freshness_minutes=freshness_minutes,
         )
-        _write_candidate_manifest(candidate_manifest_path, candidates_after)
+        manifest_candidates = _merge_manifest_candidates(
+            candidates_after,
+            snapshot_recovery_candidates,
+            limit=candidate_limit,
+        )
+        _write_candidate_manifest(candidate_manifest_path, manifest_candidates)
         paper_orders_after = _paper_order_count(session)
         mark_stage("commit_single_writer")
         session.commit()
@@ -414,7 +426,6 @@ def run_gh2_single_writer_decision_refresh(
         [Path(path) for path in crypto_drain.get("drained_files") or []],
         archive_dir=crypto_staging_dir / "drained",
     )
-    r5_payload = _read_json(r5_artifacts.json_path)
     r5_summary = r5_payload.get("latest_summary") or r5_payload.get("summary") or {}
     weather_summary = weather_gate.get("summary") or {}
     crypto_paper_ready = int(r5_summary.get("paper_ready_candidates") or 0)
@@ -495,8 +506,12 @@ def run_gh2_single_writer_decision_refresh(
         "candidate_alignment": {
             "before_count": len(candidates_before),
             "after_count": len(candidates_after),
+            "ranked_candidates": len(candidates_after),
+            "snapshot_recovery_candidates": len(snapshot_recovery_candidates),
+            "manifest_count": len(manifest_candidates),
             "manifest_path": str(candidate_manifest_path),
-            "tickers": [row["ticker"] for row in candidates_after],
+            "tickers": [row["ticker"] for row in manifest_candidates],
+            "snapshot_recovery_tickers": [row["ticker"] for row in snapshot_recovery_candidates],
         },
         "paper_readiness": {
             "crypto_paper_ready_candidates": crypto_paper_ready,
@@ -521,6 +536,12 @@ def run_gh2_single_writer_decision_refresh(
     }
     mark_stage("write_cycle_report")
     _write_cycle_artifacts(json_path, markdown_path, payload)
+    _write_r5_owner_status(
+        reports_dir / "phase3bc_r5" / R5_OWNER_FILE,
+        r5_payload=r5_payload,
+        cadence_minutes=15,
+        status=("SCHEDULED_OWNER_HEALTHY" if cycle_healthy else "SCHEDULED_OWNER_NEEDS_ATTENTION"),
+    )
     mark_stage("complete")
     return GH2Artifacts(output_dir, json_path, markdown_path, history_path, candidate_manifest_path)
 
@@ -630,10 +651,113 @@ def _write_candidate_manifest(path: Path, candidates: list[dict[str, Any]]) -> N
         {
             "phase": "GH-2",
             "generated_at": utc_now().isoformat(),
-            "selection": "CURRENT_ACTIONABLE_RANKINGS",
+            "selection": "CURRENT_ACTIONABLE_RANKINGS_WITH_SNAPSHOT_RECOVERY",
             "tickers": [row["ticker"] for row in candidates],
             "candidates": candidates,
             "paper_only_safety": PAPER_ONLY_SAFETY,
+        },
+    )
+
+
+def _snapshot_recovery_candidates(
+    r5_payload: dict[str, Any],
+    *,
+    limit: int,
+) -> list[dict[str, Any]]:
+    if limit <= 0:
+        return []
+    raw_rows = r5_payload.get("blocked_active_pure_examples") or []
+    generated_at = str(r5_payload.get("generated_at") or utc_now().isoformat())
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in raw_rows:
+        if not isinstance(raw, dict):
+            continue
+        ticker = str(raw.get("ticker") or "").strip()
+        missing_snapshot = str(
+            raw.get("blocked_reason") or ""
+        ) == "BLOCKED_MISSING_ACTIVE_SNAPSHOT" or (
+            raw.get("latest_snapshot_at") is None
+            and str(raw.get("readiness_status") or "") == "BLOCKED_MISSING_ACTIVE_SNAPSHOT"
+        )
+        if not ticker or ticker in seen or not missing_snapshot:
+            continue
+        if not ticker.startswith(CRYPTO_TICKER_PREFIXES):
+            continue
+        seen.add(ticker)
+        rows.append(
+            {
+                "ticker": ticker,
+                "series_ticker": raw.get("series_ticker"),
+                "model": "crypto_v2",
+                "ranked_at": generated_at,
+                "snapshot_at": None,
+                "snapshot_age_minutes": None,
+                "estimated_edge": None,
+                "opportunity_score": None,
+                "best_side": None,
+                "best_price": None,
+                "fresh": False,
+                "executable": False,
+                "positive_edge": False,
+                "selection_tier": "MISSING_SNAPSHOT_RECOVERY",
+                "blocking_gates": ["snapshot_missing"],
+            }
+        )
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def _merge_manifest_candidates(
+    ranked: list[dict[str, Any]],
+    recovery: list[dict[str, Any]],
+    *,
+    limit: int,
+) -> list[dict[str, Any]]:
+    if limit <= 0:
+        return []
+    recovery_rows = recovery[:limit]
+    ranked_budget = max(limit - len(recovery_rows), 0)
+    selected = list(ranked[:ranked_budget]) + list(recovery_rows)
+    deduped: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in selected:
+        ticker = str(row.get("ticker") or "").strip()
+        if not ticker or ticker in seen:
+            continue
+        seen.add(ticker)
+        deduped.append(row)
+    if len(deduped) < limit:
+        for row in ranked[ranked_budget:]:
+            ticker = str(row.get("ticker") or "").strip()
+            if not ticker or ticker in seen:
+                continue
+            seen.add(ticker)
+            deduped.append(row)
+            if len(deduped) >= limit:
+                break
+    return deduped
+
+
+def _write_r5_owner_status(
+    path: Path,
+    *,
+    r5_payload: dict[str, Any],
+    cadence_minutes: int,
+    status: str,
+) -> None:
+    _write_json(
+        path,
+        {
+            "owner": "GH-2_SINGLE_WRITER_DECISION_REFRESH",
+            "status": status,
+            "generated_at": utc_now().isoformat(),
+            "r5_report_generated_at": r5_payload.get("generated_at"),
+            "cadence_minutes": cadence_minutes,
+            "paper_only_safety": PAPER_ONLY_SAFETY,
+            "paper_order_creation_enabled": False,
+            "live_execution_enabled": False,
         },
     )
 

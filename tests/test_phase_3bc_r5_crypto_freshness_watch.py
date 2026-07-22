@@ -20,6 +20,7 @@ from kalshi_predictor.phase3bc_r6 import (
     write_phase3bc_r5_unattended_guard_report,
 )
 from kalshi_predictor.scheduler import scheduler_plan
+from kalshi_predictor.ui import service as ui_service
 from kalshi_predictor.ui.service import crypto_freshness_watch_status
 from kalshi_predictor.utils.time import utc_now
 
@@ -1954,6 +1955,95 @@ def test_phase3bc_r5_status_reports_stale_pid_after_empty_process_scan(
     assert payload["guard"]["status"] == "STOPPED_WITH_STALE_PID"
     assert payload["guard"]["should_stop"] is False
     assert "stale PID metadata can be overwritten" in payload["recommended_next_action"]
+
+
+def test_phase3bc_r5_status_uses_fresh_gh2_scheduled_owner_over_stale_pid(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(phase3bc_r6, "_pid_matches_phase3bc_r5_watch", lambda _pid: False)
+    monkeypatch.setattr(
+        phase3bc_r6,
+        "_phase3bc_r5_running_pids_with_limit",
+        lambda: ([], False),
+    )
+    output_dir = Path("reports/phase3bc_r5")
+    output_dir.mkdir(parents=True)
+    (output_dir / "phase3bc_r5_unattended_job.pid").write_text("5151", encoding="utf-8")
+    (output_dir / "phase3bc_r5_unattended_job.json").write_text(
+        json.dumps(
+            {
+                "started_at": (utc_now() - timedelta(hours=9)).isoformat(),
+                "pid": 5151,
+                "timeout_seconds": 30,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (output_dir / "phase3bc_r5_crypto_freshness_watch.json").write_text(
+        json.dumps(
+            {
+                "generated_at": utc_now().isoformat(),
+                "summary": {"watch_state": "WAITING_FOR_POSITIVE_EV"},
+                "options": {"cadence_minutes": 15},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (output_dir / "phase3bc_r5_owner.json").write_text(
+        json.dumps(
+            {
+                "owner": "GH-2_SINGLE_WRITER_DECISION_REFRESH",
+                "status": "SCHEDULED_OWNER_HEALTHY",
+                "generated_at": utc_now().isoformat(),
+                "cadence_minutes": 15,
+                "paper_order_creation_enabled": False,
+                "live_execution_enabled": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    artifacts = write_phase3bc_r5_status_report(output_dir=output_dir)
+    payload = json.loads(artifacts.json_path.read_text(encoding="utf-8"))
+
+    assert payload["ownership"]["active"] is True
+    assert payload["process"]["status"] == "SCHEDULED_OWNER_IDLE"
+    assert payload["process"]["discovered_by"] == "gh2_owner_artifact"
+    assert payload["guard"]["status"] == "SCHEDULED_OWNER_HEALTHY"
+    assert payload["guard"]["pid"] is None
+    assert payload["guard"]["metadata_superseded_by_scheduled_owner"] is True
+    assert payload["guard"]["should_stop"] is False
+    assert "do not start a duplicate R5 watcher" in payload["recommended_next_action"]
+
+
+def test_crypto_gate_diagnostics_explain_missing_snapshot_recovery() -> None:
+    payload = {
+        "blocked_active_pure_examples": [
+            {
+                "ticker": "KXXRP-26JUL2417-B1.4699500",
+                "clean_title": "Ripple price",
+                "blocked_reason": "BLOCKED_MISSING_ACTIVE_SNAPSHOT",
+                "readiness_status": "BLOCKED_MISSING_ACTIVE_SNAPSHOT",
+                "latest_snapshot_at": None,
+                "best_price": None,
+                "expected_value_cents": None,
+            }
+        ]
+    }
+
+    rows = ui_service._crypto_gate_failure_examples(payload)
+    note = ui_service._crypto_actionability_note(
+        {"snapshot_missing_rows": 13, "positive_ev_rows": 0},
+        "SNAPSHOT_MISSING",
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["book_label"] == "Snapshot missing"
+    assert "Snapshot Missing" in rows[0]["failed_gate_label"]
+    assert "GH-1 snapshot recovery" in rows[0]["next_action"]
+    assert "13 active crypto rows have no snapshot" in note
+    assert "no order action is allowed" in note
 
 
 def test_phase3bc_r5_pid_exists_treats_permission_error_as_live(monkeypatch) -> None:

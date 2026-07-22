@@ -37,7 +37,7 @@ def discover_quoted_market_tickers(
     max_quoted_per_series: int,
     preferred_tickers: Sequence[str] = (),
 ) -> list[dict[str, Any]]:
-    """Discover bounded open books without writing local or exchange state."""
+    """Discover preferred tickers and bounded open books without writing state."""
 
     rows: list[dict[str, Any]] = []
     selected_tickers: set[str] = set()
@@ -49,15 +49,17 @@ def discover_quoted_market_tickers(
         except Exception:
             continue
         yes_levels, no_levels = _book_levels(orderbook)
-        if not yes_levels and not no_levels:
-            continue
         rows.append(
             {
                 "ticker": ticker,
                 "series_ticker": _series_for_ticker(ticker, series),
                 "yes_levels": len(yes_levels),
                 "no_levels": len(no_levels),
-                "selection_source": "ACTIONABLE_RANKING",
+                "selection_source": (
+                    "ACTIONABLE_RANKING"
+                    if yes_levels or no_levels
+                    else "PREFERRED_SNAPSHOT_RECOVERY"
+                ),
             }
         )
         selected_tickers.add(ticker)
@@ -275,7 +277,11 @@ def run_reconnecting_websocket_watch(
                                 preferred_selected = sum(
                                     1
                                     for row in rows
-                                    if row.get("selection_source") == "ACTIONABLE_RANKING"
+                                    if row.get("selection_source")
+                                    in {
+                                        "ACTIONABLE_RANKING",
+                                        "PREFERRED_SNAPSHOT_RECOVERY",
+                                    }
                                 )
                                 discovery_refreshes += 1
                                 last_discovery_success_at = utc_now().isoformat()

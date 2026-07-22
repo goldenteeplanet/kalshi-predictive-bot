@@ -105,7 +105,7 @@ def runtime_identity(
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     resolved = settings or get_settings()
-    db_url = database_url_from_settings(resolved)
+    db_url = _session_database_url(session) or database_url_from_settings(resolved)
     db_location = describe_db_location(db_url)
     root = _repo_root()
     cwd = Path.cwd().resolve()
@@ -1157,6 +1157,23 @@ def _sqlite_identity(path: Path | None) -> dict[str, Any] | None:
         }
     )
     return payload
+
+
+def _session_database_url(session: Session) -> str | None:
+    try:
+        binding = session.get_bind()
+    except Exception:
+        return None
+    url = getattr(binding, "url", None)
+    if url is None:
+        engine = getattr(binding, "engine", None)
+        url = getattr(engine, "url", None)
+    if url is None:
+        return None
+    render = getattr(url, "render_as_string", None)
+    if callable(render):
+        return str(render(hide_password=False))
+    return str(url)
 
 
 def _split_brain_status(db_url: str) -> dict[str, Any]:
