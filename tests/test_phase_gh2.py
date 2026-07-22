@@ -270,6 +270,75 @@ def test_soak_history_records_candidate_and_reset_evidence(tmp_path: Path) -> No
     assert latest["reset_reason"] is None
 
 
+def test_soak_quality_rejects_empty_or_all_stale_market_cycles() -> None:
+    quality = phase_gh2._build_soak_quality(
+        r5_summary={
+            "current_active_window_rows": 2,
+            "snapshot_missing_rows": 0,
+            "snapshot_stale_rows": 2,
+        },
+        weather_summary={"current_weather_links": 0, "fresh_snapshot_rows": 0},
+        manifest_count=4,
+        fresh_manifest_count=1,
+    )
+
+    assert quality["passed"] is False
+    assert quality["checks"]["fresh_crypto_windows"] is False
+    assert quality["checks"]["current_weather_links"] is False
+    assert quality["checks"]["manifest_freshness"] is False
+
+
+def test_active_rollover_catalog_import_is_bounded(tmp_path: Path) -> None:
+    session_factory = _session_factory(tmp_path)
+    catalog_path = tmp_path / "active_market_catalog.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "generated_at": utc_now().isoformat(),
+                "markets": [
+                    {"ticker": "KXBTC-NEXT", "series_ticker": "KXBTC", "status": "open"},
+                    {"ticker": "KXTEMPNYCH-NEXT", "series_ticker": "KXTEMPNYCH", "status": "open"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with session_factory() as session:
+        result = phase_gh2._import_active_market_catalog(session, catalog_path, limit=1)
+        session.commit()
+
+    assert result["status"] == "COMPLETE"
+    assert result["rows_seen"] == 2
+    assert result["rows_imported"] == 1
+    assert result["imported_tickers"] == ["KXBTC-NEXT"]
+
+
+def test_active_rollover_catalog_does_not_rejuvenate_stale_discovery(tmp_path: Path) -> None:
+    session_factory = _session_factory(tmp_path)
+    catalog_path = tmp_path / "active_market_catalog.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "generated_at": (utc_now() - timedelta(hours=2)).isoformat(),
+                "markets": [
+                    {"ticker": "KXBTC-STALE", "series_ticker": "KXBTC", "status": "open"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with session_factory() as session:
+        result = phase_gh2._import_active_market_catalog(
+            session,
+            catalog_path,
+            limit=10,
+            max_age_minutes=30,
+        )
+
+    assert result["status"] == "STALE_NOT_IMPORTED"
+    assert result["rows_imported"] == 0
+
+
 def _session_factory(tmp_path: Path):
     engine = init_db(f"sqlite:///{tmp_path / 'gh2.db'}")
     return get_session_factory(engine)

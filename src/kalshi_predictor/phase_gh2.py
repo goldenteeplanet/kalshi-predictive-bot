@@ -20,6 +20,7 @@ from kalshi_predictor.crypto.assets import DEFAULT_CRYPTO_SYMBOLS
 from kalshi_predictor.crypto.linker import link_crypto_markets
 from kalshi_predictor.crypto.repository import parse_symbols
 from kalshi_predictor.data.locks import db_writer_monitor
+from kalshi_predictor.data.repositories import upsert_market
 from kalshi_predictor.data.schema import (
     Market,
     MarketRanking,
@@ -37,6 +38,7 @@ from kalshi_predictor.phase3ba_r3 import build_phase3ba_r3_weather_paper_gate
 from kalshi_predictor.phase3bc_r5 import (
     write_phase3bc_r5_crypto_freshness_watch_report,
 )
+from kalshi_predictor.refresh_control_plane import write_refresh_control_plane_bundle
 from kalshi_predictor.single_writer_coordinator import (
     drain_staged_crypto_quotes,
     stage_crypto_quote_fetches,
@@ -45,7 +47,7 @@ from kalshi_predictor.utils.time import utc_now
 from kalshi_predictor.weather.features import build_weather_features
 from kalshi_predictor.weather.linker import WEATHER_TICKER_PREFIXES, link_weather_markets
 
-PHASE_GH2_VERSION = "GH-2.0"
+PHASE_GH2_VERSION = "GH-3B.0"
 CRYPTO_TICKER_PREFIXES = ("KXBTC", "KXETH", "KXSOLE", "KXXRP", "KXDOGE")
 ACTIONABLE_MODELS = ("crypto_v2", "weather_v2")
 WEATHER_DECISION_LIMIT = 6
@@ -55,6 +57,11 @@ SNAPSHOT_RECOVERY_LIMIT = 20
 STICKY_CANDIDATE_LIMIT = 12
 R5_OWNER_FILE = "phase3bc_r5_owner.json"
 PAPER_ONLY_SAFETY = "PAPER_ONLY_NO_ORDER_CREATION_OR_EXCHANGE_WRITES"
+MIN_CURRENT_CRYPTO_WINDOWS = 1
+MIN_CURRENT_WEATHER_LINKS = 1
+MIN_FRESH_CRYPTO_WINDOWS = 1
+MIN_FRESH_WEATHER_BOOKS = 1
+MIN_FRESH_MANIFEST_RATIO = 0.60
 
 
 @dataclass(frozen=True)
@@ -215,6 +222,7 @@ def run_gh2_single_writer_decision_refresh(
     crypto_staging_dir: Path = Path("reports/phase_gh2/crypto_staging"),
     gh1_staging_dir: Path | None = None,
     candidate_manifest_path: Path = Path("reports/phase_gh1/watch/actionable_tickers.json"),
+    active_market_catalog_path: Path | None = None,
     settings: Settings | None = None,
     candidate_limit: int = 40,
     active_link_limit: int = 250,
@@ -233,15 +241,45 @@ def run_gh2_single_writer_decision_refresh(
     markdown_path = output_dir / "gh2_active_candidate_refresh.md"
     history_path = output_dir / "gh2_paper_only_soak_history.jsonl"
     stage_path = output_dir / "gh2_stage.json"
+    coverage_checkpoint_path = output_dir / "gh2_active_coverage_checkpoint.json"
+    resolved_active_catalog_path = active_market_catalog_path or (
+        candidate_manifest_path.parent / "active_market_catalog.json"
+    )
     previous_manifest_tickers = _candidate_manifest_tickers(candidate_manifest_path)
     cycle_started_at = utc_now()
     cycle_started_monotonic = time.monotonic()
+    cycle_id = f"gh2-{cycle_started_at.strftime('%Y%m%dT%H%M%S%fZ')}"
+    stage_started_monotonic = cycle_started_monotonic
+    stage_started_at = cycle_started_at
+    current_stage: str | None = None
+    stage_timings: list[dict[str, Any]] = []
 
     def mark_stage(stage: str) -> None:
+        nonlocal current_stage, stage_started_monotonic, stage_started_at
+        now_monotonic = time.monotonic()
+        now = utc_now()
+        if current_stage is not None:
+            stage_timings.append(
+                {
+                    "stage": current_stage,
+                    "started_at": stage_started_at.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "duration_seconds": round(now_monotonic - stage_started_monotonic, 3),
+                    "status": "COMPLETED",
+                    "input_rows": None,
+                    "output_rows": None,
+                    "artifact_mode": "REGENERATED",
+                    "reason": None,
+                }
+            )
+        current_stage = stage
+        stage_started_monotonic = now_monotonic
+        stage_started_at = now
         _write_json(
             stage_path,
             {
                 "phase": "GH-2",
+                "cycle_id": cycle_id,
                 "generated_at": utc_now().isoformat(),
                 "stage": stage,
                 "paper_order_creation_enabled": False,
@@ -280,6 +318,14 @@ def run_gh2_single_writer_decision_refresh(
 
     mark_stage("open_single_writer_session")
     with session_factory() as session:
+        mark_stage("import_active_market_rollover_catalog")
+        active_catalog_import = _import_active_market_catalog(
+            session,
+            resolved_active_catalog_path,
+            limit=active_link_limit * 2,
+            max_age_minutes=max(freshness_minutes * 2, 15),
+        )
+        stage_errors.extend(str(item) for item in active_catalog_import.get("errors") or [])
         paper_orders_before = _paper_order_count(session)
         candidates_before = select_actionable_ranked_markets(
             session,
@@ -330,6 +376,14 @@ def run_gh2_single_writer_decision_refresh(
             sticky_weather + ranked_weather + active_weather,
             active_link_limit,
         )
+        _write_coverage_checkpoint(
+            coverage_checkpoint_path,
+            stage="PARSE_ACTIVE_MARKET_LEGS",
+            active_catalog_import=active_catalog_import,
+            crypto_tickers=crypto_link_tickers,
+            weather_tickers=weather_link_tickers,
+            limit=active_link_limit,
+        )
         mark_stage("parse_active_market_legs")
         active_leg_parse = parse_and_store_market_legs(
             session,
@@ -349,6 +403,17 @@ def run_gh2_single_writer_decision_refresh(
             session,
             tickers=weather_link_tickers,
             limit=active_link_limit,
+        )
+        _write_coverage_checkpoint(
+            coverage_checkpoint_path,
+            stage="LINKS_COMPLETE",
+            active_catalog_import=active_catalog_import,
+            crypto_tickers=crypto_link_tickers,
+            weather_tickers=weather_link_tickers,
+            limit=active_link_limit,
+            market_legs=asdict(active_leg_parse),
+            crypto=asdict(crypto_link),
+            weather=asdict(weather_link),
         )
         weather_decision_tickers = _bounded_unique(
             sticky_weather + ranked_weather + weather_link_tickers,
@@ -497,6 +562,12 @@ def run_gh2_single_writer_decision_refresh(
         >= utc_now() - timedelta(minutes=freshness_minutes)
     )
     paper_orders_created = paper_orders_after - paper_orders_before
+    soak_quality = _build_soak_quality(
+        r5_summary=r5_summary,
+        weather_summary=weather_summary,
+        manifest_count=len(manifest_candidates),
+        fresh_manifest_count=fresh_candidate_count,
+    )
     cycle_failure_reasons = []
     if stage_errors:
         cycle_failure_reasons.append("source_or_stage_errors")
@@ -506,6 +577,7 @@ def run_gh2_single_writer_decision_refresh(
         cycle_failure_reasons.append("no_fresh_ranked_candidates")
     if paper_orders_created != 0:
         cycle_failure_reasons.append("paper_orders_created_during_soak")
+    cycle_failure_reasons.extend(soak_quality["failure_reasons"])
     cycle_healthy = not cycle_failure_reasons
     soak = _record_soak_cycle(
         history_path,
@@ -515,11 +587,24 @@ def run_gh2_single_writer_decision_refresh(
         + int(weather_summary.get("positive_executable_ev_rows") or 0),
         rankings_inserted=rankings_inserted,
         fresh_ranked_candidates=fresh_candidate_count,
+        blocker_counts=dict(
+            Counter(
+                str(gate)
+                for row in manifest_candidates
+                for gate in (row.get("blocking_gates") or [])
+            )
+        ),
         reset_reason=", ".join(cycle_failure_reasons) if cycle_failure_reasons else None,
         required_cycles=soak_cycles_required,
+        soak_quality=soak_quality,
+    )
+    candidate_diagnostics = _build_candidate_diagnostics(
+        r5_payload=r5_payload,
+        weather_rows=list(weather_gate.get("weather_rows") or []),
     )
     payload = {
         "phase": "GH-2",
+        "cycle_id": cycle_id,
         "phase_version": PHASE_GH2_VERSION,
         "generated_at": utc_now().isoformat(),
         "status": (
@@ -536,6 +621,7 @@ def run_gh2_single_writer_decision_refresh(
             "completed_at": utc_now().isoformat(),
             "runtime_seconds": round(time.monotonic() - cycle_started_monotonic, 3),
             "lock_wait_seconds": _float_or_zero(os.getenv("GH2_LOCK_WAIT_SECONDS")),
+            "stages": stage_timings,
         },
         "websocket_drain": websocket_drain,
         "crypto_quote_drain": crypto_drain,
@@ -546,6 +632,8 @@ def run_gh2_single_writer_decision_refresh(
             "market_legs": asdict(active_leg_parse),
             "crypto": asdict(crypto_link),
             "weather": asdict(weather_link),
+            "rollover_catalog": active_catalog_import,
+            "coverage_checkpoint_path": str(coverage_checkpoint_path),
         },
         "decision_refresh": {
             "crypto_forecasts": asdict(crypto_forecasts),
@@ -592,6 +680,8 @@ def run_gh2_single_writer_decision_refresh(
             "weather_rows": list(weather_gate.get("weather_rows") or []),
             "next_action": weather_gate.get("next_action") or {},
         },
+        "soak_quality": soak_quality,
+        "candidate_diagnostics": candidate_diagnostics,
         "soak": soak,
         "errors": stage_errors,
         "safety": {
@@ -604,6 +694,25 @@ def run_gh2_single_writer_decision_refresh(
             "explicit_operator_approval_required_after_soak": True,
         },
     }
+    _enrich_stage_telemetry(
+        stage_timings,
+        websocket_drain=websocket_drain,
+        crypto_drain=crypto_drain,
+        active_leg_parse=asdict(active_leg_parse),
+        crypto_link=asdict(crypto_link),
+        weather_link=asdict(weather_link),
+        crypto_forecasts=asdict(crypto_forecasts),
+        weather_forecasts=asdict(weather_forecasts),
+        crypto_opportunities=asdict(crypto_opportunities),
+        weather_opportunities=asdict(weather_opportunities),
+        candidate_alignment=payload["candidate_alignment"],
+        stage_errors=stage_errors,
+    )
+    payload["control_plane"] = write_refresh_control_plane_bundle(
+        payload,
+        output_dir=output_dir,
+        candidate_manifest_path=candidate_manifest_path,
+    )
     mark_stage("write_cycle_report")
     _write_cycle_artifacts(json_path, markdown_path, payload)
     _write_r5_owner_status(
@@ -641,6 +750,101 @@ def _active_market_tickers(
         .limit(limit)
     )
     return list(session.scalars(statement))
+
+
+def _import_active_market_catalog(
+    session: Session,
+    path: Path,
+    *,
+    limit: int,
+    max_age_minutes: int = 30,
+) -> dict[str, Any]:
+    payload = _read_json(path)
+    raw_markets = payload.get("markets") or []
+    generated_at = _optional_datetime(payload.get("generated_at"))
+    age_minutes = (
+        max(0.0, (utc_now() - generated_at).total_seconds() / 60)
+        if generated_at is not None
+        else None
+    )
+    if payload and (age_minutes is None or age_minutes > max_age_minutes):
+        return {
+            "status": "STALE_NOT_IMPORTED",
+            "path": str(path),
+            "catalog_generated_at": payload.get("generated_at"),
+            "catalog_age_minutes": age_minutes,
+            "max_age_minutes": max_age_minutes,
+            "rows_seen": len(raw_markets),
+            "rows_imported": 0,
+            "imported_tickers": [],
+            "errors": [],
+        }
+    imported: list[str] = []
+    errors: list[str] = []
+    for raw in raw_markets[: max(limit, 0)]:
+        if not isinstance(raw, dict):
+            continue
+        ticker = str(raw.get("ticker") or "").strip()
+        if not ticker:
+            continue
+        try:
+            normalized = dict(raw)
+            normalized["ticker"] = ticker
+            normalized.setdefault("source", "kalshi_rest_active_market_discovery")
+            normalized.setdefault(
+                "source_observed_at",
+                payload.get("generated_at") or utc_now().isoformat(),
+            )
+            upsert_market(session, normalized)
+        except (TypeError, ValueError) as exc:
+            errors.append(f"{ticker}: {exc}")
+            continue
+        imported.append(ticker)
+    return {
+        "status": (
+            "NOT_AVAILABLE"
+            if not payload
+            else "COMPLETE_WITH_ERRORS"
+            if errors
+            else "COMPLETE"
+        ),
+        "path": str(path),
+        "catalog_generated_at": payload.get("generated_at"),
+        "catalog_age_minutes": age_minutes,
+        "max_age_minutes": max_age_minutes,
+        "rows_seen": len(raw_markets),
+        "rows_imported": len(imported),
+        "imported_tickers": imported,
+        "errors": errors,
+    }
+
+
+def _write_coverage_checkpoint(
+    path: Path,
+    *,
+    stage: str,
+    active_catalog_import: dict[str, Any],
+    crypto_tickers: list[str],
+    weather_tickers: list[str],
+    limit: int,
+    **progress: Any,
+) -> None:
+    _write_json(
+        path,
+        {
+            "phase": "GH-3B-BOUNDED-CATEGORY-COVERAGE",
+            "generated_at": utc_now().isoformat(),
+            "stage": stage,
+            "batch_limit_per_category": limit,
+            "crypto_tickers_attempted": len(crypto_tickers),
+            "weather_tickers_attempted": len(weather_tickers),
+            "active_catalog_import": active_catalog_import,
+            "progress": progress,
+            "single_writer_required": True,
+            "paper_order_creation_enabled": False,
+            "live_execution_enabled": False,
+        },
+    )
 
 
 def _build_current_weather_features(
@@ -779,6 +983,112 @@ def _snapshot_recovery_candidates(
     return rows
 
 
+def _build_candidate_diagnostics(
+    *,
+    r5_payload: dict[str, Any],
+    weather_rows: list[dict[str, Any]],
+    limit_per_category: int = 12,
+) -> dict[str, Any]:
+    crypto_rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for section in (
+        "blocked_active_pure_examples",
+        "liquidity_watch_rows",
+        "best_ev_candidates",
+    ):
+        for raw in r5_payload.get(section) or []:
+            if not isinstance(raw, dict):
+                continue
+            ticker = str(raw.get("ticker") or "").strip()
+            if not ticker or ticker in seen:
+                continue
+            failed = _crypto_failed_gates(raw)
+            if not failed:
+                continue
+            seen.add(ticker)
+            crypto_rows.append(
+                {
+                    "ticker": ticker,
+                    "category": "crypto",
+                    "source": raw.get("source_lineage") or "Kalshi/Coinbase",
+                    "source_ready": not any("source" in gate.lower() for gate in failed),
+                    "book_ready": not any(
+                        token in " ".join(failed).lower()
+                        for token in ("book", "snapshot", "price", "liquidity", "spread")
+                    ),
+                    "quote_age_minutes": raw.get("snapshot_age_minutes")
+                    or raw.get("quote_age_minutes"),
+                    "raw_ev": raw.get("expected_value")
+                    or raw.get("expected_value_cents"),
+                    "executable_ev": raw.get("expected_value"),
+                    "spread": raw.get("spread"),
+                    "liquidity": raw.get("liquidity_score") or raw.get("liquidity"),
+                    "ranking_ready": not any("ranking" in gate.lower() for gate in failed),
+                    "risk_ready": not any("risk" in gate.lower() for gate in failed),
+                    "expired": not bool(raw.get("active_market", True)),
+                    "failed_gates": failed,
+                }
+            )
+            if len(crypto_rows) >= limit_per_category:
+                break
+        if len(crypto_rows) >= limit_per_category:
+            break
+
+    normalized_weather = []
+    for raw in weather_rows[:limit_per_category]:
+        failed = [str(item) for item in raw.get("failed_gates") or []]
+        normalized_weather.append(
+            {
+                "ticker": raw.get("ticker"),
+                "category": "weather",
+                "source": raw.get("source_lineage"),
+                "source_ready": bool(raw.get("source_identity_ready")),
+                "book_ready": bool(raw.get("executable_book")),
+                "quote_age_minutes": raw.get("snapshot_age_minutes"),
+                "raw_ev": raw.get("raw_ev"),
+                "executable_ev": raw.get("executable_ev"),
+                "spread": raw.get("spread"),
+                "liquidity": raw.get("liquidity_score") or raw.get("liquidity"),
+                "ranking_ready": bool(raw.get("has_current_ranking")),
+                "risk_ready": bool(
+                    raw.get("phase3s_proceed")
+                    and raw.get("phase3m_nonzero_size")
+                    and raw.get("phase3n_approved")
+                ),
+                "expired": not bool(raw.get("current_window_eligible")),
+                "failed_gates": failed or [str(raw.get("first_blocker") or "UNKNOWN")],
+            }
+        )
+    rows = crypto_rows + normalized_weather
+    return {
+        "row_count": len(rows),
+        "crypto_rows": len(crypto_rows),
+        "weather_rows": len(normalized_weather),
+        "rows": rows,
+    }
+
+
+def _crypto_failed_gates(row: dict[str, Any]) -> list[str]:
+    failed = [
+        str(item)
+        for item in (row.get("preflight_blockers") or row.get("blocking_gates") or [])
+        if str(item).strip()
+    ]
+    reason = str(row.get("blocked_reason") or row.get("readiness_status") or "").strip()
+    if reason and reason != "PAPER_READY_CANDIDATE":
+        failed.append(reason)
+    if row.get("latest_snapshot_at") is None:
+        failed.append("SNAPSHOT_MISSING")
+    if row.get("best_price") is None:
+        failed.append("EXECUTABLE_PRICE_MISSING")
+    try:
+        if Decimal(str(row.get("expected_value") or "0")) <= 0:
+            failed.append("EV_NOT_POSITIVE")
+    except (InvalidOperation, TypeError, ValueError):
+        failed.append("EV_MISSING")
+    return list(dict.fromkeys(failed))
+
+
 def _merge_manifest_candidates(
     ranked: list[dict[str, Any]],
     recovery: list[dict[str, Any]],
@@ -844,6 +1154,80 @@ def _float_or_zero(value: Any) -> float:
         return 0.0
 
 
+def _enrich_stage_telemetry(
+    stages: list[dict[str, Any]],
+    *,
+    websocket_drain: dict[str, Any],
+    crypto_drain: dict[str, Any],
+    active_leg_parse: dict[str, Any],
+    crypto_link: dict[str, Any],
+    weather_link: dict[str, Any],
+    crypto_forecasts: dict[str, Any],
+    weather_forecasts: dict[str, Any],
+    crypto_opportunities: dict[str, Any],
+    weather_opportunities: dict[str, Any],
+    candidate_alignment: dict[str, Any],
+    stage_errors: list[str],
+) -> None:
+    evidence: dict[str, tuple[int | None, int | None, str]] = {
+        "drain_websocket_stage": (
+            _metric(websocket_drain, "files_found", "files_processed", "staged_files"),
+            _metric(websocket_drain, "snapshots_inserted", "snapshots_written", "files_drained"),
+            "REGENERATED",
+        ),
+        "drain_crypto_quotes": (
+            _metric(crypto_drain, "files_found", "files_processed", "staged_files"),
+            _metric(crypto_drain, "quotes_inserted", "features_inserted", "files_archived"),
+            "REGENERATED",
+        ),
+        "parse_active_market_legs": (
+            _metric(active_leg_parse, "markets_processed", "markets_seen"),
+            _metric(active_leg_parse, "legs_inserted", "legs_parsed", "markets_linked"),
+            "REGENERATED",
+        ),
+        "link_active_markets": (
+            _metric(crypto_link, "markets_checked", "markets_processed")
+            + _metric(weather_link, "markets_checked", "markets_processed"),
+            _metric(crypto_link, "links_inserted", "linked")
+            + _metric(weather_link, "links_inserted", "linked"),
+            "REGENERATED",
+        ),
+        "refresh_crypto_decisions": (
+            _metric(crypto_forecasts, "snapshots_processed", "forecasts_attempted"),
+            _metric(crypto_forecasts, "forecasts_inserted")
+            + _metric(crypto_opportunities, "rankings_inserted"),
+            "REGENERATED",
+        ),
+        "refresh_weather_decisions": (
+            _metric(weather_forecasts, "snapshots_processed", "forecasts_attempted"),
+            _metric(weather_forecasts, "forecasts_inserted")
+            + _metric(weather_opportunities, "rankings_inserted"),
+            "REGENERATED",
+        ),
+        "write_candidate_manifest": (
+            int(candidate_alignment.get("before_count") or 0),
+            int(candidate_alignment.get("manifest_count") or 0),
+            "REGENERATED",
+        ),
+    }
+    for row in stages:
+        stage = str(row.get("stage") or "")
+        if stage in evidence:
+            row["input_rows"], row["output_rows"], row["artifact_mode"] = evidence[stage]
+        matching_errors = [error for error in stage_errors if stage in error]
+        if matching_errors:
+            row["status"] = "DEGRADED"
+            row["reason"] = "; ".join(matching_errors[:3])
+
+
+def _metric(payload: dict[str, Any], *keys: str) -> int:
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, (int, float)):
+            return int(value)
+    return 0
+
+
 def _write_r5_owner_status(
     path: Path,
     *,
@@ -876,6 +1260,8 @@ def _record_soak_cycle(
     fresh_ranked_candidates: int,
     reset_reason: str | None,
     required_cycles: int,
+    blocker_counts: dict[str, int] | None = None,
+    soak_quality: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     history = _read_json_lines(path)[-95:]
     history.append(
@@ -886,7 +1272,9 @@ def _record_soak_cycle(
             "positive_ev_rows": positive_ev_rows,
             "rankings_inserted": rankings_inserted,
             "fresh_ranked_candidates": fresh_ranked_candidates,
+            "blocker_counts": blocker_counts or {},
             "reset_reason": reset_reason,
+            "soak_quality": soak_quality or {},
         }
     )
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -911,6 +1299,57 @@ def _record_soak_cycle(
         "paper_ready_seen_in_required_window": has_candidate,
         "soak_complete": complete,
         "paper_order_creation_enabled": False,
+        "quality_gates_passed": bool((soak_quality or {}).get("passed", healthy)),
+    }
+
+
+def _build_soak_quality(
+    *,
+    r5_summary: dict[str, Any],
+    weather_summary: dict[str, Any],
+    manifest_count: int,
+    fresh_manifest_count: int,
+) -> dict[str, Any]:
+    current_crypto = int(r5_summary.get("current_active_window_rows") or 0)
+    crypto_missing = int(r5_summary.get("snapshot_missing_rows") or 0)
+    crypto_stale = int(r5_summary.get("snapshot_stale_rows") or 0)
+    fresh_crypto = max(0, current_crypto - crypto_missing - crypto_stale)
+    current_weather = int(weather_summary.get("current_weather_links") or 0)
+    fresh_weather = int(weather_summary.get("fresh_snapshot_rows") or 0)
+    fresh_ratio = fresh_manifest_count / manifest_count if manifest_count else 0.0
+    checks = {
+        "current_crypto_windows": current_crypto >= MIN_CURRENT_CRYPTO_WINDOWS,
+        "fresh_crypto_windows": fresh_crypto >= MIN_FRESH_CRYPTO_WINDOWS,
+        "current_weather_links": current_weather >= MIN_CURRENT_WEATHER_LINKS,
+        "fresh_weather_books": fresh_weather >= MIN_FRESH_WEATHER_BOOKS,
+        "manifest_present": manifest_count > 0,
+        "manifest_freshness": fresh_ratio >= MIN_FRESH_MANIFEST_RATIO,
+    }
+    failure_reasons = [
+        f"soak_quality_{name}_failed" for name, passed in checks.items() if not passed
+    ]
+    return {
+        "passed": not failure_reasons,
+        "checks": checks,
+        "failure_reasons": failure_reasons,
+        "observed": {
+            "current_crypto_windows": current_crypto,
+            "fresh_crypto_windows": fresh_crypto,
+            "crypto_snapshot_missing": crypto_missing,
+            "crypto_snapshot_stale": crypto_stale,
+            "current_weather_links": current_weather,
+            "fresh_weather_books": fresh_weather,
+            "manifest_candidates": manifest_count,
+            "fresh_manifest_candidates": fresh_manifest_count,
+            "fresh_manifest_ratio": round(fresh_ratio, 3),
+        },
+        "required": {
+            "current_crypto_windows": MIN_CURRENT_CRYPTO_WINDOWS,
+            "fresh_crypto_windows": MIN_FRESH_CRYPTO_WINDOWS,
+            "current_weather_links": MIN_CURRENT_WEATHER_LINKS,
+            "fresh_weather_books": MIN_FRESH_WEATHER_BOOKS,
+            "fresh_manifest_ratio": MIN_FRESH_MANIFEST_RATIO,
+        },
     }
 
 
@@ -1009,3 +1448,10 @@ def _decimal(value: Any) -> Decimal:
 
 def _aware(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _optional_datetime(value: Any) -> datetime | None:
+    try:
+        return _aware(datetime.fromisoformat(str(value).replace("Z", "+00:00")))
+    except (TypeError, ValueError):
+        return None

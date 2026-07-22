@@ -51,6 +51,7 @@ def test_discovery_prioritizes_ranked_manifest_books(tmp_path: Path) -> None:
     assert [row["ticker"] for row in rows] == ["KXBTC-RANKED", "KXETH-RANKED"]
     assert all(row["selection_source"] == "ACTIONABLE_RANKING" for row in rows)
     assert client.orderbook_calls == ["KXBTC-RANKED", "KXETH-RANKED"]
+    assert all(row["market"]["source"] == "fake" for row in rows)
 
 
 def test_discovery_retains_preferred_ticker_with_empty_initial_book() -> None:
@@ -75,6 +76,7 @@ def test_watch_reconnects_uses_cached_discovery_and_stages_only(tmp_path: Path) 
     adapter_factory = _AdapterFactory()
     sleeps: list[float] = []
     status_path = tmp_path / "watch" / "status.json"
+    catalog_path = tmp_path / "watch" / "active_market_catalog.json"
     settings = Settings(
         kalshi_websocket_enabled=True,
         kalshi_websocket_staging_dir=str(tmp_path / "staging"),
@@ -93,6 +95,7 @@ def test_watch_reconnects_uses_cached_discovery_and_stages_only(tmp_path: Path) 
         reconnect_initial_seconds=1,
         reconnect_max_seconds=4,
         status_path=status_path,
+        active_market_catalog_path=catalog_path,
         max_cycles=2,
         client_factory=_FakeClient,
         adapter_factory=adapter_factory,
@@ -120,6 +123,10 @@ def test_watch_reconnects_uses_cached_discovery_and_stages_only(tmp_path: Path) 
     persisted = json.loads(status_path.read_text(encoding="utf-8"))
     assert persisted["state"] == "STOPPED_MAX_CYCLES"
     assert persisted["safety"]["execution_enabled"] is False
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    assert catalog["market_count"] == 1
+    assert catalog["markets"][0]["ticker"] == "KXBTC-QUOTED"
+    assert catalog["markets"][0]["source"] == "kalshi_rest_active_market_discovery"
 
 
 class _FakeClient:
@@ -145,6 +152,14 @@ class _FakeClient:
         if ticker.endswith("-EMPTY"):
             return {"orderbook_fp": {"yes_dollars": [], "no_dollars": []}}
         return {"orderbook_fp": {"yes_dollars": [["0.40", "10"]], "no_dollars": []}}
+
+    def get_market(self, ticker: str) -> dict[str, object]:
+        return {
+            "ticker": ticker,
+            "series_ticker": ticker.split("-", 1)[0],
+            "status": "open",
+            "source": "fake",
+        }
 
 
 class _FakeAdapter:
