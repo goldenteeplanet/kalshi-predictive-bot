@@ -64,6 +64,24 @@ def test_strategy_does_not_create_duplicate_order_for_same_forecast(tmp_path) ->
         assert len(session.scalars(select(PaperOrder)).all()) == 1
 
 
+def test_strategy_enforces_open_order_risk_limit(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    settings = _settings().model_copy(update={"paper_max_open_orders": 1})
+    with session_factory() as session:
+        _seed_forecast(session, ticker="FIRST", yes_probability=Decimal("0.60"))
+        first_decision = generate_paper_decisions(session, settings=settings).decisions[0]
+        create_paper_order(session, first_decision)
+        _seed_forecast(session, ticker="SECOND", yes_probability=Decimal("0.60"))
+        session.commit()
+
+        result = generate_paper_decisions(session, settings=settings)
+
+        assert result.decisions_generated == 0
+        assert result.skipped_due_to_risk_limits == 1
+        assert result.duplicates_skipped == 1
+        assert len(session.scalars(select(PaperOrder)).all()) == 1
+
+
 def _session_factory(tmp_path):
     engine = init_db(f"sqlite:///{tmp_path / 'paper_strategy.db'}")
     return get_session_factory(engine)

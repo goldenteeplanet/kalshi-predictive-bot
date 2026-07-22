@@ -102,6 +102,7 @@ def write_phase3ba_r3_weather_paper_gate_report(
     limit: int = 500,
     current_window_lookback_hours: int = 3,
     match_tolerance_hours: int = 3,
+    tickers: list[str] | tuple[str, ...] | None = None,
 ) -> Phase3BAR3ArtifactSet:
     payload = build_phase3ba_r3_weather_paper_gate(
         session,
@@ -112,6 +113,7 @@ def write_phase3ba_r3_weather_paper_gate_report(
         limit=limit,
         current_window_lookback_hours=current_window_lookback_hours,
         match_tolerance_hours=match_tolerance_hours,
+        tickers=tickers,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     executive_summary_path = output_dir / "EXECUTIVE_SUMMARY.md"
@@ -160,6 +162,7 @@ def build_phase3ba_r3_weather_paper_gate(
     limit: int = 500,
     current_window_lookback_hours: int = 3,
     match_tolerance_hours: int = 3,
+    tickers: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     base_settings = settings or get_settings()
     resolved = learning_paper_settings(base_settings)
@@ -171,11 +174,20 @@ def build_phase3ba_r3_weather_paper_gate(
         command_args=command_args or [],
     )
     current_since = now - timedelta(hours=max(current_window_lookback_hours, 0))
-    links = _current_weather_links(session, current_since=current_since, limit=limit)
-    tickers = sorted({link.ticker for link in links})
-    sizing = _latest_by_ticker(session, PositionSizingDecisionLog, tickers, "decision_timestamp")
-    risk = _latest_by_ticker(session, AdvancedRiskDecisionLog, tickers, "decision_timestamp")
-    paper_orders = _paper_order_keys(session, tickers)
+    links = _current_weather_links(
+        session,
+        current_since=current_since,
+        limit=limit,
+        tickers=tickers,
+    )
+    selected_tickers = sorted({link.ticker for link in links})
+    sizing = _latest_by_ticker(
+        session, PositionSizingDecisionLog, selected_tickers, "decision_timestamp"
+    )
+    risk = _latest_by_ticker(
+        session, AdvancedRiskDecisionLog, selected_tickers, "decision_timestamp"
+    )
+    paper_orders = _paper_order_keys(session, selected_tickers)
     rows = [
         _weather_paper_gate_row(
             session,
@@ -203,6 +215,8 @@ def build_phase3ba_r3_weather_paper_gate(
             "limit": limit,
             "current_window_lookback_hours": current_window_lookback_hours,
             "match_tolerance_hours": match_tolerance_hours,
+            "ticker_scope_count": len(tickers or ()),
+            "active_ticker_scope": tickers is not None,
             "model_name": MODEL_NAME,
             "quote_stale_after_minutes": str(QUOTE_STALE_AFTER_MINUTES),
             "min_executable_liquidity_score": str(MIN_EXECUTABLE_LIQUIDITY_SCORE),

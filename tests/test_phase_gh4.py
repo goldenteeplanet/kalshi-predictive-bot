@@ -23,6 +23,11 @@ def test_gh3_soak_status_reports_progress_eta_and_source_health(tmp_path: Path) 
     assert status["remaining_cycles"] == 13
     assert status["eta_label"] == "about 3.2h"
     assert status["paper_ready_seen"] is False
+    assert status["scheduler_status"] == "Complete"
+    assert status["lock_wait_seconds"] == 7.0
+    assert status["writer_runtime_seconds"] == 92.0
+    assert status["deferred_cycle_reason"] == "None"
+    assert status["last_successful_completion"] != "n/a"
     assert status["reconnect"]["status"] == "HEALTHY"
     assert status["weather_gate"]["positive_raw_ev_rows"] == 1
     assert status["weather_gate"]["positive_executable_ev_rows"] == 0
@@ -50,6 +55,27 @@ def test_gh4_preflight_blocks_until_soak_and_candidate_gates_pass(tmp_path: Path
     assert "gh3_soak_complete" in payload["failed_checks"]
     assert "paper_ready_observed" in payload["failed_checks"]
     assert "current_candidate_available" in payload["failed_checks"]
+
+
+def test_gh3_soak_status_reports_live_writer_runtime(tmp_path: Path) -> None:
+    paths = _write_inputs(tmp_path, completed=11, paper_ready_seen=False, current_ready=0)
+    scheduler_path = paths["scheduler_status_path"]
+    scheduler_path.write_text(
+        json.dumps(
+            {
+                "generated_at": (NOW - timedelta(minutes=2)).isoformat(),
+                "status": "RUNNING",
+                "lock_wait_seconds": 4,
+                "writer_runtime_seconds": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = build_gh3_soak_status(**paths, now=NOW)
+
+    assert status["next_run"] == "Running now"
+    assert status["writer_runtime_seconds"] == 120.0
 
 
 def test_gh4_preflight_becomes_ready_but_does_not_enable_orders(tmp_path: Path) -> None:
@@ -136,6 +162,7 @@ def _write_inputs(
     report_path = tmp_path / "gh2.json"
     history_path = tmp_path / "history.jsonl"
     gh1_status_path = tmp_path / "gh1.json"
+    scheduler_status_path = tmp_path / "scheduler.json"
     report = {
         "generated_at": NOW.isoformat(),
         "status": "PAPER_ONLY_SOAK_RUNNING",
@@ -191,6 +218,14 @@ def _write_inputs(
         "reconnect_count": 2,
         "consecutive_failures": 0,
     }
+    scheduler = {
+        "generated_at": NOW.isoformat(),
+        "status": "COMPLETE",
+        "lock_wait_seconds": 7,
+        "writer_runtime_seconds": 92,
+        "deferred_cycle_reason": None,
+        "last_successful_completion": NOW.isoformat(),
+    }
     history = {
         "generated_at": NOW.isoformat(),
         "healthy": True,
@@ -201,9 +236,11 @@ def _write_inputs(
     }
     report_path.write_text(json.dumps(report), encoding="utf-8")
     gh1_status_path.write_text(json.dumps(gh1), encoding="utf-8")
+    scheduler_status_path.write_text(json.dumps(scheduler), encoding="utf-8")
     history_path.write_text(json.dumps(history) + "\n", encoding="utf-8")
     return {
         "report_path": report_path,
         "history_path": history_path,
         "gh1_status_path": gh1_status_path,
+        "scheduler_status_path": scheduler_status_path,
     }

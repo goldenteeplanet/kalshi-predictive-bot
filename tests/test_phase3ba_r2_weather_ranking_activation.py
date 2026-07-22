@@ -163,3 +163,24 @@ def test_phase3ba_r2_cli_help_exposes_command() -> None:
 
     assert result.exit_code == 0
     assert "phase3ba-r2-weather-ranking-activation" in result.output
+
+
+def test_current_weather_links_applies_exact_ticker_scope() -> None:
+    statements = []
+
+    class FakeSession:
+        def scalars(self, statement):
+            statements.append(statement)
+            return []
+
+    rows = phase3ba_r2._current_weather_links(
+        FakeSession(),
+        current_since=phase3ba_r2.utc_now(),
+        limit=6,
+        tickers=["KXTEMPNYCH-A", "KXTEMPNYCH-A", "KXTEMPCHI-B"],
+    )
+
+    assert rows == []
+    assert len(statements) == 1
+    sql = str(statements[0])
+    assert "weather_market_links.ticker IN" in sql

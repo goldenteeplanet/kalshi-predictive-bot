@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -50,6 +52,7 @@ WEATHER_DECISION_LIMIT = 6
 WEATHER_FEATURE_LOCATION_LIMIT = 2
 WEATHER_FEATURE_FORECAST_LIMIT = 4
 SNAPSHOT_RECOVERY_LIMIT = 20
+STICKY_CANDIDATE_LIMIT = 12
 R5_OWNER_FILE = "phase3bc_r5_owner.json"
 PAPER_ONLY_SAFETY = "PAPER_ONLY_NO_ORDER_CREATION_OR_EXCHANGE_WRITES"
 
@@ -98,17 +101,24 @@ def select_actionable_ranked_markets(
     max_ranking_age_hours: int = 24,
     freshness_minutes: int = 15,
     now: datetime | None = None,
+    ticker_scope: list[str] | tuple[str, ...] | None = None,
 ) -> list[dict[str, Any]]:
     """Select active ranked books, favoring fresh executable positive-edge rows."""
 
     resolved_now = _aware(now or utc_now())
     cutoff = resolved_now - timedelta(hours=max(max_ranking_age_hours, 1))
+    scoped_tickers = _bounded_unique(list(ticker_scope or ()), max(len(ticker_scope or ()), 1))
+    if ticker_scope is not None and not scoped_tickers:
+        return []
+    filters = [
+        MarketRanking.forecast_model.in_(ACTIONABLE_MODELS),
+        MarketRanking.ranked_at >= cutoff,
+    ]
+    if ticker_scope is not None:
+        filters.append(MarketRanking.ticker.in_(scoped_tickers))
     statement = (
         select(MarketRanking)
-        .where(
-            MarketRanking.forecast_model.in_(ACTIONABLE_MODELS),
-            MarketRanking.ranked_at >= cutoff,
-        )
+        .where(*filters)
         .order_by(
             desc(MarketRanking.ranked_at),
             desc(MarketRanking.opportunity_score),
@@ -223,6 +233,9 @@ def run_gh2_single_writer_decision_refresh(
     markdown_path = output_dir / "gh2_active_candidate_refresh.md"
     history_path = output_dir / "gh2_paper_only_soak_history.jsonl"
     stage_path = output_dir / "gh2_stage.json"
+    previous_manifest_tickers = _candidate_manifest_tickers(candidate_manifest_path)
+    cycle_started_at = utc_now()
+    cycle_started_monotonic = time.monotonic()
 
     def mark_stage(stage: str) -> None:
         _write_json(
@@ -273,6 +286,16 @@ def run_gh2_single_writer_decision_refresh(
             limit=candidate_limit,
             freshness_minutes=freshness_minutes,
         )
+        sticky_before = _fresh_sticky_candidates(
+            select_actionable_ranked_markets(
+                session,
+                limit=min(candidate_limit, STICKY_CANDIDATE_LIMIT),
+                max_per_series=candidate_limit,
+                freshness_minutes=freshness_minutes,
+                ticker_scope=previous_manifest_tickers,
+            ),
+            limit=min(candidate_limit, STICKY_CANDIDATE_LIMIT),
+        )
         active_crypto = _active_market_tickers(
             session,
             prefixes=CRYPTO_TICKER_PREFIXES,
@@ -291,16 +314,20 @@ def run_gh2_single_writer_decision_refresh(
             link_crypto_after_drain=False,
         )
         stage_errors.extend(str(item) for item in crypto_drain.get("errors") or [])
+        sticky_crypto = [row["ticker"] for row in sticky_before if row["model"] == "crypto_v2"]
+        sticky_weather = [
+            row["ticker"] for row in sticky_before if row["model"] == "weather_v2"
+        ]
         ranked_crypto = [row["ticker"] for row in candidates_before if row["model"] == "crypto_v2"]
         ranked_weather = [
             row["ticker"] for row in candidates_before if row["model"] == "weather_v2"
         ]
         crypto_link_tickers = _bounded_unique(
-            ranked_crypto + active_crypto,
+            sticky_crypto + ranked_crypto + active_crypto,
             active_link_limit,
         )
         weather_link_tickers = _bounded_unique(
-            ranked_weather + active_weather,
+            sticky_weather + ranked_weather + active_weather,
             active_link_limit,
         )
         mark_stage("parse_active_market_legs")
@@ -324,7 +351,7 @@ def run_gh2_single_writer_decision_refresh(
             limit=active_link_limit,
         )
         weather_decision_tickers = _bounded_unique(
-            ranked_weather + weather_link_tickers,
+            sticky_weather + ranked_weather + weather_link_tickers,
             WEATHER_DECISION_LIMIT,
         )
 
@@ -415,6 +442,7 @@ def run_gh2_single_writer_decision_refresh(
             settings=resolved,
             limit=forecast_limit,
             current_window_lookback_hours=3,
+            tickers=weather_decision_tickers,
         )
         mark_stage("write_candidate_manifest")
         candidates_after = select_actionable_ranked_markets(
@@ -422,10 +450,21 @@ def run_gh2_single_writer_decision_refresh(
             limit=candidate_limit,
             freshness_minutes=freshness_minutes,
         )
+        sticky_after = _fresh_sticky_candidates(
+            select_actionable_ranked_markets(
+                session,
+                limit=min(candidate_limit, STICKY_CANDIDATE_LIMIT),
+                max_per_series=candidate_limit,
+                freshness_minutes=freshness_minutes,
+                ticker_scope=previous_manifest_tickers,
+            ),
+            limit=min(candidate_limit, STICKY_CANDIDATE_LIMIT),
+        )
         manifest_candidates = _merge_manifest_candidates(
             candidates_after,
             snapshot_recovery_candidates,
             limit=candidate_limit,
+            sticky=sticky_after,
         )
         _write_candidate_manifest(candidate_manifest_path, manifest_candidates)
         paper_orders_after = _paper_order_count(session)
@@ -446,13 +485,13 @@ def run_gh2_single_writer_decision_refresh(
     if rankings_inserted == 0:
         rankings_inserted = sum(
             1
-            for row in candidates_after
+            for row in manifest_candidates
             if _aware(datetime.fromisoformat(row["ranked_at"]))
             >= utc_now() - timedelta(minutes=freshness_minutes)
         )
     fresh_candidate_count = sum(
         1
-        for row in candidates_after
+        for row in manifest_candidates
         if row.get("fresh")
         and _aware(datetime.fromisoformat(row["ranked_at"]))
         >= utc_now() - timedelta(minutes=freshness_minutes)
@@ -492,6 +531,12 @@ def run_gh2_single_writer_decision_refresh(
         ),
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "writer_monitor_at_start": monitor,
+        "cycle_telemetry": {
+            "started_at": cycle_started_at.isoformat(),
+            "completed_at": utc_now().isoformat(),
+            "runtime_seconds": round(time.monotonic() - cycle_started_monotonic, 3),
+            "lock_wait_seconds": _float_or_zero(os.getenv("GH2_LOCK_WAIT_SECONDS")),
+        },
         "websocket_drain": websocket_drain,
         "crypto_quote_drain": crypto_drain,
         "active_linking": {
@@ -519,10 +564,17 @@ def run_gh2_single_writer_decision_refresh(
             "after_count": len(candidates_after),
             "ranked_candidates": len(candidates_after),
             "snapshot_recovery_candidates": len(snapshot_recovery_candidates),
+            "sticky_candidates": len(sticky_after),
             "manifest_count": len(manifest_candidates),
             "manifest_path": str(candidate_manifest_path),
             "tickers": [row["ticker"] for row in manifest_candidates],
             "snapshot_recovery_tickers": [row["ticker"] for row in snapshot_recovery_candidates],
+            "sticky_tickers": [row["ticker"] for row in sticky_after],
+            "warmup_tickers": [
+                row["ticker"]
+                for row in manifest_candidates
+                if row["ticker"] not in {item["ticker"] for item in sticky_after}
+            ],
         },
         "paper_readiness": {
             "crypto_paper_ready_candidates": crypto_paper_ready,
@@ -669,7 +721,7 @@ def _write_candidate_manifest(path: Path, candidates: list[dict[str, Any]]) -> N
         {
             "phase": "GH-2",
             "generated_at": utc_now().isoformat(),
-            "selection": "CURRENT_ACTIONABLE_RANKINGS_WITH_SNAPSHOT_RECOVERY",
+            "selection": "STICKY_FRESH_THEN_CURRENT_RANKINGS_WITH_SNAPSHOT_RECOVERY",
             "tickers": [row["ticker"] for row in candidates],
             "candidates": candidates,
             "paper_only_safety": PAPER_ONLY_SAFETY,
@@ -732,30 +784,60 @@ def _merge_manifest_candidates(
     recovery: list[dict[str, Any]],
     *,
     limit: int,
+    sticky: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     if limit <= 0:
         return []
     recovery_rows = recovery[:limit]
     ranked_budget = max(limit - len(recovery_rows), 0)
-    selected = list(ranked[:ranked_budget]) + list(recovery_rows)
+    sticky_rows = list((sticky or [])[: min(STICKY_CANDIDATE_LIMIT, ranked_budget)])
+    selected = sticky_rows + list(ranked) + list(recovery_rows)
     deduped: list[dict[str, Any]] = []
     seen: set[str] = set()
     for row in selected:
         ticker = str(row.get("ticker") or "").strip()
         if not ticker or ticker in seen:
             continue
+        if row in recovery_rows and len(deduped) < ranked_budget:
+            continue
+        if row not in recovery_rows and len(deduped) >= ranked_budget:
+            continue
         seen.add(ticker)
         deduped.append(row)
-    if len(deduped) < limit:
-        for row in ranked[ranked_budget:]:
-            ticker = str(row.get("ticker") or "").strip()
-            if not ticker or ticker in seen:
-                continue
-            seen.add(ticker)
-            deduped.append(row)
-            if len(deduped) >= limit:
-                break
     return deduped
+
+
+def _candidate_manifest_tickers(path: Path) -> list[str]:
+    payload = _read_json(path)
+    raw_tickers = payload.get("tickers") or []
+    return _bounded_unique(
+        [str(ticker).strip() for ticker in raw_tickers if str(ticker).strip()],
+        STICKY_CANDIDATE_LIMIT,
+    )
+
+
+def _fresh_sticky_candidates(
+    candidates: list[dict[str, Any]],
+    *,
+    limit: int,
+) -> list[dict[str, Any]]:
+    rows = []
+    for candidate in candidates:
+        if not candidate.get("fresh"):
+            continue
+        row = dict(candidate)
+        row["selection_tier"] = "STICKY_FRESH"
+        rows.append(row)
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def _float_or_zero(value: Any) -> float:
+    try:
+        return max(float(value or 0), 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _write_r5_owner_status(

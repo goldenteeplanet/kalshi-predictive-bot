@@ -178,6 +178,12 @@ GH1_WATCH_STATUS_PATH = Path(
         "/var/lib/kalshi-bot-gh1/watch/status.json",
     )
 )
+GH2_SCHEDULER_STATUS_PATH = Path(
+    os.getenv(
+        "KALSHI_GH2_SCHEDULER_STATUS_PATH",
+        "/var/lib/kalshi-bot-gh2/reports/gh2_scheduler_status.json",
+    )
+)
 CRYPTO_FRESHNESS_REPORT_HREF = "/reports/phase3bc_r5/phase3bc_r5_crypto_freshness_watch.md"
 PHASE3AP_EXECUTIVE_SUMMARY_HREF = "/reports/phase3ap/EXECUTIVE_SUMMARY.md"
 PHASE3AP_GATE_HREF = "/reports/phase3ap/paper_ready_gate.json"
@@ -1417,12 +1423,14 @@ def paper_only_soak_status(
     report_path: Path = GH2_SOAK_REPORT_PATH,
     history_path: Path = GH2_SOAK_HISTORY_PATH,
     gh1_status_path: Path = GH1_WATCH_STATUS_PATH,
+    scheduler_status_path: Path = GH2_SCHEDULER_STATUS_PATH,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     return build_gh3_soak_status(
         report_path=report_path,
         history_path=history_path,
         gh1_status_path=gh1_status_path,
+        scheduler_status_path=scheduler_status_path,
         now=now,
     )
 

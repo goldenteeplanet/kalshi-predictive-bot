@@ -12,11 +12,15 @@ on:
       - "src/kalshi_predictor/ingest/websocket_watch.py"
       - "src/kalshi_predictor/phase_gh2.py"
       - "src/kalshi_predictor/phase_gh4.py"
+      - "src/kalshi_predictor/phase3ba_r2.py"
+      - "src/kalshi_predictor/phase3ba_r3.py"
       - "src/kalshi_predictor/single_writer_coordinator.py"
       - "src/kalshi_predictor/ui/service.py"
       - "src/kalshi_predictor/ui/templates/today.html"
       - "src/kalshi_predictor/weather/providers.py"
       - "tests/**"
+      - "scripts/cloud/verify-paper-deployment.sh"
+      - "scripts/local/gh4-paper-lifecycle-rehearsal.sh"
       - ".github/workflows/gh4-paper-activation-readiness.yml"
   workflow_dispatch:
 
@@ -46,11 +50,16 @@ jobs:
           python -m ruff check
           src/kalshi_predictor/phase_gh4.py
           src/kalshi_predictor/phase_gh2.py
+          src/kalshi_predictor/phase3ba_r2.py
+          src/kalshi_predictor/phase3ba_r3.py
           src/kalshi_predictor/single_writer_coordinator.py
           src/kalshi_predictor/ingest/websocket_watch.py
           src/kalshi_predictor/weather/providers.py
           tests/test_phase_gh4.py
           tests/test_phase_gh2.py
+          tests/test_phase3ba_r2_weather_ranking_activation.py
+          tests/test_phase3ba_r3_weather_paper_gate.py
+          tests/test_cloud_deployment_smoke.py
           tests/test_single_writer_coordinator.py
           tests/test_gh1_websocket_watch.py
           tests/test_source_retries.py
@@ -58,11 +67,21 @@ jobs:
       - name: Check legacy UI module without inherited line-length debt
         run: python -m ruff check --ignore E501 src/kalshi_predictor/ui/service.py
 
+      - name: Check operator shell contracts
+        run: >-
+          bash -n
+          scripts/cloud/kalshi-gh2-decision-refresh.sh
+          scripts/cloud/verify-paper-deployment.sh
+          scripts/local/gh4-paper-lifecycle-rehearsal.sh
+
       - name: Run GH-4 focused and paper lifecycle tests
         run: >-
           python -m pytest -q
           tests/test_phase_gh4.py
           tests/test_phase_gh2.py
+          tests/test_phase3ba_r2_weather_ranking_activation.py
+          tests/test_phase3ba_r3_weather_paper_gate.py
+          tests/test_cloud_deployment_smoke.py
           tests/test_single_writer_coordinator.py
           tests/test_gh1_websocket_watch.py
           tests/test_source_retries.py

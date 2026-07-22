@@ -318,11 +318,24 @@ def _current_weather_links(
     *,
     current_since: Any,
     limit: int,
+    tickers: list[str] | tuple[str, ...] | None = None,
 ) -> list[WeatherMarketLink]:
+    ticker_scope = list(
+        dict.fromkeys(
+            str(ticker).strip() for ticker in (tickers or ()) if str(ticker).strip()
+        )
+    )
+    if tickers is not None and not ticker_scope:
+        return []
+    filters = [
+        WeatherMarketLink.target_time.is_not(None),
+        WeatherMarketLink.target_time >= current_since,
+    ]
+    if tickers is not None:
+        filters.append(WeatherMarketLink.ticker.in_(ticker_scope))
     statement = (
         select(WeatherMarketLink)
-        .where(WeatherMarketLink.target_time.is_not(None))
-        .where(WeatherMarketLink.target_time >= current_since)
+        .where(*filters)
         .order_by(
             desc(WeatherMarketLink.target_time),
             WeatherMarketLink.ticker,
