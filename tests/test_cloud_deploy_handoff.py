@@ -9,6 +9,11 @@ def test_guarded_cloud_deploy_handoff_contract() -> None:
     assert "exact 40-character Git commit SHA" in script
     assert 'systemctl stop "${TIMERS[@]}"' in script
     assert "kalshi-gh2-decision-refresh.service" in script
+    assert "kalshi-r5-bounded.service" in script
+    assert "LEGACY_OWNER_TIMER=kalshi-r5-bounded.timer" in script
+    assert 'systemctl stop "$LEGACY_OWNER_TIMER"' in script
+    assert 'systemctl disable "$LEGACY_OWNER_TIMER"' in script
+    assert "restore_legacy_timer" in script
     assert "db-writer-monitor --json" in script
     assert '"safe_to_start_write": true' in script
     assert '"writer_count": 0' in script
