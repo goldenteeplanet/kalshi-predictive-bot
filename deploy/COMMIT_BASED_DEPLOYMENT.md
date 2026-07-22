@@ -21,6 +21,23 @@ Stop on any failed gate. Never use deployment to enable paper or live execution.
 
 ## Guarded deployment outline
 
+Generate the fail-closed preparation manifest before touching the cloud checkout:
+
+```bash
+.venv/bin/python scripts/cloud/prepare-exact-sha-deployment.py \
+  --target-sha "$TARGET_SHA" \
+  --rollback-sha "$ROLLBACK_SHA" \
+  --environment-file /path/to/redacted-runtime-copy.env \
+  --backup-database /path/to/verified-backup.db \
+  --output /path/to/deployment-preflight.json
+```
+
+The command is read-only with respect to Git, configuration, and the database. It refuses
+a dirty checkout, a target other than `origin/main`, unsafe execution flags, a missing or
+invalid rollback commit, or a backup that fails SQLite quick/full integrity checks. The
+manifest records hashes but never environment secret values. Producing it does not
+authorize deployment, paper orders, or live execution.
+
 1. Fetch the repository without altering the active checkout.
 2. Verify the approved commit exists on `origin/main` and record its SHA.
 3. Record the current cloud commit as the rollback target.
