@@ -47,6 +47,14 @@
 </section>
 
 <section class="section-band">
+  <div class="section-head"><div><h2>Category ingestion census</h2><p class="muted">Ticker-level funnel evidence across every supported category. Aggregate-only evidence remains explicitly insufficient.</p></div><span class="status-pill {{ 'status-healthy' if dashboard.category_census.state == 'VERIFIED' else 'status-degraded' }}">{{ dashboard.category_census.state }}</span></div>
+  <div class="table-wrap"><table><thead><tr><th>Category</th><th>Source</th><th>Granularity</th><th>Active denominator</th><th>First blockers</th><th>Scope</th></tr></thead><tbody>
+  {% for row in dashboard.category_census.categories %}<tr><td>{{ row.category }}</td><td>{{ row.source_name or 'unavailable' }} · {{ row.source_state }}</td><td>{{ row.evidence_granularity }}</td><td>{{ row.active_market_denominator }}</td><td>{% for blocker, count in row.first_blocker_counts.items() %}{{ blocker }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}</td><td>{{ 'paper-only' if row.paper_only else 'live-v1 candidate' }}</td></tr>
+  {% else %}<tr><td colspan="6">No verified category census is available. Generate <code>reports/roadmap/category_ingestion_census.json</code>.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="section-band">
   <div class="section-head"><div><h2>Operational incidents</h2><p class="muted">Alerts deduplicate across cycles and resolve without deleting history.</p></div></div>
   <div class="table-wrap"><table><thead><tr><th>Code</th><th>State</th><th>Occurrences</th><th>Last seen</th></tr></thead><tbody>
   {% for row in dashboard.incidents.incidents %}<tr><td>{{ row.code }}</td><td>{{ row.state }}</td><td>{{ row.occurrences }}</td><td>{{ row.last_seen_at }}</td></tr>

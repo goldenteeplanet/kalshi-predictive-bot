@@ -6,6 +6,10 @@ from fastapi.testclient import TestClient
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
+from kalshi_predictor.roadmap.category_census import (
+    build_category_ingestion_census,
+    write_category_ingestion_census,
+)
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.ui.refresh_readiness import build_refresh_readiness_dashboard
 from kalshi_predictor.utils.time import utc_now
@@ -125,3 +129,21 @@ def test_refresh_readiness_routes_are_get_only_and_read_only(tmp_path: Path, mon
     assert roadmap_api.status_code == 200
     assert roadmap_api.json()["live_execution_enabled"] is False
     assert client.post("/api/system/refresh-readiness").status_code == 405
+
+
+def test_dashboard_loads_only_verified_category_census(tmp_path: Path) -> None:
+    census_path = tmp_path / "census.json"
+    missing = build_refresh_readiness_dashboard(category_census_path=census_path)
+    assert missing["category_census"]["state"] == "MISSING_OR_UNVERIFIED"
+
+    payload = build_category_ingestion_census({})
+    write_category_ingestion_census(census_path, payload)
+    loaded = build_refresh_readiness_dashboard(category_census_path=census_path)
+    assert loaded["category_census"]["state"] == "VERIFIED"
+    assert len(loaded["category_census"]["categories"]) == 7
+
+    envelope = json.loads(census_path.read_text(encoding="utf-8"))
+    envelope["payload"]["categories"][0]["source_state"] = "READY"
+    census_path.write_text(json.dumps(envelope), encoding="utf-8")
+    tampered = build_refresh_readiness_dashboard(category_census_path=census_path)
+    assert tampered["category_census"]["state"] == "MISSING_OR_UNVERIFIED"
