@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -154,6 +155,8 @@ def build_gh3_soak_status(
     report_fresh = report_age is not None and report_age <= max(35, cadence_minutes * 2 + 5)
     soak_complete = bool(soak.get("soak_complete"))
     current_paper_ready = int(readiness.get("total_paper_ready_candidates") or 0)
+    weather_gate = payload.get("weather_gate") or {}
+    weather_gate_summary = weather_gate.get("summary") or {}
     if not payload:
         status = "UNAVAILABLE"
         status_label = "Soak report unavailable"
@@ -205,9 +208,93 @@ def build_gh3_soak_status(
         ),
         "history": list(reversed(history[-8:])),
         "reconnect": reconnect,
+        "weather_gate": {
+            "status": str(weather_gate.get("status") or "UNAVAILABLE"),
+            "status_label": _enum_label(weather_gate.get("status") or "UNAVAILABLE"),
+            "current_weather_links": int(weather_gate_summary.get("current_weather_links") or 0),
+            "positive_raw_ev_rows": int(weather_gate_summary.get("positive_raw_ev_rows") or 0),
+            "positive_executable_ev_rows": int(
+                weather_gate_summary.get("positive_executable_ev_rows") or 0
+            ),
+            "paper_ready_rows": int(weather_gate_summary.get("paper_ready_rows") or 0),
+            "first_hard_blocker": str(
+                weather_gate_summary.get("first_hard_blocker") or "UNAVAILABLE"
+            ),
+            "candidate_rows": _weather_candidate_gate_rows(weather_gate),
+        },
         "paper_order_creation_enabled": False,
         "live_execution_enabled": False,
     }
+
+
+def _weather_candidate_gate_rows(
+    weather_gate: dict[str, Any],
+    *,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for raw in weather_gate.get("weather_rows") or []:
+        if not isinstance(raw, dict):
+            continue
+        ticker = str(raw.get("ticker") or "").strip()
+        if not ticker:
+            continue
+        blocker = str(raw.get("first_blocker") or "UNKNOWN")
+        rows.append(
+            {
+                "ticker": ticker,
+                "detail_href": f"/opportunities/{ticker}",
+                "raw_ev_label": _edge_cents_label(raw.get("raw_ev")),
+                "executable_ev_label": _edge_cents_label(raw.get("executable_ev")),
+                "liquidity_score": str(raw.get("liquidity_score") or "0"),
+                "book_label": (
+                    "Executable"
+                    if bool(raw.get("executable_book"))
+                    else _enum_label(raw.get("no_book_reason") or "BOOK_MISSING")
+                ),
+                "failed_gate": blocker,
+                "failed_gate_label": _enum_label(blocker),
+                "next_action": _weather_gate_next_action(blocker),
+            }
+        )
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def _edge_cents_label(value: Any) -> str:
+    try:
+        cents = Decimal(str(value)) * Decimal("100")
+    except (InvalidOperation, TypeError, ValueError):
+        return "n/a"
+    rounded = cents.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return f"{rounded}c"
+
+
+def _enum_label(value: Any) -> str:
+    return str(value or "UNKNOWN").replace("_", " ").title()
+
+
+def _weather_gate_next_action(blocker: str) -> str:
+    actions = {
+        "SOURCE_MISSING": "Refresh the bounded NOAA source and active market link.",
+        "SNAPSHOT_STALE": "Keep the ticker subscribed until a fresh Kalshi book arrives.",
+        "FORECAST_MISSING": "Run the next bounded weather_v2 forecast refresh.",
+        "RANKING_MISSING": "Run the next bounded weather_v2 ranking refresh.",
+        "EV_NOT_POSITIVE": "Wait for model probability or market price to create positive raw EV.",
+        "EXECUTABLE_EV_NOT_POSITIVE": (
+            "Raw edge does not cover spread and configured execution costs."
+        ),
+        "LIQUIDITY_TOO_LOW": "Wait for sufficient visible depth at the configured limit.",
+        "SPREAD_TOO_WIDE": "Wait for the book spread to enter the configured limit.",
+        "BOOK_MISSING": "Keep the WebSocket subscription active until a usable book arrives.",
+        "SETTLEMENT_TERMS_UNKNOWN": "Verify settlement terms before paper entry.",
+        "RISK_NOT_ELIGIBLE": "Wait for the configured opportunity score and risk gates.",
+        "PHASE_3M_ZERO_SIZE": "Produce a nonzero bounded paper position size.",
+        "PHASE_3N_RISK_BLOCK": "Resolve the paper risk decision without weakening limits.",
+        "PAPER_READY": "Eligible for the guarded GH-4 paper-only preflight.",
+    }
+    return actions.get(blocker, "Re-evaluate after the next guarded GH-2 refresh.")
 
 
 def build_gh4_paper_activation_preflight(

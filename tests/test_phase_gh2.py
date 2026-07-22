@@ -111,7 +111,8 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "EXECUTION_ENABLED=false" in service
     assert "AUTOPILOT_ENABLED=false" in service
     assert "OnUnitActiveSec=15min" in timer
-    assert "flock -n 9" in script
+    assert "flock -w 45 9" in script
+    assert "TimeoutStartSec=6min" in service
     assert "db-writer-monitor --json" in script
     assert "gh2-stage-crypto-quotes" in script
     assert "gh2-single-writer-decision-refresh" in script
@@ -123,6 +124,8 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "latest_snapshots_for_model" not in implementation
     assert "_latest_snapshots(session, crypto_link_tickers)" in implementation
     assert "_latest_snapshots(session, weather_decision_tickers)" in implementation
+    assert "parse_and_store_market_legs(" in implementation
+    assert "tickers=_bounded_unique(" in implementation
 
 
 def test_weather_feature_refresh_is_strictly_bounded(monkeypatch) -> None:
