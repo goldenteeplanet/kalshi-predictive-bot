@@ -37,7 +37,11 @@ from kalshi_predictor.data.schema import (
     WeatherMarketLink,
 )
 from kalshi_predictor.learning.config import learning_paper_settings
-from kalshi_predictor.opportunities.market_identity import verify_market_identity
+from kalshi_predictor.opportunities.market_identity import (
+    BUILT_FROM_EXACT_CATALOG,
+    VERIFIED,
+    verify_market_identity,
+)
 from kalshi_predictor.opportunities.window_eligibility import current_market_window_status
 from kalshi_predictor.paper.models import BUY_NO
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
@@ -64,8 +68,15 @@ PHASE3BA_R3_VERSION = "phase3ba_r3_weather_paper_gate_v1"
 MODEL_NAME = "weather_v2"
 
 WEATHER_PAPER_BLOCKERS = (
-    "SOURCE_MISSING",
+    "MARKET_WINDOW_NOT_CURRENT",
+    "MARKET_SOURCE_MISSING",
+    "MARKET_LINK_UNVERIFIED",
+    "SNAPSHOT_MISSING",
     "SNAPSHOT_STALE",
+    "WEATHER_SOURCE_MISSING",
+    "WEATHER_SOURCE_STALE",
+    "WEATHER_FEATURE_MISSING",
+    "WEATHER_FEATURE_STALE",
     "FORECAST_MISSING",
     "RANKING_MISSING",
     "EV_NOT_POSITIVE",
@@ -255,6 +266,10 @@ def _weather_paper_gate_row(
         settings=settings,
     )
     identity_payload = identity.as_dict()
+    source_identity_ready = _weather_source_identity_ready(
+        identity_payload,
+        ticker=link.ticker,
+    )
     feature = _latest_weather_feature(
         session,
         link,
@@ -344,6 +359,9 @@ def _weather_paper_gate_row(
         "verified_kalshi_url": bool(identity_payload.get("kalshi_url_verified")),
         "kalshi_url": identity_payload.get("kalshi_url"),
         "kalshi_url_status": identity_payload.get("kalshi_url_status"),
+        "kalshi_api_url": identity_payload.get("api_url"),
+        "source_identity_ready": source_identity_ready,
+        "source_identity_reason": identity_payload.get("kalshi_url_reason"),
         "source_lineage": identity_payload.get("source_lineage"),
         "current_window_eligible": bool(window.get("current_window_eligible")),
         "window_status": window.get("window_status"),
@@ -377,6 +395,7 @@ def _weather_paper_gate_row(
         "estimated_edge": getattr(ranking, "estimated_edge", None),
         "opportunity_score": getattr(ranking, "opportunity_score", None),
         "spread": getattr(ranking, "spread", None),
+        "max_spread": decimal_to_str(settings.opportunity_max_spread),
         "liquidity": getattr(ranking, "liquidity", None),
         "liquidity_score": getattr(ranking, "liquidity_score", None),
         "executable_book": bool(book.get("executable_book")),
@@ -400,11 +419,14 @@ def _weather_paper_gate_row(
         "weather_feature_id": getattr(feature, "id", None),
         "weather_source_forecast_id": getattr(source_forecast, "id", None),
     }
-    row["first_blocker"] = _first_weather_paper_blocker(row)
+    row["failed_gates"] = _weather_paper_blockers(row)
+    row["first_blocker"] = (
+        row["failed_gates"][0] if row["failed_gates"] else "PAPER_READY"
+    )
     row["paper_ready"] = row["first_blocker"] == "PAPER_READY"
     row["entered_paper_gate"] = bool(
         row["current_window_eligible"]
-        and row["verified_kalshi_url"]
+        and row["source_identity_ready"]
         and row["snapshot_fresh"]
         and row["has_weather_feature"]
         and row["weather_feature_fresh"]
@@ -415,46 +437,66 @@ def _weather_paper_gate_row(
 
 
 def _first_weather_paper_blocker(row: dict[str, Any]) -> str:
+    blockers = _weather_paper_blockers(row)
+    return blockers[0] if blockers else "PAPER_READY"
+
+
+def _weather_source_identity_ready(identity: dict[str, Any], *, ticker: str) -> bool:
+    return bool(
+        identity.get("market_ticker") == ticker
+        and identity.get("api_url")
+        and identity.get("kalshi_url_status") in {VERIFIED, BUILT_FROM_EXACT_CATALOG}
+    )
+
+
+def _weather_paper_blockers(row: dict[str, Any]) -> list[str]:
+    blockers: list[str] = []
     if not row.get("current_window_eligible"):
-        return "SOURCE_MISSING"
+        blockers.append("MARKET_WINDOW_NOT_CURRENT")
+    if not row.get("source_identity_ready"):
+        blockers.append("MARKET_SOURCE_MISSING")
     if not row.get("verified_kalshi_url"):
-        return "SOURCE_MISSING"
+        blockers.append("MARKET_LINK_UNVERIFIED")
     if not row.get("has_snapshot"):
-        return "SOURCE_MISSING"
-    if not row.get("snapshot_fresh"):
-        return "SNAPSHOT_STALE"
-    if not row.get("has_weather_source_forecast") or not row.get("weather_source_forecast_fresh"):
-        return "SOURCE_MISSING"
-    if not row.get("has_weather_feature") or not row.get("weather_feature_fresh"):
-        return "SOURCE_MISSING"
+        blockers.append("SNAPSHOT_MISSING")
+    elif not row.get("snapshot_fresh"):
+        blockers.append("SNAPSHOT_STALE")
+    if not row.get("has_weather_source_forecast"):
+        blockers.append("WEATHER_SOURCE_MISSING")
+    elif not row.get("weather_source_forecast_fresh"):
+        blockers.append("WEATHER_SOURCE_STALE")
+    if not row.get("has_weather_feature"):
+        blockers.append("WEATHER_FEATURE_MISSING")
+    elif not row.get("weather_feature_fresh"):
+        blockers.append("WEATHER_FEATURE_STALE")
     if not row.get("has_current_forecast"):
-        return "FORECAST_MISSING"
+        blockers.append("FORECAST_MISSING")
     if not row.get("has_current_ranking"):
-        return "RANKING_MISSING"
+        blockers.append("RANKING_MISSING")
     raw_ev = to_decimal(row.get("raw_ev"))
     if raw_ev is None or raw_ev <= 0:
-        return "EV_NOT_POSITIVE"
+        blockers.append("EV_NOT_POSITIVE")
     executable_ev = to_decimal(row.get("executable_ev"))
     if executable_ev is None or executable_ev <= 0:
-        return "EXECUTABLE_EV_NOT_POSITIVE"
+        blockers.append("EXECUTABLE_EV_NOT_POSITIVE")
     if row.get("no_book_reason") in {"ZERO_VISIBLE_DEPTH", "INSUFFICIENT_DEPTH"}:
-        return "LIQUIDITY_TOO_LOW"
+        blockers.append("LIQUIDITY_TOO_LOW")
     if row.get("no_book_reason") == "WIDE_SPREAD":
-        return "SPREAD_TOO_WIDE"
+        blockers.append("SPREAD_TOO_WIDE")
     if not row.get("executable_book"):
-        return "BOOK_MISSING"
+        blockers.append("BOOK_MISSING")
     spread = to_decimal(row.get("spread"))
     if spread is not None and spread > (to_decimal(row.get("max_spread")) or Decimal("1")):
-        return "SPREAD_TOO_WIDE"
+        blockers.append("SPREAD_TOO_WIDE")
     if not row.get("settlement_terms_known") or not row.get("paper_entry_settlement_eligible"):
-        return "SETTLEMENT_TERMS_UNKNOWN"
+        blockers.append("SETTLEMENT_TERMS_UNKNOWN")
     if not row.get("phase3s_proceed"):
-        return "RISK_NOT_ELIGIBLE"
+        blockers.append("RISK_NOT_ELIGIBLE")
     if not row.get("phase3m_nonzero_size"):
-        return "PHASE_3M_ZERO_SIZE"
+        blockers.append("PHASE_3M_ZERO_SIZE")
     if not row.get("phase3n_approved"):
-        return "PHASE_3N_RISK_BLOCK"
-    return "PAPER_READY"
+        blockers.append("PHASE_3N_RISK_BLOCK")
+    return list(dict.fromkeys(blockers))
 
 
 def _ev_values(
@@ -645,6 +687,9 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "current_weather_links": len(rows),
         "verified_kalshi_url_rows": sum(1 for row in rows if row["verified_kalshi_url"]),
+        "source_identity_ready_rows": sum(
+            1 for row in rows if row["source_identity_ready"]
+        ),
         "fresh_snapshot_rows": sum(1 for row in rows if row["snapshot_fresh"]),
         "weather_source_rows": sum(
             1
@@ -755,7 +800,8 @@ def _next_action(*, status: str, summary: dict[str, Any]) -> dict[str, Any]:
 def _funnel_steps() -> tuple[str, ...]:
     return (
         "current linked weather markets",
-        "verified Kalshi URL",
+        "exact Kalshi API catalog source",
+        "verified Kalshi operator URL",
         "fresh weather snapshot/source evidence",
         "weather feature available",
         "weather forecast available",

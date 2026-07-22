@@ -31,6 +31,7 @@ def test_gh3_soak_status_reports_progress_eta_and_source_health(tmp_path: Path) 
     assert status["reconnect"]["status"] == "HEALTHY"
     assert status["weather_gate"]["positive_raw_ev_rows"] == 1
     assert status["weather_gate"]["positive_executable_ev_rows"] == 0
+    assert status["quality_gates_passed"] is True
     assert status["weather_gate"]["candidate_rows"][0]["raw_ev_label"] == "0.51c"
     assert (
         status["weather_gate"]["candidate_rows"][0]["failed_gate"] == "EXECUTABLE_EV_NOT_POSITIVE"
@@ -178,6 +179,18 @@ def _write_inputs(
             "total_paper_ready_candidates": current_ready,
             "crypto_positive_ev_rows": 3,
             "weather_positive_ev_rows": 0,
+        },
+        "soak_quality": {
+            "passed": True,
+            "failure_reasons": [],
+            "observed": {
+                "current_crypto_windows": 4,
+                "fresh_crypto_windows": 3,
+                "current_weather_links": 1,
+                "fresh_weather_books": 1,
+                "manifest_candidates": 6,
+                "fresh_manifest_candidates": 6,
+            },
         },
         "crypto_quote_drain": {
             "status": "COMPLETE",
