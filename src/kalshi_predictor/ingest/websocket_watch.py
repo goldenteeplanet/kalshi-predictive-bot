@@ -48,6 +48,10 @@ def discover_quoted_market_tickers(
             orderbook = client.get_orderbook(ticker)
         except Exception:
             continue
+        try:
+            market = client.get_market(ticker)
+        except Exception:
+            market = None
         yes_levels, no_levels = _book_levels(orderbook)
         rows.append(
             {
@@ -60,6 +64,7 @@ def discover_quoted_market_tickers(
                     if yes_levels or no_levels
                     else "PREFERRED_SNAPSHOT_RECOVERY"
                 ),
+                "market": market,
             }
         )
         selected_tickers.add(ticker)
@@ -89,6 +94,7 @@ def discover_quoted_market_tickers(
                     "yes_levels": len(yes_levels),
                     "no_levels": len(no_levels),
                     "selection_source": "SERIES_FALLBACK",
+                    "market": market,
                 }
             )
             selected_tickers.add(ticker)
@@ -128,6 +134,7 @@ def run_reconnecting_websocket_watch(
     reconnect_max_seconds: float = 120.0,
     persist_every_deltas: int = 25,
     status_path: Path = Path("reports/phase_gh1/watch/status.json"),
+    active_market_catalog_path: Path | None = None,
     preferred_tickers_path: Path | None = None,
     max_preferred_tickers: int = 40,
     max_cycles: int | None = None,
@@ -184,6 +191,11 @@ def run_reconnecting_websocket_watch(
     last_stream_success_at: str | None = None
     last_message_at: str | None = None
     last_snapshot_at: str | None = None
+    catalog_rows_staged = 0
+    catalog_generated_at: str | None = None
+    resolved_catalog_path = active_market_catalog_path or (
+        status_path.parent / "active_market_catalog.json"
+    )
 
     def status_payload() -> dict[str, Any]:
         return {
@@ -214,6 +226,9 @@ def run_reconnecting_websocket_watch(
             "last_stream_success_at": last_stream_success_at,
             "last_message_at": last_message_at,
             "last_snapshot_at": last_snapshot_at,
+            "active_market_catalog_path": str(resolved_catalog_path),
+            "active_market_catalog_rows": catalog_rows_staged,
+            "active_market_catalog_generated_at": catalog_generated_at,
             "recent_errors": recent_errors[-20:],
             "staging_dir": settings.kalshi_websocket_staging_dir,
             "safety": {
@@ -274,6 +289,10 @@ def run_reconnecting_websocket_watch(
                             )
                             if discovered:
                                 cached_tickers = discovered
+                                catalog_payload = _active_market_catalog_payload(rows)
+                                _atomic_write_json(resolved_catalog_path, catalog_payload)
+                                catalog_rows_staged = int(catalog_payload["market_count"])
+                                catalog_generated_at = str(catalog_payload["generated_at"])
                                 preferred_selected = sum(
                                     1
                                     for row in rows
@@ -364,6 +383,37 @@ def _book_levels(payload: dict[str, Any]) -> tuple[list[Any], list[Any]]:
 def _series_for_ticker(ticker: str, series: Sequence[str]) -> str | None:
     matches = [str(item) for item in series if ticker.startswith(str(item))]
     return max(matches, key=len) if matches else None
+
+
+def _active_market_catalog_payload(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    markets: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        market = row.get("market")
+        if not isinstance(market, dict):
+            continue
+        ticker = str(market.get("ticker") or row.get("ticker") or "").strip()
+        if not ticker or ticker in seen:
+            continue
+        seen.add(ticker)
+        normalized = dict(market)
+        normalized["ticker"] = ticker
+        normalized.setdefault("series_ticker", row.get("series_ticker"))
+        normalized["source"] = "kalshi_rest_active_market_discovery"
+        normalized["source_observed_at"] = utc_now().isoformat()
+        markets.append(normalized)
+    generated_at = utc_now().isoformat()
+    return {
+        "phase": "GH-1-ACTIVE-MARKET-ROLLOVER",
+        "generated_at": generated_at,
+        "market_count": len(markets),
+        "markets": markets,
+        "safety": {
+            "filesystem_stage_only": True,
+            "database_writes": 0,
+            "orders_submitted": 0,
+        },
+    }
 
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:

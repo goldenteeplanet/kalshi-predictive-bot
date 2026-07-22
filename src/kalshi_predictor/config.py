@@ -902,6 +902,10 @@ class Settings(BaseSettings):
     execution_enabled: bool = Field(default=False, validation_alias="EXECUTION_ENABLED")
     execution_dry_run: bool = Field(default=True, validation_alias="EXECUTION_DRY_RUN")
     execution_kill_switch: bool = Field(default=False, validation_alias="EXECUTION_KILL_SWITCH")
+    execution_gateway_mode: str = Field(
+        default="disabled",
+        validation_alias="EXECUTION_GATEWAY_MODE",
+    )
     execution_confirmation_token: str = Field(
         default="DEMO ONLY",
         validation_alias="EXECUTION_CONFIRMATION_TOKEN",

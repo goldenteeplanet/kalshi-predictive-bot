@@ -100,6 +100,7 @@ if .venv/bin/kalshi-bot gh2-single-writer-decision-refresh \
   --crypto-staging-dir "$GH2_ROOT/crypto-staging" \
   --gh1-staging-dir "$GH1_ROOT/staging" \
   --candidate-manifest-path "$GH1_ROOT/watch/actionable_tickers.json" \
+  --active-market-catalog-path "$GH1_ROOT/watch/active_market_catalog.json" \
   --candidate-limit 40 \
   --active-link-limit 24 \
   --forecast-limit 24 \

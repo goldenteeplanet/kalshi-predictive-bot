@@ -10,6 +10,7 @@ def _base_row() -> dict:
     return {
         "current_window_eligible": True,
         "verified_kalshi_url": True,
+        "source_identity_ready": True,
         "has_snapshot": True,
         "snapshot_fresh": True,
         "has_weather_source_forecast": True,
@@ -32,8 +33,14 @@ def _base_row() -> dict:
 
 def test_phase3ba_r3_first_weather_paper_blocker_order() -> None:
     cases = [
-        ({"verified_kalshi_url": False}, "SOURCE_MISSING"),
+        ({"source_identity_ready": False}, "MARKET_SOURCE_MISSING"),
+        ({"verified_kalshi_url": False}, "MARKET_LINK_UNVERIFIED"),
+        ({"has_snapshot": False}, "SNAPSHOT_MISSING"),
         ({"snapshot_fresh": False}, "SNAPSHOT_STALE"),
+        ({"has_weather_source_forecast": False}, "WEATHER_SOURCE_MISSING"),
+        ({"weather_source_forecast_fresh": False}, "WEATHER_SOURCE_STALE"),
+        ({"has_weather_feature": False}, "WEATHER_FEATURE_MISSING"),
+        ({"weather_feature_fresh": False}, "WEATHER_FEATURE_STALE"),
         ({"has_current_forecast": False}, "FORECAST_MISSING"),
         ({"has_current_ranking": False}, "RANKING_MISSING"),
         ({"raw_ev": "0"}, "EV_NOT_POSITIVE"),
@@ -51,6 +58,47 @@ def test_phase3ba_r3_first_weather_paper_blocker_order() -> None:
         row = _base_row()
         row.update(patch)
         assert phase3ba_r3._first_weather_paper_blocker(row) == expected
+
+
+def test_phase3ba_r3_reports_every_failed_gate() -> None:
+    row = _base_row()
+    row.update(
+        {
+            "verified_kalshi_url": False,
+            "snapshot_fresh": False,
+            "raw_ev": "0",
+            "executable_ev": "0",
+            "phase3n_approved": False,
+        }
+    )
+
+    blockers = phase3ba_r3._weather_paper_blockers(row)
+
+    assert blockers == [
+        "MARKET_LINK_UNVERIFIED",
+        "SNAPSHOT_STALE",
+        "EV_NOT_POSITIVE",
+        "EXECUTABLE_EV_NOT_POSITIVE",
+        "PHASE_3N_RISK_BLOCK",
+    ]
+
+
+def test_phase3ba_r3_accepts_exact_catalog_api_identity_without_promoting_ui_url() -> None:
+    identity = {
+        "market_ticker": "KXTEMPNYCH-TEST",
+        "api_url": (
+            "https://external-api.kalshi.com/trade-api/v2/markets/"
+            "KXTEMPNYCH-TEST"
+        ),
+        "kalshi_url_status": "BUILT_FROM_EXACT_CATALOG",
+        "kalshi_url_verified": False,
+    }
+
+    assert phase3ba_r3._weather_source_identity_ready(
+        identity,
+        ticker="KXTEMPNYCH-TEST",
+    ) is True
+    assert identity["kalshi_url_verified"] is False
 
 
 def test_phase3ba_r3_summary_counts_ready_and_blockers() -> None:

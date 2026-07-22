@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Refresh & Readiness{% endblock %}
+{% block content %}
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">READ-ONLY OPERATIONS</p>
+      <h1>Refresh & Readiness</h1>
+      <p class="muted">GH-1 data health, GH-2 refresh evidence, GH-3 soak progress, and candidate gates.</p>
+    </div>
+    <span class="status-pill {{ 'status-healthy' if dashboard.source.state == 'CURRENT' else 'status-degraded' }}">
+      {{ dashboard.source.state }} · {{ dashboard.source.age_label }} old
+    </span>
+  </div>
+  <p>{{ dashboard.source.meaning }}</p>
+  <p class="muted">Source: <code>{{ dashboard.source.path }}</code> · generated {{ dashboard.source.generated_at }}</p>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Source authority</h2><p class="muted">Local evidence stays distinct from checksummed cloud evidence.</p></div></div>
+  <div class="summary-grid">
+    <article class="summary-card"><span>Cloud state</span><strong>{{ dashboard.cloud_authority.state }}</strong></article>
+    <article class="summary-card"><span>Host</span><strong>{{ dashboard.cloud_authority.snapshot.host_id | default('unavailable') }}</strong></article>
+    <article class="summary-card"><span>Deployment</span><strong>{{ dashboard.cloud_authority.snapshot.deployment_commit_sha | default('unavailable') }}</strong></article>
+  </div>
+  {% if dashboard.cloud_authority.missing_fields %}<p class="muted">Missing cloud fields: {{ dashboard.cloud_authority.missing_fields | join(', ') }}</p>{% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>What changed?</h2><p class="muted">Deterministic comparison with the previous persisted cycle.</p></div></div>
+  {% if dashboard.changes.comparable %}
+  <div class="summary-grid">
+    <article class="summary-card"><span>Added</span><strong>{{ dashboard.changes.candidates_added | length }}</strong></article>
+    <article class="summary-card"><span>Removed</span><strong>{{ dashboard.changes.candidates_removed | length }}</strong></article>
+    <article class="summary-card"><span>Transitions</span><strong>{{ dashboard.changes.candidate_transitions | length }}</strong></article>
+    <article class="summary-card"><span>Soak reset</span><strong>{{ 'yes' if dashboard.changes.soak_reset else 'no' }}</strong></article>
+  </div>
+  {% else %}<p>No prior comparable control-plane cycle is available.</p>{% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Data-quality scorecard</h2><p class="muted">Every ratio includes its numerator, denominator, threshold, and source.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Metric</th><th>Coverage</th><th>Threshold</th><th>Source</th><th>Gate</th></tr></thead><tbody>
+  {% for row in dashboard.scorecard.metrics %}<tr><td>{{ row.name }}</td><td>{{ row.numerator }}/{{ row.denominator }}</td><td>{{ row.threshold }}</td><td>{{ row.source }}</td><td>{{ 'PASS' if row.passed else 'BLOCKED' }}</td></tr>
+  {% else %}<tr><td colspan="5">No normalized scorecard has been generated yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Operational incidents</h2><p class="muted">Alerts deduplicate across cycles and resolve without deleting history.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Code</th><th>State</th><th>Occurrences</th><th>Last seen</th></tr></thead><tbody>
+  {% for row in dashboard.incidents.incidents %}<tr><td>{{ row.code }}</td><td>{{ row.state }}</td><td>{{ row.occurrences }}</td><td>{{ row.last_seen_at }}</td></tr>
+  {% else %}<tr><td colspan="4">No operational incidents have been recorded.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Paper-to-live roadmap</h2><p class="muted">A phase remains blocked until its persisted evidence gate passes.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Phase</th><th>Capability</th><th>Status</th><th>Blocking predecessor</th></tr></thead><tbody>
+  {% for row in dashboard.roadmap.phases %}<tr><td>{{ row.phase }}</td><td>{{ row.name }}</td><td>{{ row.status }}</td><td>{{ row.blocking_predecessor if row.blocking_predecessor is not none else 'none' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="summary-grid" aria-label="Refresh summary">
+  <article class="summary-card"><span>Status</span><strong>{{ dashboard.summary.status }}</strong></article>
+  <article class="summary-card"><span>Healthy soak</span><strong>{{ dashboard.summary.soak_current }} / {{ dashboard.summary.soak_required }}</strong></article>
+  <article class="summary-card"><span>Paper-ready</span><strong>{{ dashboard.summary.paper_ready }}</strong></article>
+  <article class="summary-card"><span>Positive EV</span><strong>{{ dashboard.summary.positive_ev }}</strong></article>
+  <article class="summary-card"><span>Fresh candidates</span><strong>{{ dashboard.summary.fresh_candidates }}</strong></article>
+  <article class="summary-card"><span>Next refresh</span><strong>{{ dashboard.summary.next_refresh }}</strong></article>
+</section>
+
+{% if dashboard.empty_state %}
+<section class="section-band status-incomplete" role="status">
+  <h2>{{ dashboard.empty_state.code }}</h2>
+  <p>{{ dashboard.empty_state.message }}</p>
+</section>
+{% endif %}
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Refresh pipeline</h2><p class="muted">Future cycles include per-stage durations; older artifacts remain compatible.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Stage</th><th>State</th><th>Duration</th></tr></thead><tbody>
+  {% for row in dashboard.stages %}<tr><td>{{ row.label }}</td><td>{{ row.state }}</td><td>{{ row.duration }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Blocker trends</h2><p class="muted">Current candidate gates compared with prior recorded blocker counts.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Blocker</th><th>Current</th><th>Previous</th><th>Trend</th></tr></thead><tbody>
+  {% for row in dashboard.blockers %}<tr><td>{{ row.blocker }}</td><td>{{ row.current }}</td><td>{{ row.previous }}</td><td>{{ row.trend }}</td></tr>
+  {% else %}<tr><td colspan="4">No candidate blocker evidence is available.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Candidate lifecycle</h2><p class="muted">Why each watched ticker is retained and what it needs next.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Ticker</th><th>Lifecycle</th><th>Selection tier</th><th>Fresh</th><th>Blocking gates</th></tr></thead><tbody>
+  {% for row in dashboard.candidates %}<tr><td><code>{{ row.ticker }}</code></td><td>{{ row.lifecycle }}</td><td>{{ row.tier }}</td><td>{{ 'yes' if row.fresh else 'no' }}</td><td>{{ row.blockers | join(', ') if row.blockers else 'none' }}</td></tr>
+  {% else %}<tr><td colspan="5">No candidate rows are present.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Recent soak cycles</h2><p class="muted">Newest cycle first. Reset reasons remain explicit.</p></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Generated</th><th>Healthy</th><th>Paper-ready</th><th>Positive EV</th><th>Fresh</th><th>Reset reason</th></tr></thead><tbody>
+  {% for row in dashboard.history %}<tr><td>{{ row.generated_at }}</td><td>{{ 'yes' if row.healthy else 'no' }}</td><td>{{ row.paper_ready }}</td><td>{{ row.positive_ev }}</td><td>{{ row.fresh_candidates }}</td><td>{{ row.reset_reason }}</td></tr>
+  {% else %}<tr><td colspan="6">No soak history is available.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="section-band">
+  <h2>Safety boundary</h2>
+  <ul class="checks">
+    <li class="pass">This page is artifact-backed and read-only.</li>
+    <li class="pass">Paper-order creation: {{ 'ENABLED' if dashboard.safety.paper_order_creation_enabled else 'DISABLED' }}</li>
+    <li class="pass">Live execution: {{ 'ENABLED' if dashboard.safety.live_execution_enabled else 'DISABLED' }}</li>
+    <li class="pass">Autopilot: {{ 'ENABLED' if dashboard.safety.autopilot_enabled else 'DISABLED' }}</li>
+  </ul>
+</section>
+{% endblock %}

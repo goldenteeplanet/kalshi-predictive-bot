@@ -14,4 +14,8 @@ echo "No cloud connection or exchange order path is used."
 .venv/bin/pytest -q \
   tests/test_phase_gh4.py \
   tests/test_paper_strategy.py \
-  tests/test_paper_ledger_pnl.py
+  tests/test_paper_ledger_pnl.py \
+  tests/test_phase_3m_dynamic_position_sizing.py \
+  tests/test_phase_3n_advanced_risk.py \
+  tests/test_phase_3aa_r2_exact_settlement_harvest.py \
+  tests/test_phase_3ai_link_reconciliation.py

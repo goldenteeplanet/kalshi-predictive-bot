@@ -164,6 +164,17 @@ def build_gh3_soak_status(
     current_paper_ready = int(readiness.get("total_paper_ready_candidates") or 0)
     weather_gate = payload.get("weather_gate") or {}
     weather_gate_summary = weather_gate.get("summary") or {}
+    raw_soak_quality = payload.get("soak_quality") or {}
+    soak_quality = {
+        "passed": False,
+        "checks": {},
+        "failure_reasons": ["soak_quality_evidence_missing"],
+        "observed": {},
+        "required": {},
+        **raw_soak_quality,
+    }
+    soak_quality["observed"] = dict(raw_soak_quality.get("observed") or {})
+    soak_quality["required"] = dict(raw_soak_quality.get("required") or {})
     cycle_telemetry = payload.get("cycle_telemetry") or {}
     scheduler_state = str(scheduler.get("status") or "UNAVAILABLE")
     lock_wait_seconds = _nonnegative_float(
@@ -227,6 +238,8 @@ def build_gh3_soak_status(
             or (generated_at if bool(soak.get("healthy_cycle")) else None)
         ),
         "healthy_cycle": bool(soak.get("healthy_cycle")),
+        "quality_gates_passed": bool(soak_quality.get("passed")),
+        "soak_quality": soak_quality,
         "paper_ready_seen": bool(soak.get("paper_ready_seen_in_required_window")),
         "current_paper_ready_candidates": current_paper_ready,
         "positive_ev_rows": int(readiness.get("crypto_positive_ev_rows") or 0)
@@ -256,6 +269,9 @@ def build_gh3_soak_status(
             ),
             "candidate_rows": _weather_candidate_gate_rows(weather_gate),
         },
+        "candidate_diagnostics": _candidate_diagnostic_rows(
+            payload.get("candidate_diagnostics") or {}
+        ),
         "paper_order_creation_enabled": False,
         "live_execution_enabled": False,
     }
@@ -281,14 +297,75 @@ def _weather_candidate_gate_rows(
                 "raw_ev_label": _edge_cents_label(raw.get("raw_ev")),
                 "executable_ev_label": _edge_cents_label(raw.get("executable_ev")),
                 "liquidity_score": str(raw.get("liquidity_score") or "0"),
+                "source_label": (
+                    "Exact API source"
+                    if bool(raw.get("source_identity_ready"))
+                    else _enum_label(raw.get("kalshi_url_status") or "SOURCE_MISSING")
+                ),
+                "quote_age_label": (
+                    f"{raw.get('snapshot_age_minutes')}m"
+                    if raw.get("snapshot_age_minutes") is not None
+                    else "n/a"
+                ),
+                "spread_label": str(raw.get("spread") or "n/a"),
+                "ranking_label": (
+                    "Current" if bool(raw.get("has_current_ranking")) else "Missing"
+                ),
+                "risk_label": (
+                    "Ready"
+                    if bool(raw.get("phase3s_proceed"))
+                    and bool(raw.get("phase3m_nonzero_size"))
+                    and bool(raw.get("phase3n_approved"))
+                    else "Blocked"
+                ),
                 "book_label": (
                     "Executable"
                     if bool(raw.get("executable_book"))
                     else _enum_label(raw.get("no_book_reason") or "BOOK_MISSING")
                 ),
                 "failed_gate": blocker,
-                "failed_gate_label": _enum_label(blocker),
+                "failed_gate_label": ", ".join(
+                    _enum_label(item)
+                    for item in (raw.get("failed_gates") or [blocker])
+                ),
                 "next_action": _weather_gate_next_action(blocker),
+            }
+        )
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def _candidate_diagnostic_rows(
+    diagnostics: dict[str, Any],
+    *,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for raw in diagnostics.get("rows") or []:
+        if not isinstance(raw, dict) or not raw.get("ticker"):
+            continue
+        failed = [str(item) for item in raw.get("failed_gates") or []]
+        rows.append(
+            {
+                **raw,
+                "detail_href": f"/opportunities/{raw['ticker']}",
+                "category_label": _enum_label(raw.get("category")),
+                "source_label": "Ready" if raw.get("source_ready") else "Blocked",
+                "book_label": "Ready" if raw.get("book_ready") else "Blocked",
+                "quote_age_label": (
+                    f"{raw.get('quote_age_minutes')}m"
+                    if raw.get("quote_age_minutes") is not None
+                    else "n/a"
+                ),
+                "raw_ev_label": _edge_cents_label(raw.get("raw_ev")),
+                "executable_ev_label": _edge_cents_label(raw.get("executable_ev")),
+                "spread_label": str(raw.get("spread") or "n/a"),
+                "liquidity_label": str(raw.get("liquidity") or "n/a"),
+                "ranking_label": "Ready" if raw.get("ranking_ready") else "Blocked",
+                "risk_label": "Ready" if raw.get("risk_ready") else "Blocked",
+                "failed_gate_label": ", ".join(_enum_label(item) for item in failed)
+                or "Paper Ready",
             }
         )
         if len(rows) >= limit:
@@ -311,8 +388,15 @@ def _enum_label(value: Any) -> str:
 
 def _weather_gate_next_action(blocker: str) -> str:
     actions = {
-        "SOURCE_MISSING": "Refresh the bounded NOAA source and active market link.",
+        "MARKET_WINDOW_NOT_CURRENT": "Discover and link the next active market contract.",
+        "MARKET_SOURCE_MISSING": "Refresh the exact Kalshi REST catalog source.",
+        "MARKET_LINK_UNVERIFIED": "Verify the exact Kalshi operator URL mapping.",
+        "SNAPSHOT_MISSING": "Keep the ticker subscribed until its first book arrives.",
         "SNAPSHOT_STALE": "Keep the ticker subscribed until a fresh Kalshi book arrives.",
+        "WEATHER_SOURCE_MISSING": "Refresh the bounded NOAA source for this location.",
+        "WEATHER_SOURCE_STALE": "Wait for a fresh bounded NOAA forecast.",
+        "WEATHER_FEATURE_MISSING": "Build weather features for the active target window.",
+        "WEATHER_FEATURE_STALE": "Rebuild stale weather features from fresh source data.",
         "FORECAST_MISSING": "Run the next bounded weather_v2 forecast refresh.",
         "RANKING_MISSING": "Run the next bounded weather_v2 ranking refresh.",
         "EV_NOT_POSITIVE": "Wait for model probability or market price to create positive raw EV.",
@@ -362,6 +446,11 @@ def build_gh4_paper_activation_preflight(
         ),
         _check(
             "latest_cycle_healthy", soak_status["healthy_cycle"], "Latest GH-2 cycle is healthy"
+        ),
+        _check(
+            "soak_quality_gates",
+            soak_status["quality_gates_passed"],
+            "Current crypto/weather coverage and freshness minimums are satisfied",
         ),
         _check(
             "source_reconnect_health",

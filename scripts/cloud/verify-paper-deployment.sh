@@ -18,7 +18,7 @@ die() {
 [[ -x $APP_PATH/.venv/bin/kalshi-bot ]] || die "Repository virtualenv is missing."
 [[ -f $ENV_FILE ]] || die "$ENV_FILE is missing."
 
-deployed_sha=$(git -C "$APP_PATH" rev-parse HEAD)
+deployed_sha=$(git -c safe.directory="$APP_PATH" -C "$APP_PATH" rev-parse HEAD)
 [[ $deployed_sha == "$EXPECTED_SHA" ]] \
   || die "Deployed SHA $deployed_sha does not match $EXPECTED_SHA."
 curl --fail --silent --show-error --max-time 10 "$UI_URL" >/dev/null \

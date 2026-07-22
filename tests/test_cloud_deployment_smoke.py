@@ -15,6 +15,8 @@ def test_cloud_deployment_smoke_is_read_only_and_checks_runtime_ownership() -> N
     assert "EXECUTION_ENABLED=false" in script
     assert "AUTOPILOT_ENABLED=false" in script
     assert "EXECUTION_KILL_SWITCH=true" in script
+    assert 'git -c safe.directory="$APP_PATH" -C "$APP_PATH" rev-parse HEAD' in script
+    assert "git config --global" not in script
     for mutation in (
         "systemctl start",
         "systemctl stop",
@@ -34,5 +36,9 @@ def test_gh4_rehearsal_is_local_and_simulated() -> None:
     assert "tests/test_phase_gh4.py" in script
     assert "tests/test_paper_strategy.py" in script
     assert "tests/test_paper_ledger_pnl.py" in script
+    assert "tests/test_phase_3m_dynamic_position_sizing.py" in script
+    assert "tests/test_phase_3n_advanced_risk.py" in script
+    assert "tests/test_phase_3aa_r2_exact_settlement_harvest.py" in script
+    assert "tests/test_phase_3ai_link_reconciliation.py" in script
     assert "ssh " not in script
     assert "kalshi-cloud" not in script
