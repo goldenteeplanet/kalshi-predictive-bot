@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -189,6 +189,10 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "SHARED_WRITER_LOCK_BUSY" in script
     assert "DB_WRITER_MONITOR_BUSY" in script
     assert "GH2_DECISION_REFRESH_FAILED" in script
+    assert "GH2_INTERNAL_DEADLINE_EXCEEDED" in script
+    assert "GH2_WRITER_BUDGET_SECONDS:-270" in script
+    assert "GH2_DIAGNOSTICS_BUDGET_SECONDS:-45" in script
+    assert "trap handle_termination TERM INT" in script
     assert "TimeoutStartSec=6min" in service
     assert "db-writer-monitor --json" in script
     assert "gh2-stage-crypto-quotes" in script
@@ -197,12 +201,53 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "--active-link-limit 24" in script
     assert "--forecast-limit 24" in script
     assert "--opportunity-limit 20" in script
-    assert "paper-order" not in script.lower()
+    assert "PAPER_ORDER_CREATION_ENABLED=true" not in script
+    assert "paper-run" not in script
+    assert "roadmap-runtime-reports" in script
+    assert script.index('write_scheduler_status "COMPLETE"') < script.index("flock -u 9")
+    assert script.index("flock -u 9") < script.index("roadmap-runtime-reports")
+    assert "write_runtime_roadmap_reports" not in implementation
+    assert implementation.index('mark_stage("commit_single_writer")') < implementation.index(
+        "_write_candidate_manifest(candidate_manifest_path, manifest_candidates)"
+    )
     assert "latest_snapshots_for_model" not in implementation
     assert "_latest_snapshots(session, crypto_link_tickers)" in implementation
     assert "_latest_snapshots(session, weather_decision_tickers)" in implementation
+    assert "limit=max(1, min(forecast_limit, len(weather_decision_tickers)))" in implementation
     assert "parse_and_store_market_legs(" in implementation
     assert "tickers=_bounded_unique(" in implementation
+
+
+def test_stage_telemetry_records_per_stage_durations(tmp_path: Path) -> None:
+    timestamps = iter(
+        [
+            datetime(2026, 7, 23, 12, 0, 0, tzinfo=UTC),
+            datetime(2026, 7, 23, 12, 0, 1, tzinfo=UTC),
+            datetime(2026, 7, 23, 12, 0, 4, tzinfo=UTC),
+        ]
+    )
+    monotonic_values = iter([10.0, 11.0, 14.0])
+    path = tmp_path / "gh2_stage.json"
+    telemetry = phase_gh2._GH2StageTelemetry(
+        path,
+        now_fn=lambda: next(timestamps),
+        monotonic_fn=lambda: next(monotonic_values),
+    )
+
+    telemetry.mark("first")
+    telemetry.mark("second")
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["stage"] == "second"
+    assert payload["cycle_elapsed_seconds"] == 4.0
+    assert telemetry.snapshot() == [
+        {
+            "stage": "first",
+            "started_at": "2026-07-23T12:00:01+00:00",
+            "completed_at": "2026-07-23T12:00:04+00:00",
+            "duration_seconds": 3.0,
+        }
+    ]
 
 
 def test_weather_feature_refresh_is_strictly_bounded(monkeypatch) -> None:

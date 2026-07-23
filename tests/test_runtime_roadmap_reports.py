@@ -171,6 +171,28 @@ def test_runtime_census_reads_real_stage_tables_and_sports_provenance() -> None:
     assert before == after == 1
 
 
+def test_runtime_census_is_bounded_to_current_candidate_tickers() -> None:
+    now = datetime.now(UTC)
+    engine = init_db("sqlite:///:memory:")
+    with get_session_factory(engine)() as session:
+        session.add_all([_market("BTC-CURRENT", now), _market("BTC-OTHER", now)])
+        session.add_all([_leg("BTC-CURRENT", "crypto", now), _leg("BTC-OTHER", "crypto", now)])
+        session.commit()
+
+        report = build_runtime_category_census(
+            session,
+            generated_at=now,
+            market_limit=40,
+            ticker_scope=["BTC-CURRENT"],
+        )
+
+    crypto = report["categories"][0]
+    assert crypto["stage_coverage"]["verified_link"]["denominator"] == 1
+    assert report["runtime_evidence"]["active_markets_scanned"] == 1
+    assert report["runtime_evidence"]["ticker_scope"] == ["BTC-CURRENT"]
+    assert report["runtime_evidence"]["ticker_scope_provided"] is True
+
+
 def test_paper_throughput_reports_category_progress_pending_and_lineage() -> None:
     now = datetime.now(UTC)
     engine = init_db("sqlite:///:memory:")
@@ -296,6 +318,45 @@ def test_zero_order_report_has_deterministic_reason() -> None:
     assert report["zero_trade_reasons"] == {"NO_PAPER_ORDERS": 1}
     assert report["summary"]["overall_remaining"] == 100
     assert report["next_actions"][0]["code"] == "DIAGNOSE_NO_ORDERS"
+
+
+def test_paper_throughput_reads_only_bounded_recent_orders() -> None:
+    now = datetime.now(UTC)
+    engine = init_db("sqlite:///:memory:")
+    with get_session_factory(engine)() as session:
+        for index in range(3):
+            session.add(
+                PaperOrder(
+                    ticker=f"BTC-{index}",
+                    forecast_id=None,
+                    created_at=now + timedelta(minutes=index),
+                    model_name="crypto_v1",
+                    side="yes",
+                    probability="0.6",
+                    market_price="0.5",
+                    limit_price="0.5",
+                    edge="0.1",
+                    quantity=1,
+                    status="open",
+                    reason="fixture",
+                    raw_decision_json="{}",
+                )
+            )
+        session.commit()
+
+        report = build_paper_settlement_throughput(
+            session,
+            generated_at=now + timedelta(minutes=3),
+            order_limit=2,
+        )
+
+    assert report["summary"]["orders"] == 2
+    assert report["summary"]["open"] == 2
+    assert report["runtime_evidence"] == {
+        "database_read_only": True,
+        "order_limit": 2,
+        "orders_truncated": True,
+    }
 
 
 def test_rejection_breakdown_has_denominators_and_safe_action() -> None:

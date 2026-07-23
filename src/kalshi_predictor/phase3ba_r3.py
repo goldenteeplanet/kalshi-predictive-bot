@@ -588,20 +588,19 @@ def _latest_by_ticker(
     if not tickers:
         return {}
     column = getattr(model, time_attr)
-    rows = list(
-        session.scalars(
+    latest: dict[str, Any] = {}
+    for ticker in dict.fromkeys(tickers):
+        row = session.scalar(
             select(model)
-            .where(model.ticker.in_(tickers))
+            .where(model.ticker == ticker)
             .order_by(
-                model.ticker,
                 desc(column),
                 desc(model.id) if hasattr(model, "id") else desc(column),
             )
+            .limit(1)
         )
-    )
-    latest: dict[str, Any] = {}
-    for row in rows:
-        latest.setdefault(row.ticker, row)
+        if row is not None:
+            latest[ticker] = row
     return latest
 
 

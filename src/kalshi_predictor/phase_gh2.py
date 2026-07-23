@@ -37,7 +37,6 @@ from kalshi_predictor.phase3ba_r3 import build_phase3ba_r3_weather_paper_gate
 from kalshi_predictor.phase3bc_r5 import (
     write_phase3bc_r5_crypto_freshness_watch_report,
 )
-from kalshi_predictor.roadmap.runtime_reports import write_runtime_roadmap_reports
 from kalshi_predictor.single_writer_coordinator import (
     drain_staged_crypto_quotes,
     stage_crypto_quote_fetches,
@@ -65,6 +64,68 @@ class GH2Artifacts:
     markdown_path: Path
     history_path: Path
     candidate_manifest_path: Path
+
+
+class _GH2StageTelemetry:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        now_fn: Callable[[], datetime] = utc_now,
+        monotonic_fn: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.path = path
+        self.now_fn = now_fn
+        self.monotonic_fn = monotonic_fn
+        self.cycle_started_at = now_fn()
+        self.cycle_started_monotonic = monotonic_fn()
+        self.current_stage: str | None = None
+        self.current_stage_started_at: datetime | None = None
+        self.current_stage_started_monotonic: float | None = None
+        self.stage_timings: list[dict[str, Any]] = []
+
+    def mark(self, stage: str) -> None:
+        now = self.now_fn()
+        monotonic_now = self.monotonic_fn()
+        if (
+            self.current_stage is not None
+            and self.current_stage_started_at is not None
+            and self.current_stage_started_monotonic is not None
+        ):
+            self.stage_timings.append(
+                {
+                    "stage": self.current_stage,
+                    "started_at": self.current_stage_started_at.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "duration_seconds": round(
+                        max(0.0, monotonic_now - self.current_stage_started_monotonic), 3
+                    ),
+                }
+            )
+        self.current_stage = stage
+        self.current_stage_started_at = now
+        self.current_stage_started_monotonic = monotonic_now
+        _write_json(
+            self.path,
+            {
+                "phase": "GH-2",
+                "generated_at": now.isoformat(),
+                "stage": stage,
+                "stage_started_at": now.isoformat(),
+                "stage_elapsed_seconds": 0.0,
+                "cycle_started_at": self.cycle_started_at.isoformat(),
+                "cycle_elapsed_seconds": round(
+                    max(0.0, monotonic_now - self.cycle_started_monotonic), 3
+                ),
+                "stage_timings": list(self.stage_timings),
+                "paper_order_creation_enabled": False,
+                "live_execution_enabled": False,
+            },
+        )
+        print(f"GH-2 stage: {stage}", flush=True)
+
+    def snapshot(self) -> list[dict[str, Any]]:
+        return list(self.stage_timings)
 
 
 def stage_gh2_crypto_quotes(
@@ -235,21 +296,11 @@ def run_gh2_single_writer_decision_refresh(
     history_path = output_dir / "gh2_paper_only_soak_history.jsonl"
     stage_path = output_dir / "gh2_stage.json"
     previous_manifest_tickers = _candidate_manifest_tickers(candidate_manifest_path)
-    cycle_started_at = utc_now()
-    cycle_started_monotonic = time.monotonic()
+    stage_telemetry = _GH2StageTelemetry(stage_path)
+    cycle_started_at = stage_telemetry.cycle_started_at
+    cycle_started_monotonic = stage_telemetry.cycle_started_monotonic
 
-    def mark_stage(stage: str) -> None:
-        _write_json(
-            stage_path,
-            {
-                "phase": "GH-2",
-                "generated_at": utc_now().isoformat(),
-                "stage": stage,
-                "paper_order_creation_enabled": False,
-                "live_execution_enabled": False,
-            },
-        )
-        print(f"GH-2 stage: {stage}", flush=True)
+    mark_stage = stage_telemetry.mark
 
     mark_stage("preflight_writer_gate")
     resolved = (settings or get_settings()).model_copy(
@@ -439,11 +490,11 @@ def run_gh2_single_writer_decision_refresh(
             output_dir=reports_dir / "phase3ba_r3",
             reports_dir=reports_dir,
             settings=resolved,
-            limit=forecast_limit,
+            limit=max(1, min(forecast_limit, len(weather_decision_tickers))),
             current_window_lookback_hours=3,
             tickers=weather_decision_tickers,
         )
-        mark_stage("write_candidate_manifest")
+        mark_stage("select_candidate_manifest")
         candidates_after = select_actionable_ranked_markets(
             session,
             limit=candidate_limit,
@@ -465,16 +516,11 @@ def run_gh2_single_writer_decision_refresh(
             limit=candidate_limit,
             sticky=sticky_after,
         )
-        _write_candidate_manifest(candidate_manifest_path, manifest_candidates)
         paper_orders_after = _paper_order_count(session)
         mark_stage("commit_single_writer")
         session.commit()
-        mark_stage("write_runtime_roadmap_reports")
-        runtime_report_paths = write_runtime_roadmap_reports(
-            session,
-            reports_root=reports_dir,
-            freshness_minutes=freshness_minutes,
-        )
+        mark_stage("publish_candidate_manifest")
+        _write_candidate_manifest(candidate_manifest_path, manifest_candidates)
 
     crypto_drain["files_archived"] = _archive_drained_files(
         [Path(path) for path in crypto_drain.get("drained_files") or []],
@@ -541,6 +587,7 @@ def run_gh2_single_writer_decision_refresh(
             "completed_at": utc_now().isoformat(),
             "runtime_seconds": round(time.monotonic() - cycle_started_monotonic, 3),
             "lock_wait_seconds": _float_or_zero(os.getenv("GH2_LOCK_WAIT_SECONDS")),
+            "stage_timings": stage_telemetry.snapshot(),
         },
         "websocket_drain": websocket_drain,
         "crypto_quote_drain": crypto_drain,
@@ -597,7 +644,11 @@ def run_gh2_single_writer_decision_refresh(
             "weather_rows": list(weather_gate.get("weather_rows") or []),
             "next_action": weather_gate.get("next_action") or {},
         },
-        "runtime_roadmap_reports": {name: str(path) for name, path in runtime_report_paths.items()},
+        "runtime_roadmap_reports": {
+            "mode": "OUT_OF_WRITER_READ_ONLY",
+            "category_census": str(reports_dir / "roadmap/category_ingestion_census.json"),
+            "paper_throughput": str(reports_dir / "roadmap/paper_settlement_throughput.json"),
+        },
         "soak": soak,
         "errors": stage_errors,
         "safety": {

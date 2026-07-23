@@ -19539,6 +19539,78 @@ def gh2_single_writer_decision_refresh_command(
     console.print(f"Candidate manifest: {artifacts.candidate_manifest_path}")
 
 
+@app.command("roadmap-runtime-reports")
+def roadmap_runtime_reports_command(
+    reports_root: Annotated[
+        Path,
+        typer.Option(help="Canonical report root for the signed read-only artifacts."),
+    ] = Path("reports"),
+    candidate_manifest_path: Annotated[
+        Path | None,
+        typer.Option(help="Optional current candidate manifest used to scope market census."),
+    ] = None,
+    freshness_minutes: Annotated[
+        int,
+        typer.Option(help="Freshness window used by the category census."),
+    ] = 15,
+    market_limit: Annotated[
+        int,
+        typer.Option(help="Maximum current markets inspected by the census."),
+    ] = 500,
+    paper_order_limit: Annotated[
+        int,
+        typer.Option(help="Maximum recent paper orders inspected for throughput."),
+    ] = 1_000,
+    scope_limit: Annotated[
+        int,
+        typer.Option(help="Maximum unique candidate tickers read from the manifest."),
+    ] = 100,
+) -> None:
+    """Write bounded runtime census and paper-throughput diagnostics read-only."""
+    if min(freshness_minutes, market_limit, paper_order_limit, scope_limit) < 1:
+        raise typer.BadParameter("all runtime report limits must be positive")
+
+    ticker_scope: list[str] | None = None
+    if candidate_manifest_path is not None:
+        try:
+            manifest = json.loads(candidate_manifest_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
+            raise typer.BadParameter(f"candidate manifest is unavailable: {exc}") from exc
+        raw_tickers = manifest.get("tickers") if isinstance(manifest, dict) else None
+        if not isinstance(raw_tickers, list) and isinstance(manifest, dict):
+            raw_tickers = [
+                row.get("ticker")
+                for row in manifest.get("candidates") or []
+                if isinstance(row, dict)
+            ]
+        ticker_scope = list(
+            dict.fromkeys(
+                str(ticker).strip() for ticker in (raw_tickers or []) if str(ticker).strip()
+            )
+        )[:scope_limit]
+
+    from kalshi_predictor.roadmap.runtime_reports import write_runtime_roadmap_reports
+
+    engine = make_engine(database_url_from_settings(get_settings()))
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        paths = write_runtime_roadmap_reports(
+            session,
+            reports_root=reports_root,
+            freshness_minutes=freshness_minutes,
+            market_limit=market_limit,
+            paper_order_limit=paper_order_limit,
+            ticker_scope=ticker_scope,
+        )
+    console.print("Runtime roadmap diagnostics")
+    console.print("Mode: READ ONLY")
+    console.print("Database writes: 0")
+    console.print("Paper/live order creation: disabled")
+    console.print(f"Candidate ticker scope: {len(ticker_scope or [])}")
+    for name, path in paths.items():
+        console.print(f"Wrote {name}: {path}")
+
+
 @app.command("gh4-paper-activation-preflight")
 def gh4_paper_activation_preflight_command(
     output_dir: Annotated[
