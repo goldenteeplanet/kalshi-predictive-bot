@@ -129,6 +129,13 @@ def _paper_throughput_view(verification: dict[str, Any]) -> dict[str, Any]:
             payload.get("live_category_progress", {}) if isinstance(payload, dict) else {}
         ),
         "lineage_gaps": payload.get("lineage_gaps", []) if isinstance(payload, dict) else [],
+        "pending_settlements": (
+            payload.get("pending_settlements", []) if isinstance(payload, dict) else []
+        ),
+        "rejection_breakdown": (
+            payload.get("rejection_breakdown", []) if isinstance(payload, dict) else []
+        ),
+        "next_actions": payload.get("next_actions", []) if isinstance(payload, dict) else [],
         "zero_trade_reasons": (
             payload.get("zero_trade_reasons", {}) if isinstance(payload, dict) else {}
         ),

@@ -175,7 +175,10 @@ def test_paper_throughput_reports_category_progress_pending_and_lineage() -> Non
     now = datetime.now(UTC)
     engine = init_db("sqlite:///:memory:")
     with get_session_factory(engine)() as session:
-        session.add_all([_market("BTC-1", now), _market("WX-1", now)])
+        btc_market = _market("BTC-1", now)
+        weather_market = _market("WX-1", now)
+        weather_market.close_time = now + timedelta(hours=1)
+        session.add_all([btc_market, weather_market])
         session.add_all([_leg("BTC-1", "crypto", now), _leg("WX-1", "weather", now)])
         forecast = Forecast(
             ticker="BTC-1",
@@ -257,6 +260,8 @@ def test_paper_throughput_reports_category_progress_pending_and_lineage() -> Non
 
     assert report["summary"]["settled"] == 1
     assert report["summary"]["awaiting_settlement"] == 1
+    assert report["summary"]["filled"] == 2
+    assert report["summary"]["past_market_close"] == 0
     assert report["categories"]["crypto"]["settled"] == 1
     assert report["categories"]["weather"]["awaiting_settlement"] == 1
     assert report["live_category_progress"]["crypto"]["remaining"] == 29
@@ -268,6 +273,19 @@ def test_paper_throughput_reports_category_progress_pending_and_lineage() -> Non
             "gaps": ["FORECAST_ID_MISSING", "FILL_LINEAGE_MISSING", "SETTLEMENT_MISSING"],
         }
     ]
+    assert report["pending_settlements"] == [
+        {
+            "paper_order_id": pending.id,
+            "ticker": "WX-1",
+            "category": "weather",
+            "created_at": now.isoformat(),
+            "age_hours": 0.0,
+            "market_close_time": (now + timedelta(hours=1)).isoformat(),
+            "past_market_close": False,
+            "fill_rows": 0,
+        }
+    ]
+    assert report["next_actions"][0]["code"] == "REPAIR_LINEAGE"
     assert all(value is False for value in report["safety"].values())
 
 
@@ -277,6 +295,77 @@ def test_zero_order_report_has_deterministic_reason() -> None:
         report = build_paper_settlement_throughput(session)
     assert report["zero_trade_reasons"] == {"NO_PAPER_ORDERS": 1}
     assert report["summary"]["overall_remaining"] == 100
+    assert report["next_actions"][0]["code"] == "DIAGNOSE_NO_ORDERS"
+
+
+def test_rejection_breakdown_has_denominators_and_safe_action() -> None:
+    now = datetime.now(UTC)
+    engine = init_db("sqlite:///:memory:")
+    with get_session_factory(engine)() as session:
+        session.add(_market("BTC-1", now))
+        session.add(
+            PaperOrder(
+                ticker="BTC-1",
+                forecast_id=None,
+                created_at=now,
+                model_name="crypto_v1",
+                side="yes",
+                probability="0.6",
+                market_price="0.5",
+                limit_price="0.5",
+                edge="0.1",
+                quantity=1,
+                status="rejected",
+                reason="insufficient edge",
+                raw_decision_json="{}",
+            )
+        )
+        session.commit()
+        report = build_paper_settlement_throughput(session, generated_at=now)
+
+    assert report["summary"]["rejected"] == 1
+    assert report["rejection_breakdown"] == [
+        {
+            "reason": "INSUFFICIENT_EDGE",
+            "count": 1,
+            "denominator": 1,
+            "rate": 1.0,
+            "recommended_action": "Wait for genuine edge; do not lower thresholds.",
+        }
+    ]
+    assert report["next_actions"][-1]["code"] == "ADDRESS_PRIMARY_REJECTION"
+
+
+def test_open_order_is_not_misclassified_as_rejected() -> None:
+    now = datetime.now(UTC)
+    engine = init_db("sqlite:///:memory:")
+    with get_session_factory(engine)() as session:
+        session.add(_market("BTC-OPEN", now))
+        session.add(
+            PaperOrder(
+                ticker="BTC-OPEN",
+                forecast_id=None,
+                created_at=now,
+                model_name="crypto_v1",
+                side="yes",
+                probability="0.6",
+                market_price="0.5",
+                limit_price="0.5",
+                edge="0.1",
+                quantity=1,
+                status="OPEN",
+                reason="awaiting executable fill",
+                raw_decision_json="{}",
+            )
+        )
+        session.commit()
+        report = build_paper_settlement_throughput(session, generated_at=now)
+
+    assert report["summary"]["open"] == 1
+    assert report["summary"]["rejected"] == 0
+    assert report["rejection_breakdown"] == []
+    assert report["zero_trade_reasons"] == {"OPEN_PAPER_ORDERS": 1}
+    assert report["next_actions"][-1]["code"] == "INSPECT_OPEN_ORDERS"
 
 
 def test_runtime_report_writer_emits_verified_artifacts(tmp_path) -> None:

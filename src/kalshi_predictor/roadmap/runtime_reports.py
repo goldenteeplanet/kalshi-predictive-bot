@@ -37,6 +37,21 @@ from kalshi_predictor.utils.time import utc_now
 
 FINAL_RESULTS = frozenset({"yes", "no"})
 FILLED_STATUSES = frozenset({"filled", "executed"})
+OPEN_ORDER_STATUSES = frozenset({"open", "pending", "resting"})
+REJECTED_ORDER_STATUSES = frozenset(
+    {"blocked", "cancelled", "canceled", "expired", "rejected", "skipped"}
+)
+REJECTION_ACTIONS = {
+    "NO_MARKET": "Inspect active-market discovery and category coverage.",
+    "NO_SNAPSHOT": "Restore fresh executable orderbook snapshots.",
+    "NO_FORECAST": "Inspect source links, features, and forecast generation.",
+    "NO_RANKING": "Inspect ranking inputs after forecast generation.",
+    "INSUFFICIENT_EDGE": "Wait for genuine edge; do not lower thresholds.",
+    "LIQUIDITY": "Wait for sufficient executable depth and spread quality.",
+    "RISK": "Inspect the recorded risk decision; do not bypass the gate.",
+    "DUPLICATE": "Keep the existing idempotency block in place.",
+    "CATEGORY_QUOTA": "Wait for quota capacity or another category opportunity.",
+}
 
 
 def build_runtime_category_census(
@@ -173,22 +188,39 @@ def build_paper_settlement_throughput(
     )
     categories = _categories_by_ticker(list(market_map.values()), legs)
     category_counts = {
-        category: {"orders": 0, "filled": 0, "settled": 0, "awaiting_settlement": 0}
+        category: {
+            "orders": 0,
+            "open": 0,
+            "filled": 0,
+            "rejected": 0,
+            "other_unfilled": 0,
+            "settled": 0,
+            "awaiting_settlement": 0,
+        }
         for category in CATEGORY_NAMES
     }
     lineage_gaps: list[dict[str, Any]] = []
     rejection_reasons: Counter[str] = Counter()
+    order_statuses: Counter[str] = Counter()
+    pending_settlements: list[dict[str, Any]] = []
     settled_total = 0
     awaiting_total = 0
     for order in orders:
         category = categories.get(order.ticker) or _category_from_order(order)
         counts = category_counts[category]
         counts["orders"] += 1
-        filled = order.status.strip().lower() in FILLED_STATUSES
+        normalized_status = order.status.strip().lower() or "unknown"
+        order_statuses[normalized_status] += 1
+        filled = normalized_status in FILLED_STATUSES
         if filled:
             counts["filled"] += 1
-        else:
+        elif normalized_status in OPEN_ORDER_STATUSES:
+            counts["open"] += 1
+        elif normalized_status in REJECTED_ORDER_STATUSES:
+            counts["rejected"] += 1
             rejection_reasons[_reason_code(order.reason, order.status)] += 1
+        else:
+            counts["other_unfilled"] += 1
         settlement = settlements.get(order.ticker)
         settled = (
             filled
@@ -204,6 +236,20 @@ def build_paper_settlement_throughput(
         elif filled:
             counts["awaiting_settlement"] += 1
             awaiting_total += 1
+            market = market_map.get(order.ticker)
+            close_time = market.close_time if market is not None else None
+            pending_settlements.append(
+                {
+                    "paper_order_id": order.id,
+                    "ticker": order.ticker,
+                    "category": category,
+                    "created_at": _iso(order.created_at),
+                    "age_hours": _age_hours(now, order.created_at),
+                    "market_close_time": _iso(close_time) if close_time else None,
+                    "past_market_close": bool(close_time and _as_utc(now) > _as_utc(close_time)),
+                    "fill_rows": len(fills_by_order.get(order.id, [])),
+                }
+            )
         gaps: list[str] = []
         if order.forecast_id is None:
             gaps.append("FORECAST_ID_MISSING")
@@ -234,8 +280,36 @@ def build_paper_settlement_throughput(
     zero_trade_reasons = dict(sorted(rejection_reasons.items()))
     if not orders:
         zero_trade_reasons = {"NO_PAPER_ORDERS": 1}
+    elif not zero_trade_reasons and not settled_total:
+        open_total = sum(order_statuses[status] for status in OPEN_ORDER_STATUSES)
+        zero_trade_reasons = {"OPEN_PAPER_ORDERS": open_total} if open_total else {
+            "NO_SETTLED_PAPER_TRADES": 1
+        }
+    rejected_total = sum(rejection_reasons.values())
+    rejection_breakdown = [
+        {
+            "reason": reason,
+            "count": count,
+            "denominator": rejected_total,
+            "rate": round(count / rejected_total, 4) if rejected_total else 0.0,
+            "recommended_action": _rejection_action(reason),
+        }
+        for reason, count in sorted(
+            rejection_reasons.items(), key=lambda item: (-item[1], item[0])
+        )
+    ]
+    overdue_count = sum(row["past_market_close"] for row in pending_settlements)
+    next_actions = _paper_next_actions(
+        orders=len(orders),
+        open_orders=sum(order_statuses[status] for status in OPEN_ORDER_STATUSES),
+        filled=sum(order_statuses[status] for status in FILLED_STATUSES),
+        settled=settled_total,
+        overdue=overdue_count,
+        lineage_gaps=len(lineage_gaps),
+        rejection_breakdown=rejection_breakdown,
+    )
     return {
-        "schema_version": "paper-settlement-throughput-v1",
+        "schema_version": "paper-settlement-throughput-v2",
         "generated_at": _iso(now),
         "mode": "READ_ONLY_PAPER_EVIDENCE",
         "safety": {
@@ -247,8 +321,12 @@ def build_paper_settlement_throughput(
         },
         "summary": {
             "orders": len(orders),
+            "open": sum(order_statuses[status] for status in OPEN_ORDER_STATUSES),
+            "filled": sum(order_statuses[status] for status in FILLED_STATUSES),
+            "rejected": rejected_total,
             "settled": settled_total,
             "awaiting_settlement": awaiting_total,
+            "past_market_close": overdue_count,
             "lineage_gap_orders": len(lineage_gaps),
             "overall_target": max(1, overall_target),
             "overall_remaining": max(0, overall_target - settled_total),
@@ -256,8 +334,12 @@ def build_paper_settlement_throughput(
         },
         "categories": category_counts,
         "live_category_progress": live_progress,
+        "order_status_counts": dict(sorted(order_statuses.items())),
+        "pending_settlements": pending_settlements,
         "lineage_gaps": lineage_gaps,
         "zero_trade_reasons": zero_trade_reasons,
+        "rejection_breakdown": rejection_breakdown,
+        "next_actions": next_actions,
     }
 
 
@@ -384,6 +466,85 @@ def _category_from_order(order: PaperOrder) -> str:
 def _reason_code(reason: str, status: str) -> str:
     raw = str(reason or status or "unknown").strip().upper()
     return "_".join(raw.split())[:120] or "UNKNOWN"
+
+
+def _rejection_action(reason: str) -> str:
+    for prefix, action in REJECTION_ACTIONS.items():
+        if reason.startswith(prefix):
+            return action
+    return "Inspect the recorded order reason and upstream decision trace."
+
+
+def _paper_next_actions(
+    *,
+    orders: int,
+    open_orders: int,
+    filled: int,
+    settled: int,
+    overdue: int,
+    lineage_gaps: int,
+    rejection_breakdown: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    actions: list[dict[str, str]] = []
+    if overdue:
+        actions.append(
+            {
+                "code": "SYNC_OVERDUE_SETTLEMENTS",
+                "priority": "high",
+                "action": (
+                    "Run the paper-only settlement synchronizer and inspect unresolved markets."
+                ),
+            }
+        )
+    if lineage_gaps:
+        actions.append(
+            {
+                "code": "REPAIR_LINEAGE",
+                "priority": "high",
+                "action": "Repair missing forecast, fill, settlement, or P&L lineage.",
+            }
+        )
+    if orders == 0:
+        actions.append(
+            {
+                "code": "DIAGNOSE_NO_ORDERS",
+                "priority": "medium",
+                "action": "Inspect the candidate funnel before considering paper activation.",
+            }
+        )
+    elif filled == 0 and open_orders:
+        actions.append(
+            {
+                "code": "INSPECT_OPEN_ORDERS",
+                "priority": "medium",
+                "action": "Inspect executable-price simulation for resting paper orders.",
+            }
+        )
+    elif filled == 0 and rejection_breakdown:
+        actions.append(
+            {
+                "code": "ADDRESS_PRIMARY_REJECTION",
+                "priority": "medium",
+                "action": rejection_breakdown[0]["recommended_action"],
+            }
+        )
+    elif settled == 0:
+        actions.append(
+            {
+                "code": "AWAIT_GENUINE_SETTLEMENTS",
+                "priority": "medium",
+                "action": "Continue settlement synchronization without fabricating outcomes.",
+            }
+        )
+    return actions
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _age_hours(now: datetime, created_at: datetime) -> float:
+    return round(max(0.0, (_as_utc(now) - _as_utc(created_at)).total_seconds() / 3600), 2)
 
 
 def _json_source(raw: str) -> str:
