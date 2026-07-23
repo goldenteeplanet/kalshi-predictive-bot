@@ -21,6 +21,27 @@ def _fast_option_value(args: list[str], option: str, default: str | None = None)
     return args[index + 1]
 
 
+def _candidate_ticker_scope(path: Path | None, *, limit: int) -> list[str] | None:
+    if path is None:
+        return None
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
+        raise ValueError(f"candidate manifest is unavailable: {exc}") from exc
+    raw_tickers = manifest.get("tickers") if isinstance(manifest, dict) else None
+    if not isinstance(raw_tickers, list) and isinstance(manifest, dict):
+        raw_tickers = [
+            row.get("ticker")
+            for row in manifest.get("candidates") or []
+            if isinstance(row, dict)
+        ]
+    return list(
+        dict.fromkeys(
+            str(ticker).strip() for ticker in (raw_tickers or []) if str(ticker).strip()
+        )
+    )[:limit]
+
+
 def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
     """Run low-latency R5 monitor commands before importing the full CLI graph."""
 
@@ -32,10 +53,59 @@ def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
         "phase3aw-dashboard-truth",
         "phase3bc-r5-status",
         "phase3bc-r5-unattended-guard",
+        "roadmap-runtime-reports",
     }:
         return None
     if "--help" in args or "-h" in args:
         return None
+
+    if command == "roadmap-runtime-reports":
+        from kalshi_predictor.config import get_settings
+        from kalshi_predictor.data.backend import database_url_from_settings
+        from kalshi_predictor.data.db import get_session_factory, make_engine
+        from kalshi_predictor.roadmap.runtime_reports import write_runtime_roadmap_reports
+
+        try:
+            freshness_minutes = int(
+                _fast_option_value(args, "--freshness-minutes", "15") or "15"
+            )
+            market_limit = int(_fast_option_value(args, "--market-limit", "500") or "500")
+            paper_order_limit = int(
+                _fast_option_value(args, "--paper-order-limit", "1000") or "1000"
+            )
+            scope_limit = int(_fast_option_value(args, "--scope-limit", "100") or "100")
+            if min(freshness_minutes, market_limit, paper_order_limit, scope_limit) < 1:
+                raise ValueError("all runtime report limits must be positive")
+            manifest_raw = _fast_option_value(args, "--candidate-manifest-path")
+            ticker_scope = _candidate_ticker_scope(
+                Path(manifest_raw) if manifest_raw else None,
+                limit=scope_limit,
+            )
+        except ValueError as exc:
+            print(f"Invalid roadmap-runtime-reports options: {exc}")
+            return 2
+
+        reports_root = Path(_fast_option_value(args, "--reports-root", "reports") or "reports")
+        settings = get_settings()
+        engine = make_engine(database_url_from_settings(settings))
+        session_factory = get_session_factory(engine)
+        with session_factory() as session:
+            paths = write_runtime_roadmap_reports(
+                session,
+                reports_root=reports_root,
+                freshness_minutes=freshness_minutes,
+                market_limit=market_limit,
+                paper_order_limit=paper_order_limit,
+                ticker_scope=ticker_scope,
+            )
+        print("Runtime roadmap diagnostics")
+        print("Mode: READ ONLY")
+        print("Database writes: 0")
+        print("Paper/live order creation: disabled")
+        print(f"Candidate ticker scope: {len(ticker_scope or [])}")
+        for name, path in paths.items():
+            print(f"Wrote {name}: {path}")
+        return 0
 
     output_dir = Path(_fast_option_value(args, "--output-dir", "reports/phase3bc_r5") or "")
     if command == "phase3aw-dashboard-truth":
@@ -19537,6 +19607,64 @@ def gh2_single_writer_decision_refresh_command(
     console.print(f"Wrote JSON: {artifacts.json_path}")
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
     console.print(f"Candidate manifest: {artifacts.candidate_manifest_path}")
+
+
+@app.command("roadmap-runtime-reports")
+def roadmap_runtime_reports_command(
+    reports_root: Annotated[
+        Path,
+        typer.Option(help="Canonical report root for the signed read-only artifacts."),
+    ] = Path("reports"),
+    candidate_manifest_path: Annotated[
+        Path | None,
+        typer.Option(help="Optional current candidate manifest used to scope market census."),
+    ] = None,
+    freshness_minutes: Annotated[
+        int,
+        typer.Option(help="Freshness window used by the category census."),
+    ] = 15,
+    market_limit: Annotated[
+        int,
+        typer.Option(help="Maximum current markets inspected by the census."),
+    ] = 500,
+    paper_order_limit: Annotated[
+        int,
+        typer.Option(help="Maximum recent paper orders inspected for throughput."),
+    ] = 1_000,
+    scope_limit: Annotated[
+        int,
+        typer.Option(help="Maximum unique candidate tickers read from the manifest."),
+    ] = 100,
+) -> None:
+    """Write bounded runtime census and paper-throughput diagnostics read-only."""
+    if min(freshness_minutes, market_limit, paper_order_limit, scope_limit) < 1:
+        raise typer.BadParameter("all runtime report limits must be positive")
+
+    try:
+        ticker_scope = _candidate_ticker_scope(candidate_manifest_path, limit=scope_limit)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    from kalshi_predictor.roadmap.runtime_reports import write_runtime_roadmap_reports
+
+    engine = make_engine(database_url_from_settings(get_settings()))
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        paths = write_runtime_roadmap_reports(
+            session,
+            reports_root=reports_root,
+            freshness_minutes=freshness_minutes,
+            market_limit=market_limit,
+            paper_order_limit=paper_order_limit,
+            ticker_scope=ticker_scope,
+        )
+    console.print("Runtime roadmap diagnostics")
+    console.print("Mode: READ ONLY")
+    console.print("Database writes: 0")
+    console.print("Paper/live order creation: disabled")
+    console.print(f"Candidate ticker scope: {len(ticker_scope or [])}")
+    for name, path in paths.items():
+        console.print(f"Wrote {name}: {path}")
 
 
 @app.command("gh4-paper-activation-preflight")

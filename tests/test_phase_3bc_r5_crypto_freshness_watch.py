@@ -1,4 +1,5 @@
 import json
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -2205,6 +2206,58 @@ def test_phase3bc_r5_fast_status_path_writes_report(monkeypatch, capsys) -> None
 
 def test_phase3bc_r5_fast_path_ignores_help() -> None:
     assert _phase3bc_r5_fast_path_command(["phase3bc-r5-status", "--help"]) is None
+
+
+def test_runtime_reports_fast_path_uses_bounded_manifest_scope(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    from kalshi_predictor import config
+    from kalshi_predictor.data import backend, db
+    from kalshi_predictor.roadmap import runtime_reports
+
+    manifest_path = tmp_path / "actionable_tickers.json"
+    manifest_path.write_text(
+        json.dumps({"tickers": ["KXBTC-1", "KXBTC-2", "KXBTC-3"]}),
+        encoding="utf-8",
+    )
+    called = {}
+    monkeypatch.setattr(config, "get_settings", lambda: SimpleNamespace())
+    monkeypatch.setattr(backend, "database_url_from_settings", lambda settings: "sqlite://")
+    monkeypatch.setattr(db, "make_engine", lambda url: "engine")
+    monkeypatch.setattr(db, "get_session_factory", lambda engine: lambda: nullcontext("session"))
+
+    def fake_write(session, **kwargs):
+        called.update(session=session, **kwargs)
+        return {"category_census": tmp_path / "census.json"}
+
+    monkeypatch.setattr(runtime_reports, "write_runtime_roadmap_reports", fake_write)
+
+    exit_code = _phase3bc_r5_fast_path_command(
+        [
+            "roadmap-runtime-reports",
+            "--reports-root",
+            str(tmp_path),
+            "--candidate-manifest-path",
+            str(manifest_path),
+            "--market-limit",
+            "4",
+            "--paper-order-limit",
+            "8",
+            "--scope-limit",
+            "2",
+        ]
+    )
+
+    assert exit_code == 0
+    assert called == {
+        "session": "session",
+        "reports_root": tmp_path,
+        "freshness_minutes": 15,
+        "market_limit": 4,
+        "paper_order_limit": 8,
+        "ticker_scope": ["KXBTC-1", "KXBTC-2"],
+    }
+    assert "Mode: READ ONLY" in capsys.readouterr().out
 
 
 def _row(

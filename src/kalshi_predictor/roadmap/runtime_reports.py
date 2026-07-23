@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter, defaultdict
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from kalshi_predictor.active_universe import is_active_market_status
+from kalshi_predictor.active_universe import current_market_predicate, is_active_market_status
 from kalshi_predictor.data.schema import (
     AdvancedRiskDecisionLog,
     CryptoMarketLink,
@@ -59,14 +60,23 @@ def build_runtime_category_census(
     *,
     generated_at: datetime | None = None,
     freshness_minutes: int = 30,
-    market_limit: int = 5_000,
+    market_limit: int = 500,
+    ticker_scope: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     now = generated_at or utc_now()
     cutoff = now - timedelta(minutes=max(1, freshness_minutes))
+    bounded_limit = max(1, market_limit)
+    scope_provided = ticker_scope is not None
+    requested_tickers = list(
+        dict.fromkeys(str(ticker).strip() for ticker in (ticker_scope or []) if str(ticker).strip())
+    )[:bounded_limit]
+    market_statement = select(Market)
+    if scope_provided:
+        market_statement = market_statement.where(Market.ticker.in_(requested_tickers))
+    else:
+        market_statement = market_statement.where(current_market_predicate(now=now))
     markets = list(
-        session.scalars(
-            select(Market).order_by(Market.last_seen_at.desc()).limit(max(1, market_limit))
-        )
+        session.scalars(market_statement.order_by(Market.last_seen_at.desc()).limit(bounded_limit))
     )
     active = [market for market in markets if is_active_market_status(market.status)]
     tickers = {market.ticker for market in active}
@@ -93,7 +103,11 @@ def build_runtime_category_census(
         cutoff,
         tickers,
     )
-    complete_traces = _complete_paper_trace_tickers(session, tickers)
+    complete_traces = _complete_paper_trace_tickers(
+        session,
+        tickers,
+        order_limit=max(100, bounded_limit * 10),
+    )
     rows_by_category: dict[str, list[dict[str, Any]]] = defaultdict(list)
     latest_seen: dict[str, datetime] = {}
     for market in active:
@@ -139,10 +153,14 @@ def build_runtime_category_census(
     result = build_category_ingestion_census(payloads, generated_at=now)
     result["runtime_evidence"] = {
         "database_read_only": True,
-        "market_limit": max(1, market_limit),
+        "market_limit": bounded_limit,
+        "paper_trace_order_limit": max(100, bounded_limit * 10),
+        "ticker_scope_count": len(requested_tickers),
+        "ticker_scope": requested_tickers,
+        "ticker_scope_provided": scope_provided,
         "freshness_minutes": max(1, freshness_minutes),
         "active_markets_scanned": len(active),
-        "truncated": len(markets) >= max(1, market_limit),
+        "truncated": len(markets) >= bounded_limit,
     }
     return result
 
@@ -153,18 +171,36 @@ def build_paper_settlement_throughput(
     generated_at: datetime | None = None,
     overall_target: int = 100,
     live_category_target: int = 30,
+    order_limit: int = 1_000,
 ) -> dict[str, Any]:
     now = generated_at or utc_now()
-    orders = list(
-        session.scalars(select(PaperOrder).order_by(PaperOrder.created_at, PaperOrder.id))
+    bounded_order_limit = max(1, order_limit)
+    latest_orders = list(
+        session.scalars(
+            select(PaperOrder)
+            .order_by(PaperOrder.created_at.desc(), PaperOrder.id.desc())
+            .limit(bounded_order_limit + 1)
+        )
     )
+    orders_truncated = len(latest_orders) > bounded_order_limit
+    orders = sorted(
+        latest_orders[:bounded_order_limit],
+        key=lambda order: (order.created_at, order.id),
+    )
+    order_ids = {order.id for order in orders}
+    order_tickers = {order.ticker for order in orders}
     fills_by_order: dict[int, list[PaperFill]] = defaultdict(list)
-    for fill in session.scalars(select(PaperFill)):
+    fill_statement = select(PaperFill).where(PaperFill.paper_order_id.in_(order_ids))
+    for fill in session.scalars(fill_statement) if order_ids else []:
         fills_by_order[fill.paper_order_id].append(fill)
-    settlements = {row.ticker: row for row in session.scalars(select(Settlement))}
+    settlement_statement = select(Settlement).where(Settlement.ticker.in_(order_tickers))
+    settlements = {
+        row.ticker: row for row in (session.scalars(settlement_statement) if order_tickers else [])
+    }
+    pnl_statement = select(PaperPnl).where(PaperPnl.ticker.in_(order_tickers))
     pnl_tickers = {
         row.ticker
-        for row in session.scalars(select(PaperPnl))
+        for row in (session.scalars(pnl_statement) if order_tickers else [])
         if _final_result(row.settlement_result)
     }
     market_map = (
@@ -332,6 +368,11 @@ def build_paper_settlement_throughput(
             "overall_remaining": max(0, overall_target - settled_total),
             "overall_passed": settled_total >= overall_target,
         },
+        "runtime_evidence": {
+            "database_read_only": True,
+            "order_limit": bounded_order_limit,
+            "orders_truncated": orders_truncated,
+        },
         "categories": category_counts,
         "live_category_progress": live_progress,
         "order_status_counts": dict(sorted(order_statuses.items())),
@@ -349,14 +390,23 @@ def write_runtime_roadmap_reports(
     reports_root: Path,
     generated_at: datetime | None = None,
     freshness_minutes: int = 30,
+    market_limit: int = 500,
+    paper_order_limit: int = 1_000,
+    ticker_scope: Iterable[str] | None = None,
 ) -> dict[str, Path]:
     now = generated_at or utc_now()
     census = build_runtime_category_census(
         session,
         generated_at=now,
         freshness_minutes=freshness_minutes,
+        market_limit=market_limit,
+        ticker_scope=ticker_scope,
     )
-    throughput = build_paper_settlement_throughput(session, generated_at=now)
+    throughput = build_paper_settlement_throughput(
+        session,
+        generated_at=now,
+        order_limit=paper_order_limit,
+    )
     return {
         "category_census": write_signed_artifact(
             reports_root / "roadmap/category_ingestion_census.json", census
@@ -422,10 +472,22 @@ def _ticker_set(
     )
 
 
-def _complete_paper_trace_tickers(session: Session, tickers: set[str]) -> set[str]:
+def _complete_paper_trace_tickers(
+    session: Session,
+    tickers: set[str],
+    *,
+    order_limit: int,
+) -> set[str]:
     if not tickers:
         return set()
-    orders = list(session.scalars(select(PaperOrder).where(PaperOrder.ticker.in_(tickers))))
+    orders = list(
+        session.scalars(
+            select(PaperOrder)
+            .where(PaperOrder.ticker.in_(tickers))
+            .order_by(PaperOrder.created_at.desc(), PaperOrder.id.desc())
+            .limit(max(1, order_limit))
+        )
+    )
     settled = {
         row.ticker
         for row in session.scalars(select(Settlement).where(Settlement.ticker.in_(tickers)))
