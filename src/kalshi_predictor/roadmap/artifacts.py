@@ -21,7 +21,7 @@ def write_category_certification(
     *,
     reports_root: Path = Path("reports"),
 ) -> Path:
-    return _write_signed_json(
+    return write_signed_artifact(
         reports_root / "roadmap/categories" / f"{evidence.category}.json",
         certify_category_pipeline(evidence),
     )
@@ -32,7 +32,7 @@ def write_paper_scale_certification(
     *,
     reports_root: Path = Path("reports"),
 ) -> Path:
-    return _write_signed_json(
+    return write_signed_artifact(
         reports_root / "roadmap/paper_scale_gate.json",
         evaluate_paper_scale_gate(evidence),
     )
@@ -43,7 +43,7 @@ def write_postgres_authority_certification(
     *,
     reports_root: Path = Path("reports"),
 ) -> Path:
-    return _write_signed_json(
+    return write_signed_artifact(
         reports_root / "roadmap/postgres_authority.json",
         certify_postgres_authority(evidence),
     )
@@ -63,7 +63,7 @@ def verify_signed_artifact(path: Path) -> dict[str, Any]:
     }
 
 
-def _write_signed_json(path: Path, payload: dict[str, Any]) -> Path:
+def write_signed_artifact(path: Path, payload: dict[str, Any]) -> Path:
     envelope = {
         "schema_version": "roadmap-evidence-envelope-v1",
         "sha256": _digest(payload),

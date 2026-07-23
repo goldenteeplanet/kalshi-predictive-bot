@@ -18,6 +18,7 @@ STALE_AFTER_SECONDS = 30 * 60
 DEFAULT_CONTROL_PLANE_ROOT = Path("reports/phase_gh2/control_plane")
 DEFAULT_CLOUD_STATUS_PATH = Path("reports/phase_gh2/authoritative_cloud_status.json")
 DEFAULT_CATEGORY_CENSUS_PATH = Path("reports/roadmap/category_ingestion_census.json")
+DEFAULT_PAPER_THROUGHPUT_PATH = Path("reports/roadmap/paper_settlement_throughput.json")
 
 
 def build_refresh_readiness_dashboard(
@@ -28,6 +29,7 @@ def build_refresh_readiness_dashboard(
     control_plane_root: Path = DEFAULT_CONTROL_PLANE_ROOT,
     cloud_status_path: Path = DEFAULT_CLOUD_STATUS_PATH,
     category_census_path: Path = DEFAULT_CATEGORY_CENSUS_PATH,
+    paper_throughput_path: Path = DEFAULT_PAPER_THROUGHPUT_PATH,
 ) -> dict[str, Any]:
     refresh = _read_json(refresh_path)
     history = _read_json_lines(history_path)[-24:]
@@ -37,9 +39,7 @@ def build_refresh_readiness_dashboard(
     source_state = _source_state(refresh, age_seconds)
     soak = refresh.get("soak") if isinstance(refresh.get("soak"), dict) else {}
     readiness = (
-        refresh.get("paper_readiness")
-        if isinstance(refresh.get("paper_readiness"), dict)
-        else {}
+        refresh.get("paper_readiness") if isinstance(refresh.get("paper_readiness"), dict) else {}
     )
     candidates = manifest.get("candidates") if isinstance(manifest.get("candidates"), list) else []
     current_blockers = Counter(
@@ -57,6 +57,7 @@ def build_refresh_readiness_dashboard(
     incidents = _read_json(control_plane_root / "incident_history.json")
     cloud = verify_authoritative_cloud_snapshot(cloud_status_path)
     category_census = verify_signed_artifact(category_census_path)
+    paper_throughput = verify_signed_artifact(paper_throughput_path)
     return {
         "read_only": True,
         "source": {
@@ -78,7 +79,8 @@ def build_refresh_readiness_dashboard(
             ),
             "next_refresh": "15-minute service cadence",
         },
-        "safety": refresh.get("safety") or {
+        "safety": refresh.get("safety")
+        or {
             "paper_order_creation_enabled": False,
             "live_execution_enabled": False,
             "autopilot_enabled": False,
@@ -97,6 +99,7 @@ def build_refresh_readiness_dashboard(
         "reports": (refresh.get("control_plane") or {}),
         "roadmap": build_roadmap_status(),
         "category_census": _category_census_view(category_census),
+        "paper_throughput": _paper_throughput_view(paper_throughput),
     }
 
 
@@ -110,6 +113,24 @@ def _category_census_view(verification: dict[str, Any]) -> dict[str, Any]:
         "categories": categories if isinstance(categories, list) else [],
         "priority_blockers": (
             payload.get("priority_blockers", []) if isinstance(payload, dict) else []
+        ),
+    }
+
+
+def _paper_throughput_view(verification: dict[str, Any]) -> dict[str, Any]:
+    payload = verification.get("payload") if verification.get("verified") else {}
+    return {
+        "state": "VERIFIED" if verification.get("verified") else "MISSING_OR_UNVERIFIED",
+        "path": verification.get("path"),
+        "generated_at": payload.get("generated_at") if isinstance(payload, dict) else None,
+        "summary": payload.get("summary", {}) if isinstance(payload, dict) else {},
+        "categories": payload.get("categories", {}) if isinstance(payload, dict) else {},
+        "live_category_progress": (
+            payload.get("live_category_progress", {}) if isinstance(payload, dict) else {}
+        ),
+        "lineage_gaps": payload.get("lineage_gaps", []) if isinstance(payload, dict) else [],
+        "zero_trade_reasons": (
+            payload.get("zero_trade_reasons", {}) if isinstance(payload, dict) else {}
         ),
     }
 
@@ -188,9 +209,7 @@ def _history_rows(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def _blocker_rows(
-    current: Counter[str], previous: Counter[str] | None
-) -> list[dict[str, Any]]:
+def _blocker_rows(current: Counter[str], previous: Counter[str] | None) -> list[dict[str, Any]]:
     rows = []
     prior = previous or Counter()
     for blocker in sorted(set(current) | set(prior)):
