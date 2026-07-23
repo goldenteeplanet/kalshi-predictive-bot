@@ -1,6 +1,6 @@
 {
   "schema_version": "refresh-readiness-visual-baseline-v1",
-  "template_sha256": "ecadf43426969bde389cd153bfbc2a20403afd8aac62f5579b80217c2e769974",
+  "template_sha256": "4a454185f0259ed6ee381a14c52381af4eee017d566203463e4240a30840273a",
   "states": [
     "NO_SOURCE_DATA",
     "INVALID_SOURCE",
