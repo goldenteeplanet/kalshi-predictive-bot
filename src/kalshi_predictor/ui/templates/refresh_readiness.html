@@ -17,6 +17,20 @@
 </section>
 
 <section class="section-band">
+  <div class="section-head"><div><h2>Paper settlement throughput</h2><p class="muted">Genuine filled-order lineage and progress toward 100 settled trades and 30 per proposed live category.</p></div><span class="status-pill {{ 'status-healthy' if dashboard.paper_throughput.state == 'VERIFIED' else 'status-degraded' }}">{{ dashboard.paper_throughput.state }}</span></div>
+  {% if dashboard.paper_throughput.state == 'VERIFIED' %}
+  <div class="summary-grid">
+    <article class="summary-card"><span>Settled</span><strong>{{ dashboard.paper_throughput.summary.settled }} / {{ dashboard.paper_throughput.summary.overall_target }}</strong></article>
+    <article class="summary-card"><span>Awaiting settlement</span><strong>{{ dashboard.paper_throughput.summary.awaiting_settlement }}</strong></article>
+    <article class="summary-card"><span>Lineage gaps</span><strong>{{ dashboard.paper_throughput.summary.lineage_gap_orders }}</strong></article>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>Category</th><th>Settled</th><th>Target</th><th>Remaining</th><th>Gate</th></tr></thead><tbody>
+  {% for category, row in dashboard.paper_throughput.live_category_progress.items() %}<tr><td>{{ category }}</td><td>{{ row.settled }}</td><td>{{ row.target }}</td><td>{{ row.remaining }}</td><td>{{ 'PASS' if row.passed else 'BLOCKED' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<p>No verified paper-settlement throughput artifact is available.</p>{% endif %}
+</section>
+
+<section class="section-band">
   <div class="section-head"><div><h2>Source authority</h2><p class="muted">Local evidence stays distinct from checksummed cloud evidence.</p></div></div>
   <div class="summary-grid">
     <article class="summary-card"><span>Cloud state</span><strong>{{ dashboard.cloud_authority.state }}</strong></article>

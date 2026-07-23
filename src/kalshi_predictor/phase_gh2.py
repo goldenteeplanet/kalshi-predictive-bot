@@ -37,6 +37,7 @@ from kalshi_predictor.phase3ba_r3 import build_phase3ba_r3_weather_paper_gate
 from kalshi_predictor.phase3bc_r5 import (
     write_phase3bc_r5_crypto_freshness_watch_report,
 )
+from kalshi_predictor.roadmap.runtime_reports import write_runtime_roadmap_reports
 from kalshi_predictor.single_writer_coordinator import (
     drain_staged_crypto_quotes,
     stage_crypto_quote_fetches,
@@ -315,9 +316,7 @@ def run_gh2_single_writer_decision_refresh(
         )
         stage_errors.extend(str(item) for item in crypto_drain.get("errors") or [])
         sticky_crypto = [row["ticker"] for row in sticky_before if row["model"] == "crypto_v2"]
-        sticky_weather = [
-            row["ticker"] for row in sticky_before if row["model"] == "weather_v2"
-        ]
+        sticky_weather = [row["ticker"] for row in sticky_before if row["model"] == "weather_v2"]
         ranked_crypto = [row["ticker"] for row in candidates_before if row["model"] == "crypto_v2"]
         ranked_weather = [
             row["ticker"] for row in candidates_before if row["model"] == "weather_v2"
@@ -470,6 +469,12 @@ def run_gh2_single_writer_decision_refresh(
         paper_orders_after = _paper_order_count(session)
         mark_stage("commit_single_writer")
         session.commit()
+        mark_stage("write_runtime_roadmap_reports")
+        runtime_report_paths = write_runtime_roadmap_reports(
+            session,
+            reports_root=reports_dir,
+            freshness_minutes=freshness_minutes,
+        )
 
     crypto_drain["files_archived"] = _archive_drained_files(
         [Path(path) for path in crypto_drain.get("drained_files") or []],
@@ -592,6 +597,7 @@ def run_gh2_single_writer_decision_refresh(
             "weather_rows": list(weather_gate.get("weather_rows") or []),
             "next_action": weather_gate.get("next_action") or {},
         },
+        "runtime_roadmap_reports": {name: str(path) for name, path in runtime_report_paths.items()},
         "soak": soak,
         "errors": stage_errors,
         "safety": {
