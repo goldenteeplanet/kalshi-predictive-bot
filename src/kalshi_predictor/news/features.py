@@ -29,12 +29,15 @@ def build_news_features(
 ) -> NewsFeatureBuildSummary:
     resolved = settings or get_settings()
     resolved_window = window_minutes or resolved.news_default_window_minutes
-    cutoff = utc_now() - timedelta(minutes=resolved_window)
+    generated_at = utc_now()
+    cutoff = generated_at - timedelta(minutes=resolved_window)
     rows = list(
         session.execute(
             select(NewsMarketLink, NewsItem)
             .join(NewsItem, NewsMarketLink.news_item_id == NewsItem.id)
             .where(
+                NewsItem.ingested_at <= generated_at,
+                or_(NewsItem.published_at.is_(None), NewsItem.published_at <= generated_at),
                 or_(
                     NewsItem.published_at.is_(None),
                     NewsItem.published_at >= cutoff,

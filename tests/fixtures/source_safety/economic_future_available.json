@@ -1,0 +1,9 @@
+{
+  "source": "fred_fed_target_upper",
+  "source_url": "https://fred.stlouisfed.org/series/DFEDTARU",
+  "published_at": "2026-07-15T18:00:00Z",
+  "available_at": "2026-07-15T18:00:05Z",
+  "ingested_at": "2026-07-15T18:00:06Z",
+  "decision_at": "2026-07-15T17:59:59Z",
+  "value": "4.50"
+}
