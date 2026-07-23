@@ -1,0 +1,9 @@
+{
+  "source": "bls_cpi",
+  "source_url": "https://api.bls.gov/publicAPI/v2/timeseries/data/?utm_source=test",
+  "published_at": "2026-07-14T12:30:00Z",
+  "available_at": "2026-07-14T12:30:03Z",
+  "ingested_at": "2026-07-14T12:30:05Z",
+  "decision_at": "2026-07-14T12:31:00Z",
+  "value": "324.1"
+}

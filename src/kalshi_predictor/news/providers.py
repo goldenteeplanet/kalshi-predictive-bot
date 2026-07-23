@@ -1,12 +1,16 @@
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from email.utils import parsedate_to_datetime
 from typing import Any
+from urllib.parse import urlsplit
 from xml.etree import ElementTree
 
 import httpx
 
 from kalshi_predictor.config import Settings, get_settings
+from kalshi_predictor.source_safety import normalize_news_evidence
+from kalshi_predictor.utils.time import utc_now
 
 
 @dataclass(frozen=True)
@@ -43,6 +47,10 @@ def configured_rss_feeds(
         if not name or not url:
             errors.append("Skipped a feed entry missing name or url.")
             continue
+        parsed_url = urlsplit(url)
+        if parsed_url.scheme.lower() != "https" or not parsed_url.hostname:
+            errors.append(f"Skipped feed {name!r}: URL must be absolute HTTPS.")
+            continue
         feeds.append(
             NewsFeedConfig(
                 name=name,
@@ -72,18 +80,21 @@ def parse_rss_feed(
     category: str | None = None,
     source_url: str | None = None,
     limit: int = 50,
+    fetched_at: datetime | None = None,
 ) -> list[dict[str, Any]]:
     root = ElementTree.fromstring(xml_text)
     channel_items = [_item_payload(item) for item in root.findall(".//item")]
     if channel_items:
-        return _with_source(channel_items[:limit], source_name, category, source_url)
+        return _with_source(
+            channel_items[:limit], source_name, category, source_url, fetched_at
+        )
 
     atom_entries = [
         _atom_payload(entry)
         for entry in root.iter()
         if _tag_name(entry.tag) == "entry"
     ]
-    return _with_source(atom_entries[:limit], source_name, category, source_url)
+    return _with_source(atom_entries[:limit], source_name, category, source_url, fetched_at)
 
 
 def _with_source(
@@ -91,8 +102,10 @@ def _with_source(
     source_name: str,
     category: str | None,
     source_url: str | None,
+    fetched_at: datetime | None,
 ) -> list[dict[str, Any]]:
     output = []
+    observed_at = fetched_at or utc_now()
     for item in items:
         enriched = {
             "source": source_name,
@@ -102,7 +115,14 @@ def _with_source(
         }
         if category and not enriched.get("category"):
             enriched["category"] = category
-        output.append(enriched)
+        output.append(
+            normalize_news_evidence(
+                enriched,
+                feed_url=str(source_url or enriched.get("source_url") or ""),
+                available_at=observed_at,
+                ingested_at=observed_at,
+            )
+        )
     return output
 
 

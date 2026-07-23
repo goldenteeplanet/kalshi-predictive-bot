@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from kalshi_predictor.data.repositories import decode_json, encode_json
 from kalshi_predictor.data.schema import NewsFeature, NewsItem, NewsMarketLink, NewsSignal
 from kalshi_predictor.news.classifier import classify_news_item
+from kalshi_predictor.source_safety import canonicalize_source_url, validate_point_in_time
 from kalshi_predictor.utils.decimals import decimal_to_str, to_decimal
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
@@ -23,8 +24,24 @@ def upsert_news_item(
     raw_payload = dict(payload)
     title = _required_text(raw_payload.get("title"), "title")
     source = str(raw_payload.get("source") or "manual").strip() or "manual"
-    source_url = _str_or_none(raw_payload.get("source_url") or raw_payload.get("url"))
+    source_url = canonicalize_source_url(
+        _str_or_none(
+            raw_payload.get("canonical_url")
+            or raw_payload.get("source_url")
+            or raw_payload.get("url")
+        )
+    )
     published_at = parse_datetime(raw_payload.get("published_at"))
+    resolved_ingested_at = (
+        ingested_at or parse_datetime(raw_payload.get("ingested_at")) or utc_now()
+    )
+    available_at = parse_datetime(raw_payload.get("available_at")) or resolved_ingested_at
+    if published_at is not None:
+        validate_point_in_time(
+            published_at=published_at,
+            available_at=available_at,
+            ingested_at=resolved_ingested_at,
+        )
     existing = _pending_news_item(session, source_url, title, published_at) or _existing_news_item(
         session,
         source=source,
@@ -40,7 +57,7 @@ def upsert_news_item(
         source=source,
         source_url=source_url,
         published_at=published_at,
-        ingested_at=ingested_at or utc_now(),
+        ingested_at=resolved_ingested_at,
         title=title,
         summary=_str_or_none(raw_payload.get("summary")),
         body=_str_or_none(raw_payload.get("body")),
@@ -50,7 +67,14 @@ def upsert_news_item(
         sentiment_score=decimal_to_str(classification["sentiment_score"]) or "0",
         importance_score=decimal_to_str(classification["importance_score"]) or "0",
         freshness_score=decimal_to_str(classification["freshness_score"]) or "0",
-        raw_json=encode_json({**raw_payload, "classification": classification}),
+        raw_json=encode_json(
+            {
+                **raw_payload,
+                "canonical_url": source_url,
+                "available_at": available_at.isoformat(),
+                "classification": classification,
+            }
+        ),
     )
     session.add(item)
     session.flush()
