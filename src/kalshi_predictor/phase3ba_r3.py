@@ -188,6 +188,17 @@ def build_phase3ba_r3_weather_paper_gate(
         session, AdvancedRiskDecisionLog, selected_tickers, "decision_timestamp"
     )
     paper_orders = _paper_order_keys(session, selected_tickers)
+    weather_features = _weather_features_for_links(
+        session,
+        links,
+        settings=resolved,
+        match_tolerance_hours=match_tolerance_hours,
+    )
+    source_forecasts = _weather_source_forecasts_for_links(
+        session,
+        links,
+        match_tolerance_hours=match_tolerance_hours,
+    )
     rows = [
         _weather_paper_gate_row(
             session,
@@ -197,7 +208,8 @@ def build_phase3ba_r3_weather_paper_gate(
             sizing=sizing.get(link.ticker),
             risk=risk.get(link.ticker),
             paper_orders=paper_orders,
-            match_tolerance_hours=match_tolerance_hours,
+            feature=weather_features.get(link.ticker),
+            source_forecast=source_forecasts.get(link.ticker),
         )
         for link in links
     ]
@@ -241,7 +253,8 @@ def _weather_paper_gate_row(
     sizing: PositionSizingDecisionLog | None,
     risk: AdvancedRiskDecisionLog | None,
     paper_orders: set[tuple[str, str, int | None]],
-    match_tolerance_hours: int,
+    feature: WeatherFeature | None,
+    source_forecast: WeatherForecast | None,
 ) -> dict[str, Any]:
     market = session.get(Market, link.ticker)
     snapshot = _latest_snapshot(session, link.ticker)
@@ -255,17 +268,6 @@ def _weather_paper_gate_row(
         settings=settings,
     )
     identity_payload = identity.as_dict()
-    feature = _latest_weather_feature(
-        session,
-        link,
-        settings=settings,
-        match_tolerance_hours=match_tolerance_hours,
-    )
-    source_forecast = _latest_weather_source_forecast(
-        session,
-        link,
-        match_tolerance_hours=match_tolerance_hours,
-    )
     snapshot_age = _age_minutes(snapshot.captured_at, now) if snapshot is not None else None
     snapshot_fresh = bool(
         snapshot is not None
@@ -516,45 +518,75 @@ def _empty_book(reason: str) -> dict[str, Any]:
     }
 
 
-def _latest_weather_feature(
+def _weather_features_for_links(
     session: Session,
-    link: WeatherMarketLink,
+    links: list[WeatherMarketLink],
     *,
     settings: Settings,
     match_tolerance_hours: int,
-) -> WeatherFeature | None:
-    if link.target_time is None:
-        return None
-    location_key = _effective_location_key(link.location_key, settings)
-    candidates = list(
-        session.scalars(
-            select(WeatherFeature)
-            .where(WeatherFeature.location_key == location_key)
-            .order_by(desc(WeatherFeature.generated_at), WeatherFeature.target_time)
-            .limit(200)
+) -> dict[str, WeatherFeature]:
+    candidates_by_location: dict[str, list[WeatherFeature]] = {}
+    for location_key in dict.fromkeys(
+        _effective_location_key(link.location_key, settings) for link in links
+    ):
+        candidates_by_location[location_key] = list(
+            session.scalars(
+                select(WeatherFeature)
+                .where(WeatherFeature.location_key == location_key)
+                .order_by(desc(WeatherFeature.generated_at), WeatherFeature.target_time)
+                .limit(200)
+            )
         )
-    )
-    return _nearest_target_time(candidates, link.target_time, match_tolerance_hours)
+    return {
+        link.ticker: selected
+        for link in links
+        if link.target_time is not None
+        and (
+            selected := _nearest_target_time(
+                candidates_by_location.get(
+                    _effective_location_key(link.location_key, settings),
+                    [],
+                ),
+                link.target_time,
+                match_tolerance_hours,
+            )
+        )
+        is not None
+    }
 
 
-def _latest_weather_source_forecast(
+def _weather_source_forecasts_for_links(
     session: Session,
-    link: WeatherMarketLink,
+    links: list[WeatherMarketLink],
     *,
     match_tolerance_hours: int,
-) -> WeatherForecast | None:
-    if link.target_time is None:
-        return None
-    location_key = normalize_location_key(link.location_key)
-    candidates = list(
-        session.scalars(
-            select(WeatherForecast)
-            .where(WeatherForecast.location_key == location_key)
-            .order_by(desc(WeatherForecast.forecast_generated_at), WeatherForecast.forecast_time)
-            .limit(200)
+) -> dict[str, WeatherForecast]:
+    candidates_by_location: dict[str, list[WeatherForecast]] = {}
+    for location_key in dict.fromkeys(normalize_location_key(link.location_key) for link in links):
+        candidates_by_location[location_key] = list(
+            session.scalars(
+                select(WeatherForecast)
+                .where(WeatherForecast.location_key == location_key)
+                .order_by(
+                    desc(WeatherForecast.forecast_generated_at),
+                    WeatherForecast.forecast_time,
+                )
+                .limit(200)
+            )
         )
-    )
-    return _nearest_target_time(candidates, link.target_time, match_tolerance_hours)
+    return {
+        link.ticker: selected
+        for link in links
+        if link.target_time is not None
+        and (
+            selected := _nearest_target_time(
+                candidates_by_location.get(normalize_location_key(link.location_key), []),
+                link.target_time,
+                match_tolerance_hours,
+            )
+        )
+        is not None
+    }
 
 
 def _nearest_target_time(
