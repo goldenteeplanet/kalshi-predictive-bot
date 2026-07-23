@@ -1,7 +1,6 @@
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import SimpleNamespace
 
 from kalshi_predictor import phase_gh2
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -9,7 +8,6 @@ from kalshi_predictor.data.repositories import insert_market_snapshot
 from kalshi_predictor.opportunities.repository import insert_market_ranking
 from kalshi_predictor.phase_gh2 import select_actionable_ranked_markets
 from kalshi_predictor.utils.time import utc_now
-from kalshi_predictor.weather.features import WeatherFeatureBuildSummary
 
 
 def test_candidate_alignment_prioritizes_fresh_executable_rankings(tmp_path: Path) -> None:
@@ -207,6 +205,8 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert script.index('write_scheduler_status "COMPLETE"') < script.index("flock -u 9")
     assert script.index("flock -u 9") < script.index("roadmap-runtime-reports")
     assert "write_runtime_roadmap_reports" not in implementation
+    assert "build_weather_features" not in implementation
+    assert "DEDICATED_RUNTIME_OWNER_REUSE" in implementation
     assert implementation.index('mark_stage("commit_single_writer")') < implementation.index(
         "_write_candidate_manifest(candidate_manifest_path, manifest_candidates)"
     )
@@ -250,33 +250,27 @@ def test_stage_telemetry_records_per_stage_durations(tmp_path: Path) -> None:
     ]
 
 
-def test_weather_feature_refresh_is_strictly_bounded(monkeypatch) -> None:
-    calls = []
-
+def test_weather_feature_refresh_is_owned_by_dedicated_runtime() -> None:
     class FakeSession:
         def scalars(self, statement):
             return iter(("new_york", "chicago", "miami"))
 
-    def fake_build(session, *, location_key, settings, limit):
-        calls.append((location_key, limit))
-        return WeatherFeatureBuildSummary(
-            location_key=location_key,
-            forecasts_processed=limit,
-            features_inserted=limit,
-        )
-
-    monkeypatch.setattr(phase_gh2, "build_weather_features", fake_build)
-
-    summaries = phase_gh2._build_current_weather_features(
+    summaries = phase_gh2._weather_feature_owner_evidence(
         FakeSession(),
         ["KXTEMPNYCH-TEST"],
-        settings=SimpleNamespace(),
         max_locations=2,
-        forecasts_per_location=4,
     )
 
-    assert calls == [("new_york", 4), ("chicago", 4)]
-    assert len(summaries) == 2
+    assert summaries == [
+        {
+            "mode": "DEDICATED_RUNTIME_OWNER_REUSE",
+            "owner": "kalshi-nyc-weather-runtime-refresh.timer",
+            "ticker_scope_count": 1,
+            "location_count": 2,
+            "locations": ["new_york", "chicago"],
+            "features_built_in_gh2": 0,
+        }
+    ]
 
 
 def test_soak_history_records_candidate_and_reset_evidence(tmp_path: Path) -> None:

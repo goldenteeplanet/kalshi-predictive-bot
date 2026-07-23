@@ -42,7 +42,6 @@ from kalshi_predictor.single_writer_coordinator import (
     stage_crypto_quote_fetches,
 )
 from kalshi_predictor.utils.time import utc_now
-from kalshi_predictor.weather.features import build_weather_features
 from kalshi_predictor.weather.linker import WEATHER_TICKER_PREFIXES, link_weather_markets
 
 PHASE_GH2_VERSION = "GH-2.0"
@@ -50,7 +49,6 @@ CRYPTO_TICKER_PREFIXES = ("KXBTC", "KXETH", "KXSOLE", "KXXRP", "KXDOGE")
 ACTIONABLE_MODELS = ("crypto_v2", "weather_v2")
 WEATHER_DECISION_LIMIT = 6
 WEATHER_FEATURE_LOCATION_LIMIT = 2
-WEATHER_FEATURE_FORECAST_LIMIT = 4
 SNAPSHOT_RECOVERY_LIMIT = 20
 STICKY_CANDIDATE_LIMIT = 12
 R5_OWNER_FILE = "phase3bc_r5_owner.json"
@@ -425,12 +423,10 @@ def run_gh2_single_writer_decision_refresh(
         )
 
         mark_stage("refresh_weather_decisions")
-        weather_features = _build_current_weather_features(
+        weather_features = _weather_feature_owner_evidence(
             session,
             weather_decision_tickers,
-            settings=resolved,
             max_locations=WEATHER_FEATURE_LOCATION_LIMIT,
-            forecasts_per_location=WEATHER_FEATURE_FORECAST_LIMIT,
         )
         weather_latest = _latest_snapshots(session, weather_decision_tickers)
         weather_snapshots = [
@@ -700,13 +696,11 @@ def _active_market_tickers(
     return list(session.scalars(statement))
 
 
-def _build_current_weather_features(
+def _weather_feature_owner_evidence(
     session: Session,
     tickers: list[str],
     *,
-    settings: Settings,
     max_locations: int = WEATHER_FEATURE_LOCATION_LIMIT,
-    forecasts_per_location: int = WEATHER_FEATURE_FORECAST_LIMIT,
 ) -> list[dict[str, Any]]:
     if not tickers:
         return []
@@ -718,16 +712,16 @@ def _build_current_weather_features(
             .limit(max_locations)
         )
     )[:max_locations]
-    summaries = []
-    for location in locations:
-        summary = build_weather_features(
-            session,
-            location_key=location,
-            settings=settings,
-            limit=forecasts_per_location,
-        )
-        summaries.append(asdict(summary))
-    return summaries
+    return [
+        {
+            "mode": "DEDICATED_RUNTIME_OWNER_REUSE",
+            "owner": "kalshi-nyc-weather-runtime-refresh.timer",
+            "ticker_scope_count": len(tickers),
+            "location_count": len(locations),
+            "locations": locations,
+            "features_built_in_gh2": 0,
+        }
+    ]
 
 
 def _latest_snapshots(
