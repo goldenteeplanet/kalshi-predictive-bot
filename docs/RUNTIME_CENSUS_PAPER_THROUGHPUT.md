@@ -23,9 +23,10 @@ The scheduled GH-2 owner scopes the category census to the current candidate man
 caps it at 40 tickers. Diagnostics have a separate 45-second timeout and do not turn a
 successfully committed decision refresh into a failed writer cycle. Their `COMPLETE`,
 `TIMED_OUT`, `FAILED`, or `SKIPPED_DEADLINE` state is recorded separately in
-`gh2_scheduler_status.json`.
+`gh2_scheduler_status.json`. The diagnostics command uses a low-memory CLI fast path instead
+of importing the full operator command graph.
 
-The commit-critical refresh has a 270-second budget inside a 345-second internal service
+The commit-critical refresh has a 300-second budget inside a 345-second internal service
 deadline. Per-stage durations are written to `gh2_stage.json` and copied into scheduler
 telemetry. Termination and unexpected-exit traps publish a terminal scheduler status so a
 systemd timeout cannot leave the owner at stale `RUNNING`.

@@ -190,7 +190,7 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "DB_WRITER_MONITOR_BUSY" in script
     assert "GH2_DECISION_REFRESH_FAILED" in script
     assert "GH2_INTERNAL_DEADLINE_EXCEEDED" in script
-    assert "GH2_WRITER_BUDGET_SECONDS:-270" in script
+    assert "GH2_WRITER_BUDGET_SECONDS:-300" in script
     assert "GH2_DIAGNOSTICS_BUDGET_SECONDS:-45" in script
     assert "trap handle_termination TERM INT" in script
     assert "TimeoutStartSec=6min" in service
