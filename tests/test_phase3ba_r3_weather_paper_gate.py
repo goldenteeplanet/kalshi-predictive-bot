@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from types import SimpleNamespace
+
 from typer.testing import CliRunner
 
 from kalshi_predictor import phase3ba_r3
@@ -68,6 +71,44 @@ def test_phase3ba_r3_summary_counts_ready_and_blockers() -> None:
         "PAPER_READY": 1,
         "SNAPSHOT_STALE": 1,
     }
+
+
+def test_weather_gate_reuses_location_evidence_across_tickers() -> None:
+    target = datetime(2026, 7, 23, 18, 0, tzinfo=UTC)
+    links = [
+        SimpleNamespace(ticker="KXTEMPNYCH-A", location_key="new_york", target_time=target),
+        SimpleNamespace(ticker="KXTEMPNYCH-B", location_key="new_york", target_time=target),
+    ]
+
+    class FakeSession:
+        def __init__(self, candidates):
+            self.candidates = candidates
+            self.calls = 0
+
+        def scalars(self, statement):
+            self.calls += 1
+            return iter(self.candidates)
+
+    feature = SimpleNamespace(target_time=target)
+    feature_session = FakeSession([feature])
+    features = phase3ba_r3._weather_features_for_links(
+        feature_session,
+        links,
+        settings=SimpleNamespace(weather_v2_default_location_key="new_york"),
+        match_tolerance_hours=3,
+    )
+    assert feature_session.calls == 1
+    assert features == {link.ticker: feature for link in links}
+
+    source = SimpleNamespace(forecast_time=target)
+    source_session = FakeSession([source])
+    forecasts = phase3ba_r3._weather_source_forecasts_for_links(
+        source_session,
+        links,
+        match_tolerance_hours=3,
+    )
+    assert source_session.calls == 1
+    assert forecasts == {link.ticker: source for link in links}
 
 
 def test_phase3ba_r3_cli_help_exposes_command() -> None:
