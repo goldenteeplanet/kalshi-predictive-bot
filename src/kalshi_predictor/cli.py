@@ -6552,6 +6552,16 @@ def phase3ay_health_refresh_command(
             ),
         ),
     ] = False,
+    market_refresh_only: Annotated[
+        bool,
+        typer.Option(
+            "--market-refresh-only/--full-health-steps",
+            help=(
+                "Run market snapshot/forecast collection only, then stop before "
+                "settlement sync, paper realization, coverage, and roadmap reports."
+            ),
+        ),
+    ] = False,
     stop_on_error: Annotated[
         bool,
         typer.Option(help="Stop the loop on the first step error."),
@@ -6583,6 +6593,7 @@ def phase3ay_health_refresh_command(
         settlement_commit_every=settlement_commit_every,
         realize_paper=realize_paper,
         settlement_only=settlement_only,
+        market_refresh_only=market_refresh_only,
         stop_on_error=stop_on_error,
         duration_budget_seconds=duration_budget_seconds,
     )
@@ -6688,6 +6699,16 @@ def phase3ay_unattended_start_command(
             ),
         ),
     ] = False,
+    market_refresh_only: Annotated[
+        bool,
+        typer.Option(
+            "--market-refresh-only/--full-health-steps",
+            help=(
+                "Run only the long market snapshot/forecast refresh in the background; "
+                "skip the chained health/report steps."
+            ),
+        ),
+    ] = False,
     timeout_grace_seconds: Annotated[
         int,
         typer.Option(help="Seconds past the configured budget before guard stops it."),
@@ -6709,6 +6730,7 @@ def phase3ay_unattended_start_command(
         settlement_commit_every=settlement_commit_every,
         realize_paper=not dry_run_paper,
         settlement_only=settlement_only,
+        market_refresh_only=market_refresh_only,
         timeout_grace_seconds=timeout_grace_seconds,
     )
     console.print("Phase 3AY unattended refresh")

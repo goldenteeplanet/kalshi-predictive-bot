@@ -376,6 +376,83 @@ def test_phase3aw_dashboard_prefers_low_edge_over_unrelated_snapshot_backlog(
     assert panel["status_label"] == "Edge or score below threshold"
 
 
+def test_phase3aw_dashboard_explains_current_positive_ev_gates_and_scheduler_owner(
+    tmp_path,
+) -> None:
+    reports_dir = Path(tmp_path) / "reports"
+    output_dir = reports_dir / "phase3aw"
+    _write_r5_positive_ev_blocked_status(reports_dir)
+    session_factory = _session_factory(tmp_path)
+
+    with session_factory() as session:
+        artifacts = write_phase3aw_dashboard_truth_report(
+            session,
+            output_dir=output_dir,
+            reports_dir=reports_dir,
+            settings=Settings(opportunity_min_time_to_close_minutes=1),
+        )
+
+    payload = json.loads(artifacts.dashboard_truth_path.read_text(encoding="utf-8"))
+    panel = _paper_trade_blocker_status_from_phase3aw(payload)
+    metrics = {item["label"]: item["value"] for item in panel["metrics"]}
+    truth_row = next(row for row in panel["blockers"] if row["area"] == "Current crypto truth")
+    watcher_row = next(row for row in panel["blockers"] if row["area"] == "Watcher freshness")
+
+    assert payload["phase_version"] == "phase3aw_dashboard_truth_v2"
+    assert payload["summary"]["true_current_blocker"] == "LOW_EDGE_OR_SCORE_BLOCK"
+    assert payload["metadata"]["safety_flags"]["thresholds_lowered"] is False
+    assert payload["current_crypto_funnel"]["scheduled_owner_active"] is True
+    assert payload["current_crypto_funnel"]["refresh_owner_active"] is True
+    assert panel["status_label"] == "Edge below threshold"
+    assert panel["summary"] == (
+        "2 current crypto markets have positive EV, but none cleared all execution "
+        "and risk gates. Paper-order creation remains blocked."
+    )
+    assert metrics["Positive EV"] == 2
+    assert metrics["EV gate"] == "Cleared"
+    assert metrics["Refresh owner"] == "GH-2 scheduled refresh"
+    assert "Gap to positive" not in metrics
+    assert "low edge 2" in truth_row["evidence"]
+    assert "no liquidity 2" in truth_row["evidence"]
+    assert "risk decision missing 2" in truth_row["evidence"]
+    assert "do not lower" in truth_row["next_action"].lower()
+    assert watcher_row["source"] == "GH-2 scheduled refresh"
+    assert watcher_row["status_kind"] == "healthy"
+    assert "R9" not in " ".join(link["label"] for link in panel["report_links"])
+    assert panel["last_updated_label"].endswith("ago")
+    assert [row["ticker"] for row in panel["candidate_rows"]] == [
+        "KXSOLE-26JUL2317-T39",
+        "KXXRP-26JUL2317-T0.72000",
+    ]
+    assert panel["candidate_rows"][0]["expected_value_label"] == "0.3c"
+
+
+def test_phase3aw_candidate_formats_legacy_decimal_ev_without_cents(tmp_path) -> None:
+    reports_dir = Path(tmp_path) / "reports"
+    output_dir = reports_dir / "phase3aw"
+    _write_r5_positive_ev_blocked_status(reports_dir)
+    r5_path = reports_dir / "phase3bc_r5" / "phase3bc_r5_crypto_freshness_watch.json"
+    payload = json.loads(r5_path.read_text(encoding="utf-8"))
+    payload["best_ev_candidates"][0].pop("expected_value_cents")
+    r5_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with _session_factory(tmp_path)() as session:
+        artifacts = write_phase3aw_dashboard_truth_report(
+            session,
+            output_dir=output_dir,
+            reports_dir=reports_dir,
+            settings=Settings(opportunity_min_time_to_close_minutes=1),
+        )
+
+    dashboard = json.loads(artifacts.dashboard_truth_path.read_text(encoding="utf-8"))
+    panel = _paper_trade_blocker_status_from_phase3aw(dashboard)
+    assert panel["candidate_rows"][0]["expected_value_label"] == "0.3c"
+    assert panel["candidate_rows"][0]["book_label"] == "No visible liquidity"
+    assert panel["candidate_rows"][0]["failed_gate_label"] == (
+        "low edge, no liquidity, risk decision missing"
+    )
+
+
 def test_phase3aw_cli_help() -> None:
     runner = CliRunner()
 
@@ -482,6 +559,95 @@ def _write_r5_snapshot_refreshing_status(reports_dir: Path) -> None:
     watch = {
         "generated_at": now,
         "summary": summary,
+    }
+    (r5_dir / "phase3bc_r5_status.json").write_text(
+        json.dumps(status),
+        encoding="utf-8",
+    )
+    (r5_dir / "phase3bc_r5_crypto_freshness_watch.json").write_text(
+        json.dumps(watch),
+        encoding="utf-8",
+    )
+
+
+def _write_r5_positive_ev_blocked_status(reports_dir: Path) -> None:
+    r5_dir = reports_dir / "phase3bc_r5"
+    r5_dir.mkdir(parents=True, exist_ok=True)
+    now = utc_now().isoformat()
+    summary = {
+        "watch_state": "REFRESH_RANKINGS",
+        "active_pure_crypto_rows": 14,
+        "current_active_window_rows": 8,
+        "snapshot_stale_rows": 0,
+        "snapshot_missing_rows": 0,
+        "forecast_stale_rows": 0,
+        "forecast_missing_rows": 0,
+        "ranking_missing_rows": 0,
+        "ranking_stale_rows": 0,
+        "ranking_before_forecast_rows": 4,
+        "true_ranking_gap_after_repair": 4,
+        "primary_gap_after_refresh": "LOW_EDGE_OR_SCORE_BLOCK",
+        "phase3bc_main_blocker": "BLOCKED_INACTIVE_OR_DEPRECATED_MARKET",
+        "freshness_backlog_blocks_current_positive_ev": False,
+        "positive_ev_snapshot_stale_rows": 0,
+        "positive_ev_forecast_stale_rows": 0,
+        "positive_ev_rows": 2,
+        "positive_ev_no_executable_book_rows": 2,
+        "positive_ev_clean_book_rows": 0,
+        "clean_execution_rows": 0,
+        "paper_ready_candidates": 0,
+        "best_ev_candidate_ticker": "KXSOLE-26JUL2317-T39",
+        "best_current_expected_value_cents": "0.3",
+        "best_ev_gap_to_positive_cents": "0.0",
+        "preflight_blocker_counts": {
+            "LIQUIDITY_ZERO": 2,
+            "LOW_EDGE": 2,
+            "LOW_SCORE": 0,
+            "RISK_MISSING": 2,
+        },
+    }
+    candidates = [
+        {
+            "ticker": "KXSOLE-26JUL2317-T39",
+            "clean_title": "SOL price on Jul 23, 2026?",
+            "expected_value": "0.0030320000",
+            "expected_value_cents": "0.3",
+            "best_price": "0.0100",
+            "liquidity_score": "0.00",
+            "preflight_blockers": ["LOW_EDGE", "LIQUIDITY_ZERO", "RISK_MISSING"],
+        },
+        {
+            "ticker": "KXXRP-26JUL2317-T0.72000",
+            "clean_title": "Ripple price at Jul 23, 2026 at 5pm EDT?",
+            "expected_value": "0.0017360000",
+            "expected_value_cents": "0.2",
+            "best_price": "0.0100",
+            "liquidity_score": "0.00",
+            "preflight_blockers": ["LOW_EDGE", "LIQUIDITY_ZERO", "RISK_MISSING"],
+        },
+    ]
+    status = {
+        "generated_at": now,
+        "latest_report_generated_at": now,
+        "guard": {
+            "status": "SCHEDULED_OWNER_HEALTHY",
+            "running": False,
+            "scheduled_owner_active": True,
+            "scheduler_owner": "GH-2_SINGLE_WRITER_DECISION_REFRESH",
+            "stale_report": False,
+            "latest_age_seconds": 0,
+            "freshness_window_minutes": 15,
+            "recommended_next_action": (
+                "GH-2 owns the bounded refresh; do not start a duplicate watcher."
+            ),
+        },
+        "latest_summary": summary,
+    }
+    watch = {
+        "generated_at": now,
+        "summary": summary,
+        "positive_ev_no_executable_book_examples": candidates,
+        "best_ev_candidates": candidates,
     }
     (r5_dir / "phase3bc_r5_status.json").write_text(
         json.dumps(status),

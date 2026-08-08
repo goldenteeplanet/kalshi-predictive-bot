@@ -220,24 +220,33 @@
   {% endif %}
 </section>
 
-<section class="section-band compact-band" aria-labelledby="paper-blockers-title">
+<section class="section-band compact-band paper-blocker-section" aria-labelledby="paper-blockers-title">
   <div class="section-head">
     <div>
       <h2 id="paper-blockers-title">Why No Paper Trades?</h2>
       <p class="muted">{{ paper_trade_blockers.summary }}</p>
+      <p class="paper-report-age">
+        Last report
+        {% if paper_trade_blockers.last_updated != 'n/a' %}
+        <time datetime="{{ paper_trade_blockers.last_updated }}" title="{{ paper_trade_blockers.last_updated }}">
+          {{ paper_trade_blockers.last_updated_label|default(paper_trade_blockers.last_updated) }}
+        </time>
+        {% else %}
+        n/a
+        {% endif %}
+      </p>
     </div>
-    <div class="hero-status">
+    <div class="hero-status paper-blocker-actions">
       <span class="badge badge-{{ paper_trade_blockers.status_kind }}">{{ paper_trade_blockers.status_label }}</span>
       {% for link in paper_trade_blockers.report_links[:2] %}
       <a class="button" href="{{ link.href }}">{{ link.label }}</a>
       {% endfor %}
     </div>
   </div>
-  <div class="status-grid">
+  <div class="status-grid paper-blocker-metrics">
     {% for item in paper_trade_blockers.metrics %}
     <div><span>{{ item.label }}</span><strong>{{ item.value }}</strong></div>
     {% endfor %}
-    <div><span>Last report</span><strong>{{ paper_trade_blockers.last_updated }}</strong></div>
   </div>
   <div class="table-wrap professional-table paper-blocker-table">
     <table>
@@ -262,7 +271,41 @@
       </tbody>
     </table>
   </div>
-  {% if paper_trade_blockers.positive_ev_rows %}
+  {% if paper_trade_blockers.candidate_rows %}
+  <div class="paper-candidate-heading">
+    <h3>Current Positive-EV Candidates</h3>
+    <span>{{ paper_trade_blockers.candidate_rows|length }} shown</span>
+  </div>
+  <div class="table-wrap professional-table paper-current-candidate-table">
+    <table>
+      <caption class="sr-only">Current positive-EV candidates and their remaining paper-readiness gates</caption>
+      <thead>
+        <tr>
+          <th scope="col">Market</th>
+          <th scope="col">EV</th>
+          <th scope="col">Book</th>
+          <th scope="col">Remaining gates</th>
+          <th scope="col">Next action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for candidate in paper_trade_blockers.candidate_rows %}
+        <tr>
+          <td>
+            <a href="{{ candidate.detail_href }}"><strong>{{ candidate.ticker }}</strong></a>
+            <small>{{ candidate.title }}</small>
+          </td>
+          <td class="numeric"><strong>{{ candidate.expected_value_label }}</strong></td>
+          <td><span class="status-pill status-blocked">{{ candidate.book_label }}</span></td>
+          <td>{{ candidate.failed_gate_label }}</td>
+          <td>{{ candidate.next_action }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if paper_trade_blockers.positive_ev_rows and not paper_trade_blockers.candidate_rows %}
   <div class="table-wrap professional-table paper-positive-ev-table">
     <table>
       <caption class="sr-only">Positive-EV rows classified by verified Kalshi link and book status</caption>
@@ -310,9 +353,9 @@
     </table>
   </div>
   {% endif %}
-  <div class="mini-actions">
+  <div class="mini-actions paper-report-links">
     {% for link in paper_trade_blockers.report_links[2:] %}
-    <a href="{{ link.href }}">{{ link.label }}</a>
+    <a class="button" href="{{ link.href }}">{{ link.label }}</a>
     {% endfor %}
   </div>
 </section>

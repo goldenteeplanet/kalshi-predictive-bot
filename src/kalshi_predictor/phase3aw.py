@@ -22,7 +22,7 @@ from kalshi_predictor.utils.time import parse_datetime, utc_now
 DEFAULT_OUTPUT_DIR = Path("reports/phase3aw")
 DEFAULT_MARKDOWN = "phase3aw_crash_recovery.md"
 DEFAULT_JSON = "phase3aw_crash_recovery.json"
-PHASE3AW_DASHBOARD_VERSION = "phase3aw_dashboard_truth_v1"
+PHASE3AW_DASHBOARD_VERSION = "phase3aw_dashboard_truth_v2"
 
 DASHBOARD_TRUTH_JSON = "dashboard_truth.json"
 STALE_ARTIFACT_AUDIT_JSON = "stale_artifact_audit.json"
@@ -197,6 +197,7 @@ def build_phase3aw_dashboard_truth(
     next_command = _operator_next_command(true_blocker)
     ui_panel = _ui_panel(
         current_funnel=current_funnel,
+        r5_watch=r5_watch,
         true_blocker=true_blocker,
         stale_artifacts_ignored=stale_artifacts_ignored,
         next_command=next_command,
@@ -506,9 +507,14 @@ def _current_crypto_funnel(
         ),
         "best_ev_candidate_ticker": r5_summary.get("best_ev_candidate_ticker") or "n/a",
         "r5_running": bool(r5_guard.get("running")),
+        "scheduled_owner_active": bool(r5_guard.get("scheduled_owner_active")),
+        "scheduler_owner": r5_guard.get("scheduler_owner"),
+        "refresh_owner_active": bool(r5_guard.get("running"))
+        or bool(r5_guard.get("scheduled_owner_active")),
         "r5_status": r5_guard.get("status") or "UNKNOWN",
         "r5_runner_state": runner_state,
         "r5_stale_report": bool(r5_guard.get("stale_report")),
+        "r5_recommended_next_action": r5_guard.get("recommended_next_action"),
         "r5_latest_age_seconds": _first_present(
             r5_guard,
             "latest_age_seconds",
@@ -535,6 +541,11 @@ def _current_crypto_funnel(
         "data_freshness_complete": bool(r5_summary.get("data_freshness_complete")),
         "data_freshness_partial_reason": r5_summary.get(
             "data_freshness_partial_reason"
+        ),
+        "preflight_blocker_counts": (
+            r5_summary.get("preflight_blocker_counts")
+            if isinstance(r5_summary.get("preflight_blocker_counts"), dict)
+            else {}
         ),
         "stale_artifacts_ignored": stale_artifacts_ignored,
     }
@@ -664,6 +675,7 @@ def _artifact_conflict_reason(
 def _ui_panel(
     *,
     current_funnel: dict[str, Any],
+    r5_watch: dict[str, Any],
     true_blocker: str,
     stale_artifacts_ignored: int,
     next_command: str,
@@ -671,15 +683,33 @@ def _ui_panel(
 ) -> dict[str, Any]:
     status_label = _ui_status_label(true_blocker, current_funnel)
     status_kind = _ui_status_kind(true_blocker)
-    evidence = (
-        f"best_current_expected_value_cents={current_funnel['best_current_expected_value_cents']}, "
-        f"positive_ev_rows={current_funnel['current_positive_ev_rows']}, "
-        f"clean_execution_rows={current_funnel['clean_execution_rows']}"
+    positive_ev_rows = current_funnel["current_positive_ev_rows"]
+    candidate_rows = (
+        _positive_ev_candidate_rows(r5_watch)[:positive_ev_rows]
+        if positive_ev_rows > 0
+        else []
     )
-    runner_status_kind = "healthy" if current_funnel["r5_running"] else "stale"
+    gate_counts = _preflight_gate_counts_label(
+        current_funnel.get("preflight_blocker_counts")
+    )
+    evidence = (
+        f"Best EV {_format_cents(current_funnel['best_current_expected_value_cents'])}; "
+        f"{positive_ev_rows} positive-EV row(s); "
+        f"{current_funnel['clean_execution_rows']} clean execution row(s)."
+    )
+    if gate_counts:
+        evidence += f" Remaining gates: {gate_counts}."
+    runner_status_kind = (
+        "healthy" if current_funnel["refresh_owner_active"] else "stale"
+    )
     if current_funnel["r5_runner_state"] == RUNNING_CYCLE_OVERDUE:
         runner_status_kind = "warn"
     runner_label = _display_runner_label(current_funnel)
+    refresh_owner_label = _refresh_owner_label(current_funnel)
+    refresh_next_action = str(
+        current_funnel.get("r5_recommended_next_action")
+        or "Keep the guarded refresh owner active; do not start a duplicate watcher."
+    )
     blockers = [
         {
             "area": "Current crypto truth",
@@ -688,24 +718,22 @@ def _ui_panel(
             "status_kind": status_kind if status_kind != "good" else "healthy",
             "status_label": status_label,
             "evidence": evidence,
-            "next_action": _next_action_text(true_blocker),
+            "next_action": _next_action_text(true_blocker, current_funnel),
         },
         {
             "area": "Watcher freshness",
-            "source": "Phase 3AX-R9 guarded refresh status",
+            "source": refresh_owner_label,
             "status": current_funnel["r5_runner_state"],
             "status_kind": runner_status_kind,
             "status_label": runner_label,
             "evidence": (
-                f"Runner {runner_label}; "
+                f"{refresh_owner_label} is "
+                f"{'active' if current_funnel['refresh_owner_active'] else 'inactive'}; "
                 f"watch state {_format_enum(str(current_funnel['watch_state']))}; "
-                f"latest_age_seconds={current_funnel['r5_latest_age_seconds']}; "
-                f"freshness_window_minutes={current_funnel['r5_freshness_window_minutes']}."
+                f"latest report age {_format_seconds(current_funnel['r5_latest_age_seconds'])}; "
+                f"freshness window {current_funnel['r5_freshness_window_minutes']} minutes."
             ),
-            "next_action": (
-                "Use the R9 status-only command for refresh-job truth; do not start "
-                "a duplicate watcher."
-            ),
+            "next_action": refresh_next_action,
         },
     ]
     if stale_artifacts_ignored:
@@ -742,31 +770,196 @@ def _ui_panel(
                 "value": _format_cents(current_funnel["best_current_expected_value_cents"]),
             },
             {
-                "label": "Gap to positive",
-                "value": _format_cents(current_funnel["best_ev_gap_to_positive_cents"]),
+                "label": "EV gate",
+                "value": (
+                    "Cleared"
+                    if positive_ev_rows > 0
+                    else f"{_format_cents(current_funnel['best_ev_gap_to_positive_cents'])} short"
+                ),
             },
             {
                 "label": "R5 status",
                 "value": runner_label,
             },
             {
-                "label": "R9 refresh source",
-                "value": "Phase 3AX-R9 guarded refresh job",
+                "label": "Refresh owner",
+                "value": refresh_owner_label,
             },
             {"label": "Old artifacts ignored", "value": stale_artifacts_ignored},
         ],
         "last_updated": str(current_funnel.get("watch_state") or "n/a"),
         "blockers": blockers,
         "positive_ev_rows": [],
+        "candidate_rows": candidate_rows,
         "report_links": [
             {"label": "Truth report", "href": "/reports/phase3aw/EXECUTIVE_SUMMARY.md"},
-            {"label": "R9 status", "href": "/reports/phase3ax_r9/guarded_refresh_job.json"},
             {"label": "R5 status", "href": f"/{r5_status_path.as_posix()}"},
-            {"label": "Artifact audit", "href": "/reports/phase3aw/stale_artifact_audit.json"},
             {"label": "Current funnel", "href": "/reports/phase3aw/current_crypto_funnel.md"},
+            {"label": "Artifact audit", "href": "/reports/phase3aw/stale_artifact_audit.json"},
         ],
         "operator_next_command": next_command,
     }
+
+
+def _positive_ev_candidate_rows(
+    r5_watch: dict[str, Any],
+    *,
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    if limit <= 0:
+        return []
+    sections = (
+        "positive_ev_preflight_candidates",
+        "positive_ev_clean_book_risk_missing_examples",
+        "positive_ev_clean_book_examples",
+        "positive_ev_liquidity_positive_examples",
+        "positive_ev_spread_blocked_examples",
+        "positive_ev_no_executable_book_examples",
+        "positive_ev_snapshot_stale_examples",
+        "positive_ev_forecast_stale_examples",
+        "best_ev_candidates",
+    )
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for section in sections:
+        raw_rows = r5_watch.get(section)
+        if not isinstance(raw_rows, list):
+            continue
+        for raw in raw_rows:
+            if not isinstance(raw, dict):
+                continue
+            ticker = str(raw.get("ticker") or "").strip()
+            expected_value = raw.get("expected_value")
+            if expected_value is None:
+                expected_value = raw.get("expected_value_cents")
+            if not ticker or ticker in seen or not _is_positive(expected_value):
+                continue
+            blockers = _candidate_blockers(raw)
+            seen.add(ticker)
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "title": str(raw.get("clean_title") or raw.get("title") or ticker),
+                    "detail_href": f"/opportunities/{ticker}",
+                    "expected_value_label": _candidate_expected_value_label(raw),
+                    "book_label": _candidate_book_label(raw, blockers),
+                    "failed_gate_label": ", ".join(
+                        _preflight_gate_label(blocker) for blocker in blockers
+                    )
+                    or "Paper-readiness gate pending",
+                    "next_action": _candidate_next_action(raw, blockers),
+                }
+            )
+            if len(rows) >= limit:
+                return rows
+    return rows
+
+
+def _candidate_blockers(row: dict[str, Any]) -> list[str]:
+    raw_blockers = row.get("preflight_blockers") or row.get("blocking_gates") or []
+    if not isinstance(raw_blockers, list):
+        raw_blockers = []
+    blockers = [str(item).strip().upper() for item in raw_blockers if str(item).strip()]
+    return list(dict.fromkeys(blockers))
+
+
+def _candidate_expected_value_label(row: dict[str, Any]) -> str:
+    cents = row.get("expected_value_cents")
+    if cents is None:
+        try:
+            cents = float(row.get("expected_value")) * 100
+        except (TypeError, ValueError):
+            cents = None
+    return _format_cents(cents)
+
+
+def _candidate_book_label(row: dict[str, Any], blockers: list[str]) -> str:
+    if "SNAPSHOT_MISSING" in blockers:
+        return "Snapshot missing"
+    if row.get("best_price") is None:
+        return "No executable price"
+    try:
+        liquidity = float(row.get("liquidity_score"))
+    except (TypeError, ValueError):
+        liquidity = None
+    if liquidity is not None and liquidity <= 0:
+        return "No visible liquidity"
+    if "SPREAD_TOO_WIDE" in blockers or "HIGH_SPREAD" in blockers:
+        return "Spread above limit"
+    return "Visible quote"
+
+
+def _candidate_next_action(row: dict[str, Any], blockers: list[str]) -> str:
+    reported = row.get("what_would_make_paper_ready")
+    if isinstance(reported, list):
+        text = " ".join(str(item).strip() for item in reported if str(item).strip())
+        if text:
+            return text
+    actions: list[str] = []
+    if "LOW_EDGE" in blockers:
+        actions.append("Wait for edge to meet the configured minimum")
+    if "LOW_SCORE" in blockers:
+        actions.append("wait for score to meet the configured minimum")
+    if "LIQUIDITY_ZERO" in blockers:
+        actions.append("wait for visible executable liquidity")
+    if "RISK_MISSING" in blockers:
+        actions.append("run risk evaluation only after market gates clear")
+    if "SNAPSHOT_STALE" in blockers or "SNAPSHOT_MISSING" in blockers:
+        actions.append("wait for the guarded snapshot refresh")
+    if not actions:
+        return "Re-evaluate after the next guarded GH-2 refresh."
+    return "; ".join(actions).capitalize() + "."
+
+
+def _preflight_gate_counts_label(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    parts = [
+        f"{_preflight_gate_label(str(key))} {count}"
+        for key, raw_count in value.items()
+        if (count := _int_value(raw_count)) > 0
+    ]
+    return ", ".join(parts)
+
+
+def _preflight_gate_label(value: str) -> str:
+    labels = {
+        "LIQUIDITY_ZERO": "no liquidity",
+        "LOW_EDGE": "low edge",
+        "LOW_SCORE": "low score",
+        "RANKING_GAP": "ranking gap",
+        "RISK_MISSING": "risk decision missing",
+        "SNAPSHOT_MISSING": "snapshot missing",
+        "SNAPSHOT_STALE": "snapshot refreshing",
+    }
+    normalized = str(value or "UNKNOWN").strip().upper()
+    return labels.get(normalized, normalized.replace("_", " ").lower())
+
+
+def _refresh_owner_label(funnel: dict[str, Any]) -> str:
+    if funnel.get("scheduled_owner_active"):
+        return "GH-2 scheduled refresh"
+    if funnel.get("r5_running"):
+        return "R5 guarded refresh"
+    return "R5 refresh status"
+
+
+def _format_seconds(value: Any) -> str:
+    try:
+        seconds = max(0, int(float(value)))
+    except (TypeError, ValueError):
+        return "unknown"
+    if seconds < 60:
+        return f"{seconds} second{'s' if seconds != 1 else ''}"
+    minutes = seconds // 60
+    return f"{minutes} minute{'s' if minutes != 1 else ''}"
+
+
+def _is_positive(value: Any) -> bool:
+    try:
+        return float(value) > 0
+    except (TypeError, ValueError):
+        return False
 
 
 def _display_runner_label(funnel: dict[str, Any]) -> str:
@@ -1158,10 +1351,19 @@ def _display_blocker_label(blocker: str, funnel: dict[str, Any]) -> str:
         and funnel.get("r5_runner_state") == RUNNING_CYCLE_OVERDUE
     ):
         return "Refresh running / cycle overdue"
-    if blocker == SNAPSHOT_STALE and funnel.get("r5_running"):
+    if blocker == SNAPSHOT_STALE and funnel.get("refresh_owner_active"):
         return "Refreshing snapshots"
-    if blocker == FORECAST_STALE and funnel.get("r5_running"):
+    if blocker == FORECAST_STALE and funnel.get("refresh_owner_active"):
         return "Refreshing forecasts"
+    if blocker == LOW_EDGE_OR_SCORE_BLOCK:
+        gate_counts = funnel.get("preflight_blocker_counts")
+        if isinstance(gate_counts, dict):
+            low_edge = _int_value(gate_counts.get("LOW_EDGE"))
+            low_score = _int_value(gate_counts.get("LOW_SCORE"))
+            if low_edge > 0 and low_score == 0:
+                return "Edge below threshold"
+            if low_score > 0 and low_edge == 0:
+                return "Score below threshold"
     return _blocker_label(blocker)
 
 
@@ -1201,24 +1403,51 @@ def _summary_text(true_blocker: str, funnel: dict[str, Any]) -> str:
         return "Current crypto evidence is still catching up, so paper readiness is blocked."
     if true_blocker == PAPER_READY_CANDIDATE_AVAILABLE:
         return "A paper-ready candidate exists, but this dashboard remains read-only."
+    if funnel["current_positive_ev_rows"] > 0:
+        row_count = funnel["current_positive_ev_rows"]
+        row_word = "market has" if row_count == 1 else "markets have"
+        return (
+            f"{row_count} current crypto {row_word} positive EV, but none cleared "
+            "all execution and risk gates. Paper-order creation remains blocked."
+        )
     return (
         f"Current crypto truth is blocked at {_blocker_label(true_blocker)} with "
         f"{funnel['current_positive_ev_rows']} positive-EV row(s)."
     )
 
 
-def _next_action_text(true_blocker: str) -> str:
+def _next_action_text(
+    true_blocker: str,
+    funnel: dict[str, Any] | None = None,
+) -> str:
+    funnel = funnel or {}
+    scheduled_refresh = bool(funnel.get("scheduled_owner_active"))
+    refresh_name = "GH-2 scheduled refresh" if scheduled_refresh else "R5 guarded refresh"
     if true_blocker == EV_NOT_POSITIVE:
-        return "Keep the R9 guarded R5 refresh job running. Do not force paper trades."
+        return f"Keep the {refresh_name} active. Do not force paper trades."
     if true_blocker in {SNAPSHOT_STALE, FORECAST_STALE, RANKING_GAP}:
         return (
-            "Keep the bounded R5 refresh/watch path active; do not use old URL "
+            f"Keep the bounded {refresh_name} active; do not use old URL "
             "artifacts as primary evidence."
         )
     if true_blocker == WATCHER_NOT_RUNNING_OR_STALE:
         return (
             "Run the R5 status command and restart only the watcher if the guard "
             "says it is stopped."
+        )
+    if true_blocker == LOW_EDGE_OR_SCORE_BLOCK:
+        return (
+            f"Wait for the next {refresh_name} cycle; do not lower edge, score, "
+            "liquidity, or risk thresholds."
+        )
+    if true_blocker in {
+        LIQUIDITY_OR_SPREAD_BLOCK,
+        EXECUTABLE_EV_NOT_POSITIVE,
+        RISK_OR_SIZE_BLOCK,
+    }:
+        return (
+            f"Wait for the next {refresh_name} cycle and keep all execution and "
+            "risk gates enforced."
         )
     return "Review current R5 truth before taking any paper-only follow-up."
 
