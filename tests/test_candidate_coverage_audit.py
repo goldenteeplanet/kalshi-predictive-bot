@@ -50,6 +50,29 @@ def test_candidate_coverage_fee_adjusted_ev_remains_diagnostic() -> None:
     assert payload["category_funnels"]["crypto"]["counts"]["executable_ev"] == 0
 
 
+def test_candidate_coverage_names_unknown_series_manifest_bucket() -> None:
+    weather = _row("WEATHER", category="weather", manifest=False)
+    weather["series_ticker"] = None
+    payload = build_candidate_coverage_audit(
+        evidence=[weather],
+        manifest_payload={
+            "selection": "STICKY_FRESH_THEN_CURRENT_RANKINGS_WITH_SNAPSHOT_RECOVERY",
+            "tickers": [],
+        },
+        gh2_payload={"candidate_alignment": {"ranked_candidates": 6}},
+        crypto_r5_payload={},
+        freshness_minutes=15,
+        addition_limit=10,
+    )
+
+    addition = payload["safe_coverage_additions"][0]
+    diagnostics = payload["manifest_selection_diagnostics"]
+    assert addition["reason"] == "MANIFEST_UNKNOWN_SERIES_BUCKET"
+    assert "Repair series lineage" in addition["next_action"]
+    assert diagnostics["excluded_ranked_rows_without_series"] == 1
+    assert diagnostics["excluded_tickers"] == ["WEATHER"]
+
+
 def test_candidate_coverage_read_only_engine_rejects_writes(tmp_path) -> None:
     database = tmp_path / "coverage.db"
     with sqlite3.connect(database) as connection:
