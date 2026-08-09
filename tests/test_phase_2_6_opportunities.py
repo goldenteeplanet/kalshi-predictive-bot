@@ -9,13 +9,13 @@ from kalshi_predictor.data.repositories import insert_forecast, insert_market_sn
 from kalshi_predictor.data.schema import MarketOpportunity
 from kalshi_predictor.forecasting.base import ForecastOutput
 from kalshi_predictor.opportunities.scanner import scan_opportunities
-from kalshi_predictor.paper.ledger import get_latest_forecast_per_ticker
 from kalshi_predictor.opportunities.scoring import (
     calculate_opportunity_score,
     score_liquidity,
     score_spread,
     score_time_to_close,
 )
+from kalshi_predictor.paper.ledger import get_latest_forecast_per_ticker
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES
 from kalshi_predictor.utils.time import utc_now
 
@@ -66,6 +66,11 @@ def test_scanner_detects_buy_yes_opportunity(tmp_path) -> None:
         assert summary.opportunities[0]["side"] == BUY_YES
         assert summary.rankings[0]["forecast_id"] is not None
         assert summary.rankings[0]["market_snapshot_id"] is not None
+        assert summary.rankings[0]["price_tick_size"] == "0.01"
+        assert summary.rankings[0]["price_tick_valid"] is True
+        assert summary.rankings[0]["gross_expected_value"] == "0.2000"
+        assert summary.rankings[0]["estimated_taker_fee"] == "0.0175"
+        assert summary.rankings[0]["fee_adjusted_expected_value"] == "0.1825"
         assert session.scalar(select(MarketOpportunity)).side == BUY_YES
 
 

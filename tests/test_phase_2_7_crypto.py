@@ -17,7 +17,7 @@ from kalshi_predictor.crypto.repository import (
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import encode_json, insert_market_snapshot, upsert_market
 from kalshi_predictor.data.schema import ForecastSkipLog, MarketLeg
-from kalshi_predictor.forecasting.crypto_v2 import CryptoV2Forecaster
+from kalshi_predictor.forecasting.crypto_v2 import CryptoV2Forecaster, _clamp_probability
 from kalshi_predictor.utils.time import utc_now
 
 
@@ -48,6 +48,12 @@ def test_crypto_feature_builder_handles_insufficient_history(tmp_path) -> None:
         assert features["return_1h"] is None
         assert features["trend_direction"] == "UNKNOWN"
         assert "Insufficient history" in " ".join(features["notes"])
+
+
+def test_crypto_forecast_probability_is_not_rounded_to_exchange_ticks() -> None:
+    assert _clamp_probability(Decimal("0.005312")) == Decimal("0.005312")
+    assert _clamp_probability(Decimal("-0.1")) == Decimal("0")
+    assert _clamp_probability(Decimal("1.1")) == Decimal("1")
 
 
 def test_crypto_feature_builder_calculates_returns_correctly(tmp_path) -> None:

@@ -64,6 +64,9 @@ PHASE3BA_R3_VERSION = "phase3ba_r3_weather_paper_gate_v1"
 MODEL_NAME = "weather_v2"
 
 WEATHER_PAPER_BLOCKERS = (
+    "MARKET_WINDOW_INELIGIBLE",
+    "LINK_UNVERIFIED",
+    "SNAPSHOT_MISSING",
     "SOURCE_MISSING",
     "SNAPSHOT_STALE",
     "FORECAST_MISSING",
@@ -418,11 +421,11 @@ def _weather_paper_gate_row(
 
 def _first_weather_paper_blocker(row: dict[str, Any]) -> str:
     if not row.get("current_window_eligible"):
-        return "SOURCE_MISSING"
+        return "MARKET_WINDOW_INELIGIBLE"
     if not row.get("verified_kalshi_url"):
-        return "SOURCE_MISSING"
+        return "LINK_UNVERIFIED"
     if not row.get("has_snapshot"):
-        return "SOURCE_MISSING"
+        return "SNAPSHOT_MISSING"
     if not row.get("snapshot_fresh"):
         return "SNAPSHOT_STALE"
     if not row.get("has_weather_source_forecast") or not row.get("weather_source_forecast_fresh"):
@@ -748,7 +751,28 @@ def _next_action(*, status: str, summary: dict[str, Any]) -> dict[str, Any]:
             ),
             "allow_paper_trade_creation": False,
         }
-    if summary["first_hard_blocker"] == "SNAPSHOT_STALE":
+    if summary["first_hard_blocker"] == "MARKET_WINDOW_INELIGIBLE":
+        command = (
+            "kalshi-bot phase3ba-r3-weather-paper-gate --output-dir "
+            "reports/phase3ba_r3 --reports-dir reports"
+        )
+        reason = (
+            "Linked weather rows are outside the eligible entry window; wait for the next "
+            "scheduled market window."
+        )
+    elif summary["first_hard_blocker"] == "LINK_UNVERIFIED":
+        command = (
+            "kalshi-bot phase3az-r13-weather-handoff-status --output-dir "
+            "reports/phase3az_r13_weather --reports-dir reports"
+        )
+        reason = "Weather source evidence exists, but the exact Kalshi market link is not verified."
+    elif summary["first_hard_blocker"] == "SNAPSHOT_MISSING":
+        command = (
+            "kalshi-bot db-writer-monitor --json && "
+            "kalshi-bot capture-snapshots --status open --limit 100"
+        )
+        reason = "Weather gate is missing a market snapshot/orderbook."
+    elif summary["first_hard_blocker"] == "SNAPSHOT_STALE":
         command = (
             "kalshi-bot db-writer-monitor --json && "
             "kalshi-bot capture-snapshots --status open --limit 100"
@@ -786,6 +810,7 @@ def _next_action(*, status: str, summary: dict[str, Any]) -> dict[str, Any]:
 def _funnel_steps() -> tuple[str, ...]:
     return (
         "current linked weather markets",
+        "eligible market entry window",
         "verified Kalshi URL",
         "fresh weather snapshot/source evidence",
         "weather feature available",
@@ -858,14 +883,14 @@ def _data_watermark(session: Session) -> dict[str, Any]:
 
 def _latest_iso(session: Session, column: Any) -> str | None:
     value = session.scalar(select(func.max(column)))
-    return value.isoformat() if hasattr(value, "isoformat") else value
+    return _iso_string(value)
 
 
 def _latest_forecast_iso(session: Session) -> str | None:
     value = session.scalar(
         select(func.max(Forecast.forecasted_at)).where(Forecast.model_name == MODEL_NAME)
     )
-    return value.isoformat() if hasattr(value, "isoformat") else value
+    return _iso_string(value)
 
 
 def _latest_ranking_iso(session: Session) -> str | None:
@@ -874,7 +899,14 @@ def _latest_ranking_iso(session: Session) -> str | None:
             MarketRanking.forecast_model == MODEL_NAME
         )
     )
-    return value.isoformat() if hasattr(value, "isoformat") else value
+    return _iso_string(value)
+
+
+def _iso_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    formatter = getattr(value, "isoformat", None)
+    return str(formatter()) if callable(formatter) else str(value)
 
 
 def _database_fingerprint(db_url: str) -> dict[str, Any]:

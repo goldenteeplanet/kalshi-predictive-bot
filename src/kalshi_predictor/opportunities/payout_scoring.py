@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Any
 
 from kalshi_predictor.data.repositories import decode_json
+from kalshi_predictor.kalshi.protocol_math import trading_fee
 from kalshi_predictor.opportunities.scoring import score_edge
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES
 from kalshi_predictor.utils.decimals import ONE_DOLLAR, decimal_to_str, to_decimal
@@ -20,6 +21,9 @@ class PayoutMetrics:
     downside_if_wrong: Decimal | None
     risk_adjusted_edge: Decimal | None
     payout_to_risk_ratio: Decimal | None
+    gross_expected_value: Decimal | None
+    estimated_taker_fee: Decimal | None
+    fee_adjusted_expected_value: Decimal | None
     expected_value: Decimal | None
     expected_value_score: Decimal
     payout_adjusted_score: Decimal
@@ -30,6 +34,9 @@ class PayoutMetrics:
             "downside_if_wrong": decimal_to_str(self.downside_if_wrong),
             "risk_adjusted_edge": decimal_to_str(self.risk_adjusted_edge),
             "payout_to_risk_ratio": decimal_to_str(self.payout_to_risk_ratio),
+            "gross_expected_value": decimal_to_str(self.gross_expected_value),
+            "estimated_taker_fee": decimal_to_str(self.estimated_taker_fee),
+            "fee_adjusted_expected_value": decimal_to_str(self.fee_adjusted_expected_value),
             "expected_value": decimal_to_str(self.expected_value),
             "expected_value_score": decimal_to_str(self.expected_value_score),
             "payout_adjusted_score": decimal_to_str(self.payout_adjusted_score),
@@ -58,6 +65,9 @@ def calculate_payout_metrics(
             downside_if_wrong=None,
             risk_adjusted_edge=None,
             payout_to_risk_ratio=None,
+            gross_expected_value=None,
+            estimated_taker_fee=None,
+            fee_adjusted_expected_value=None,
             expected_value=None,
             expected_value_score=ZERO,
             payout_adjusted_score=ZERO,
@@ -65,10 +75,17 @@ def calculate_payout_metrics(
 
     payout_if_correct = ONE_DOLLAR - cost_value
     downside_if_wrong = cost_value
-    expected_value = (
+    gross_expected_value = (
         probability * payout_if_correct
         - (ONE_DOLLAR - probability) * downside_if_wrong
     )
+    estimated_taker_fee = trading_fee(price=cost_value)
+    fee_adjusted_expected_value = (
+        gross_expected_value - estimated_taker_fee
+        if estimated_taker_fee is not None
+        else None
+    )
+    expected_value = gross_expected_value
     payout_to_risk_ratio = (
         payout_if_correct / downside_if_wrong if downside_if_wrong > ZERO else None
     )
@@ -94,6 +111,9 @@ def calculate_payout_metrics(
         downside_if_wrong=downside_if_wrong,
         risk_adjusted_edge=risk_adjusted_edge,
         payout_to_risk_ratio=payout_to_risk_ratio,
+        gross_expected_value=gross_expected_value,
+        estimated_taker_fee=estimated_taker_fee,
+        fee_adjusted_expected_value=fee_adjusted_expected_value,
         expected_value=expected_value,
         expected_value_score=expected_value_score,
         payout_adjusted_score=payout_adjusted_score,
