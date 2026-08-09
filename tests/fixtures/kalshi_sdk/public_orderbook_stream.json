@@ -1,0 +1,28 @@
+{
+  "access": "PUBLIC_READ_ONLY",
+  "source": "synthetic_protocol_fixture_no_historical_claim",
+  "snapshot": {
+    "type": "orderbook_snapshot",
+    "sid": 7,
+    "seq": 101,
+    "msg": {
+      "market_ticker": "KX-CONFORMANCE",
+      "market_id": "fixture-market-id",
+      "yes_dollars_fp": [["0.4200", "12.00"], ["0.4100", "8.50"]],
+      "no_dollars_fp": [["0.5700", "9.00"], ["0.5600", "4.00"]]
+    }
+  },
+  "delta": {
+    "type": "orderbook_delta",
+    "sid": 7,
+    "seq": 102,
+    "msg": {
+      "market_ticker": "KX-CONFORMANCE",
+      "market_id": "fixture-market-id",
+      "price_dollars": "0.4200",
+      "delta_fp": "3.00",
+      "side": "yes",
+      "ts": "2026-08-09T00:00:00Z"
+    }
+  }
+}
