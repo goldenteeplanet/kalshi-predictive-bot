@@ -72,11 +72,14 @@ def insert_market_snapshot(
     captured_at: datetime,
 ) -> MarketSnapshot:
     market_payload = dict(market_json)
-    if "close_time" not in market_payload:
-        existing_market = _pending_market(session, _required_str(market_payload, "ticker"))
-        if existing_market is None:
-            existing_market = session.get(Market, _required_str(market_payload, "ticker"))
-        if existing_market is not None and existing_market.close_time is not None:
+    existing_market = _pending_market(session, _required_str(market_payload, "ticker"))
+    if existing_market is None:
+        existing_market = session.get(Market, _required_str(market_payload, "ticker"))
+    if existing_market is not None:
+        for field in ("event_ticker", "series_ticker"):
+            if field not in market_payload and getattr(existing_market, field) is not None:
+                market_payload[field] = getattr(existing_market, field)
+        if "close_time" not in market_payload and existing_market.close_time is not None:
             # Snapshot payloads can be intentionally partial. Preserve the exact known
             # close time only when the source omitted the field; explicit values retain
             # normal upsert semantics.
@@ -107,7 +110,7 @@ def insert_market_snapshot(
         volume_fp=_decimal_string(market_json.get("volume_fp")),
         volume_24h_fp=_decimal_string(market_json.get("volume_24h_fp")),
         open_interest_fp=_decimal_string(market_json.get("open_interest_fp")),
-        raw_market_json=encode_json(dict(market_json)),
+        raw_market_json=encode_json(market_payload),
         raw_orderbook_json=(
             encode_json(dict(orderbook_json)) if orderbook_json is not None else None
         ),
