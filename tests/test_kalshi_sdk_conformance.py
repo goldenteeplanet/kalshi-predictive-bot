@@ -66,6 +66,28 @@ def test_public_market_pagination_preserves_cursor_contract() -> None:
     assert [request.url.params.get("cursor") for request in requests] == [None, "NEXT"]
 
 
+def test_exact_event_and_series_requests_are_public_read_only() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path.endswith("/events/E"):
+            return httpx.Response(200, json={"event": {"event_ticker": "E", "series_ticker": "S"}})
+        return httpx.Response(200, json={"series": {"ticker": "S"}})
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(transport=transport, base_url="https://api.elections.kalshi.com") as http:
+        client = KalshiClient(client=http, throttle_seconds=0)
+        assert client.get_event("E")["event"]["series_ticker"] == "S"
+        assert client.get_series_by_ticker("S")["series"]["ticker"] == "S"
+
+    assert [(request.method, request.url.path) for request in requests] == [
+        ("GET", "/events/E"),
+        ("GET", "/series/S"),
+    ]
+    assert all("KALSHI-ACCESS-KEY" not in request.headers for request in requests)
+
+
 def test_sdk_and_local_orderbook_snapshot_and_delta_are_conformant() -> None:
     pytest.importorskip("kalshi")
     payload = json.loads(FIXTURE.read_text(encoding="utf-8"))

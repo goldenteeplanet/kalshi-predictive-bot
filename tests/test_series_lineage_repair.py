@@ -235,9 +235,115 @@ def test_bounded_fetch_and_rollback_artifact(tmp_path) -> None:
         normalize_tickers("A,B", limit=1)
 
 
+def test_missing_market_series_uses_exact_event_and_series_evidence(tmp_path) -> None:
+    client = _EventBackedClient()
+    evidence = fetch_exact_catalog_lineage(
+        client,
+        tickers=["M"],
+        deadline_monotonic=time.monotonic() + 5,
+    )
+    assert evidence["M"][0]["series_ticker"] == "S"
+    assert evidence["M"][0]["_lineage_evidence"] == "EXACT_EVENT_AND_SERIES_CATALOG"
+    assert client.calls == [("event", "E"), ("series", "S")]
+
+    session_factory = _session_factory(tmp_path)
+    with session_factory.begin() as session:
+        upsert_market(session, {"ticker": "M", "event_ticker": "E", "status": "open"})
+    with session_factory() as session:
+        plan = build_lineage_repair_plan(session, tickers=["M"], catalog_evidence=evidence)
+        assert plan["rows"][0]["action"] == "APPLY"
+        assert plan["rows"][0]["source"]["series_ticker"] == "S"
+        assert plan["rows"][0]["source"]["lineage_evidence"] == (
+            "EXACT_EVENT_AND_SERIES_CATALOG"
+        )
+
+
+@pytest.mark.parametrize(
+    ("client_kwargs", "reason"),
+    [
+        ({"event": {"event_ticker": "OTHER", "series_ticker": "S"}},
+         "EVENT_EVIDENCE_MISMATCH"),
+        ({"event": {"event_ticker": "E"}}, "EVENT_SERIES_MISSING"),
+        ({"series": {"ticker": "OTHER"}}, "SERIES_EVIDENCE_MISMATCH"),
+    ],
+)
+def test_event_backed_evidence_mismatch_fails_closed(tmp_path, client_kwargs, reason) -> None:
+    client = _EventBackedClient(**client_kwargs)
+    evidence = fetch_exact_catalog_lineage(
+        client,
+        tickers=["M"],
+        deadline_monotonic=time.monotonic() + 5,
+    )
+    session_factory = _session_factory(tmp_path)
+    with session_factory.begin() as session:
+        upsert_market(session, {"ticker": "M", "event_ticker": "E", "status": "open"})
+    with session_factory() as session:
+        plan = build_lineage_repair_plan(session, tickers=["M"], catalog_evidence=evidence)
+        assert plan["rows"][0]["reason"] == reason
+
+
+def test_event_backed_evidence_never_derives_identity_from_ticker(tmp_path) -> None:
+    client = _EventBackedClient(market={"ticker": "SERIES-EVENT-MARKET", "status": "open"})
+    evidence = fetch_exact_catalog_lineage(
+        client,
+        tickers=["SERIES-EVENT-MARKET"],
+        deadline_monotonic=time.monotonic() + 5,
+    )
+    assert client.calls == []
+    session_factory = _session_factory(tmp_path)
+    with session_factory.begin() as session:
+        upsert_market(session, {"ticker": "SERIES-EVENT-MARKET", "status": "open"})
+    with session_factory() as session:
+        plan = build_lineage_repair_plan(
+            session,
+            tickers=["SERIES-EVENT-MARKET"],
+            catalog_evidence=evidence,
+        )
+        assert plan["rows"][0]["reason"] == "CATALOG_EVENT_MISSING"
+
+
+def test_event_backed_ambiguous_and_conflicting_evidence_fails_closed(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory.begin() as session:
+        upsert_market(session, {"ticker": "M", "event_ticker": "OTHER", "status": "open"})
+    duplicate = {"ticker": "M", "event_ticker": "E", "series_ticker": "S"}
+    with session_factory() as session:
+        ambiguous = build_lineage_repair_plan(
+            session,
+            tickers=["M"],
+            catalog_evidence={"M": [duplicate, duplicate]},
+        )
+        conflicting = build_lineage_repair_plan(
+            session,
+            tickers=["M"],
+            catalog_evidence={"M": [duplicate]},
+        )
+    assert ambiguous["rows"][0]["reason"] == "CATALOG_EVIDENCE_NOT_UNIQUE"
+    assert conflicting["rows"][0]["reason"] == "EVENT_CONFLICT"
+
+
 class _FakeClient:
     def get_markets(self, **_kwargs):
         return {"markets": [{"ticker": "M", "event_ticker": "E", "series_ticker": "S"}]}
+
+
+class _EventBackedClient:
+    def __init__(self, *, market=None, event=None, series=None):
+        self.market = market or {"ticker": "M", "event_ticker": "E", "status": "open"}
+        self.event = event or {"event_ticker": "E", "series_ticker": "S"}
+        self.series = series or {"ticker": "S"}
+        self.calls = []
+
+    def get_markets(self, **_kwargs):
+        return {"markets": [self.market]}
+
+    def get_event(self, event_ticker):
+        self.calls.append(("event", event_ticker))
+        return {"event": self.event}
+
+    def get_series_by_ticker(self, series_ticker):
+        self.calls.append(("series", series_ticker))
+        return {"series": self.series}
 
 
 def _session_factory(tmp_path):

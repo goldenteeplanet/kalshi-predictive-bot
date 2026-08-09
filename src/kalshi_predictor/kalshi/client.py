@@ -224,6 +224,12 @@ class KalshiClient:
             params["limit"] = limit
         return self._get("/series", params=params)
 
+    def get_event(self, event_ticker: str) -> dict[str, Any]:
+        return self._get(f"/events/{event_ticker}")
+
+    def get_series_by_ticker(self, series_ticker: str) -> dict[str, Any]:
+        return self._get(f"/series/{series_ticker}")
+
     def iter_markets(
         self,
         status: str | None = "open",

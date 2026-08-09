@@ -46,7 +46,51 @@ def fetch_exact_catalog_lineage(
         ticker = str(raw.get("ticker") or "").strip()
         if ticker in requested:
             evidence[ticker].append(dict(raw))
+    _enrich_from_exact_events(
+        client,
+        evidence=evidence,
+        deadline_monotonic=deadline_monotonic,
+    )
     return dict(evidence)
+
+
+def _enrich_from_exact_events(
+    client: Any,
+    *,
+    evidence: dict[str, list[dict[str, Any]]],
+    deadline_monotonic: float,
+) -> None:
+    events: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for rows in evidence.values():
+        for row in rows:
+            if _clean(row.get("series_ticker")) is not None:
+                continue
+            event_ticker = _clean(row.get("event_ticker"))
+            if event_ticker is None:
+                row["_lineage_blocker"] = "CATALOG_EVENT_MISSING"
+                continue
+            events[event_ticker].append(row)
+
+    for event_ticker, rows in events.items():
+        _require_deadline(deadline_monotonic)
+        event_payload = client.get_event(event_ticker)
+        event = event_payload.get("event") if isinstance(event_payload, Mapping) else None
+        if not isinstance(event, Mapping) or _clean(event.get("event_ticker")) != event_ticker:
+            _block_rows(rows, "EVENT_EVIDENCE_MISMATCH")
+            continue
+        series_ticker = _clean(event.get("series_ticker"))
+        if series_ticker is None:
+            _block_rows(rows, "EVENT_SERIES_MISSING")
+            continue
+        _require_deadline(deadline_monotonic)
+        series_payload = client.get_series_by_ticker(series_ticker)
+        series = series_payload.get("series") if isinstance(series_payload, Mapping) else None
+        if not isinstance(series, Mapping) or _clean(series.get("ticker")) != series_ticker:
+            _block_rows(rows, "SERIES_EVIDENCE_MISMATCH")
+            continue
+        for row in rows:
+            row["series_ticker"] = series_ticker
+            row["_lineage_evidence"] = "EXACT_EVENT_AND_SERIES_CATALOG"
 
 
 def build_lineage_repair_plan(
@@ -192,6 +236,8 @@ def _plan_row(
     if len(source_rows) != 1:
         return _blocked(ticker, "CATALOG_EVIDENCE_NOT_UNIQUE")
     source = source_rows[0]
+    if source.get("_lineage_blocker"):
+        return _blocked(ticker, str(source["_lineage_blocker"]))
     if is_inactive_market_status(source.get("status")):
         return _blocked(ticker, "CATALOG_MARKET_NOT_ACTIVE")
     source_ticker = str(source.get("ticker") or "").strip()
@@ -210,7 +256,11 @@ def _plan_row(
         "series_ticker": market.series_ticker,
         "raw_json": market.raw_json,
     }
-    source_identity = {"event_ticker": event, "series_ticker": series}
+    source_identity = {
+        "event_ticker": event,
+        "series_ticker": series,
+        "lineage_evidence": source.get("_lineage_evidence") or "EXACT_MARKET_CATALOG",
+    }
     identity_matches = market.series_ticker == series and (
         event is None or market.event_ticker == event
     )
@@ -234,6 +284,16 @@ def _blocked(ticker: str, reason: str) -> dict[str, Any]:
 def _clean(value: Any) -> str | None:
     text = str(value or "").strip()
     return text or None
+
+
+def _require_deadline(deadline_monotonic: float) -> None:
+    if time.monotonic() > deadline_monotonic:
+        raise TimeoutError("Catalog lineage fetch exceeded its deadline.")
+
+
+def _block_rows(rows: list[dict[str, Any]], reason: str) -> None:
+    for row in rows:
+        row["_lineage_blocker"] = reason
 
 
 def _render_markdown(payload: dict[str, Any]) -> str:
