@@ -35,7 +35,9 @@ def _base_row() -> dict:
 
 def test_phase3ba_r3_first_weather_paper_blocker_order() -> None:
     cases = [
-        ({"verified_kalshi_url": False}, "SOURCE_MISSING"),
+        ({"current_window_eligible": False}, "MARKET_WINDOW_INELIGIBLE"),
+        ({"verified_kalshi_url": False}, "LINK_UNVERIFIED"),
+        ({"has_snapshot": False}, "SNAPSHOT_MISSING"),
         ({"snapshot_fresh": False}, "SNAPSHOT_STALE"),
         ({"has_current_forecast": False}, "FORECAST_MISSING"),
         ({"has_current_ranking": False}, "RANKING_MISSING"),

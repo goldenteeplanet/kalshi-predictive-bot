@@ -10,9 +10,10 @@ from kalshi_predictor.active_universe import is_inactive_market_status
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.repositories import decode_json
 from kalshi_predictor.data.schema import Forecast, Market, MarketSnapshot
+from kalshi_predictor.kalshi.orderbook import LocalOrderbook
+from kalshi_predictor.kalshi.protocol_math import is_valid_market_price, tick_size_for_price
 from kalshi_predictor.learning.config import learning_paper_settings
 from kalshi_predictor.learning.repository import insert_learning_rejection
-from kalshi_predictor.kalshi.orderbook import LocalOrderbook
 from kalshi_predictor.opportunities.payout_scoring import calculate_payout_metrics
 from kalshi_predictor.opportunities.repository import (
     insert_market_opportunity,
@@ -288,6 +289,8 @@ def build_market_ranking(
         time_score=time_score,
     )
     payout_fields = payout_metrics.as_dict()
+    price_tick_size = tick_size_for_price(raw_market, price)
+    price_tick_valid = is_valid_market_price(raw_market, price) if price is not None else None
     opportunity_score = payout_metrics.payout_adjusted_score
     reason = _reason(side, edge, opportunity_score, spread, time_to_close)
     return {
@@ -309,6 +312,9 @@ def build_market_ranking(
         "forecast_probability": decimal_to_str(forecast_probability),
         "best_side": side,
         "best_price": decimal_to_str(price),
+        "price_level_structure": raw_market.get("price_level_structure"),
+        "price_tick_size": decimal_to_str(price_tick_size),
+        "price_tick_valid": price_tick_valid,
         "estimated_edge": decimal_to_str(edge),
         "liquidity_score": decimal_to_str(liquidity_score),
         "spread_score": decimal_to_str(spread_score),
@@ -322,6 +328,10 @@ def build_market_ranking(
             "snapshot_id": snapshot.id,
             "best_yes_ask": decimal_to_str(best_yes_ask),
             "best_no_ask": decimal_to_str(best_no_ask),
+            "price_level_structure": raw_market.get("price_level_structure"),
+            "price_ranges": raw_market.get("price_ranges"),
+            "price_tick_size": decimal_to_str(price_tick_size),
+            "price_tick_valid": price_tick_valid,
             "market_liquidity_dollars": decimal_to_str(market_liquidity),
             "orderbook_top5_notional": decimal_to_str(orderbook_depth_notional),
             "liquidity_input_source": (

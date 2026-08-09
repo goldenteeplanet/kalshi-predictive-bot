@@ -9,9 +9,9 @@ from kalshi_predictor.crypto.repository import (
     get_latest_crypto_link_for_ticker,
 )
 from kalshi_predictor.crypto.semantics import (
-    EXACT_LINK,
     DEFAULT_FEATURE_MAX_AGE_MINUTES,
     DEFAULT_FUTURE_SKEW_SECONDS,
+    EXACT_LINK,
     CryptoMarketTerms,
     FeatureCompatibility,
     parse_crypto_market_terms,
@@ -499,10 +499,12 @@ def _component_observation_references(
 
 
 def _clamp_probability(value: Decimal) -> Decimal:
-    if value < Decimal("0.01"):
-        return Decimal("0.01")
-    if value > Decimal("0.99"):
-        return Decimal("0.99")
+    # Forecast probabilities are continuous model outputs. Exchange tick sizes
+    # constrain executable prices, not probabilities.
+    if value < Decimal("0"):
+        return Decimal("0")
+    if value > Decimal("1"):
+        return Decimal("1")
     return value
 
 

@@ -119,6 +119,10 @@ def test_expected_value_calculation_for_buy_yes_and_buy_no() -> None:
 
     assert yes.expected_value == Decimal("0.1800")
     assert no.expected_value == Decimal("0.2500")
+    assert yes.estimated_taker_fee == Decimal("0.0175")
+    assert yes.fee_adjusted_expected_value == Decimal("0.1625")
+    assert no.estimated_taker_fee == Decimal("0.0174")
+    assert no.fee_adjusted_expected_value == Decimal("0.2326")
 
 
 def test_payout_to_risk_ratio_calculation() -> None:
