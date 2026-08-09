@@ -20229,6 +20229,103 @@ def candidate_coverage_audit_command(
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
+@app.command("catalog-lineage-repair")
+def catalog_lineage_repair_command(
+    tickers: Annotated[
+        str,
+        typer.Option(help="Comma-separated exact active market tickers."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Repair plan and rollback artifact directory."),
+    ] = Path("reports/catalog_lineage_repair"),
+    limit: Annotated[
+        int,
+        typer.Option(help="Maximum explicit ticker count."),
+    ] = 20,
+    deadline_seconds: Annotated[
+        int,
+        typer.Option(help="Catalog evidence fetch deadline in seconds."),
+    ] = 30,
+    apply: Annotated[
+        bool,
+        typer.Option("--apply", help="Apply source-backed null repairs in one transaction."),
+    ] = False,
+) -> None:
+    import time
+
+    from kalshi_predictor.candidate_funnel_audit import (
+        make_candidate_funnel_read_only_engine,
+    )
+    from kalshi_predictor.kalshi.client import KalshiClient
+    from kalshi_predictor.series_lineage_repair import (
+        apply_lineage_repair,
+        build_lineage_repair_plan,
+        fetch_exact_catalog_lineage,
+        normalize_tickers,
+        write_lineage_repair_artifacts,
+    )
+
+    if deadline_seconds < 1:
+        raise typer.BadParameter("deadline-seconds must be positive")
+    try:
+        scoped_tickers = normalize_tickers(tickers, limit=limit)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    deadline = time.monotonic() + deadline_seconds
+    with KalshiClient() as client:
+        evidence = fetch_exact_catalog_lineage(
+            client,
+            tickers=scoped_tickers,
+            deadline_monotonic=deadline,
+        )
+
+    settings = get_settings()
+    engine = (
+        init_db()
+        if apply
+        else make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
+    )
+    session_factory = get_session_factory(engine)
+    apply_result = None
+    if apply:
+        with session_factory.begin() as session:
+            plan = build_lineage_repair_plan(
+                session,
+                tickers=scoped_tickers,
+                catalog_evidence=evidence,
+            )
+            # Persist the exact pre-repair values before entering the write path.
+            write_lineage_repair_artifacts(
+                plan=plan,
+                output_dir=output_dir,
+                dry_run=True,
+            )
+            apply_result = apply_lineage_repair(
+                session,
+                plan=plan,
+                writer_monitor=lambda: db_writer_monitor(settings=settings),
+            )
+    else:
+        with session_factory() as session:
+            plan = build_lineage_repair_plan(
+                session,
+                tickers=scoped_tickers,
+                catalog_evidence=evidence,
+            )
+    artifacts = write_lineage_repair_artifacts(
+        plan=plan,
+        output_dir=output_dir,
+        dry_run=not apply,
+        apply_result=apply_result,
+    )
+    console.print(f"Mode: {'APPLY' if apply else 'DRY RUN'}")
+    console.print("Historical rankings rewritten: 0")
+    console.print("Candidate selection changed: no")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote rollback evidence: {artifacts.rollback_path}")
+
+
 @app.command("explain-opportunity")
 def explain_opportunity_command(
     ticker: Annotated[
