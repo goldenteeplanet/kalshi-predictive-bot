@@ -263,6 +263,11 @@ def build_candidate_coverage_audit(
             "category_count": len(categories),
         },
         "category_funnels": funnels,
+        "manifest_selection_diagnostics": _manifest_selection_diagnostics(
+            rows,
+            gh2_payload=gh2_payload,
+            manifest_payload=manifest_payload,
+        ),
         "exclusion_reason_counts": dict(
             sorted(Counter(str(row["exclusion_reason"]) for row in rows).items())
         ),
@@ -389,6 +394,8 @@ def _exclusion_reason(stage: str, row: dict[str, Any]) -> str:
     if stage == "ranking":
         return "RANKING_MISSING_OR_STALE"
     if stage == "candidate_manifest":
+        if not row.get("series_ticker"):
+            return "MANIFEST_UNKNOWN_SERIES_BUCKET"
         return "NOT_SELECTED_IN_CANDIDATE_MANIFEST"
     if stage == "positive_gross_ev":
         return "EV_NOT_POSITIVE"
@@ -401,6 +408,11 @@ def _exclusion_reason(stage: str, row: dict[str, Any]) -> str:
 
 def _safe_next_action(row: dict[str, Any]) -> str:
     stage = str(row["first_exclusion_stage"])
+    if row.get("exclusion_reason") == "MANIFEST_UNKNOWN_SERIES_BUCKET":
+        return (
+            "Repair series lineage before considering bounded manifest coverage; "
+            "do not bypass diversity selection."
+        )
     return {
         "linked": "Review exact semantic link evidence; do not auto-link ambiguity.",
         "fresh_snapshot": "Allow the existing scheduled collector to capture this ticker.",
@@ -410,6 +422,33 @@ def _safe_next_action(row: dict[str, Any]) -> str:
         "positive_gross_ev": "Observe only; wait for model or price movement.",
         "executable_ev": "Observe only; wait for fee-adjusted executable EV.",
     }.get(stage, "Keep excluded until authoritative evidence clears the current stage.")
+
+
+def _manifest_selection_diagnostics(
+    rows: list[dict[str, Any]],
+    *,
+    gh2_payload: dict[str, Any],
+    manifest_payload: dict[str, Any],
+) -> dict[str, Any]:
+    ranked = [row for row in rows if row.get("ranking")]
+    unknown_series = [row for row in ranked if not row.get("series_ticker")]
+    unknown_manifest = [row for row in unknown_series if row.get("candidate_manifest")]
+    unknown_excluded = [row for row in unknown_series if not row.get("candidate_manifest")]
+    alignment = gh2_payload.get("candidate_alignment") or {}
+    return {
+        "selection": manifest_payload.get("selection"),
+        "gh2_ranked_candidates": alignment.get("ranked_candidates"),
+        "ranked_rows_without_series": len(unknown_series),
+        "manifest_rows_without_series": len(unknown_manifest),
+        "excluded_ranked_rows_without_series": len(unknown_excluded),
+        "excluded_tickers": sorted(str(row["ticker"]) for row in unknown_excluded),
+        "interpretation": (
+            "Rows without series_ticker share the selector's UNKNOWN diversity bucket; "
+            "this diagnostic does not change manifest selection or gate authority."
+            if unknown_excluded
+            else "No ranked row was excluded from the manifest with missing series lineage."
+        ),
+    }
 
 
 def _category(ticker: str, leg_categories: set[str]) -> str:
