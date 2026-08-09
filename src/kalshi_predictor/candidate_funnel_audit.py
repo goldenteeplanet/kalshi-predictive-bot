@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import Engine, create_engine, desc, event, select
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.data.schema import MarketRanking
@@ -19,6 +20,31 @@ AUDIT_VERSION = "candidate_funnel_audit_v1"
 class CandidateFunnelArtifacts:
     json_path: Path
     markdown_path: Path
+
+
+def make_candidate_funnel_read_only_engine(database_url: str) -> Engine:
+    url = make_url(database_url)
+    if not url.drivername.startswith("sqlite") or not url.database:
+        raise ValueError("Candidate funnel audit currently requires a SQLite database URL")
+    database_path = Path(url.database)
+    resolved = database_path.expanduser().resolve()
+    if not resolved.is_file():
+        raise FileNotFoundError(f"Candidate funnel database does not exist: {resolved}")
+    engine = create_engine(
+        f"sqlite+pysqlite:///file:{resolved.as_posix()}?mode=ro&uri=true",
+        future=True,
+        connect_args={"check_same_thread": False},
+    )
+
+    @event.listens_for(engine, "connect")
+    def _enforce_query_only(dbapi_connection: Any, _connection_record: Any) -> None:
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA query_only=ON")
+        finally:
+            cursor.close()
+
+    return engine
 
 
 def write_candidate_funnel_audit(

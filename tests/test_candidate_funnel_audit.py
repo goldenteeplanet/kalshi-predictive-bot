@@ -1,4 +1,13 @@
-from kalshi_predictor.candidate_funnel_audit import build_candidate_funnel_audit
+import sqlite3
+
+import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
+
+from kalshi_predictor.candidate_funnel_audit import (
+    build_candidate_funnel_audit,
+    make_candidate_funnel_read_only_engine,
+)
 
 
 def test_candidate_funnel_preserves_source_gate_and_fee_diagnostic() -> None:
@@ -94,3 +103,19 @@ def test_candidate_funnel_honors_gh2_manifest_scope() -> None:
 
     assert payload["summary"]["manifest_scope_count"] == 1
     assert [row["ticker"] for row in payload["candidates"]] == ["CURRENT"]
+
+
+def test_candidate_funnel_engine_enforces_query_only(tmp_path) -> None:
+    database_path = tmp_path / "audit.db"
+    with sqlite3.connect(database_path) as connection:
+        connection.execute("CREATE TABLE evidence (value TEXT NOT NULL)")
+        connection.execute("INSERT INTO evidence VALUES ('accepted')")
+
+    engine = make_candidate_funnel_read_only_engine(
+        f"sqlite:///{database_path.as_posix()}"
+    )
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT value FROM evidence")).scalar_one() == "accepted"
+        assert connection.execute(text("PRAGMA query_only")).scalar_one() == 1
+        with pytest.raises(OperationalError, match="readonly database"):
+            connection.execute(text("INSERT INTO evidence VALUES ('forbidden')"))

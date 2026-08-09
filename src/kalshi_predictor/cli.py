@@ -20146,9 +20146,15 @@ def candidate_funnel_audit_command(
         typer.Option(help="Read-only candidate funnel report directory."),
     ] = Path("reports/candidate_funnel"),
 ) -> None:
-    from kalshi_predictor.candidate_funnel_audit import write_candidate_funnel_audit
+    from kalshi_predictor.candidate_funnel_audit import (
+        make_candidate_funnel_read_only_engine,
+        write_candidate_funnel_audit,
+    )
 
-    engine = init_db()
+    settings = get_settings()
+    engine = make_candidate_funnel_read_only_engine(
+        database_url_from_settings(settings)
+    )
     session_factory = get_session_factory(engine)
     with session_factory() as session:
         artifacts = write_candidate_funnel_audit(
