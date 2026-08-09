@@ -2168,7 +2168,11 @@ def paper_trade_blocker_status(*, crypto_freshness: dict[str, Any]) -> dict[str,
         "status_label": status_label,
         "metrics": metrics,
         "last_updated": age_label,
+        "last_updated_label": (
+            age_label if age_label == "n/a" or age_label.endswith("ago") else f"{age_label} ago"
+        ),
         "blockers": blockers,
+        "candidate_rows": _positive_crypto_gate_rows(crypto_freshness),
         "positive_ev_rows": (
             _phase3ar_positive_ev_rows_for_ui(phase3ar_payload)
             if phase3ar_summary
@@ -2226,13 +2230,20 @@ def _paper_trade_blocker_status_from_phase3aw(payload: dict[str, Any]) -> dict[s
             0,
             {"label": "Truth report", "href": PHASE3AW_EXECUTIVE_SUMMARY_HREF},
         )
+    last_updated = str(summary.get("r5_latest_report_generated_at") or "n/a")
     return {
         "summary": str(ui_panel.get("summary") or ""),
         "status_kind": str(ui_panel.get("status_kind") or "neutral"),
         "status_label": str(ui_panel.get("status_label") or "Unknown"),
         "metrics": ui_panel.get("metrics") if isinstance(ui_panel.get("metrics"), list) else [],
-        "last_updated": str(summary.get("r5_latest_report_generated_at") or "n/a"),
+        "last_updated": last_updated,
+        "last_updated_label": _format_timestamp_age_label(last_updated),
         "blockers": ui_panel.get("blockers") if isinstance(ui_panel.get("blockers"), list) else [],
+        "candidate_rows": (
+            ui_panel.get("candidate_rows")
+            if isinstance(ui_panel.get("candidate_rows"), list)
+            else []
+        ),
         "positive_ev_rows": (
             ui_panel.get("positive_ev_rows")
             if isinstance(ui_panel.get("positive_ev_rows"), list)
@@ -2277,6 +2288,10 @@ def _paper_trade_blocker_status_from_crypto_truth(
     paper_ready = _safe_int(crypto_freshness.get("paper_ready_candidates"))
     best_ev = str(crypto_freshness.get("best_current_expected_value_label") or "n/a")
     gap = str(crypto_freshness.get("best_ev_gap_to_positive_label") or "n/a")
+    scheduled_owner_active = bool(crypto_freshness.get("scheduled_owner_active"))
+    refresh_owner_label = (
+        "GH-2 scheduled refresh" if scheduled_owner_active else "Crypto freshness watch"
+    )
     summary = (
         "The crypto watch is running. Current snapshots, forecasts, and rankings "
         "are healthy. No current crypto market has strictly positive expected value, "
@@ -2303,9 +2318,13 @@ def _paper_trade_blocker_status_from_crypto_truth(
         },
         {
             "area": "Watcher freshness",
-            "source": "Crypto freshness watch",
+            "source": refresh_owner_label,
             "status": crypto_freshness.get("runner_status") or "UNKNOWN",
-            "status_kind": "healthy" if crypto_freshness.get("runner_running") else "stale",
+            "status_kind": (
+                "healthy"
+                if crypto_freshness.get("runner_running") or scheduled_owner_active
+                else "stale"
+            ),
             "status_label": str(
                 crypto_freshness.get("runner_status_label")
                 or _format_enum_label(str(crypto_freshness.get("runner_status") or "UNKNOWN"))
@@ -2335,6 +2354,11 @@ def _paper_trade_blocker_status_from_crypto_truth(
                 ),
             }
         )
+    last_updated = str(
+        crypto_freshness.get("r5_latest_report_generated_at")
+        or crypto_freshness.get("generated_at")
+        or "n/a"
+    )
     return {
         "summary": summary,
         "status_kind": status_kind,
@@ -2344,19 +2368,21 @@ def _paper_trade_blocker_status_from_crypto_truth(
             {"label": "Positive EV", "value": positive_ev},
             {"label": "Clean execution rows", "value": clean_execution},
             {"label": "Best EV", "value": best_ev},
-            {"label": "Gap to positive", "value": gap},
+            {
+                "label": "EV gate",
+                "value": "Cleared" if positive_ev > 0 else f"{gap} short",
+            },
             {
                 "label": "R5 status",
                 "value": crypto_freshness.get("runner_status_label") or "Unknown",
             },
+            {"label": "Refresh owner", "value": refresh_owner_label},
             {"label": "Stale artifacts ignored", "value": stale_artifacts_ignored},
         ],
-        "last_updated": str(
-            crypto_freshness.get("r5_latest_report_generated_at")
-            or crypto_freshness.get("generated_at")
-            or "n/a"
-        ),
+        "last_updated": last_updated,
+        "last_updated_label": _format_timestamp_age_label(last_updated),
         "blockers": blockers,
+        "candidate_rows": _positive_crypto_gate_rows(crypto_freshness),
         "positive_ev_rows": [],
         "report_links": [
             {"label": "Watch report", "href": str(crypto_freshness.get("report_href") or "#")},
@@ -2413,7 +2439,9 @@ def _paper_trade_blocker_empty_truth() -> dict[str, Any]:
         "status_label": "Unknown",
         "metrics": [],
         "last_updated": "n/a",
+        "last_updated_label": "n/a",
         "blockers": [],
+        "candidate_rows": [],
         "positive_ev_rows": [],
         "report_links": [{"label": "Truth report", "href": PHASE3AW_EXECUTIVE_SUMMARY_HREF}],
     }
@@ -3469,6 +3497,7 @@ def _crypto_gate_failure_examples(
                     "expected_value_label": _format_cents(
                         raw.get("expected_value_cents")
                     ),
+                    "expected_value_cents": raw.get("expected_value_cents"),
                     "book_label": _crypto_candidate_book_label(raw, blockers),
                     "failed_gate_label": ", ".join(
                         _format_enum_label(blocker) for blocker in blockers
@@ -3479,6 +3508,25 @@ def _crypto_gate_failure_examples(
             if len(rows) >= limit:
                 return rows
     return rows
+
+
+def _positive_crypto_gate_rows(
+    crypto_freshness: dict[str, Any],
+) -> list[dict[str, Any]]:
+    rows = crypto_freshness.get("gate_failure_examples")
+    if not isinstance(rows, list):
+        return []
+    positive: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        try:
+            expected_value_cents = float(row.get("expected_value_cents"))
+        except (TypeError, ValueError):
+            continue
+        if expected_value_cents > 0:
+            positive.append(row)
+    return positive
 
 
 def _crypto_candidate_blockers(row: dict[str, Any]) -> list[str]:

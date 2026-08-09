@@ -4,6 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from typer.testing import CliRunner
 
 from kalshi_predictor import phase3ay
@@ -268,6 +269,40 @@ def test_phase3ay_unattended_start_writes_pid_logs_and_metadata(
     assert "--settlement-only" in observed["command"]
 
 
+def test_phase3ay_unattended_start_can_emit_market_refresh_only_command(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(phase3ay, "_phase3ay_running_pids", lambda: [])
+    observed: dict[str, object] = {}
+
+    class FakePopen:
+        pid = 4243
+
+    def fake_popen(command, **kwargs):
+        observed["command"] = command
+        observed["kwargs"] = kwargs
+        return FakePopen()
+
+    monkeypatch.setattr(phase3ay.subprocess, "Popen", fake_popen)
+
+    result = start_phase3ay_unattended_refresh(
+        output_dir=Path("reports/phase3ay"),
+        cycles=1,
+        interval_seconds=0,
+        all_markets=True,
+        market_refresh_only=True,
+    )
+
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+
+    assert result.started is True
+    assert metadata["market_refresh_only"] is True
+    assert "--all-markets" in observed["command"]
+    assert "--market-refresh-only" in observed["command"]
+
+
 def test_phase3ay_settlement_only_skips_slow_non_settlement_steps(
     tmp_path,
     monkeypatch,
@@ -298,6 +333,75 @@ def test_phase3ay_settlement_only_skips_slow_non_settlement_steps(
     assert steps["sports_placeholder_watch"]["status"] == "SKIPPED"
     assert steps["phase_orchestrator"]["status"] == "SKIPPED"
     assert payload["status"] in {"FRESH_SETTLEMENT_ONLY", "FRESH_WATCHING_SETTLEMENTS"}
+
+
+def test_phase3ay_market_refresh_only_skips_chained_health_steps(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(phase3ay, "db_writer_monitor", lambda settings=None: _clear_writer())
+
+    with _session_factory(tmp_path)() as session:
+        artifacts = write_phase3ay_health_refresh_report(
+            session,
+            output_dir=Path("reports/phase3ay"),
+            step_jobs=_fake_step_jobs(),
+            market_refresh_only=True,
+        )
+
+    payload = json.loads(artifacts.json_path.read_text(encoding="utf-8"))
+    steps = {step["name"]: step for step in payload["steps"]}
+
+    assert payload["mode"] == "PAPER_MARKET_REFRESH_ONLY_LOOP"
+    assert payload["status"] == "FRESH_MARKET_REFRESH_ONLY"
+    assert payload["summary"]["market_refresh_only"] is True
+    assert payload["summary"]["market_snapshots_inserted"] == 8
+    assert steps["market_collect"]["status"] == "OK"
+    assert steps["settlement_sync"]["status"] == "SKIPPED"
+    assert steps["exact_settlement_harvest"]["status"] == "SKIPPED"
+    assert steps["paper_realize"]["status"] == "SKIPPED"
+    assert steps["paper_settlement_doctor"]["status"] == "SKIPPED"
+    assert steps["market_coverage_doctor"]["status"] == "SKIPPED"
+    assert steps["active_universe_doctor"]["status"] == "SKIPPED"
+    assert steps["sports_placeholder_resolution"]["status"] == "SKIPPED"
+    assert steps["sports_placeholder_watch"]["status"] == "SKIPPED"
+    assert steps["phase_orchestrator"]["status"] == "SKIPPED"
+    assert any("phase3ae-fast-market-harvester" in command for command in payload["next_commands"])
+
+
+def test_phase3ay_refresh_only_modes_are_mutually_exclusive(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(phase3ay, "db_writer_monitor", lambda settings=None: _clear_writer())
+
+    with _session_factory(tmp_path)() as session:
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            write_phase3ay_health_refresh_report(
+                session,
+                output_dir=Path("reports/phase3ay"),
+                settlement_only=True,
+                market_refresh_only=True,
+            )
+
+
+def test_phase3ay_market_refresh_only_reports_effective_realization_safety(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(phase3ay, "db_writer_monitor", lambda settings=None: _clear_writer())
+
+    with _session_factory(tmp_path)() as session:
+        artifacts = write_phase3ay_health_refresh_report(
+            session,
+            output_dir=Path("reports/phase3ay"),
+            step_jobs=_fake_step_jobs(),
+            market_refresh_only=True,
+            realize_paper=True,
+        )
+
+    payload = json.loads(artifacts.json_path.read_text(encoding="utf-8"))
+    assert payload["safety"]["realize_paper_enabled"] is False
 
 
 def test_phase3ay_status_marks_unattended_overrun(tmp_path, monkeypatch) -> None:

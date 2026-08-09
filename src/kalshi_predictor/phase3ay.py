@@ -85,11 +85,16 @@ def start_phase3ay_unattended_refresh(
     settlement_commit_every: int = 0,
     realize_paper: bool = True,
     settlement_only: bool = False,
+    market_refresh_only: bool = False,
     stop_on_error: bool = False,
     timeout_grace_seconds: int = 600,
 ) -> Phase3AYUnattendedStart:
     """Start Phase 3AY as an owned background process with PID/log metadata."""
 
+    _validate_refresh_modes(
+        settlement_only=settlement_only,
+        market_refresh_only=market_refresh_only,
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     pid_path = output_dir / UNATTENDED_PID_FILE
     metadata_path = output_dir / UNATTENDED_META_FILE
@@ -130,6 +135,7 @@ def start_phase3ay_unattended_refresh(
         settlement_commit_every=settlement_commit_every,
         realize_paper=realize_paper,
         settlement_only=settlement_only,
+        market_refresh_only=market_refresh_only,
         stop_on_error=stop_on_error,
     )
     timeout_seconds = _unattended_timeout_seconds(
@@ -181,6 +187,7 @@ def start_phase3ay_unattended_refresh(
         "settlement_commit_every": settlement_commit_every,
         "realize_paper": realize_paper,
         "settlement_only": settlement_only,
+        "market_refresh_only": market_refresh_only,
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "exact_ticker_settlement_required": True,
         "live_or_demo_execution": False,
@@ -276,6 +283,7 @@ def write_phase3ay_health_refresh_report(
     settlement_commit_every: int = 0,
     realize_paper: bool = True,
     settlement_only: bool = False,
+    market_refresh_only: bool = False,
     stop_on_error: bool = False,
     collect_job: StepJob | None = None,
     step_jobs: dict[str, StepJob] | None = None,
@@ -301,6 +309,7 @@ def write_phase3ay_health_refresh_report(
         settlement_commit_every=settlement_commit_every,
         realize_paper=realize_paper,
         settlement_only=settlement_only,
+        market_refresh_only=market_refresh_only,
         stop_on_error=stop_on_error,
         collect_job=collect_job,
         step_jobs=step_jobs,
@@ -399,6 +408,7 @@ def build_phase3ay_health_refresh_report(
     settlement_commit_every: int = 0,
     realize_paper: bool = True,
     settlement_only: bool = False,
+    market_refresh_only: bool = False,
     stop_on_error: bool = False,
     collect_job: StepJob | None = None,
     step_jobs: dict[str, StepJob] | None = None,
@@ -406,6 +416,10 @@ def build_phase3ay_health_refresh_report(
     deadline_monotonic: float | None = None,
     resume_market_cursor: bool = True,
 ) -> dict[str, Any]:
+    _validate_refresh_modes(
+        settlement_only=settlement_only,
+        market_refresh_only=market_refresh_only,
+    )
     resolved = settings or get_settings()
     output_dir.mkdir(parents=True, exist_ok=True)
     steps: list[dict[str, Any]] = []
@@ -421,6 +435,7 @@ def build_phase3ay_health_refresh_report(
             writer_status=writer_status,
             settings=resolved,
             settlement_only=settlement_only,
+            market_refresh_only=market_refresh_only,
         )
 
     overrides = step_jobs or {}
@@ -489,7 +504,7 @@ def build_phase3ay_health_refresh_report(
     )
     add_step(
         "settlement_sync",
-        settlement_sync,
+        settlement_sync and not market_refresh_only,
         job(
             "settlement_sync",
             lambda: sync_settlements(
@@ -503,7 +518,7 @@ def build_phase3ay_health_refresh_report(
     )
     add_step(
         "exact_settlement_harvest",
-        True,
+        not market_refresh_only,
         job(
             "exact_settlement_harvest",
             lambda: write_phase3aa_r2_exact_settlement_harvest_report(
@@ -514,7 +529,7 @@ def build_phase3ay_health_refresh_report(
     )
     add_step(
         "paper_realize",
-        True,
+        not market_refresh_only,
         job(
             "paper_realize",
             lambda: write_phase3aa_report(
@@ -528,7 +543,7 @@ def build_phase3ay_health_refresh_report(
     )
     add_step(
         "paper_settlement_doctor",
-        True,
+        not market_refresh_only,
         job(
             "paper_settlement_doctor",
             lambda: write_paper_settlement_reconciliation(
@@ -539,7 +554,7 @@ def build_phase3ay_health_refresh_report(
     )
     add_step(
         "market_coverage_doctor",
-        not settlement_only,
+        not settlement_only and not market_refresh_only,
         job(
             "market_coverage_doctor",
             lambda: write_market_coverage_doctor(
@@ -552,7 +567,7 @@ def build_phase3ay_health_refresh_report(
     )
     add_step(
         "active_universe_doctor",
-        not settlement_only,
+        not settlement_only and not market_refresh_only,
         job(
             "active_universe_doctor",
             lambda: write_phase3as_report(
@@ -564,7 +579,7 @@ def build_phase3ay_health_refresh_report(
     )
     add_step(
         "sports_placeholder_resolution",
-        not settlement_only,
+        not settlement_only and not market_refresh_only,
         job(
             "sports_placeholder_resolution",
             lambda: write_phase3ah_round_placeholder_resolution_report(
@@ -574,7 +589,7 @@ def build_phase3ay_health_refresh_report(
     )
     add_step(
         "sports_placeholder_watch",
-        not settlement_only,
+        not settlement_only and not market_refresh_only,
         job(
             "sports_placeholder_watch",
             lambda: write_phase3ah_sports_placeholder_watch_report(
@@ -584,7 +599,7 @@ def build_phase3ay_health_refresh_report(
     )
     add_step(
         "phase_orchestrator",
-        not settlement_only,
+        not settlement_only and not market_refresh_only,
         job(
             "phase_orchestrator",
             lambda: write_phase_orchestrator_report(
@@ -603,7 +618,14 @@ def build_phase3ay_health_refresh_report(
     market_checkpoint = _load_json(market_checkpoint_path)
     sports = _sports_placeholder_health()
     settlement = _settlement_harvest_health()
-    status = _overall_status(steps, paper, market, sports, settlement_only=settlement_only)
+    status = _overall_status(
+        steps,
+        paper,
+        market,
+        sports,
+        settlement_only=settlement_only,
+        market_refresh_only=market_refresh_only,
+    )
     if not any(step["status"] == "ERROR" for step in steps):
         if market.get("collection_status") == "TIMED_OUT_CLEANLY":
             status = "TIMED_OUT_CLEANLY"
@@ -616,9 +638,13 @@ def build_phase3ay_health_refresh_report(
         "phase": "3AY",
         "phase_version": PHASE_3AY_VERSION,
         "mode": (
-            "PAPER_SETTLEMENT_ONLY_REFRESH_LOOP"
-            if settlement_only
-            else "PAPER_MARKET_HEALTH_REFRESH_LOOP"
+            "PAPER_MARKET_REFRESH_ONLY_LOOP"
+            if market_refresh_only
+            else (
+                "PAPER_SETTLEMENT_ONLY_REFRESH_LOOP"
+                if settlement_only
+                else "PAPER_MARKET_HEALTH_REFRESH_LOOP"
+            )
         ),
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "cycle": {
@@ -631,7 +657,7 @@ def build_phase3ay_health_refresh_report(
             "live_or_demo_execution": False,
             "live_orders_created": 0,
             "exact_ticker_settlement_required": True,
-            "realize_paper_enabled": realize_paper,
+            "realize_paper_enabled": realize_paper and not market_refresh_only,
             "execution_enabled_setting": bool(resolved.execution_enabled),
         },
         "writer_status": writer_status,
@@ -644,6 +670,7 @@ def build_phase3ay_health_refresh_report(
             "market_checkpoint_path": str(market_checkpoint_path),
             "market_checkpoint": market_checkpoint,
             "settlement_only": settlement_only,
+            "market_refresh_only": market_refresh_only,
         },
         "status": status,
         "summary": {
@@ -659,17 +686,23 @@ def build_phase3ay_health_refresh_report(
             "paper_pnl_realized": paper["paper_pnl_realized"],
             "market_snapshots_inserted": market["snapshots_inserted"],
             "settlement_only": settlement_only,
+            "market_refresh_only": market_refresh_only,
         },
         "paper_health": paper,
         "market_health": market,
         "sports_placeholder_health": sports,
         "settlement_harvest": settlement,
         "steps": steps,
-        "next_commands": _next_commands(interval_seconds, settlement_only=settlement_only),
+        "next_commands": _next_commands(
+            interval_seconds,
+            settlement_only=settlement_only,
+            market_refresh_only=market_refresh_only,
+        ),
         "recommended_next_action": _recommended_next_action(
             status,
             interval_seconds,
             settlement_only=settlement_only,
+            market_refresh_only=market_refresh_only,
         ),
     }
 
@@ -692,6 +725,7 @@ def run_phase3ay_health_refresh_loop(
     settlement_commit_every: int = 0,
     realize_paper: bool = True,
     settlement_only: bool = False,
+    market_refresh_only: bool = False,
     stop_on_error: bool = False,
     duration_budget_seconds: float | None = None,
 ) -> list[Phase3AYArtifactSet]:
@@ -724,6 +758,7 @@ def run_phase3ay_health_refresh_loop(
                     settlement_commit_every=settlement_commit_every,
                     realize_paper=realize_paper,
                     settlement_only=settlement_only,
+                    market_refresh_only=market_refresh_only,
                     stop_on_error=stop_on_error,
                     duration_budget_seconds=duration_budget_seconds,
                     deadline_monotonic=deadline_monotonic,
@@ -759,6 +794,7 @@ def _phase3ay_health_refresh_command(
     settlement_commit_every: int,
     realize_paper: bool,
     settlement_only: bool,
+    market_refresh_only: bool,
     stop_on_error: bool,
 ) -> list[str]:
     command = [
@@ -794,6 +830,8 @@ def _phase3ay_health_refresh_command(
     command.append("--realize-paper" if realize_paper else "--dry-run-paper")
     if settlement_only:
         command.append("--settlement-only")
+    if market_refresh_only:
+        command.append("--market-refresh-only")
     if stop_on_error:
         command.append("--stop-on-error")
     return command
@@ -1218,6 +1256,7 @@ def _blocked_payload(
     writer_status: dict[str, Any],
     settings: Settings,
     settlement_only: bool = False,
+    market_refresh_only: bool = False,
 ) -> dict[str, Any]:
     del output_dir
     return {
@@ -1225,9 +1264,13 @@ def _blocked_payload(
         "phase": "3AY",
         "phase_version": PHASE_3AY_VERSION,
         "mode": (
-            "PAPER_SETTLEMENT_ONLY_REFRESH_LOOP"
-            if settlement_only
-            else "PAPER_MARKET_HEALTH_REFRESH_LOOP"
+            "PAPER_MARKET_REFRESH_ONLY_LOOP"
+            if market_refresh_only
+            else (
+                "PAPER_SETTLEMENT_ONLY_REFRESH_LOOP"
+                if settlement_only
+                else "PAPER_MARKET_HEALTH_REFRESH_LOOP"
+            )
         ),
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "cycle": {
@@ -1263,7 +1306,11 @@ def _blocked_payload(
         "sports_placeholder_health": {},
         "settlement_harvest": {},
         "steps": [],
-        "next_commands": _next_commands(interval_seconds, settlement_only=settlement_only),
+        "next_commands": _next_commands(
+            interval_seconds,
+            settlement_only=settlement_only,
+            market_refresh_only=market_refresh_only,
+        ),
         "recommended_next_action": (
             "Another local writer is active. Wait for it to finish before running "
             "paper/market health refresh."
@@ -1387,6 +1434,8 @@ def _sports_placeholder_health() -> dict[str, Any]:
 def _settlement_harvest_health() -> dict[str, Any]:
     harvest = _load_json(Path("reports/phase3aa_r2/phase3aa_r2_exact_settlement_harvest.json"))
     summary = harvest.get("summary") if isinstance(harvest, dict) else {}
+    if not isinstance(summary, dict):
+        summary = {}
     return {
         "exact_tickers_checked": int(summary.get("exact_tickers_checked") or 0),
         "exact_settlements_written": int(summary.get("exact_settlements_written") or 0),
@@ -1407,9 +1456,12 @@ def _overall_status(
     sports: dict[str, Any],
     *,
     settlement_only: bool = False,
+    market_refresh_only: bool = False,
 ) -> str:
     if any(step["status"] == "ERROR" for step in steps):
         return "DEGRADED_STEP_ERRORS"
+    if market_refresh_only:
+        return "FRESH_MARKET_REFRESH_ONLY"
     if not settlement_only and market["status"] != "HEALTHY":
         return "DEGRADED_MARKET_COVERAGE"
     if paper["status"] == "READY_TO_REALIZE":
@@ -1423,7 +1475,32 @@ def _overall_status(
     return "FRESH_HEALTHY"
 
 
-def _next_commands(interval_seconds: int, *, settlement_only: bool = False) -> list[str]:
+def _validate_refresh_modes(
+    *,
+    settlement_only: bool,
+    market_refresh_only: bool,
+) -> None:
+    if settlement_only and market_refresh_only:
+        raise ValueError(
+            "--settlement-only and --market-refresh-only are mutually exclusive"
+        )
+
+
+def _next_commands(
+    interval_seconds: int,
+    *,
+    settlement_only: bool = False,
+    market_refresh_only: bool = False,
+) -> list[str]:
+    if market_refresh_only:
+        return [
+            (
+                "kalshi-bot phase3ay-health-refresh --cycles 1 "
+                f"--interval-seconds {interval_seconds} --paged-markets --no-market-collect"
+            ),
+            "kalshi-bot phase3ae-fast-market-harvester --output-dir reports/phase3ae_fast_market",
+            "kalshi-bot phase3ab-learning-governor",
+        ]
     if settlement_only:
         return [
             (
@@ -1460,7 +1537,13 @@ def _recommended_next_action(
     interval_seconds: int,
     *,
     settlement_only: bool = False,
+    market_refresh_only: bool = False,
 ) -> str:
+    if market_refresh_only and status == "FRESH_MARKET_REFRESH_ONLY":
+        return (
+            "Market refresh completed without chained health diagnostics. Run the separate "
+            "post-refresh health check, then rerun the Phase 3AE harvester."
+        )
     if status == "TIMED_OUT_CLEANLY":
         return (
             "Phase 3AY stopped at its duration budget and left a market cursor. "
