@@ -20131,6 +20131,40 @@ def find_opportunities_command(
     console.print(f"Wrote opportunities report to {report_path}")
 
 
+@app.command("candidate-funnel-audit")
+def candidate_funnel_audit_command(
+    gh2_report_path: Annotated[
+        Path,
+        typer.Option(help="Accepted GH-2 candidate refresh JSON path."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.json"),
+    crypto_r5_path: Annotated[
+        Path,
+        typer.Option(help="Crypto R5 freshness-watch JSON path."),
+    ] = Path("reports/phase3bc_r5/phase3bc_r5_crypto_freshness_watch.json"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Read-only candidate funnel report directory."),
+    ] = Path("reports/candidate_funnel"),
+) -> None:
+    from kalshi_predictor.candidate_funnel_audit import write_candidate_funnel_audit
+
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        artifacts = write_candidate_funnel_audit(
+            session,
+            gh2_report_path=gh2_report_path,
+            crypto_r5_path=crypto_r5_path,
+            output_dir=output_dir,
+        )
+    console.print("Candidate funnel audit")
+    console.print("Mode: READ ONLY")
+    console.print("Database writes: 0")
+    console.print("Order creation: disabled")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
 @app.command("explain-opportunity")
 def explain_opportunity_command(
     ticker: Annotated[
