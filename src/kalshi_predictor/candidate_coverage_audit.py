@@ -430,7 +430,13 @@ def _manifest_selection_diagnostics(
     gh2_payload: dict[str, Any],
     manifest_payload: dict[str, Any],
 ) -> dict[str, Any]:
-    ranked = [row for row in rows if row.get("ranking")]
+    ranking_index = FUNNEL_STAGES.index("ranking")
+    stages_through_ranking = FUNNEL_STAGES[: ranking_index + 1]
+    ranked = [
+        row
+        for row in rows
+        if all(bool(row.get(stage)) for stage in stages_through_ranking)
+    ]
     unknown_series = [row for row in ranked if not row.get("series_ticker")]
     unknown_manifest = [row for row in unknown_series if row.get("candidate_manifest")]
     unknown_excluded = [row for row in unknown_series if not row.get("candidate_manifest")]

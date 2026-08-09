@@ -53,8 +53,11 @@ def test_candidate_coverage_fee_adjusted_ev_remains_diagnostic() -> None:
 def test_candidate_coverage_names_unknown_series_manifest_bucket() -> None:
     weather = _row("WEATHER", category="weather", manifest=False)
     weather["series_ticker"] = None
+    inactive = _row("INACTIVE", category="weather", manifest=False)
+    inactive["active"] = False
+    inactive["series_ticker"] = None
     payload = build_candidate_coverage_audit(
-        evidence=[weather],
+        evidence=[weather, inactive],
         manifest_payload={
             "selection": "STICKY_FRESH_THEN_CURRENT_RANKINGS_WITH_SNAPSHOT_RECOVERY",
             "tickers": [],
@@ -71,6 +74,7 @@ def test_candidate_coverage_names_unknown_series_manifest_bucket() -> None:
     assert "Repair series lineage" in addition["next_action"]
     assert diagnostics["excluded_ranked_rows_without_series"] == 1
     assert diagnostics["excluded_tickers"] == ["WEATHER"]
+    assert payload["exclusion_reason_counts"]["MARKET_NOT_ACTIVE"] == 1
 
 
 def test_candidate_coverage_read_only_engine_rejects_writes(tmp_path) -> None:
