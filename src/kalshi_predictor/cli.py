@@ -63,6 +63,10 @@ def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
         from kalshi_predictor.config import get_settings
         from kalshi_predictor.data.backend import database_url_from_settings
         from kalshi_predictor.data.db import get_session_factory, make_engine
+        from kalshi_predictor.data.locks import db_writer_monitor
+        from kalshi_predictor.gh2_weather_identity_shadow import (
+            append_weather_identity_shadow,
+        )
         from kalshi_predictor.roadmap.runtime_reports import write_runtime_roadmap_reports
 
         try:
@@ -86,6 +90,22 @@ def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
             return 2
 
         reports_root = Path(_fast_option_value(args, "--reports-root", "reports") or "reports")
+        gh2_report_path = Path(
+            _fast_option_value(
+                args,
+                "--gh2-report-path",
+                str(reports_root / "phase_gh2/gh2_active_candidate_refresh.json"),
+            )
+            or ""
+        )
+        gh2_markdown_path = Path(
+            _fast_option_value(
+                args,
+                "--gh2-markdown-path",
+                str(reports_root / "phase_gh2/gh2_active_candidate_refresh.md"),
+            )
+            or ""
+        )
         settings = get_settings()
         engine = make_engine(database_url_from_settings(settings))
         session_factory = get_session_factory(engine)
@@ -98,11 +118,23 @@ def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
                 paper_order_limit=paper_order_limit,
                 ticker_scope=ticker_scope,
             )
+        shadow = append_weather_identity_shadow(
+            report_path=gh2_report_path,
+            markdown_path=gh2_markdown_path,
+            settings=settings,
+            writer_monitor=lambda: db_writer_monitor(settings=settings),
+        )
         print("Runtime roadmap diagnostics")
         print("Mode: READ ONLY")
         print("Database writes: 0")
         print("Paper/live order creation: disabled")
         print(f"Candidate ticker scope: {len(ticker_scope or [])}")
+        print(
+            "Weather identity shadow: "
+            f"{shadow.get('status', 'COMPLETE')} "
+            f"({(shadow.get('summary') or {}).get('authoritative_identity_verified', 0)} "
+            "verified)"
+        )
         for name, path in paths.items():
             print(f"Wrote {name}: {path}")
         return 0
@@ -19653,6 +19685,14 @@ def roadmap_runtime_reports_command(
         Path,
         typer.Option(help="Canonical report root for the signed read-only artifacts."),
     ] = Path("reports"),
+    gh2_report_path: Annotated[
+        Path,
+        typer.Option(help="Canonical GH-2 JSON report enriched by shadow diagnostics."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.json"),
+    gh2_markdown_path: Annotated[
+        Path,
+        typer.Option(help="Canonical GH-2 Markdown report enriched by shadow diagnostics."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.md"),
     candidate_manifest_path: Annotated[
         Path | None,
         typer.Option(help="Optional current candidate manifest used to scope market census."),
@@ -19701,8 +19741,8 @@ def roadmap_runtime_reports_command(
     )
 
     shadow = append_weather_identity_shadow(
-        report_path=reports_root / "phase_gh2/gh2_active_candidate_refresh.json",
-        markdown_path=reports_root / "phase_gh2/gh2_active_candidate_refresh.md",
+        report_path=gh2_report_path,
+        markdown_path=gh2_markdown_path,
         settings=get_settings(),
         writer_monitor=lambda: db_writer_monitor(settings=get_settings()),
     )

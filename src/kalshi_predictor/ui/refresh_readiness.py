@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,9 +12,24 @@ from kalshi_predictor.roadmap.artifacts import verify_signed_artifact
 from kalshi_predictor.roadmap.status import build_roadmap_status
 from kalshi_predictor.utils.time import utc_now
 
-DEFAULT_REFRESH_PATH = Path("reports/phase_gh2/gh2_active_candidate_refresh.json")
-DEFAULT_HISTORY_PATH = Path("reports/phase_gh2/gh2_paper_only_soak_history.jsonl")
-DEFAULT_MANIFEST_PATH = Path("reports/phase_gh1/watch/actionable_tickers.json")
+DEFAULT_REFRESH_PATH = Path(
+    os.getenv(
+        "KALSHI_GH2_SOAK_REPORT_PATH",
+        "/var/lib/kalshi-bot-gh2/reports/gh2_active_candidate_refresh.json",
+    )
+)
+DEFAULT_HISTORY_PATH = Path(
+    os.getenv(
+        "KALSHI_GH2_SOAK_HISTORY_PATH",
+        "/var/lib/kalshi-bot-gh2/reports/gh2_paper_only_soak_history.jsonl",
+    )
+)
+DEFAULT_MANIFEST_PATH = Path(
+    os.getenv(
+        "KALSHI_GH1_ACTIONABLE_MANIFEST_PATH",
+        "/var/lib/kalshi-bot-gh1/watch/actionable_tickers.json",
+    )
+)
 STALE_AFTER_SECONDS = 30 * 60
 DEFAULT_CONTROL_PLANE_ROOT = Path("reports/phase_gh2/control_plane")
 DEFAULT_CLOUD_STATUS_PATH = Path("reports/phase_gh2/authoritative_cloud_status.json")

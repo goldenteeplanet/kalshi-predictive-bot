@@ -12,6 +12,7 @@ on:
       - "src/kalshi_predictor/cli.py"
       - "src/kalshi_predictor/gh2_weather_identity_shadow.py"
       - "src/kalshi_predictor/weather_identity_evidence.py"
+      - "src/kalshi_predictor/ui/refresh_readiness.py"
       - "src/kalshi_predictor/data/locks.py"
       - "deploy/systemd/kalshi-gh*.service"
       - "deploy/systemd/kalshi-gh*.timer"
@@ -21,6 +22,7 @@ on:
       - "tests/test_phase_gh2.py"
       - "tests/test_gh2_weather_identity_shadow.py"
       - "tests/test_weather_identity_evidence.py"
+      - "tests/test_refresh_readiness_ui.py"
       - "tests/test_phase3ba_r2_weather_ranking_activation.py"
       - "tests/test_phase3ba_r3_weather_paper_gate.py"
       - "tests/test_cloud_deployment_smoke.py"
@@ -57,6 +59,7 @@ jobs:
           src/kalshi_predictor/phase_gh2.py
           src/kalshi_predictor/gh2_weather_identity_shadow.py
           src/kalshi_predictor/weather_identity_evidence.py
+          src/kalshi_predictor/ui/refresh_readiness.py
           src/kalshi_predictor/phase3ba_r2.py
           src/kalshi_predictor/phase3ba_r3.py
           src/kalshi_predictor/weather/linker.py
@@ -64,6 +67,7 @@ jobs:
           tests/test_phase_gh2.py
           tests/test_gh2_weather_identity_shadow.py
           tests/test_weather_identity_evidence.py
+          tests/test_refresh_readiness_ui.py
           tests/test_phase3ba_r2_weather_ranking_activation.py
           tests/test_phase3ba_r3_weather_paper_gate.py
 
@@ -80,6 +84,7 @@ jobs:
           tests/test_phase_gh2.py
           tests/test_gh2_weather_identity_shadow.py
           tests/test_weather_identity_evidence.py
+          tests/test_refresh_readiness_ui.py
           tests/test_phase3ba_r2_weather_ranking_activation.py
           tests/test_phase3ba_r3_weather_paper_gate.py
           tests/test_cloud_deployment_smoke.py

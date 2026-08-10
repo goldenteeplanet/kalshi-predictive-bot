@@ -164,7 +164,12 @@ def test_scheduler_runs_shadow_in_post_lock_diagnostics() -> None:
     cli = (root / "src/kalshi_predictor/cli.py").read_text(encoding="utf-8")
 
     assert script.index("flock -u 9") < script.index("roadmap-runtime-reports")
+    assert '--gh2-report-path "$GH2_ROOT/reports/gh2_active_candidate_refresh.json"' in script
+    assert '--gh2-markdown-path "$GH2_ROOT/reports/gh2_active_candidate_refresh.md"' in script
     assert "append_weather_identity_shadow(" in cli
-    assert cli.index("write_runtime_roadmap_reports(") < cli.index(
-        "append_weather_identity_shadow("
-    )
+    fast_path = cli.index('if command == "roadmap-runtime-reports":')
+    typer_command = cli.index('@app.command("roadmap-runtime-reports")')
+    assert "append_weather_identity_shadow(" in cli[fast_path:typer_command]
+    assert cli[fast_path:typer_command].index(
+        "write_runtime_roadmap_reports("
+    ) < cli[fast_path:typer_command].index("append_weather_identity_shadow(")
