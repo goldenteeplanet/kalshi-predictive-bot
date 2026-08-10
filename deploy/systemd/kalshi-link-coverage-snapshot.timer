@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh read-only Kalshi link coverage snapshot every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+AccuracySec=15s
+RandomizedDelaySec=30s
+Persistent=false
+Unit=kalshi-link-coverage-snapshot.service
+
+[Install]
+WantedBy=timers.target

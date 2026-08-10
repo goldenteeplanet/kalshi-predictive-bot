@@ -1,0 +1,32 @@
+[Unit]
+Description=Kalshi read-only link coverage snapshot refresh
+After=network-online.target
+ConditionPathExists=/etc/kalshi-bot/kalshi-bot.env
+
+[Service]
+Type=oneshot
+User=kalshi
+WorkingDirectory=/opt/kalshi-predictive-bot
+EnvironmentFile=/etc/kalshi-bot/kalshi-bot.env
+Environment=UI_READ_ONLY=true
+Environment=EXECUTION_ENABLED=false
+Environment=AUTOPILOT_ENABLED=false
+Environment=PAPER_ORDER_CREATION_ENABLED=false
+Environment=PAPER_ORDER_KILL_SWITCH=true
+Environment=EXECUTION_KILL_SWITCH=true
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/kalshi-predictive-bot/.venv/bin/kalshi-bot link-coverage --database-read-only --output /opt/kalshi-predictive-bot/reports/link_coverage_report.md
+TimeoutStartSec=5min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=384M
+TasksMax=32
+ReadWritePaths=/opt/kalshi-predictive-bot/reports
+ReadOnlyPaths=/opt/kalshi-predictive-bot /etc/kalshi-bot /var/lib/kalshi-bot
