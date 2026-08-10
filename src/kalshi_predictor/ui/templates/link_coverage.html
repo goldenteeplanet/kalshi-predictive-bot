@@ -16,7 +16,10 @@
       <span class="muted">{{ coverage.freshness_note }}</span>
       {% endif %}
     </p>
-    <p class="muted">Source: {{ coverage.data_source | default('live_database') }}{% if coverage.generated_at %} · As of {{ coverage.generated_at }}{% endif %}</p>
+    <p class="muted">Source: {{ coverage.data_source | default('live_database') }}{% if coverage.generated_at %} | Generated at {{ coverage.generated_at }}{% endif %}</p>
+    {% if coverage.freshness_status == 'REPORT_STALE' %}
+    <p class="status-pill status-degraded">Stale coverage snapshot: counts are historical diagnostic evidence.</p>
+    {% endif %}
   </div>
   <div class="hero-status">
     <span class="badge badge-demo">{{ coverage.mode }}</span>
