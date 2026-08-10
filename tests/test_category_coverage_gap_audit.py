@@ -5,7 +5,10 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from kalshi_predictor.category_coverage_gap_audit import build_category_coverage_gap_audit
+from kalshi_predictor.category_coverage_gap_audit import (
+    _limitation_class,
+    build_category_coverage_gap_audit,
+)
 from kalshi_predictor.crypto.repository import insert_crypto_market_link
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_market_snapshot, upsert_market
@@ -111,6 +114,17 @@ def test_read_only_engine_rejects_writes(tmp_path: Path) -> None:
         else:
             raise AssertionError("read-only category audit accepted a write")
         assert connection.execute(select(Market.ticker)).all() == []
+
+
+def test_paper_readiness_distinguishes_liquidity_from_other_gates() -> None:
+    assert _limitation_class(
+        "PAPER_READINESS_GATE",
+        {"liquidity_score": "0", "executable_book": False},
+    ) == "liquidity_limitation"
+    assert _limitation_class(
+        "PAPER_READINESS_GATE",
+        {"liquidity_score": "0.75", "executable_book": True},
+    ) == "paper_readiness_gate"
 
 
 def _session_factory(tmp_path: Path):
