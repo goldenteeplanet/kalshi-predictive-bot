@@ -261,6 +261,8 @@ set +e
 timeout --signal=TERM --kill-after=5s "${diagnostics_timeout}s" \
   .venv/bin/kalshi-bot roadmap-runtime-reports \
     --reports-root "$APP_PATH/reports" \
+    --gh2-report-path "$GH2_ROOT/reports/gh2_active_candidate_refresh.json" \
+    --gh2-markdown-path "$GH2_ROOT/reports/gh2_active_candidate_refresh.md" \
     --candidate-manifest-path "$GH1_ROOT/watch/actionable_tickers.json" \
     --freshness-minutes 15 \
     --market-limit 40 \

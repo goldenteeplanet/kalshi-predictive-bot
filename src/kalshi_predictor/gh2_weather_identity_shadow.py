@@ -38,6 +38,15 @@ def append_weather_identity_shadow(
     collector: Callable[[list[str]], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Append shadow identity evidence after GH-2 releases its writer lock."""
+    if not report_path.is_file():
+        return _deferred_payload(
+            [],
+            "GH2_REPORT_UNAVAILABLE",
+            {
+                "status": "NOT_CHECKED",
+                "reason": "GH2_REPORT_UNAVAILABLE",
+            },
+        )
     report = _read_json(report_path)
     weather_gate = report.get("weather_gate") or {}
     weather_rows = list(weather_gate.get("weather_rows") or [])

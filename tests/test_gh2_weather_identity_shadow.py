@@ -126,6 +126,25 @@ def test_shadow_defers_before_collector_when_writer_is_active(tmp_path: Path) ->
     assert row["authoritative_identity_reason"] == "DEFERRED_ACTIVE_WRITER"
 
 
+def test_shadow_defers_when_gh2_report_is_unavailable(tmp_path: Path) -> None:
+    shadow = append_weather_identity_shadow(
+        report_path=tmp_path / "missing.json",
+        markdown_path=tmp_path / "missing.md",
+        settings=get_settings(),
+        writer_monitor=lambda: {"writer_count": 0, "safe_to_start_write": True},
+    )
+
+    assert shadow["status"] == "DEFERRED"
+    assert shadow["writer_monitor_before_collection"] == {
+        "status": "NOT_CHECKED",
+        "reason": "GH2_REPORT_UNAVAILABLE",
+    }
+    assert shadow["safety"]["database_opened"] is False
+    assert shadow["safety"]["database_writes"] == 0
+    assert not (tmp_path / "missing.json").exists()
+    assert not (tmp_path / "missing.md").exists()
+
+
 def test_shadow_is_idempotent_and_preserves_authoritative_gate_fields(tmp_path: Path) -> None:
     original = _report()
     report_path, markdown_path = _write_report(tmp_path, original)
@@ -164,7 +183,12 @@ def test_scheduler_runs_shadow_in_post_lock_diagnostics() -> None:
     cli = (root / "src/kalshi_predictor/cli.py").read_text(encoding="utf-8")
 
     assert script.index("flock -u 9") < script.index("roadmap-runtime-reports")
+    assert '--gh2-report-path "$GH2_ROOT/reports/gh2_active_candidate_refresh.json"' in script
+    assert '--gh2-markdown-path "$GH2_ROOT/reports/gh2_active_candidate_refresh.md"' in script
     assert "append_weather_identity_shadow(" in cli
-    assert cli.index("write_runtime_roadmap_reports(") < cli.index(
-        "append_weather_identity_shadow("
-    )
+    fast_path = cli.index('if command == "roadmap-runtime-reports":')
+    typer_command = cli.index('@app.command("roadmap-runtime-reports")')
+    assert "append_weather_identity_shadow(" in cli[fast_path:typer_command]
+    assert cli[fast_path:typer_command].index(
+        "write_runtime_roadmap_reports("
+    ) < cli[fast_path:typer_command].index("append_weather_identity_shadow(")
