@@ -19696,11 +19696,26 @@ def roadmap_runtime_reports_command(
             paper_order_limit=paper_order_limit,
             ticker_scope=ticker_scope,
         )
+    from kalshi_predictor.gh2_weather_identity_shadow import (
+        append_weather_identity_shadow,
+    )
+
+    shadow = append_weather_identity_shadow(
+        report_path=reports_root / "phase_gh2/gh2_active_candidate_refresh.json",
+        markdown_path=reports_root / "phase_gh2/gh2_active_candidate_refresh.md",
+        settings=get_settings(),
+        writer_monitor=lambda: db_writer_monitor(settings=get_settings()),
+    )
     console.print("Runtime roadmap diagnostics")
     console.print("Mode: READ ONLY")
     console.print("Database writes: 0")
     console.print("Paper/live order creation: disabled")
     console.print(f"Candidate ticker scope: {len(ticker_scope or [])}")
+    console.print(
+        "Weather identity shadow: "
+        f"{shadow.get('status', 'COMPLETE')} "
+        f"({(shadow.get('summary') or {}).get('authoritative_identity_verified', 0)} verified)"
+    )
     for name, path in paths.items():
         console.print(f"Wrote {name}: {path}")
 
