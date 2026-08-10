@@ -75,7 +75,7 @@
           <th class="numeric">Current Markets</th>
           <th class="numeric">Current Linked</th>
           <th class="numeric">Current Unlinked</th>
-          <th class="numeric">Current Coverage</th>
+          <th class="numeric">Eligible Coverage</th>
           <th class="numeric">All Parsed</th>
           <th class="numeric">All Linked</th>
           <th class="numeric">Historical Unlinked</th>
@@ -94,7 +94,7 @@
           <td class="numeric">{{ row.current_parsed_markets | default(row.parsed_markets) }}</td>
           <td class="numeric">{{ row.current_linked_markets | default(row.linked_markets) }}</td>
           <td class="numeric">{{ row.current_unlinked_markets | default(row.unlinked_markets) }}</td>
-          <td class="numeric">{{ row.current_coverage_percent | default(row.coverage_percent) }}</td>
+          <td class="numeric">{{ row.current_coverage_display | default(row.current_coverage_percent) | default(row.coverage_percent) }}</td>
           <td class="numeric">{{ row.parsed_markets }}</td>
           <td class="numeric">{{ row.linked_markets }}</td>
           <td class="numeric">{{ row.historical_unlinked_markets | default(0) }}</td>
