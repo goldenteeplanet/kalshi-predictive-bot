@@ -812,7 +812,10 @@ def test_link_coverage_snapshot_zero_or_missing_denominator_is_na(tmp_path, monk
   "summary_cards": [],
   "category_rows": [
     {"category": "weather", "current_linked_markets": 0, "current_linkable_markets": 0},
-    {"category": "news", "current_linked_markets": 0}
+    {"category": "news", "current_linked_markets": 0},
+    {"category": "sports", "current_linked_markets": 0, "current_linkable_markets": -1},
+    {"category": "economic", "current_linked_markets": 0, "current_linkable_markets": true},
+    {"category": "general", "current_linked_markets": 0, "current_linkable_markets": "bad"}
   ],
   "bottleneck": {"status": "CONNECTED", "message": "Snapshot coverage."},
   "link_counts": [],
@@ -830,6 +833,27 @@ def test_link_coverage_snapshot_zero_or_missing_denominator_is_na(tmp_path, monk
     assert [row["current_coverage_display"] for row in coverage["category_rows"]] == [
         "n/a",
         "n/a",
+        "n/a",
+        "n/a",
+        "n/a",
+    ]
+
+
+def test_link_coverage_snapshot_preserves_existing_display_values() -> None:
+    payload = {
+        "category_rows": [
+            {"current_coverage_display": "SOURCE VALUE"},
+            {"current_coverage_display": ""},
+            {"current_coverage_display": None},
+        ]
+    }
+
+    ui_routes._normalize_link_coverage_rows(payload)
+
+    assert [row["current_coverage_display"] for row in payload["category_rows"]] == [
+        "SOURCE VALUE",
+        "",
+        None,
     ]
 
 

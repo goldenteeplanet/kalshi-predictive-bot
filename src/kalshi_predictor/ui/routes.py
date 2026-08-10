@@ -227,7 +227,7 @@ def _normalize_link_coverage_rows(payload: dict[str, Any]) -> None:
             normalized_rows.append(source_row)
             continue
         row = dict(source_row)
-        if not row.get("current_coverage_display"):
+        if "current_coverage_display" not in row:
             linked = _non_negative_int(row.get("current_linked_markets"))
             eligible = _positive_int(row.get("current_linkable_markets"))
             row["current_coverage_display"] = (
