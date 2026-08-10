@@ -313,6 +313,7 @@ from kalshi_predictor.market_legs import (
     generate_link_coverage_report,
     link_coverage_dashboard,
     parse_and_store_market_legs,
+    write_link_coverage_snapshot,
 )
 from kalshi_predictor.memory.archive import archive_memory_to_jsonl
 from kalshi_predictor.memory.backfill import backfill_memory_from_existing_tables
@@ -2528,9 +2529,7 @@ def link_coverage_command(
             )
         coverage = link_coverage_dashboard(session)
         report_path = generate_link_coverage_report(session, output_path=output, coverage=coverage)
-        snapshot_path = Path("reports/market_coverage/link_coverage.json")
-        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-        snapshot_path.write_text(json.dumps(coverage, indent=2, sort_keys=True), encoding="utf-8")
+        snapshot_path = write_link_coverage_snapshot(coverage)
     console.print("Market link coverage")
     console.print("Mode: PAPER ONLY diagnostics")
     console.print(

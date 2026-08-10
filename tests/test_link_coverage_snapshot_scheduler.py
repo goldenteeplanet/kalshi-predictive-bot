@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 from kalshi_predictor.cli import app, link_coverage_command
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import init_db, make_sqlite_read_only_engine
+from kalshi_predictor.market_legs import write_link_coverage_snapshot
 
 
 def test_link_coverage_cli_help_exposes_database_read_only_mode() -> None:
@@ -21,6 +22,27 @@ def test_link_coverage_cli_help_exposes_database_read_only_mode() -> None:
     assert result.exit_code == 0
     assert "--database-read-only" in result.output
     assert "mode=ro plus PRAGMA query_only=ON" in result.output
+
+
+def test_link_coverage_snapshot_publish_is_atomic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "link_coverage.json"
+    output.write_text('{"state": "accepted"}', encoding="utf-8")
+    original_replace = Path.replace
+
+    def fail_replace(source: Path, target: Path) -> Path:
+        if source.name == "link_coverage.json.tmp":
+            raise OSError("simulated interrupted publication")
+        return original_replace(source, target)
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="interrupted publication"):
+        write_link_coverage_snapshot({"state": "new"}, output_path=output)
+
+    assert json.loads(output.read_text(encoding="utf-8")) == {"state": "accepted"}
 
 
 def test_sqlite_read_only_engine_rejects_writes(tmp_path: Path) -> None:
