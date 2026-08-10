@@ -20229,6 +20229,54 @@ def candidate_coverage_audit_command(
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
+@app.command("category-coverage-gap-audit")
+def category_coverage_gap_audit_command(
+    gh1_manifest_path: Annotated[
+        Path,
+        typer.Option(help="Accepted GH-1 actionable candidate manifest JSON path."),
+    ] = Path("reports/phase_gh1/watch/actionable_tickers.json"),
+    gh2_report_path: Annotated[
+        Path,
+        typer.Option(help="Accepted GH-2 candidate refresh JSON path."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.json"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Read-only category coverage report directory."),
+    ] = Path("reports/category_coverage_gap"),
+    freshness_minutes: Annotated[
+        int,
+        typer.Option(help="Fresh snapshot, forecast, and ranking window."),
+    ] = 15,
+) -> None:
+    from kalshi_predictor.candidate_funnel_audit import (
+        make_candidate_funnel_read_only_engine,
+    )
+    from kalshi_predictor.category_coverage_gap_audit import (
+        write_category_coverage_gap_audit,
+    )
+
+    if freshness_minutes < 1:
+        raise typer.BadParameter("freshness-minutes must be positive")
+    settings = get_settings()
+    engine = make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        artifacts = write_category_coverage_gap_audit(
+            session,
+            gh1_manifest_path=gh1_manifest_path,
+            gh2_report_path=gh2_report_path,
+            output_dir=output_dir,
+            freshness_minutes=freshness_minutes,
+        )
+    console.print("Category coverage gap audit")
+    console.print("Mode: READ ONLY")
+    console.print("Database writes: 0")
+    console.print("GH-2 trigger: disabled")
+    console.print("Order creation: disabled")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
 @app.command("catalog-lineage-repair")
 def catalog_lineage_repair_command(
     tickers: Annotated[
