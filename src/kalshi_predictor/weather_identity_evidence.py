@@ -11,7 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from kalshi_predictor.active_universe import is_inactive_market_status
+from kalshi_predictor.active_universe import is_active_market_status
 from kalshi_predictor.data.schema import Market
 from kalshi_predictor.utils.time import utc_now
 
@@ -48,7 +48,8 @@ class BoundedProtocolCache:
         entry = self._entries.get((kind, identity))
         if entry is None:
             return None
-        if _as_utc(now) - entry.fetched_at > self.max_age:
+        age = _as_utc(now) - entry.fetched_at
+        if age < timedelta(0) or age > self.max_age:
             del self._entries[(kind, identity)]
             return None
         return dict(entry.payload)
@@ -61,6 +62,8 @@ class BoundedProtocolCache:
         *,
         fetched_at: datetime,
     ) -> None:
+        if not isinstance(fetched_at, datetime):
+            raise ValueError("fetched_at must be a datetime")
         key = (kind, identity)
         normalized = dict(payload)
         source_sha256 = canonical_source_sha256(normalized)
@@ -166,8 +169,8 @@ def _collect_row(
     local = session.get(Market, ticker)
     if local is None:
         return {**base, "reason": "LOCAL_MARKET_MISSING"}
-    if is_inactive_market_status(local.status):
-        return {**base, "reason": "LOCAL_MARKET_INACTIVE"}
+    if not is_active_market_status(local.status):
+        return {**base, "reason": "LOCAL_MARKET_NOT_CONFIRMED_ACTIVE"}
     try:
         market = _exact_payload(
             client,
@@ -182,8 +185,8 @@ def _collect_row(
         return {**base, "reason": str(exc)}
     if _clean(market.get("ticker")) != ticker:
         return {**base, "reason": "MARKET_TICKER_MISMATCH"}
-    if is_inactive_market_status(market.get("status")):
-        return {**base, "reason": "CATALOG_MARKET_INACTIVE"}
+    if not is_active_market_status(market.get("status")):
+        return {**base, "reason": "CATALOG_MARKET_NOT_CONFIRMED_ACTIVE"}
     event_ticker = _clean(market.get("event_ticker"))
     if event_ticker is None:
         return {**base, "reason": "MARKET_EVENT_MISSING"}
@@ -274,6 +277,7 @@ def _collect_row(
             "event": canonical_source_sha256(event_payload),
             "series": canonical_source_sha256(series_payload),
         },
+        "freshness_status": "FRESH",
     }
 
 
@@ -316,7 +320,7 @@ def _blocked_row(
         "source_identity": None,
         "source_sha256": None,
         "fetched_at": now.isoformat(),
-        "freshness_status": "FRESH",
+        "freshness_status": "NOT_VERIFIED",
         "max_age_seconds": int(max_age.total_seconds()),
         "diagnostic_only": True,
     }

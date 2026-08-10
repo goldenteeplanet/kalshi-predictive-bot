@@ -109,7 +109,8 @@ def test_exact_market_event_and_series_produce_shadow_evidence(tmp_path) -> None
     ("patch", "reason"),
     [
         (("market", "ticker", "WRONG"), "MARKET_TICKER_MISMATCH"),
-        (("market", "status", "closed"), "CATALOG_MARKET_INACTIVE"),
+        (("market", "status", "closed"), "CATALOG_MARKET_NOT_CONFIRMED_ACTIVE"),
+        (("market", "status", None), "CATALOG_MARKET_NOT_CONFIRMED_ACTIVE"),
         (("market", "event_ticker", None), "MARKET_EVENT_MISSING"),
         (("event.event", "event_ticker", "WRONG"), "EVENT_TICKER_MISMATCH"),
         (("event.event", "series_ticker", None), "EVENT_SERIES_MISSING"),
@@ -149,6 +150,22 @@ def test_local_conflict_fails_closed_and_no_text_derivation_occurs(tmp_path) -> 
     assert row["series_ticker"] == SERIES
 
 
+def test_missing_local_lifecycle_status_fails_closed(tmp_path) -> None:
+    engine, session = _session(tmp_path)
+    try:
+        market = session.get(Market, TICKER)
+        assert market is not None
+        market.status = None
+        session.commit()
+        row = _collect(session, FakeClient())["rows"][0]
+    finally:
+        session.close()
+        engine.dispose()
+    assert row["authoritative_identity_verified"] is False
+    assert row["reason"] == "LOCAL_MARKET_NOT_CONFIRMED_ACTIVE"
+    assert row["freshness_status"] == "NOT_VERIFIED"
+
+
 def test_cache_is_bounded_expires_and_rejects_source_hash_drift() -> None:
     cache = BoundedProtocolCache(max_entries=1, max_age=timedelta(seconds=1))
     cache.put("event", EVENT, {"event": {"event_ticker": EVENT}}, fetched_at=NOW)
@@ -162,6 +179,24 @@ def test_cache_is_bounded_expires_and_rejects_source_hash_drift() -> None:
             EVENT,
             {"event": {"event_ticker": EVENT, "series_ticker": SERIES}},
             fetched_at=NOW,
+        )
+
+
+def test_cache_discards_future_entries_and_rejects_malformed_timestamp() -> None:
+    cache = BoundedProtocolCache(max_entries=1, max_age=timedelta(minutes=15))
+    cache.put(
+        "event",
+        EVENT,
+        {"event": {"event_ticker": EVENT}},
+        fetched_at=NOW + timedelta(seconds=1),
+    )
+    assert cache.get("event", EVENT, now=NOW) is None
+    with pytest.raises(ValueError, match="fetched_at must be a datetime"):
+        cache.put(
+            "event",
+            EVENT,
+            {"event": {"event_ticker": EVENT}},
+            fetched_at="malformed",  # type: ignore[arg-type]
         )
 
 
