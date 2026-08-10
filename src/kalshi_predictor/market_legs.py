@@ -465,6 +465,19 @@ def generate_link_coverage_report(
     return output_path
 
 
+def write_link_coverage_snapshot(
+    coverage: dict[str, Any],
+    *,
+    output_path: Path = Path("reports/market_coverage/link_coverage.json"),
+) -> Path:
+    """Publish link-coverage evidence without exposing a partially written JSON file."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output_path.with_suffix(f"{output_path.suffix}.tmp")
+    temporary.write_text(json.dumps(coverage, indent=2, sort_keys=True), encoding="utf-8")
+    temporary.replace(output_path)
+    return output_path
+
+
 def _candidate_leg_texts(market: Market) -> list[str]:
     title = _clean(market.title)
     subtitle = _clean(market.subtitle)

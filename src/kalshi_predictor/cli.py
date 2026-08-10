@@ -216,6 +216,7 @@ from kalshi_predictor.data.db import (
     get_session_factory,
     init_db,
     make_engine,
+    make_sqlite_read_only_engine,
 )
 from kalshi_predictor.data.locks import (
     db_writer_monitor,
@@ -312,6 +313,7 @@ from kalshi_predictor.market_legs import (
     generate_link_coverage_report,
     link_coverage_dashboard,
     parse_and_store_market_legs,
+    write_link_coverage_snapshot,
 )
 from kalshi_predictor.memory.archive import archive_memory_to_jsonl
 from kalshi_predictor.memory.backfill import backfill_memory_from_existing_tables
@@ -2498,9 +2500,19 @@ def link_coverage_command(
         bool,
         typer.Option(help="Refresh parsed market legs when --parse-first is used."),
     ] = False,
+    database_read_only: Annotated[
+        bool,
+        typer.Option(
+            help="Require SQLite mode=ro plus PRAGMA query_only=ON; forbids parse options."
+        ),
+    ] = False,
 ) -> None:
     """Show market-leg and linker coverage across crypto/weather/economic/sports/news."""
-    engine = init_db()
+    if database_read_only and (parse_first or parse_limit or refresh):
+        raise typer.BadParameter(
+            "--database-read-only cannot be combined with parsing or refresh options."
+        )
+    engine = make_sqlite_read_only_engine() if database_read_only else init_db()
     session_factory = get_session_factory(engine)
     with session_factory() as session:
         if parse_first:
@@ -2517,11 +2529,15 @@ def link_coverage_command(
             )
         coverage = link_coverage_dashboard(session)
         report_path = generate_link_coverage_report(session, output_path=output, coverage=coverage)
-        snapshot_path = Path("reports/market_coverage/link_coverage.json")
-        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-        snapshot_path.write_text(json.dumps(coverage, indent=2, sort_keys=True), encoding="utf-8")
+        snapshot_path = write_link_coverage_snapshot(coverage)
     console.print("Market link coverage")
     console.print("Mode: PAPER ONLY diagnostics")
+    console.print(
+        "Database: SQLite mode=ro + PRAGMA query_only=ON"
+        if database_read_only
+        else "Database: configured runtime mode"
+    )
+    console.print("Database writes: 0" if database_read_only else "Database writes: not asserted")
     console.print(f"Parsed legs: {coverage['summary_cards'][1]['value']}")
     console.print(f"Linked legs: {coverage['summary_cards'][2]['value']}")
     console.print(f"Partial legs: {coverage['summary_cards'][3]['value']}")

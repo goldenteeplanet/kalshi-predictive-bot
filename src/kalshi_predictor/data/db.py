@@ -1,4 +1,5 @@
 import logging
+import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,6 +13,7 @@ from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.backend import (
     database_url_from_settings,
     redact_database_url,
+    sqlite_path_from_url,
     warn_if_sqlite_on_onedrive,
 )
 from kalshi_predictor.data.schema import Base
@@ -42,6 +44,28 @@ def make_engine(db_url: str | None = None) -> Engine:
     if _is_sqlite_url(resolved_db_url):
         _configure_sqlite_pragmas(engine, resolved_db_url)
     return engine
+
+
+def make_sqlite_read_only_engine(db_url: str | None = None) -> Engine:
+    """Open an existing SQLite database with both transport and pragma write guards."""
+    resolved_db_url = db_url or database_url_from_settings(get_settings())
+    path = sqlite_path_from_url(resolved_db_url)
+    if path is None or path == Path(":memory:"):
+        raise ValueError("Read-only reporting requires an existing file-backed SQLite database.")
+    if not path.is_file():
+        raise FileNotFoundError(path)
+
+    def connect() -> sqlite3.Connection:
+        connection = sqlite3.connect(
+            f"file:{path.as_posix()}?mode=ro",
+            uri=True,
+            timeout=30,
+            check_same_thread=False,
+        )
+        connection.execute("PRAGMA query_only=ON")
+        return connection
+
+    return create_engine("sqlite+pysqlite://", creator=connect, future=True)
 
 
 def get_session_factory(engine: Engine | None = None) -> sessionmaker[Session]:
