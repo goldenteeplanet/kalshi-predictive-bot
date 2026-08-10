@@ -126,6 +126,25 @@ def test_shadow_defers_before_collector_when_writer_is_active(tmp_path: Path) ->
     assert row["authoritative_identity_reason"] == "DEFERRED_ACTIVE_WRITER"
 
 
+def test_shadow_defers_when_gh2_report_is_unavailable(tmp_path: Path) -> None:
+    shadow = append_weather_identity_shadow(
+        report_path=tmp_path / "missing.json",
+        markdown_path=tmp_path / "missing.md",
+        settings=get_settings(),
+        writer_monitor=lambda: {"writer_count": 0, "safe_to_start_write": True},
+    )
+
+    assert shadow["status"] == "DEFERRED"
+    assert shadow["writer_monitor_before_collection"] == {
+        "status": "NOT_CHECKED",
+        "reason": "GH2_REPORT_UNAVAILABLE",
+    }
+    assert shadow["safety"]["database_opened"] is False
+    assert shadow["safety"]["database_writes"] == 0
+    assert not (tmp_path / "missing.json").exists()
+    assert not (tmp_path / "missing.md").exists()
+
+
 def test_shadow_is_idempotent_and_preserves_authoritative_gate_fields(tmp_path: Path) -> None:
     original = _report()
     report_path, markdown_path = _write_report(tmp_path, original)
