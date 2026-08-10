@@ -20251,6 +20251,20 @@ def catalog_lineage_repair_command(
         bool,
         typer.Option("--apply", help="Apply source-backed null repairs in one transaction."),
     ] = False,
+    accepted_plan: Annotated[
+        Path | None,
+        typer.Option(
+            "--accepted-plan",
+            help="Approved zero-write dry-run JSON artifact required by apply mode.",
+        ),
+    ] = None,
+    accepted_plan_sha256: Annotated[
+        str | None,
+        typer.Option(
+            "--accepted-plan-sha256",
+            help="Expected SHA-256 of the approved dry-run JSON artifact.",
+        ),
+    ] = None,
 ) -> None:
     import time
 
@@ -20262,12 +20276,19 @@ def catalog_lineage_repair_command(
         apply_lineage_repair,
         build_lineage_repair_plan,
         fetch_exact_catalog_lineage,
+        load_accepted_lineage_plan,
         normalize_tickers,
         write_lineage_repair_artifacts,
     )
 
     if deadline_seconds < 1:
         raise typer.BadParameter("deadline-seconds must be positive")
+    if apply and (accepted_plan is None or accepted_plan_sha256 is None):
+        raise typer.BadParameter(
+            "--apply requires --accepted-plan and --accepted-plan-sha256"
+        )
+    if not apply and (accepted_plan is not None or accepted_plan_sha256 is not None):
+        raise typer.BadParameter("accepted-plan options are apply-only")
     try:
         scoped_tickers = normalize_tickers(tickers, limit=limit)
     except ValueError as exc:
@@ -20289,6 +20310,10 @@ def catalog_lineage_repair_command(
     session_factory = get_session_factory(engine)
     apply_result = None
     if apply:
+        approved, approved_sha256 = load_accepted_lineage_plan(
+            accepted_plan,
+            expected_sha256=accepted_plan_sha256,
+        )
         with session_factory.begin() as session:
             plan = build_lineage_repair_plan(
                 session,
@@ -20304,8 +20329,10 @@ def catalog_lineage_repair_command(
             apply_result = apply_lineage_repair(
                 session,
                 plan=plan,
+                accepted_plan=approved,
                 writer_monitor=lambda: db_writer_monitor(settings=settings),
             )
+            apply_result["accepted_plan_sha256"] = approved_sha256
     else:
         with session_factory() as session:
             plan = build_lineage_repair_plan(

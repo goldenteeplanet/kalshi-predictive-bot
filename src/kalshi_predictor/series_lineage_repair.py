@@ -27,6 +27,60 @@ class LineageRepairArtifacts:
     rollback_path: Path
 
 
+def load_accepted_lineage_plan(
+    path: Path,
+    *,
+    expected_sha256: str,
+) -> tuple[dict[str, Any], str]:
+    if not path.is_file():
+        raise RuntimeError(f"Accepted lineage plan is missing: {path}")
+    raw = path.read_bytes()
+    actual_sha256 = hashlib.sha256(raw).hexdigest()
+    expected = expected_sha256.strip().lower()
+    if len(expected) != 64 or any(char not in "0123456789abcdef" for char in expected):
+        raise RuntimeError("Accepted lineage plan SHA-256 must be 64 lowercase hex characters.")
+    if actual_sha256 != expected:
+        raise RuntimeError("Accepted lineage plan artifact SHA-256 mismatch.")
+    try:
+        payload = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Accepted lineage plan is not valid JSON.") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("Accepted lineage plan must be a JSON object.")
+    if payload.get("dry_run") is not True or int(payload.get("database_writes") or 0) != 0:
+        raise RuntimeError("Accepted lineage plan must be a zero-write dry-run artifact.")
+    return payload, actual_sha256
+
+
+def validate_accepted_lineage_plan(
+    *,
+    plan: dict[str, Any],
+    accepted_plan: dict[str, Any],
+) -> None:
+    accepted_tickers = accepted_plan.get("tickers")
+    current_tickers = plan.get("tickers")
+    if not isinstance(accepted_tickers, list) or accepted_tickers != current_tickers:
+        raise RuntimeError("Accepted lineage plan ticker scope or order drifted.")
+    accepted_rows = accepted_plan.get("rows")
+    current_rows = plan.get("rows")
+    if not isinstance(accepted_rows, list) or not isinstance(current_rows, list):
+        raise RuntimeError("Accepted lineage plan rows are missing.")
+    if len(accepted_rows) != len(current_rows) or len(current_rows) != len(current_tickers):
+        raise RuntimeError("Accepted lineage plan row scope drifted.")
+    for label, rows in (("accepted", accepted_rows), ("current", current_rows)):
+        invalid = [row for row in rows if not isinstance(row, dict) or row.get("action") != "APPLY"]
+        if invalid:
+            raise RuntimeError(
+                f"{label.capitalize()} lineage plan contains blocked or non-APPLY rows."
+            )
+    fields = ("ticker", "action", "reason", "before", "source", "source_sha256")
+    for index, (accepted, current) in enumerate(zip(accepted_rows, current_rows, strict=True)):
+        for field in fields:
+            if accepted.get(field) != current.get(field):
+                ticker = current.get("ticker") or accepted.get("ticker") or f"row {index}"
+                raise RuntimeError(f"Accepted lineage plan drift for {ticker}: {field}.")
+
+
 def fetch_exact_catalog_lineage(
     client: Any,
     *,
@@ -134,12 +188,12 @@ def apply_lineage_repair(
     session: Session,
     *,
     plan: dict[str, Any],
+    accepted_plan: dict[str, Any],
     writer_monitor: WriterMonitor,
 ) -> dict[str, Any]:
+    validate_accepted_lineage_plan(plan=plan, accepted_plan=accepted_plan)
     writer = writer_monitor()
-    if int(writer.get("writer_count") or 0) != 0 or not bool(
-        writer.get("safe_to_start_write")
-    ):
+    if int(writer.get("writer_count") or 0) != 0 or not bool(writer.get("safe_to_start_write")):
         raise RuntimeError("Writer gate did not clear catalog lineage repair.")
     applied = 0
     for row in plan.get("rows") or []:
@@ -149,9 +203,11 @@ def apply_lineage_repair(
         if market is None:
             raise RuntimeError(f"Market disappeared during repair: {row['ticker']}")
         before = row["before"]
-        if market.event_ticker != before["event_ticker"] or market.series_ticker != before[
-            "series_ticker"
-        ]:
+        if (
+            market.event_ticker != before["event_ticker"]
+            or market.series_ticker != before["series_ticker"]
+            or market.raw_json != before["raw_json"]
+        ):
             raise RuntimeError(f"Market changed after planning: {row['ticker']}")
         source = row["source"]
         if market.event_ticker is None and source["event_ticker"] is not None:

@@ -25,7 +25,9 @@ from kalshi_predictor.series_lineage_repair import (
     apply_lineage_repair,
     build_lineage_repair_plan,
     fetch_exact_catalog_lineage,
+    load_accepted_lineage_plan,
     normalize_tickers,
+    validate_accepted_lineage_plan,
     write_lineage_repair_artifacts,
 )
 from kalshi_predictor.utils.time import utc_now
@@ -166,13 +168,20 @@ def test_dry_run_plan_is_read_only_and_apply_is_idempotent(tmp_path) -> None:
             session.execute(text("UPDATE markets SET series_ticker='BAD' WHERE ticker='M'"))
 
     with writable_factory.begin() as session:
-        result = apply_lineage_repair(session, plan=plan, writer_monitor=_clear_writer)
+        result = apply_lineage_repair(
+            session, plan=plan, accepted_plan=_accepted(plan), writer_monitor=_clear_writer
+        )
         assert result["applied"] == 1
     with writable_factory.begin() as session:
         second = build_lineage_repair_plan(session, tickers=["M"], catalog_evidence=evidence)
-        result = apply_lineage_repair(session, plan=second, writer_monitor=_clear_writer)
         assert second["summary"]["unchanged"] == 1
-        assert result["applied"] == 0
+        with pytest.raises(RuntimeError, match="non-APPLY"):
+            apply_lineage_repair(
+                session,
+                plan=second,
+                accepted_plan=_accepted(plan),
+                writer_monitor=_clear_writer,
+            )
 
 
 def test_conflicts_fail_closed_and_writer_gate_blocks_apply(tmp_path) -> None:
@@ -184,14 +193,102 @@ def test_conflicts_fail_closed_and_writer_gate_blocks_apply(tmp_path) -> None:
         plan = build_lineage_repair_plan(session, tickers=["M"], catalog_evidence=evidence)
         assert plan["rows"][0]["reason"] == "SERIES_CONFLICT"
 
-    repair = {"rows": [{"ticker": "M", "action": "APPLY", "before": {}, "source": {}}]}
+    repair = _repair_plan()
     with session_factory() as session:
         with pytest.raises(RuntimeError, match="Writer gate"):
             apply_lineage_repair(
                 session,
                 plan=repair,
+                accepted_plan=_accepted(repair),
                 writer_monitor=lambda: {"writer_count": 1, "safe_to_start_write": False},
             )
+
+
+def test_accepted_plan_hash_and_exact_plan_match(tmp_path) -> None:
+    plan = _repair_plan()
+    path = tmp_path / "accepted.json"
+    path.write_text(json.dumps(_accepted(plan), sort_keys=True), encoding="utf-8")
+    digest = __import__("hashlib").sha256(path.read_bytes()).hexdigest()
+    accepted, actual = load_accepted_lineage_plan(path, expected_sha256=digest)
+    assert actual == digest
+    validate_accepted_lineage_plan(plan=plan, accepted_plan=accepted)
+
+
+def test_accepted_plan_missing_and_hash_mismatch_fail_closed(tmp_path) -> None:
+    missing = tmp_path / "missing.json"
+    with pytest.raises(RuntimeError, match="missing"):
+        load_accepted_lineage_plan(missing, expected_sha256="0" * 64)
+    path = tmp_path / "accepted.json"
+    path.write_text(json.dumps(_accepted(_repair_plan())), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="SHA-256 mismatch"):
+        load_accepted_lineage_plan(path, expected_sha256="0" * 64)
+
+
+@pytest.mark.parametrize("field", ["before", "source", "source_sha256"])
+def test_accepted_plan_database_and_source_drift_fail_closed(field) -> None:
+    plan = _repair_plan()
+    accepted = _accepted(plan)
+    accepted["rows"][0][field] = "drift"
+    with pytest.raises(RuntimeError, match=field):
+        validate_accepted_lineage_plan(plan=plan, accepted_plan=accepted)
+
+
+def test_accepted_plan_scope_and_non_apply_rows_fail_closed() -> None:
+    plan = _repair_plan()
+    scope_drift = _accepted(plan)
+    scope_drift["tickers"] = ["OTHER"]
+    with pytest.raises(RuntimeError, match="scope or order"):
+        validate_accepted_lineage_plan(plan=plan, accepted_plan=scope_drift)
+    blocked = _accepted(plan)
+    blocked["rows"][0]["action"] = "BLOCKED"
+    with pytest.raises(RuntimeError, match="non-APPLY"):
+        validate_accepted_lineage_plan(plan=plan, accepted_plan=blocked)
+
+
+def test_validation_failure_rolls_back_with_zero_writes(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory.begin() as session:
+        upsert_market(session, {"ticker": "M", "status": "open"})
+    evidence = {"M": [{"ticker": "M", "event_ticker": "E", "series_ticker": "S"}]}
+    with session_factory.begin() as session:
+        plan = build_lineage_repair_plan(session, tickers=["M"], catalog_evidence=evidence)
+        accepted = _accepted(plan)
+        accepted["rows"][0]["source_sha256"] = "0" * 64
+        with pytest.raises(RuntimeError, match="source_sha256"):
+            apply_lineage_repair(
+                session,
+                plan=plan,
+                accepted_plan=accepted,
+                writer_monitor=_clear_writer,
+            )
+    with session_factory() as session:
+        market = session.get(Market, "M")
+        assert market is not None
+        assert market.series_ticker is None
+
+
+def test_post_plan_raw_json_drift_fails_before_mutation(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory.begin() as session:
+        upsert_market(session, {"ticker": "M", "event_ticker": "E", "status": "open"})
+    evidence = {"M": [{"ticker": "M", "event_ticker": "E", "series_ticker": "S"}]}
+    with session_factory.begin() as session:
+        plan = build_lineage_repair_plan(session, tickers=["M"], catalog_evidence=evidence)
+        market = session.get(Market, "M")
+        assert market is not None
+        market.raw_json = '{"changed":true}'
+        with pytest.raises(RuntimeError, match="changed after planning"):
+            apply_lineage_repair(
+                session,
+                plan=plan,
+                accepted_plan=_accepted(plan),
+                writer_monitor=_clear_writer,
+            )
+        session.rollback()
+    with session_factory() as session:
+        market = session.get(Market, "M")
+        assert market is not None
+        assert market.series_ticker is None
 
 
 def test_inactive_market_repair_is_blocked(tmp_path) -> None:
@@ -253,16 +350,13 @@ def test_missing_market_series_uses_exact_event_and_series_evidence(tmp_path) ->
         plan = build_lineage_repair_plan(session, tickers=["M"], catalog_evidence=evidence)
         assert plan["rows"][0]["action"] == "APPLY"
         assert plan["rows"][0]["source"]["series_ticker"] == "S"
-        assert plan["rows"][0]["source"]["lineage_evidence"] == (
-            "EXACT_EVENT_AND_SERIES_CATALOG"
-        )
+        assert plan["rows"][0]["source"]["lineage_evidence"] == ("EXACT_EVENT_AND_SERIES_CATALOG")
 
 
 @pytest.mark.parametrize(
     ("client_kwargs", "reason"),
     [
-        ({"event": {"event_ticker": "OTHER", "series_ticker": "S"}},
-         "EVENT_EVIDENCE_MISMATCH"),
+        ({"event": {"event_ticker": "OTHER", "series_ticker": "S"}}, "EVENT_EVIDENCE_MISMATCH"),
         ({"event": {"event_ticker": "E"}}, "EVENT_SERIES_MISSING"),
         ({"series": {"ticker": "OTHER"}}, "SERIES_EVIDENCE_MISMATCH"),
     ],
@@ -363,3 +457,28 @@ def _settings() -> Settings:
 
 def _clear_writer() -> dict:
     return {"writer_count": 0, "safe_to_start_write": True}
+
+
+def _accepted(plan: dict) -> dict:
+    return {**json.loads(json.dumps(plan)), "dry_run": True, "database_writes": 0}
+
+
+def _repair_plan() -> dict:
+    return {
+        "tickers": ["M"],
+        "summary": {"requested": 1, "applicable": 1, "unchanged": 0, "blocked": 0},
+        "rows": [
+            {
+                "ticker": "M",
+                "action": "APPLY",
+                "reason": "SOURCE_BACKED_NULL_REPAIR",
+                "before": {"event_ticker": "E", "series_ticker": None, "raw_json": "{}"},
+                "source": {
+                    "event_ticker": "E",
+                    "series_ticker": "S",
+                    "lineage_evidence": "EXACT_EVENT_AND_SERIES_CATALOG",
+                },
+                "source_sha256": "a" * 64,
+            }
+        ],
+    }
