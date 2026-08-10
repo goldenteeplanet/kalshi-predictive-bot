@@ -115,6 +115,7 @@ def build_category_coverage_gap_audit(
         linked = market.ticker in links.get(category, set())
         ranking = rankings.get(market.ticker)
         gross_ev = _gross_ev(ranking)
+        ranking_raw = _ranking_raw(ranking)
         row = {
             "ticker": market.ticker,
             "category": category,
@@ -129,10 +130,12 @@ def build_category_coverage_gap_audit(
             "positive_gross_ev": gross_ev is not None and gross_ev > 0,
             "paper_ready": market.ticker in paper_ready_tickers,
             "gross_expected_value": str(gross_ev) if gross_ev is not None else None,
+            "liquidity_score": ranking.liquidity_score if ranking else None,
+            "executable_book": ranking_raw.get("executable_book"),
             "unsupported_composite": unsupported_composite,
         }
         row["first_blocker"] = _first_blocker(row)
-        row["limitation_class"] = _limitation_class(str(row["first_blocker"]))
+        row["limitation_class"] = _limitation_class(str(row["first_blocker"]), row)
         rows.append(row)
 
     categories = {}
@@ -221,7 +224,14 @@ def _first_blocker(row: dict[str, Any]) -> str:
     return "PAPER_READY"
 
 
-def _limitation_class(blocker: str) -> str:
+def _limitation_class(blocker: str, row: dict[str, Any]) -> str:
+    if blocker == "PAPER_READINESS_GATE":
+        liquidity_score = _decimal(row.get("liquidity_score"))
+        if liquidity_score is None or liquidity_score <= 0:
+            return "liquidity_limitation"
+        if row.get("executable_book") is False:
+            return "liquidity_limitation"
+        return "paper_readiness_gate"
     return {
         "NO_ACTIVE_OPPORTUNITY": "absent_active_opportunity",
         "MISSING_INGESTION": "missing_ingestion",
@@ -232,7 +242,6 @@ def _limitation_class(blocker: str) -> str:
         "MISSING_OR_STALE_RANKING": "freshness_or_scheduling",
         "NOT_SELECTED_IN_CANDIDATE_MANIFEST": "scheduling_or_selection",
         "PROFITABILITY_REJECTION": "profitability_rejection",
-        "PAPER_READINESS_GATE": "liquidity_or_execution_readiness",
         "PAPER_READY": "none",
     }[blocker]
 
@@ -275,6 +284,25 @@ def _gross_ev(ranking: MarketRanking | None) -> Decimal | None:
         value = raw.get("gross_expected_value", ranking.estimated_edge)
         return Decimal(str(value)) if value not in (None, "") else None
     except (json.JSONDecodeError, InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def _ranking_raw(ranking: MarketRanking | None) -> dict[str, Any]:
+    if ranking is None:
+        return {}
+    try:
+        value = json.loads(ranking.raw_json or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _decimal(value: Any) -> Decimal | None:
+    if value in (None, ""):
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
         return None
 
 
