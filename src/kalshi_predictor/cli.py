@@ -20417,6 +20417,86 @@ def catalog_lineage_repair_command(
     console.print(f"Wrote rollback evidence: {artifacts.rollback_path}")
 
 
+@app.command("weather-identity-evidence-shadow")
+def weather_identity_evidence_shadow_command(
+    tickers: Annotated[
+        str,
+        typer.Option(help="Comma-separated exact weather market tickers."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for shadow-only JSON and Markdown evidence."),
+    ] = Path("reports/weather_identity_evidence_shadow"),
+    limit: Annotated[
+        int,
+        typer.Option(help="Maximum explicit ticker count."),
+    ] = 20,
+    deadline_seconds: Annotated[
+        int,
+        typer.Option(help="Public protocol evidence deadline in seconds."),
+    ] = 30,
+    cache_max_entries: Annotated[
+        int,
+        typer.Option(help="Maximum invocation-scoped exact protocol cache entries."),
+    ] = 100,
+    evidence_max_age_seconds: Annotated[
+        int,
+        typer.Option(help="Maximum age of invocation-scoped protocol evidence."),
+    ] = 900,
+) -> None:
+    """Collect exact weather identity evidence without changing runtime gates."""
+    import time
+    from datetime import timedelta
+
+    from kalshi_predictor.candidate_funnel_audit import (
+        make_candidate_funnel_read_only_engine,
+    )
+    from kalshi_predictor.kalshi.client import KalshiClient
+    from kalshi_predictor.series_lineage_repair import normalize_tickers
+    from kalshi_predictor.weather_identity_evidence import (
+        BoundedProtocolCache,
+        collect_weather_identity_evidence,
+        write_weather_identity_evidence,
+    )
+
+    if deadline_seconds < 1:
+        raise typer.BadParameter("deadline-seconds must be positive")
+    if cache_max_entries < 1:
+        raise typer.BadParameter("cache-max-entries must be positive")
+    if evidence_max_age_seconds < 1:
+        raise typer.BadParameter("evidence-max-age-seconds must be positive")
+    try:
+        scoped_tickers = normalize_tickers(tickers, limit=limit)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    max_age = timedelta(seconds=evidence_max_age_seconds)
+    cache = BoundedProtocolCache(max_entries=cache_max_entries, max_age=max_age)
+    settings = get_settings()
+    engine = make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
+    session_factory = get_session_factory(engine)
+    try:
+        with KalshiClient(settings=settings) as client, session_factory() as session:
+            payload = collect_weather_identity_evidence(
+                session,
+                client,
+                tickers=scoped_tickers,
+                deadline_monotonic=time.monotonic() + deadline_seconds,
+                max_age=max_age,
+                cache=cache,
+            )
+        artifacts = write_weather_identity_evidence(payload, output_dir=output_dir)
+    finally:
+        engine.dispose()
+    console.print("Authoritative weather identity shadow evidence")
+    console.print("Mode: READ ONLY / DIAGNOSTIC ONLY")
+    console.print("Candidate selection and paper readiness: unchanged")
+    console.print("Database: SQLite mode=ro + PRAGMA query_only=ON")
+    console.print("Database writes: 0")
+    console.print("Portfolio and order APIs: not imported")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
 @app.command("explain-opportunity")
 def explain_opportunity_command(
     ticker: Annotated[
