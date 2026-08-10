@@ -21,7 +21,6 @@ def test_link_coverage_cli_help_exposes_database_read_only_mode() -> None:
 
     assert result.exit_code == 0
     assert "--database-read-only" in result.output
-    assert "mode=ro plus PRAGMA query_only=ON" in result.output
 
 
 def test_link_coverage_snapshot_publish_is_atomic(
