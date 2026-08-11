@@ -50,4 +50,30 @@ def test_systemd_units_use_guarded_writers_and_paper_only_flags() -> None:
     assert "scripts/cloud/kalshi-nyc-weather-refresh.sh" in weather
     assert "Environment=EXECUTION_ENABLED=false" in weather
     assert "Environment=AUTOPILOT_ENABLED=false" in weather
-    assert "OnUnitActiveSec=15min" in timer
+    assert "OnCalendar=*-*-* *:00/15:00" in timer
+
+
+def test_weather_and_gh2_timers_keep_restart_safe_writer_separation() -> None:
+    weather_timer = (
+        ROOT / "deploy/systemd/kalshi-nyc-weather-runtime-refresh.timer"
+    ).read_text(encoding="utf-8")
+    weather_service = (
+        ROOT / "deploy/systemd/kalshi-nyc-weather-runtime-refresh.service"
+    ).read_text(encoding="utf-8")
+    gh2_timer = (ROOT / "deploy/systemd/kalshi-gh2-decision-refresh.timer").read_text(
+        encoding="utf-8"
+    )
+
+    assert "OnCalendar=*-*-* *:00/15:00" in weather_timer
+    assert "OnCalendar=*-*-* *:06/15:00" in gh2_timer
+    assert "OnBootSec=" not in weather_timer + gh2_timer
+    assert "OnUnitActiveSec=" not in weather_timer + gh2_timer
+    assert "RandomizedDelaySec=30s" in weather_timer
+    assert "RandomizedDelaySec=30s" in gh2_timer
+    assert "Persistent=false" in weather_timer
+    assert "Persistent=false" in gh2_timer
+
+    minimum_separation_seconds = (6 * 60) - 30
+    weather_timeout_seconds = 5 * 60
+    assert "TimeoutStartSec=5min" in weather_service
+    assert minimum_separation_seconds > weather_timeout_seconds
