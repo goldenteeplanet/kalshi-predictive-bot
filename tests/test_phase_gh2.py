@@ -169,6 +169,94 @@ def test_candidate_selection_can_be_scoped_to_prior_manifest(tmp_path: Path) -> 
     assert [row["ticker"] for row in rows] == ["KXBTC-KEEP"]
 
 
+def test_active_market_scope_reserves_capacity_for_each_crypto_family(tmp_path: Path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = utc_now()
+    with session_factory() as session:
+        for series in ("KXBTC15M", "KXETH15M", "KXSOL15M", "KXXRP15M", "KXDOGE15M"):
+            for index in range(3):
+                insert_market_snapshot(
+                    session,
+                    {
+                        "ticker": f"{series}-ACTIVE-{index}",
+                        "event_ticker": f"{series}-EVENT",
+                        "series_ticker": series,
+                        "status": "active",
+                        "close_time": (now + timedelta(hours=index + 1)).isoformat(),
+                    },
+                    {},
+                    now,
+                )
+        session.commit()
+
+        tickers = phase_gh2._active_market_tickers(
+            session,
+            prefixes=("KXBTC", "KXETH", "KXSOL", "KXXRP", "KXDOGE"),
+            limit=10,
+        )
+
+    assert len(tickers) == 10
+    assert {ticker.split("15M", 1)[0] for ticker in tickers} == {
+        "KXBTC",
+        "KXETH",
+        "KXSOL",
+        "KXXRP",
+        "KXDOGE",
+    }
+
+
+def test_weather_decision_scope_round_robins_locations_without_changing_order(
+    tmp_path: Path,
+) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = utc_now()
+    series = ("KXTEMPNYCH", "KXTEMPCHIH", "KXTEMPMIAH")
+    ordered: list[str] = []
+    with session_factory() as session:
+        for prefix in series:
+            for index in range(3):
+                ticker = f"{prefix}-ACTIVE-{index}"
+                ordered.append(ticker)
+                insert_market_snapshot(
+                    session,
+                    {
+                        "ticker": ticker,
+                        "event_ticker": f"{prefix}-EVENT",
+                        "series_ticker": prefix,
+                        "status": "active",
+                        "close_time": (now + timedelta(hours=index + 1)).isoformat(),
+                    },
+                    {},
+                    now,
+                )
+        session.commit()
+
+        selected = phase_gh2._fair_share_market_tickers(
+            session,
+            ordered,
+            prefixes=series,
+            limit=6,
+        )
+
+    assert selected == [
+        "KXTEMPNYCH-ACTIVE-0",
+        "KXTEMPCHIH-ACTIVE-0",
+        "KXTEMPMIAH-ACTIVE-0",
+        "KXTEMPNYCH-ACTIVE-1",
+        "KXTEMPCHIH-ACTIVE-1",
+        "KXTEMPMIAH-ACTIVE-1",
+    ]
+
+
+def test_round_robin_scope_fills_unused_family_capacity() -> None:
+    selected = phase_gh2._round_robin_unique(
+        [["BTC-1", "BTC-2", "BTC-3"], [], ["SOL-1"], ["BTC-1"]],
+        limit=4,
+    )
+
+    assert selected == ["BTC-1", "SOL-1", "BTC-2", "BTC-3"]
+
+
 def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     root = Path(__file__).parents[1]
     implementation = (root / "src/kalshi_predictor/phase_gh2.py").read_text(encoding="utf-8")
