@@ -629,7 +629,25 @@ def _text_comparator(text: str) -> str:
         return "BELOW"
     if re.search(r"\b(range|between)\b", normalized):
         return "RANGE"
+    directional = explicit_directional_price_comparator(text)
+    if directional is not None:
+        return directional
     return "UNKNOWN"
+
+
+def explicit_directional_price_comparator(text: str) -> str | None:
+    normalized = text.lower()
+    if re.search(
+        r"\b(price|value)\s+(?:(?:is|be)\s+)?(?:up|higher|increases?|rises?)\b",
+        normalized,
+    ):
+        return "ABOVE"
+    if re.search(
+        r"\b(price|value)\s+(?:(?:is|be)\s+)?(?:down|lower|decreases?|falls?)\b",
+        normalized,
+    ):
+        return "BELOW"
+    return None
 
 
 def _first_target_price_from_text(text: str) -> str | None:
@@ -720,6 +738,8 @@ def _contextual_alias_symbol(text: str) -> str | None:
         r"at or below)\s+\$?\s*[-+]?\d",
         normalized,
     ):
+        return symbol
+    if explicit_directional_price_comparator(text) is not None:
         return symbol
     return None
 
