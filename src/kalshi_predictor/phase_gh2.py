@@ -47,8 +47,8 @@ from kalshi_predictor.weather.linker import WEATHER_TICKER_PREFIXES, link_weathe
 PHASE_GH2_VERSION = "GH-2.0"
 CRYPTO_TICKER_PREFIXES = ("KXBTC", "KXETH", "KXSOLE", "KXXRP", "KXDOGE")
 ACTIONABLE_MODELS = ("crypto_v2", "weather_v2")
-WEATHER_DECISION_LIMIT = 6
-WEATHER_FEATURE_LOCATION_LIMIT = 2
+WEATHER_DECISION_LIMIT = 14
+WEATHER_FEATURE_LOCATION_LIMIT = 7
 SNAPSHOT_RECOVERY_LIMIT = 20
 STICKY_CANDIDATE_LIMIT = 12
 R5_OWNER_FILE = "phase3bc_r5_owner.json"
@@ -398,9 +398,11 @@ def run_gh2_single_writer_decision_refresh(
             tickers=weather_link_tickers,
             limit=active_link_limit,
         )
-        weather_decision_tickers = _bounded_unique(
+        weather_decision_tickers = _fair_share_market_tickers(
+            session,
             sticky_weather + ranked_weather + weather_link_tickers,
-            WEATHER_DECISION_LIMIT,
+            prefixes=WEATHER_TICKER_PREFIXES,
+            limit=WEATHER_DECISION_LIMIT,
         )
 
         mark_stage("refresh_crypto_decisions")
@@ -591,6 +593,16 @@ def run_gh2_single_writer_decision_refresh(
             "crypto_candidates": len(active_crypto),
             "weather_candidates": len(active_weather),
             "weather_decision_candidates": len(weather_decision_tickers),
+            "crypto_candidate_allocation": _prefix_allocation(
+                active_crypto, CRYPTO_TICKER_PREFIXES
+            ),
+            "weather_candidate_allocation": _prefix_allocation(
+                active_weather, WEATHER_TICKER_PREFIXES
+            ),
+            "weather_decision_allocation": _prefix_allocation(
+                weather_decision_tickers, WEATHER_TICKER_PREFIXES
+            ),
+            "allocation_mode": "BOUNDED_SUPPORTED_FAMILY_ROUND_ROBIN",
             "market_legs": asdict(active_leg_parse),
             "crypto": asdict(crypto_link),
             "weather": asdict(weather_link),
@@ -675,25 +687,97 @@ def _active_market_tickers(
     prefixes: tuple[str, ...],
     limit: int,
 ) -> list[str]:
+    if limit <= 0 or not prefixes:
+        return []
     now = utc_now()
-    filters = [
-        or_(
-            Market.ticker.like(f"{prefix}%"),
-            Market.series_ticker.like(f"{prefix}%"),
+    per_prefix_limit = max(1, limit)
+    pools: list[list[str]] = []
+    for prefix in prefixes:
+        statement = (
+            select(Market.ticker)
+            .where(
+                func.lower(func.coalesce(Market.status, "")).in_(("active", "open")),
+                or_(Market.close_time.is_(None), Market.close_time > now),
+                or_(
+                    Market.ticker.like(f"{prefix}%"),
+                    Market.series_ticker.like(f"{prefix}%"),
+                ),
+            )
+            .order_by(Market.close_time.is_(None), Market.close_time, desc(Market.last_seen_at))
+            .limit(per_prefix_limit)
         )
-        for prefix in prefixes
-    ]
-    statement = (
-        select(Market.ticker)
-        .where(
-            func.lower(func.coalesce(Market.status, "")).in_(("active", "open")),
-            or_(Market.close_time.is_(None), Market.close_time > now),
-            or_(*filters),
+        pools.append(list(session.scalars(statement)))
+    return _round_robin_unique(pools, limit=limit)
+
+
+def _fair_share_market_tickers(
+    session: Session,
+    tickers: list[str],
+    *,
+    prefixes: tuple[str, ...],
+    limit: int,
+) -> list[str]:
+    """Bound analysis scope while reserving capacity for each supported family."""
+
+    ordered = _bounded_unique(tickers, len(tickers))
+    if limit <= 0 or not ordered:
+        return []
+    identities = {
+        ticker: series
+        for ticker, series in session.execute(
+            select(Market.ticker, Market.series_ticker).where(Market.ticker.in_(ordered))
         )
-        .order_by(Market.close_time.is_(None), Market.close_time, desc(Market.last_seen_at))
-        .limit(limit)
-    )
-    return list(session.scalars(statement))
+    }
+    pools: list[list[str]] = [[] for _ in prefixes]
+    unmatched: list[str] = []
+    for ticker in ordered:
+        series = str(identities.get(ticker) or "").upper()
+        ticker_upper = ticker.upper()
+        matched = False
+        for index, prefix in enumerate(prefixes):
+            prefix_upper = prefix.upper()
+            if series.startswith(prefix_upper) or ticker_upper.startswith(prefix_upper):
+                pools[index].append(ticker)
+                matched = True
+                break
+        if not matched:
+            unmatched.append(ticker)
+    return _round_robin_unique([*pools, unmatched], limit=limit)
+
+
+def _round_robin_unique(pools: list[list[str]], *, limit: int) -> list[str]:
+    selected: list[str] = []
+    seen: set[str] = set()
+    position = 0
+    while len(selected) < limit:
+        added = False
+        for pool in pools:
+            if position >= len(pool):
+                continue
+            ticker = str(pool[position]).strip()
+            if ticker and ticker not in seen:
+                seen.add(ticker)
+                selected.append(ticker)
+                added = True
+                if len(selected) >= limit:
+                    break
+        if not added and all(position >= len(pool) - 1 for pool in pools):
+            break
+        position += 1
+    return selected
+
+
+def _prefix_allocation(tickers: list[str], prefixes: tuple[str, ...]) -> dict[str, int]:
+    allocation = {prefix: 0 for prefix in prefixes}
+    allocation["UNMATCHED"] = 0
+    for ticker in tickers:
+        ticker_upper = ticker.upper()
+        matched = next(
+            (prefix for prefix in prefixes if ticker_upper.startswith(prefix.upper())),
+            None,
+        )
+        allocation[matched or "UNMATCHED"] += 1
+    return allocation
 
 
 def _weather_feature_owner_evidence(
@@ -709,6 +793,7 @@ def _weather_feature_owner_evidence(
             select(WeatherMarketLink.location_key)
             .where(WeatherMarketLink.ticker.in_(tickers))
             .distinct()
+            .order_by(WeatherMarketLink.location_key)
             .limit(max_locations)
         )
     )[:max_locations]
