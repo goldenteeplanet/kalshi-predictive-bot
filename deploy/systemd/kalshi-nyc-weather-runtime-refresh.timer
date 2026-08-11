@@ -1,5 +1,5 @@
 [Unit]
-Description=Refresh exact NYC weather runtime inputs every 15 minutes
+Description=Refresh supported-city weather runtime inputs every 15 minutes
 
 [Timer]
 OnBootSec=3min

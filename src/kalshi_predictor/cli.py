@@ -19167,8 +19167,12 @@ def _weather_location_coordinates(location_key: str) -> tuple[float, float] | No
     locations = {
         "kansas_city": (39.0997, -94.5786),
         "new_york": (40.7128, -74.0060),
-        "chicago": (41.8781, -87.6298),
-        "los_angeles": (34.0522, -118.2437),
+        "chicago": (41.9742, -87.9073),
+        "miami": (25.7959, -80.2870),
+        "austin": (30.1975, -97.6664),
+        "los_angeles": (33.9416, -118.4085),
+        "boston": (42.3656, -71.0096),
+        "washington_dc": (38.8512, -77.0402),
     }
     normalized = location_key.strip().lower().replace("-", "_").replace(" ", "_")
     return locations.get(normalized)

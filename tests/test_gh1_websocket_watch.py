@@ -23,6 +23,21 @@ def test_default_watch_includes_supported_liquid_fifteen_minute_crypto_series() 
     }.issubset(DEFAULT_WATCH_SERIES)
 
 
+def test_default_watch_uses_current_hourly_weather_series() -> None:
+    assert {
+        "KXTEMPNYCH",
+        "KXTEMPCHIH",
+        "KXTEMPMIAH",
+        "KXTEMPAUSH",
+        "KXTEMPLAXH",
+        "KXTEMPBOSH",
+        "KXTEMPDCH",
+    }.issubset(DEFAULT_WATCH_SERIES)
+    assert not {"KXTEMPCHI", "KXTEMPMIA", "KXTEMPAUS", "KXTEMPLAX"}.intersection(
+        DEFAULT_WATCH_SERIES
+    )
+
+
 def test_discovery_keeps_bounded_quoted_books_per_series() -> None:
     client = _FakeClient()
 

@@ -14,8 +14,12 @@ def test_guarded_runtime_writers_share_one_lock() -> None:
     assert "db-writer-monitor --json" in gh1
     assert "db-writer-monitor --json" in weather
     assert "gh1-websocket-orderbook-drain --apply" in gh1
-    assert "ingest-weather --location-key new_york" in weather
-    assert "build-weather-features --location-key new_york --limit 200" in weather
+    assert (
+        "for location in new_york chicago miami austin los_angeles boston washington_dc"
+        in weather
+    )
+    assert 'ingest-weather --location-key "$location"' in weather
+    assert 'build-weather-features --location-key "$location" --limit 200' in weather
 
 
 def test_systemd_units_use_guarded_writers_and_paper_only_flags() -> None:

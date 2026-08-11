@@ -1,5 +1,5 @@
 [Unit]
-Description=Kalshi guarded NYC weather runtime refresh
+Description=Kalshi guarded supported-city weather runtime refresh
 After=network-online.target
 Wants=network-online.target
 ConditionPathExists=/etc/kalshi-bot/kalshi-bot.env
