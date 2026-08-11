@@ -21,11 +21,18 @@ DEFAULT_WATCH_SERIES = (
     "KXSOLE",
     "KXXRP",
     "KXDOGE",
+    "KXBTC15M",
+    "KXETH15M",
+    "KXSOL15M",
+    "KXXRP15M",
+    "KXDOGE15M",
     "KXTEMPNYCH",
-    "KXTEMPCHI",
-    "KXTEMPMIA",
-    "KXTEMPAUS",
-    "KXTEMPLAX",
+    "KXTEMPCHIH",
+    "KXTEMPMIAH",
+    "KXTEMPAUSH",
+    "KXTEMPLAXH",
+    "KXTEMPBOSH",
+    "KXTEMPDCH",
 )
 
 

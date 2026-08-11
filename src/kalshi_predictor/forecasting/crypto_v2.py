@@ -14,6 +14,7 @@ from kalshi_predictor.crypto.semantics import (
     EXACT_LINK,
     CryptoMarketTerms,
     FeatureCompatibility,
+    explicit_directional_price_comparator,
     parse_crypto_market_terms,
     select_compatible_crypto_feature,
     terms_from_link_payload,
@@ -212,7 +213,7 @@ def detect_market_direction(text: str) -> str:
         return "ABOVE"
     if re.search(r"\b(below|less than|under|at or below)\b", normalized):
         return "BELOW"
-    return "UNKNOWN"
+    return explicit_directional_price_comparator(text) or "UNKNOWN"
 
 
 def _market_midpoint(snapshot: MarketSnapshot) -> Decimal | None:

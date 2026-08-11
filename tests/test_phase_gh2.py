@@ -177,6 +177,9 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     )
     timer = (root / "deploy/systemd/kalshi-gh2-decision-refresh.timer").read_text(encoding="utf-8")
     script = (root / "scripts/cloud/kalshi-gh2-decision-refresh.sh").read_text(encoding="utf-8")
+    watch_service = (root / "deploy/systemd/kalshi-gh1-websocket-watch.service").read_text(
+        encoding="utf-8"
+    )
 
     assert "EXECUTION_ENABLED=false" in service
     assert "AUTOPILOT_ENABLED=false" in service
@@ -192,6 +195,7 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "GH2_DIAGNOSTICS_BUDGET_SECONDS:-45" in script
     assert "trap handle_termination TERM INT" in script
     assert "TimeoutStartSec=6min" in service
+    assert "--discovery-refresh-seconds 180" in watch_service
     assert "db-writer-monitor --json" in script
     assert "gh2-stage-crypto-quotes" in script
     assert "gh2-single-writer-decision-refresh" in script
