@@ -271,7 +271,7 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
 
     assert "EXECUTION_ENABLED=false" in service
     assert "AUTOPILOT_ENABLED=false" in service
-    assert "OnUnitActiveSec=15min" in timer
+    assert "OnCalendar=*-*-* *:06/15:00" in timer
     assert "flock -w 45 9" in script
     assert "gh2_scheduler_status.json" in script
     assert "write_scheduler_status" in script
