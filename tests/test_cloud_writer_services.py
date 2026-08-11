@@ -42,6 +42,9 @@ def test_systemd_units_use_guarded_writers_and_paper_only_flags() -> None:
     assert "StateDirectory=kalshi-bot-gh1" in gh1_watch
     assert f"KALSHI_WEBSOCKET_STAGING_DIR={GH1_STATE_DIRECTORY}" in gh1_watch
     assert "/var/lib/kalshi-bot-gh1/watch/status.json" in gh1_watch
+    assert "--max-markets-per-series 30" in gh1_watch
+    assert "--max-quoted-per-series 6" in gh1_watch
+    assert "--discovery-refresh-seconds 180" in gh1_watch
     assert "reports/phase_gh1" not in gh1_drain
     assert "reports/phase_gh1" not in gh1_watch
     assert "scripts/cloud/kalshi-nyc-weather-refresh.sh" in weather
