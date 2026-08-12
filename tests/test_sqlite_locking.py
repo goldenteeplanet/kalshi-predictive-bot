@@ -11,12 +11,41 @@ from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import init_db
 from kalshi_predictor.data.locks import (
+    _is_likely_writer,
     db_writer_monitor,
     friendly_database_locked_message,
     is_database_locked_error,
     sqlite_lock_diagnostics,
 )
 from kalshi_predictor.ui.app import create_app
+
+
+def test_explicit_read_only_link_coverage_is_not_classified_as_writer() -> None:
+    command = (
+        "/opt/kalshi-predictive-bot/.venv/bin/python "
+        "/opt/kalshi-predictive-bot/.venv/bin/kalshi-bot link-coverage "
+        "--database-read-only --output /opt/kalshi-predictive-bot/reports/link_coverage.md"
+    )
+
+    assert _is_likely_writer(command) is False
+
+
+def test_link_commands_remain_fail_closed_without_exact_read_only_shape() -> None:
+    commands = (
+        "/venv/bin/kalshi-bot link-coverage --output reports/link_coverage.md",
+        "/venv/bin/kalshi-bot link-remediate --database-read-only",
+        "/bin/sh -c 'kalshi-bot link-coverage --database-read-only; kalshi-bot link-remediate'",
+        "/venv/bin/kalshi-bot link-coverage --database-read-only='maybe'",
+        "/venv/bin/kalshi-bot link-coverage --database-read-only",
+    )
+
+    assert [_is_likely_writer(command) for command in commands] == [
+        True,
+        True,
+        True,
+        True,
+        False,
+    ]
 
 
 def test_db_init_sets_wal_and_busy_timeout(tmp_path) -> None:
