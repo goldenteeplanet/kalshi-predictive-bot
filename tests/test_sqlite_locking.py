@@ -35,11 +35,15 @@ def test_link_commands_remain_fail_closed_without_exact_read_only_shape() -> Non
         "/venv/bin/kalshi-bot link-coverage --output reports/link_coverage.md",
         "/venv/bin/kalshi-bot link-remediate --database-read-only",
         "/bin/sh -c 'kalshi-bot link-coverage --database-read-only; kalshi-bot link-remediate'",
+        "/bin/sh -c kalshi-bot link-coverage --database-read-only",
+        "/usr/bin/env kalshi-bot link-coverage --database-read-only",
         "/venv/bin/kalshi-bot link-coverage --database-read-only='maybe'",
         "/venv/bin/kalshi-bot link-coverage --database-read-only",
     )
 
     assert [_is_likely_writer(command) for command in commands] == [
+        True,
+        True,
         True,
         True,
         True,

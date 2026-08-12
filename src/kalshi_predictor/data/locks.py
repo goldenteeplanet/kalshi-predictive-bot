@@ -318,11 +318,18 @@ def _is_explicit_read_only_link_coverage(command: str) -> bool:
         tokens = shlex.split(command)
     except ValueError:
         return False
-    for index, token in enumerate(tokens[:-1]):
-        if Path(token).name != "kalshi-bot" or tokens[index + 1] != "link-coverage":
-            continue
-        return "--database-read-only" in tokens[index + 2 :]
-    return False
+    if not tokens:
+        return False
+    command_index = 0
+    if Path(tokens[0]).name.startswith("python"):
+        command_index = 1
+    if len(tokens) <= command_index + 1:
+        return False
+    return (
+        Path(tokens[command_index]).name == "kalshi-bot"
+        and tokens[command_index + 1] == "link-coverage"
+        and "--database-read-only" in tokens[command_index + 2 :]
+    )
 
 
 def _lock_status(
