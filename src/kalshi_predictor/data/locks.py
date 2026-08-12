@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 from pathlib import Path
 from typing import Any
 
@@ -306,8 +307,22 @@ def _normalize_path(path: Path) -> str:
 
 
 def _is_likely_writer(command: str) -> bool:
+    if _is_explicit_read_only_link_coverage(command):
+        return False
     lowered = command.lower()
     return any(marker in lowered for marker in LIKELY_WRITER_MARKERS)
+
+
+def _is_explicit_read_only_link_coverage(command: str) -> bool:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return False
+    for index, token in enumerate(tokens[:-1]):
+        if Path(token).name != "kalshi-bot" or tokens[index + 1] != "link-coverage":
+            continue
+        return "--database-read-only" in tokens[index + 2 :]
+    return False
 
 
 def _lock_status(
