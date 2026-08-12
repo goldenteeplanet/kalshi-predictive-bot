@@ -317,7 +317,7 @@ def _weather_paper_gate_row(
         ranking=ranking,
         now=now,
     )
-    raw_ev, executable_ev = _ev_values(ranking=ranking, forecast=forecast)
+    raw_ev, fee_adjusted_ev = _ev_values(ranking=ranking, forecast=forecast)
     book = _book_probe(
         ranking=ranking,
         market=market,
@@ -326,6 +326,10 @@ def _weather_paper_gate_row(
         snapshot_age=snapshot_age,
         settings=settings,
         window=window,
+    )
+    executable_ev = _executable_ev(
+        fee_adjusted_ev=fee_adjusted_ev,
+        executable_book=bool(book.get("executable_book")),
     )
     settlement = _settlement_entry_check(
         session,
@@ -382,6 +386,7 @@ def _weather_paper_gate_row(
         "forecast_probability": getattr(ranking, "forecast_probability", None)
         or (forecast.yes_probability if forecast is not None else None),
         "raw_ev": decimal_to_str(raw_ev),
+        "fee_adjusted_ev": decimal_to_str(fee_adjusted_ev),
         "executable_ev": decimal_to_str(executable_ev),
         "estimated_edge": getattr(ranking, "estimated_edge", None),
         "opportunity_score": getattr(ranking, "opportunity_score", None),
@@ -445,8 +450,10 @@ def _first_weather_paper_blocker(row: dict[str, Any]) -> str:
     raw_ev = to_decimal(row.get("raw_ev"))
     if raw_ev is None or raw_ev <= 0:
         return "EV_NOT_POSITIVE"
-    executable_ev = to_decimal(row.get("executable_ev"))
-    if executable_ev is None or executable_ev <= 0:
+    fee_adjusted_ev = to_decimal(row.get("fee_adjusted_ev"))
+    if fee_adjusted_ev is None:
+        fee_adjusted_ev = to_decimal(row.get("executable_ev"))
+    if fee_adjusted_ev is None or fee_adjusted_ev <= 0:
         return "EXECUTABLE_EV_NOT_POSITIVE"
     if row.get("no_book_reason") in {"ZERO_VISIBLE_DEPTH", "INSUFFICIENT_DEPTH"}:
         return "LIQUIDITY_TOO_LOW"
@@ -484,6 +491,16 @@ def _ev_values(
     raw_ev = side_probability - price
     spread = to_decimal(ranking.spread) or Decimal("0")
     return raw_ev, raw_ev - spread - RAW_EV_COST_BUFFER
+
+
+def _executable_ev(
+    *,
+    fee_adjusted_ev: Decimal | None,
+    executable_book: bool,
+) -> Decimal | None:
+    if not executable_book:
+        return None
+    return fee_adjusted_ev
 
 
 def _book_probe(
