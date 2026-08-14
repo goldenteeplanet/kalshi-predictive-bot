@@ -20377,6 +20377,32 @@ def independent_domain_experiment_command(
     console.print(f"Wrote next prompt: {artifacts.next_prompt}")
 
 
+@app.command("weather-alpha-validation")
+def weather_alpha_validation_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Weather settlement-lineage and shadow-validation reports."),
+    ] = Path("reports/weather_alpha_validation"),
+) -> None:
+    """Audit weather settlement gaps and walk-forward evidence query-only."""
+    from kalshi_predictor.weather_alpha_validation import write_weather_alpha_validation
+
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: WEATHER SHADOW VALIDATION / SQLITE QUERY ONLY")
+    console.print("Settlement writes are delegated to the existing serialized sync-settlements job.")
+    console.print("Paper/live/demo/autopilot and paper-order creation remain blocked.")
+    artifacts = write_weather_alpha_validation(
+        database_url=database_url,
+        output_dir=output_dir,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote settlement gap audit: {artifacts.gap_audit}")
+    console.print(f"Wrote readiness: {artifacts.readiness}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
 @app.command("candidate-coverage-audit")
 def candidate_coverage_audit_command(
     gh1_manifest_path: Annotated[
