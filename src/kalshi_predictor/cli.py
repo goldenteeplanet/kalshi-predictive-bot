@@ -20350,6 +20350,33 @@ def alpha_recovery_audit_command(
     console.print(f"Wrote next prompt: {artifacts.next_prompt}")
 
 
+@app.command("independent-domain-experiment")
+def independent_domain_experiment_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Phase 7 read-only domain selection and shadow report directory."),
+    ] = Path("reports/independent_domain_experiment"),
+) -> None:
+    """Rank independent domains and settlement-score the selected domain read-only."""
+    from kalshi_predictor.independent_domain_experiment import (
+        write_independent_domain_experiment,
+    )
+
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: PHASE 7 / SHADOW ONLY / SQLITE QUERY ONLY")
+    console.print("Paper/live/demo/autopilot and paper-order creation remain blocked.")
+    artifacts = write_independent_domain_experiment(
+        database_url=database_url,
+        output_dir=output_dir,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote domain ranking: {artifacts.domain_ranking}")
+    console.print(f"Wrote readiness: {artifacts.readiness}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
 @app.command("candidate-coverage-audit")
 def candidate_coverage_audit_command(
     gh1_manifest_path: Annotated[
