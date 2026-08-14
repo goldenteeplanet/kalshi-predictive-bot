@@ -20301,6 +20301,55 @@ def no_opportunity_root_cause_audit_command(
     console.print(f"Wrote next prompt: {artifacts.next_prompt}")
 
 
+@app.command("alpha-recovery-audit")
+def alpha_recovery_audit_command(
+    prompt1_dir: Annotated[
+        Path,
+        typer.Option(help="Completed no-opportunity Prompt 1 artifact directory."),
+    ] = Path("reports/no_opportunity_root_cause"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Prompt 2 shadow-only alpha-recovery output directory."),
+    ] = Path("reports/alpha_recovery"),
+    ranking_limit: Annotated[
+        int,
+        typer.Option(help="Maximum recent crypto rankings considered for replay."),
+    ] = 30000,
+    replay_limit: Annotated[
+        int,
+        typer.Option(help="Maximum isolated shadow decisions emitted."),
+    ] = 10000,
+    activation_approved: Annotated[
+        bool,
+        typer.Option(
+            help="Record explicit user approval; activation remains blocked until all gates pass."
+        ),
+    ] = False,
+) -> None:
+    """Run settlement replay and coverage/model experiments without guarded writes."""
+    from kalshi_predictor.alpha_recovery import write_alpha_recovery_reports
+
+    if ranking_limit < 100 or replay_limit < 100:
+        raise typer.BadParameter("ranking-limit and replay-limit must be at least 100")
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: SHADOW ONLY / SQLITE QUERY ONLY")
+    console.print(f"Explicit activation approval recorded: {activation_approved}")
+    console.print("Paper-order creation remains fail-closed until every readiness gate passes.")
+    artifacts = write_alpha_recovery_reports(
+        database_url=database_url,
+        prompt1_dir=prompt1_dir,
+        output_dir=output_dir,
+        ranking_limit=ranking_limit,
+        replay_limit=replay_limit,
+        activation_approved=activation_approved,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote paper readiness: {artifacts.paper_readiness}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
 @app.command("candidate-coverage-audit")
 def candidate_coverage_audit_command(
     gh1_manifest_path: Annotated[
