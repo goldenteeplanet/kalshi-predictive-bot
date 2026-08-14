@@ -24,10 +24,12 @@ from kalshi_predictor.candidate_funnel_audit import make_candidate_funnel_read_o
 from kalshi_predictor.data.repositories import decode_json
 from kalshi_predictor.data.schema import (
     Forecast,
+    ForecastSkipLog,
     Market,
     MarketSnapshot,
     Settlement,
     WeatherFeature,
+    WeatherForecast,
     WeatherMarketLink,
 )
 from kalshi_predictor.kalshi.protocol_math import trading_fee
@@ -61,6 +63,7 @@ def write_weather_alpha_validation(
         before = database_baseline(session)
         gap_rows = classify_weather_forecasts(session)
         ledger = build_weather_shadow_ledger(gap_rows)
+        runtime_health = collect_runtime_health(session)
         after = database_baseline(session)
     safety = verify_guarded_invariants(before, after)
     if not safety["guarded_counts_unchanged"]:
@@ -70,7 +73,7 @@ def write_weather_alpha_validation(
     by_location = grouped_performance(ledger, "location_key")
     by_contract = grouped_performance(ledger, "contract_type")
     by_horizon = grouped_performance(ledger, "horizon_bucket")
-    health = pipeline_health(gap_rows, ledger)
+    health = pipeline_health(gap_rows, ledger, runtime_health=runtime_health)
     readiness = paper_readiness(performance, safety)
 
     _write_csv(output_dir / "SETTLEMENT_GAP_ROWS.csv", gap_rows)
@@ -83,7 +86,10 @@ def write_weather_alpha_validation(
     _write_csv(output_dir / "PERFORMANCE_BY_CONTRACT.csv", by_contract)
     _write_csv(output_dir / "PERFORMANCE_BY_HORIZON.csv", by_horizon)
     _write_text(output_dir / "PIPELINE_HEALTH.md", health_markdown(health))
-    _write_text(output_dir / "COLLECTION_PLAN.md", collection_plan_markdown(performance))
+    _write_text(
+        output_dir / "COLLECTION_PLAN.md",
+        collection_plan_markdown(performance, health),
+    )
     _write_text(output_dir / "PAPER_READINESS.md", readiness_markdown(readiness))
     _write_text(output_dir / "SAFETY_INVARIANTS.md", safety_markdown(safety))
     _write_text(output_dir / "TEST_RESULTS.md", "# Test Results\n\nPending final verification.\n")
@@ -94,7 +100,7 @@ def write_weather_alpha_validation(
 
 def classify_weather_forecasts(session: Session) -> list[dict[str, Any]]:
     forecasts = list(session.scalars(select(Forecast).where(Forecast.model_name.in_(WEATHER_MODELS)).order_by(Forecast.forecasted_at, Forecast.id)))
-    duplicate_counts = Counter((row.ticker, row.model_name, row.forecasted_at) for row in forecasts)
+    seen_windows: set[tuple[str, str, datetime]] = set()
     rows: list[dict[str, Any]] = []
     for forecast in forecasts:
         market = session.get(Market, forecast.ticker)
@@ -104,12 +110,13 @@ def classify_weather_forecasts(session: Session) -> list[dict[str, Any]]:
         feature, source_timestamp = _feature_lineage(session, forecast, link)
         key = (forecast.ticker, forecast.model_name, forecast.forecasted_at)
         classification = classify_lineage(
-            duplicate=duplicate_counts[key] > 1,
+            duplicate=key in seen_windows,
             has_market=market is not None,
             has_link=link is not None,
             settlement_result=settlement.result if settlement else None,
             market_result=market.result if market else None,
         )
+        seen_windows.add(key)
         source_at = parse_datetime(source_timestamp)
         feature_at = parse_datetime(feature.generated_at if feature else None)
         snapshot_at = parse_datetime(snapshot.captured_at if snapshot else None)
@@ -301,7 +308,41 @@ def grouped_performance(rows: list[dict[str, Any]], field: str) -> list[dict[str
     return [{field: key, "count": len(group), "model_brier": _mean(group, "model_brier"), "market_brier": _mean(group, "market_brier"), "net_pnl_after_fee": str(sum((_decimal(r["one_contract_pnl_after_fee"]) or Decimal("0") for r in group), Decimal("0")))} for key, group in sorted(groups.items())]
 
 
-def pipeline_health(gap_rows: list[dict[str, Any]], ledger: list[dict[str, Any]]) -> dict[str, Any]:
+def collect_runtime_health(session: Session) -> dict[str, Any]:
+    latest_feature = session.scalar(
+        select(WeatherFeature).order_by(WeatherFeature.id.desc()).limit(1)
+    )
+    latest_source = session.scalar(
+        select(WeatherForecast).order_by(WeatherForecast.id.desc()).limit(1)
+    )
+    recent_skips = list(
+        session.scalars(
+            select(ForecastSkipLog)
+            .where(ForecastSkipLog.model_name == "weather_v2")
+            .order_by(ForecastSkipLog.id.desc())
+            .limit(100)
+        )
+    )
+    return {
+        "latest_global_feature_generated_at": (
+            latest_feature.generated_at.isoformat() if latest_feature else None
+        ),
+        "latest_weather_source_generated_at": (
+            latest_source.forecast_generated_at.isoformat() if latest_source else None
+        ),
+        "latest_weather_source_target_time": (
+            latest_source.forecast_time.isoformat() if latest_source else None
+        ),
+        "recent_forecast_skip_reasons": dict(Counter(row.reason for row in recent_skips)),
+    }
+
+
+def pipeline_health(
+    gap_rows: list[dict[str, Any]],
+    ledger: list[dict[str, Any]],
+    *,
+    runtime_health: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     now = utc_now()
 
     def latest(key: str) -> datetime | None:
@@ -312,7 +353,19 @@ def pipeline_health(gap_rows: list[dict[str, Any]], ledger: list[dict[str, Any]]
         return (now - value).total_seconds() / 3600 if value else None
 
     counts = Counter(row["classification"] for row in gap_rows)
-    return {"forecast_count": len(gap_rows), "unique_tickers": len({row["ticker"] for row in gap_rows}), "settled_shadow_rows": len(ledger), "settlement_coverage": len(ledger) / len(gap_rows) if gap_rows else 0, "classifications": dict(counts), "latest_source_age_hours": age(latest("source_timestamp")), "latest_feature_age_hours": age(latest("feature_timestamp")), "latest_snapshot_age_hours": age(latest("snapshot_timestamp")), "latest_forecast_age_hours": age(latest("forecasted_at")), "repair_candidates": counts[MARKET_RESULT_MISSING_ROW]}
+    return {
+        "forecast_count": len(gap_rows),
+        "unique_tickers": len({row["ticker"] for row in gap_rows}),
+        "settled_shadow_rows": len(ledger),
+        "settlement_coverage": len(ledger) / len(gap_rows) if gap_rows else 0,
+        "classifications": dict(counts),
+        "latest_scored_source_age_hours": age(latest("source_timestamp")),
+        "latest_scored_feature_age_hours": age(latest("feature_timestamp")),
+        "latest_snapshot_age_hours": age(latest("snapshot_timestamp")),
+        "latest_forecast_age_hours": age(latest("forecasted_at")),
+        "repair_candidates": counts[MARKET_RESULT_MISSING_ROW],
+        **(runtime_health or {}),
+    }
 
 
 def paper_readiness(performance: dict[str, Any], safety: dict[str, Any]) -> dict[str, Any]:
@@ -360,9 +413,11 @@ def health_markdown(health: dict[str, Any]) -> str:
     return "# Weather Pipeline Health\n\n" + "\n".join(f"- {key}: `{value}`" for key, value in health.items()) + "\n"
 
 
-def collection_plan_markdown(performance: dict[str, Any]) -> str:
+def collection_plan_markdown(
+    performance: dict[str, Any], health: dict[str, Any]
+) -> str:
     missing = max(0, 100 - performance["settled_observations"])
-    return f"""# Weather Shadow Collection Plan\n\n- Additional settled observations required: `{missing}`\n- Writer: existing shared `flock`-serialized weather refresh and `sync-settlements` commands only\n- Analytics: `kalshi-bot weather-alpha-validation` (query-only)\n- Cadence: weather source/features every 15 minutes; broad settlement sync after natural resolution; validation after sync\n- Promotion: prohibited until 100+ valid rows, zero lookahead, better market-relative calibration, positive post-cost P&L, acceptable drawdown, and all Phase 8 gates\n- Rollback: stop the weather shadow timer; no production selector, threshold, paper-order, or exchange state is changed\n\nUse `scripts/weather-alpha-shadow-cycle.sh` for the fail-closed collection sequence.\n"""
+    return f"""# Weather Shadow Collection Plan\n\n- Additional settled observations required: `{missing}`\n- Latest forecast skip reasons: `{health.get('recent_forecast_skip_reasons', {})}`\n- Current primary blocker: `FEATURE_TO_CONTRACT_TARGET_ALIGNMENT_AND_FRESHNESS`\n- Writer: existing shared `flock`-serialized weather refresh and `sync-settlements` commands only\n- Analytics: `kalshi-bot weather-alpha-validation` (query-only)\n- Cadence: weather source/features every 15 minutes; broad settlement sync after natural resolution; validation after sync\n- Promotion: prohibited until 100+ valid rows, zero lookahead, better market-relative calibration, positive post-cost P&L, acceptable drawdown, and all Phase 8 gates\n- Performance repair: use the indexed current-weather snapshot selector; do not restore the full-history grouped query\n- Rollback: stop the weather shadow timer and revert the indexed selector commit; no threshold, paper-order, or exchange state is changed\n\nUse `scripts/weather-alpha-shadow-cycle.sh` for the fail-closed collection sequence.\n"""
 
 
 def readiness_markdown(readiness: dict[str, Any]) -> str:
