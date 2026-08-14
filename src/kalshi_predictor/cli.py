@@ -20246,6 +20246,61 @@ def candidate_funnel_audit_command(
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
+@app.command("no-opportunity-root-cause-audit")
+def no_opportunity_root_cause_audit_command(
+    runtime_worktree: Annotated[
+        Path,
+        typer.Option(help="Authoritative runtime checkout whose branch and SHA are fingerprinted."),
+    ],
+    runtime_reports_dir: Annotated[
+        Path,
+        typer.Option(help="Authoritative runtime reports directory."),
+    ],
+    env_path: Annotated[
+        Path,
+        typer.Option(help="Authoritative runtime .env containing the canonical database URL."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Prompt 1 Phase 0-3 read-only diagnostic output directory."),
+    ] = Path("reports/no_opportunity_root_cause"),
+    recent_limit: Annotated[
+        int,
+        typer.Option(help="Bounded recent snapshot, forecast, and ranking rows to inspect."),
+    ] = 5000,
+    allow_noncanonical: Annotated[
+        bool,
+        typer.Option(
+            help="Label an intentionally isolated empty/missing-env database noncanonical."
+        ),
+    ] = False,
+) -> None:
+    """Audit no-opportunity root causes; query-only and incapable of populating the database."""
+    from kalshi_predictor.no_opportunity_audit import (
+        write_no_opportunity_root_cause_audit,
+    )
+
+    if recent_limit < 100:
+        raise typer.BadParameter("recent-limit must be at least 100")
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: PAPER ONLY / SQLITE QUERY ONLY")
+    console.print("This audit does not fetch markets, books, forecasts, or rankings.")
+    artifacts = write_no_opportunity_root_cause_audit(
+        database_url=database_url,
+        output_dir=output_dir,
+        runtime_worktree=runtime_worktree,
+        runtime_reports_dir=runtime_reports_dir,
+        env_path=env_path,
+        recent_limit=recent_limit,
+        allow_noncanonical=allow_noncanonical,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote verdict: {artifacts.verdict_markdown}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
 @app.command("candidate-coverage-audit")
 def candidate_coverage_audit_command(
     gh1_manifest_path: Annotated[

@@ -43,6 +43,7 @@ def build_fast_market_harvester(
     The harvester does not create paper trades. It checks whether the current ranked
     universe contains fast-settlement candidates and identifies open 0-24h markets
     that still need forecast/ranking coverage before Learning Mode can use them.
+    It does not fetch or populate markets, snapshots, forecasts, or rankings.
     """
 
     resolved = settings or get_settings()
@@ -107,6 +108,13 @@ def build_fast_market_harvester(
         "phase_title": "Fast Market Harvester",
         "phase_version": PHASE_3AE_FAST_MARKET_VERSION,
         "mode": "PAPER_ONLY_READ_ONLY_HARVESTER",
+        "capabilities": {
+            "fetches_markets": False,
+            "fetches_orderbooks": False,
+            "creates_forecasts": False,
+            "creates_rankings": False,
+            "reads_existing_rows_only": True,
+        },
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "live_or_demo_execution": False,
         "order_submission": False,
@@ -124,6 +132,12 @@ def build_fast_market_harvester(
             fast_ranked=fast_ranked,
             unranked_fast=unranked_fast,
             stale_or_missing_rankings=stale_or_missing_rankings,
+        ),
+        "empty_database_warning": (
+            "No markets or rankings exist in this database. This read-only audit cannot "
+            "populate them; run canonical collection/forecast/ranking commands first."
+            if not ranking_rows and not open_fast_markets
+            else None
         ),
         "safety": {
             "creates_paper_trades": False,
