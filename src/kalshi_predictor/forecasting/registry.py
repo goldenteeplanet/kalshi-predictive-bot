@@ -243,6 +243,11 @@ def latest_snapshots_for_model(
                     ~market_status.in_(tuple(sorted(INACTIVE_MARKET_STATUSES))),
                     Market.close_time.is_not(None),
                     Market.close_time > (as_of or utc_now()),
+                    *(
+                        (link_table.ticker.startswith("KXTEMPNYCH-"),)
+                        if model_name == "weather_v2"
+                        else ()
+                    ),
                 )
                 .distinct()
                 .limit(max(limit * 2, limit))

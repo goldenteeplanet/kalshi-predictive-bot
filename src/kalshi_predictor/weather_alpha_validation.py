@@ -309,6 +309,8 @@ def grouped_performance(rows: list[dict[str, Any]], field: str) -> list[dict[str
 
 
 def collect_runtime_health(session: Session) -> dict[str, Any]:
+    from kalshi_predictor.forecasting.registry import latest_snapshots_for_model
+
     latest_feature = session.scalar(
         select(WeatherFeature).order_by(WeatherFeature.id.desc()).limit(1)
     )
@@ -323,6 +325,17 @@ def collect_runtime_health(session: Session) -> dict[str, Any]:
             .limit(100)
         )
     )
+    current_verified_snapshots = latest_snapshots_for_model(
+        session,
+        model_name="weather_v2",
+        limit=500,
+    )
+    skip_families = Counter(
+        "VERIFIED_KXTEMPNYCH"
+        if row.ticker.startswith("KXTEMPNYCH-")
+        else "UNSUPPORTED_WEATHER_FAMILY"
+        for row in recent_skips
+    )
     return {
         "latest_global_feature_generated_at": (
             latest_feature.generated_at.isoformat() if latest_feature else None
@@ -334,6 +347,8 @@ def collect_runtime_health(session: Session) -> dict[str, Any]:
             latest_source.forecast_time.isoformat() if latest_source else None
         ),
         "recent_forecast_skip_reasons": dict(Counter(row.reason for row in recent_skips)),
+        "recent_forecast_skip_families": dict(skip_families),
+        "current_verified_family_snapshots": len(current_verified_snapshots or []),
     }
 
 
@@ -417,7 +432,13 @@ def collection_plan_markdown(
     performance: dict[str, Any], health: dict[str, Any]
 ) -> str:
     missing = max(0, 100 - performance["settled_observations"])
-    return f"""# Weather Shadow Collection Plan\n\n- Additional settled observations required: `{missing}`\n- Latest forecast skip reasons: `{health.get('recent_forecast_skip_reasons', {})}`\n- Current primary blocker: `FEATURE_TO_CONTRACT_TARGET_ALIGNMENT_AND_FRESHNESS`\n- Writer: existing shared `flock`-serialized weather refresh and `sync-settlements` commands only\n- Analytics: `kalshi-bot weather-alpha-validation` (query-only)\n- Cadence: weather source/features every 15 minutes; broad settlement sync after natural resolution; validation after sync\n- Promotion: prohibited until 100+ valid rows, zero lookahead, better market-relative calibration, positive post-cost P&L, acceptable drawdown, and all Phase 8 gates\n- Performance repair: use the indexed current-weather snapshot selector; do not restore the full-history grouped query\n- Rollback: stop the weather shadow timer and revert the indexed selector commit; no threshold, paper-order, or exchange state is changed\n\nUse `scripts/weather-alpha-shadow-cycle.sh` for the fail-closed collection sequence.\n"""
+    snapshots = int(health.get("current_verified_family_snapshots") or 0)
+    blocker = (
+        "VERIFIED_FAMILY_CURRENT_MARKET_UNIVERSE_EMPTY"
+        if snapshots == 0
+        else "VERIFIED_FAMILY_FEATURE_ALIGNMENT_OR_FRESHNESS"
+    )
+    return f"""# Weather Shadow Collection Plan\n\n- Additional settled observations required: `{missing}`\n- Current verified-family snapshots: `{snapshots}`\n- Latest forecast skip reasons: `{health.get('recent_forecast_skip_reasons', {})}`\n- Latest skip families: `{health.get('recent_forecast_skip_families', {})}`\n- Current primary blocker: `{blocker}`\n- Writer: existing shared `flock`-serialized weather refresh and `sync-settlements` commands only\n- Analytics: `kalshi-bot weather-alpha-validation` (query-only)\n- Cadence: catalog/source/features every 15 minutes only while verified KXTEMPNYCH markets exist; authoritative settlement sync after natural resolution; validation after sync\n- Promotion: prohibited until 100+ valid rows, zero lookahead, better market-relative calibration, positive post-cost P&L, acceptable drawdown, and all Phase 8 gates\n- Unsupported hurricane contracts: excluded from weather_v2; never remap them to a city or temperature feature\n- Performance repair: use the indexed current-weather snapshot selector; do not restore the full-history grouped query\n- Rollback: stop the weather shadow timer and revert the verified-family selector commit; no threshold, paper-order, or exchange state is changed\n\nUse `scripts/weather-alpha-shadow-cycle.sh` for the fail-closed collection sequence.\n"""
 
 
 def readiness_markdown(readiness: dict[str, Any]) -> str:
