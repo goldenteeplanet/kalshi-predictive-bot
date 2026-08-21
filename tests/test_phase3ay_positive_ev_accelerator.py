@@ -13,6 +13,7 @@ from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_forecast, insert_market_snapshot
 from kalshi_predictor.data.schema import PaperOrder
+from kalshi_predictor.kalshi.protocol_math import trading_fee
 from kalshi_predictor.phase3ay_positive_ev import (
     build_phase3ay_positive_ev_accelerator,
     write_phase3ay_positive_ev_accelerator_report,
@@ -119,7 +120,9 @@ def _seed_crypto_row(
     now = utc_now()
     close_time = now - timedelta(hours=1) if expired else now + timedelta(hours=3)
     yes_ask = Decimal("0.50")
-    probability = yes_ask + (ev_cents / Decimal("100"))
+    # ``expected_value`` is executable, fee-adjusted EV. Seed the requested
+    # near-miss value after the entry fee rather than as a legacy gross edge.
+    probability = yes_ask + trading_fee(price=yes_ask) + (ev_cents / Decimal("100"))
     market_json = {
         "ticker": ticker,
         "title": f"{ticker} test crypto window",

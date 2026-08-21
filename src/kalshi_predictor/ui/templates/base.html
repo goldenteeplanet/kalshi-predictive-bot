@@ -21,7 +21,7 @@
       aria-label="Global system context"
       data-status-artifact-refresh
       data-status-artifact-url="/api/ui/status-artifact"
-      data-status-artifact-generated-at="{{ shell.shell_status_snapshot.generated_at | default(shell.snapshot_as_of) }}"
+      data-status-artifact-generated-at="{{ (shell.shell_status_snapshot | default({})).generated_at | default(shell.snapshot_as_of) }}"
       data-status-artifact-poll-seconds="15"
     >
       <div class="status-item">

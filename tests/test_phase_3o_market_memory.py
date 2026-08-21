@@ -368,7 +368,9 @@ def _seed_snapshot(
     ticker: str = "P3O",
     captured_at: datetime | None = None,
 ):
-    now = captured_at or datetime(2026, 1, 2, tzinfo=UTC)
+    # Default paper candidates must remain open as the calendar advances.
+    # Historical scenarios continue to pass an explicit capture timestamp.
+    now = captured_at or datetime.now(UTC)
     return insert_market_snapshot(
         session,
         {
