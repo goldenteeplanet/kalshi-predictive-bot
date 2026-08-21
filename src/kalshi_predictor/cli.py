@@ -1429,6 +1429,7 @@ def runtime_origin_command(
     console.print(f"Branch: {payload.get('branch') or 'unknown'}")
     console.print(f"SHA: {payload.get('sha') or 'unknown'}")
     console.print(f"Deployed SHA: {payload.get('deployed_sha') or 'unknown'}")
+    console.print(f"Runtime-affecting paths current: {payload.get('runtime_code_current')}")
     console.print(f"Python: {payload['python']}")
     console.print(f"Virtualenv: {payload['virtualenv']}")
     console.print(f"Database: {payload['database'].get('path') or payload['database']['url']}")

@@ -49,6 +49,7 @@ def test_runtime_origin_ready_for_intentional_split_layout(tmp_path: Path) -> No
     assert payload["layout"]["intentional_separation"] is True
     assert payload["layout"]["runtime_import_matches"] is True
     assert payload["layout"]["database_outside_checkouts"] is True
+    assert payload["runtime_code_current"] is None
 
 
 def test_runtime_origin_reports_install_database_and_onedrive_mismatches(

@@ -97,12 +97,12 @@ def build_runtime_origin(
     development_sha = _git_value(paths.development_root, "rev-parse", "HEAD")
     deployment = _deployment_manifest(paths.runtime_root)
     deployed_sha = deployment.get("git_sha") if deployment else None
+    runtime_code_current = _runtime_code_current(paths.development_root, deployed_sha)
     statuses = _statuses(
         paths=paths,
         cwd=cwd_path,
         package_path=package_path,
-        development_sha=development_sha,
-        deployed_sha=deployed_sha,
+        runtime_code_current=runtime_code_current,
     )
     db_url = database_url_from_settings(resolved)
     return {
@@ -118,6 +118,7 @@ def build_runtime_origin(
         "branch": _git_value(paths.development_root, "branch", "--show-current"),
         "sha": development_sha,
         "deployed_sha": deployed_sha,
+        "runtime_code_current": runtime_code_current,
         "python": str(python_path),
         "virtualenv": str(Path(sys.prefix).resolve()),
         "database": {
@@ -172,6 +173,7 @@ def render_runtime_origin_markdown(payload: dict[str, Any]) -> str:
         f"- Branch: `{payload.get('branch') or 'unknown'}`",
         f"- Development SHA: `{payload.get('sha') or 'unknown'}`",
         f"- Deployed SHA: `{payload.get('deployed_sha') or 'unknown'}`",
+        f"- Runtime-affecting paths current: `{payload.get('runtime_code_current')}`",
         f"- Python: `{payload['python']}`",
         f"- Virtualenv: `{payload['virtualenv']}`",
         "",
@@ -203,15 +205,14 @@ def _statuses(
     paths: RuntimePaths,
     cwd: Path,
     package_path: Path,
-    development_sha: str | None,
-    deployed_sha: str | None,
+    runtime_code_current: bool | None,
 ) -> list[str]:
     statuses: list[str] = []
     if not (_inside(cwd, paths.development_root) or _inside(cwd, paths.runtime_root)):
         statuses.append(PATH_MISMATCH)
     if not _inside(package_path, paths.runtime_root):
         statuses.append(EDITABLE_INSTALL_MISMATCH)
-    if development_sha and deployed_sha and development_sha != deployed_sha:
+    if runtime_code_current is False:
         statuses.append(OLD_RUNTIME)
     if paths.database_path and (
         _inside(paths.database_path, paths.development_root)
@@ -268,6 +269,33 @@ def _git_value(root: Path, *args: str) -> str | None:
     )
     value = result.stdout.strip()
     return value if result.returncode == 0 and value else None
+
+
+def _runtime_code_current(root: Path, deployed_sha: str | None) -> bool | None:
+    if not deployed_sha or not (root / ".git").exists():
+        return None
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "diff",
+            "--quiet",
+            f"{deployed_sha}..HEAD",
+            "--",
+            "src/kalshi_predictor",
+            "scripts/local/kalshi-fixed-rate-refresh.sh",
+            "pyproject.toml",
+        ],
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    return None
 
 
 def _deployment_manifest(runtime_root: Path) -> dict[str, Any] | None:
