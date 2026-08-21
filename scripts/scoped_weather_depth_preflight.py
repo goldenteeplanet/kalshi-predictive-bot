@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 from datetime import UTC, datetime
 from decimal import ROUND_FLOOR
@@ -30,6 +31,17 @@ from kalshi_predictor.position_sizing.service import (
 )
 from kalshi_predictor.utils.decimals import to_decimal
 from kalshi_predictor.utils.time import utc_now
+
+
+def evaluate_paper_decision_without_persisting(session, decision, *, settings):
+    """Run Phase 3M/3N for telemetry while rolling back their decision logs."""
+    savepoint = session.begin_nested()
+    try:
+        sized = ensure_paper_decision_sized(session, decision, settings=settings)
+        session.flush()
+        return copy.deepcopy(sized.raw_decision_json)
+    finally:
+        savepoint.rollback()
 
 
 def main() -> None:
@@ -190,7 +202,7 @@ def main() -> None:
                 depth_cap = int(depth.to_integral_value(rounding=ROUND_FLOOR)) if depth else 0
                 if depth_cap < 1:
                     raise RuntimeError(f"{ticker}: exact-level depth cap is zero")
-                sized = ensure_paper_decision_sized(
+                raw = evaluate_paper_decision_without_persisting(
                     session,
                     PaperDecision(
                         ticker=ticker,
@@ -228,7 +240,6 @@ def main() -> None:
                     ),
                     settings=settings,
                 )
-                raw = sized.raw_decision_json
                 sizing = raw["position_sizing_decision"]
                 risk = raw["advanced_risk_decision"]
                 proposed = int(sizing["proposed_contracts"])
@@ -246,12 +257,14 @@ def main() -> None:
                         "fresh_snapshot_id": snapshot.id,
                         "fresh_snapshot_at": captured_at.isoformat(),
                         "depth_cap_contracts": depth_cap,
-                        "phase3m_decision_id": raw["position_sizing_decision_id"],
+                        "phase3m_decision_id": None,
+                        "phase3m_evaluation_id": raw["position_sizing_decision_id"],
                         "phase3m_tier": sizing["tier"],
                         "phase3m_proposed_contracts": proposed,
                         "phase3m_live_candidate_contracts": sizing["live_candidate_contracts"],
                         "phase3m_limiting_factors": sizing["limiting_factors"],
-                        "phase3n_decision_id": raw["advanced_risk_decision_id"],
+                        "phase3n_decision_id": None,
+                        "phase3n_evaluation_id": raw["advanced_risk_decision_id"],
                         "phase3n_action": risk["action"],
                         "phase3n_live_candidate_contracts": risk["live_candidate_contracts"],
                         "phase3n_hard_blocks": risk["hard_blocks"],
