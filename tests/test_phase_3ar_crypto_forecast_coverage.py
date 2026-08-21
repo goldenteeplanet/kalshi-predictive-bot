@@ -23,6 +23,7 @@ from kalshi_predictor.phase3ar import (
     build_crypto_forecast_coverage,
     write_phase3ar_report,
 )
+from kalshi_predictor import phase3ar
 from kalshi_predictor.utils.time import utc_now
 
 
@@ -159,6 +160,35 @@ def test_phase3ar_can_scope_diagnostics_to_exact_tickers(tmp_path) -> None:
     assert payload["diagnostic_scope"]["ticker_count"] == 1
     assert payload["summary"]["linked_crypto_markets_checked"] == 1
     assert [row["ticker"] for row in payload["rows"]] == ["KXBTC-IN-SCOPE"]
+
+
+def test_phase3ar_reuses_diagnostics_when_no_snapshot_repair_is_attempted(
+    tmp_path, monkeypatch
+) -> None:
+    session_factory = _session_factory(tmp_path)
+    original = phase3ar._diagnostic_rows
+    calls = 0
+
+    def counted_diagnostics(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(phase3ar, "_diagnostic_rows", counted_diagnostics)
+    with session_factory() as session:
+        _seed_crypto_market(session, ticker="KXBTC-FRESH")
+        payload = build_crypto_forecast_coverage(
+            session,
+            settings=_settings(),
+            limit=10,
+            repair_snapshots=True,
+            client=_FakeCryptoSnapshotClient(),
+        )
+
+    assert payload["repair_result"]["attempted"] == 0
+    assert payload["diagnostic_scope"]["diagnostic_passes"] == 1
+    assert payload["diagnostic_scope"]["reused_initial_diagnostics"] is True
+    assert calls == 1
 
 
 def test_phase3ar_cli_help_smoke() -> None:

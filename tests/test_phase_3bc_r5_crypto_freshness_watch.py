@@ -905,6 +905,32 @@ def test_phase3bc_r5_snapshot_refresh_uses_full_r4_freshness_rows() -> None:
     assert selection["unselected_tickers"] == ["KXBTC-FULL-EXPORT-3"]
 
 
+def test_phase3bc_r5_snapshot_refresh_proactively_selects_near_stale_row() -> None:
+    tickers, selection = phase3bc_r5._snapshot_refresh_selection(
+        {
+            "snapshot_freshness_rows": [
+                {
+                    "ticker": "KXDOGE-NEAR-STALE",
+                    "freshness_issue": None,
+                    "snapshot_age_minutes": "13.5",
+                    "active_market": True,
+                    "active_window_status": "CURRENT_OR_UNKNOWN",
+                    "structure_status": "PURE_CRYPTO",
+                    "market_status": "active",
+                    "expected_value": "-0.01",
+                    "liquidity_score": "0",
+                }
+            ]
+        },
+        limit=10,
+        now=datetime(2026, 7, 1, 12, tzinfo=UTC),
+    )
+
+    assert tickers == ["KXDOGE-NEAR-STALE"]
+    assert selection["active_open_candidates"] == 1
+    assert selection["skip_reason_counts"] == {}
+
+
 def test_phase3bc_r5_payload_exposes_r8_gap_reconciliation_fields() -> None:
     payload = build_phase3bc_r5_payload(
         r3_payload={"summary": {"rankings_inserted": 12}},
@@ -1543,6 +1569,51 @@ def test_crypto_freshness_watch_status_uses_freshness_window_when_running(
     assert status["runner_status"] == "RUNNING"
     assert status["runner_pid"] == 5151
     assert status["watch_state"] == "WAITING_FOR_POSITIVE_EV"
+
+
+def test_crypto_freshness_watch_uses_verified_scheduler_timestamp(tmp_path) -> None:
+    now = utc_now()
+    report_path = Path(tmp_path) / "phase3bc_r5_crypto_freshness_watch.json"
+    status_path = Path(tmp_path) / "phase3bc_r5_status.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "generated_at": (now - timedelta(minutes=30)).isoformat(),
+                "options": {"cadence_minutes": 15},
+                "summary": {"watch_state": "WAITING_FOR_POSITIVE_EV"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    status_path.write_text(
+        json.dumps(
+            {
+                "generated_at": now.isoformat(),
+                "guard": {
+                    "status": "SCHEDULED_OWNER_HEALTHY",
+                    "scheduled_owner_active": True,
+                },
+                "latest_summary": {
+                    "data_freshness_complete": True,
+                    "snapshot_stale_rows": 0,
+                    "forecast_stale_rows": 0,
+                    "missing_or_stale_ranking_rows": 0,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = crypto_freshness_watch_status(
+        report_path=report_path,
+        status_path=status_path,
+        phase3ak_status_path=None,
+        now=now,
+    )
+
+    assert status["status"] == "FRESH"
+    assert status["generated_at"] == now.isoformat()
+    assert "scheduled refresh reports current" in status["description"]
 
 
 def test_crypto_freshness_watch_status_ignores_older_phase3ak_overlay(
@@ -2293,3 +2364,36 @@ def _row(
         "latest_forecast_at": latest_forecast_at or latest_ranking_at,
         "latest_ranking_at": latest_ranking_at,
     }
+def test_phase3bc_r5_snapshot_refresh_prioritizes_missing_before_stale_maintenance() -> None:
+    tickers, _selection = phase3bc_r5._snapshot_refresh_selection(
+        {
+            "snapshot_freshness_rows": [
+                {
+                    "ticker": "KXBTC-STALE-CLEAN",
+                    "freshness_issue": "SNAPSHOT_STALE",
+                    "active_market": True,
+                    "structure_status": "PURE_CRYPTO",
+                    "market_status": "active",
+                    "expected_value": "-0.20",
+                    "liquidity_score": "90",
+                    "spread": "0.01",
+                    "opportunity_score": "90",
+                },
+                {
+                    "ticker": "KXBTC-MISSING-FIRST-BOOK",
+                    "freshness_issue": "SNAPSHOT_MISSING",
+                    "active_market": True,
+                    "structure_status": "PURE_CRYPTO",
+                    "market_status": "active",
+                    "expected_value": "-0.20",
+                    "liquidity_score": "0",
+                    "spread": None,
+                    "opportunity_score": "0",
+                },
+            ]
+        },
+        limit=1,
+        now=datetime(2026, 7, 1, 12, tzinfo=UTC),
+    )
+
+    assert tickers == ["KXBTC-MISSING-FIRST-BOOK"]

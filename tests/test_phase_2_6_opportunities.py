@@ -8,7 +8,7 @@ from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_forecast, insert_market_snapshot
 from kalshi_predictor.data.schema import MarketOpportunity
 from kalshi_predictor.forecasting.base import ForecastOutput
-from kalshi_predictor.opportunities.scanner import scan_opportunities
+from kalshi_predictor.opportunities.scanner import _forecast_policy_eligible, scan_opportunities
 from kalshi_predictor.opportunities.scoring import (
     calculate_opportunity_score,
     score_liquidity,
@@ -71,6 +71,8 @@ def test_scanner_detects_buy_yes_opportunity(tmp_path) -> None:
         assert summary.rankings[0]["gross_expected_value"] == "0.2000"
         assert summary.rankings[0]["estimated_taker_fee"] == "0.0175"
         assert summary.rankings[0]["fee_adjusted_expected_value"] == "0.1825"
+        assert summary.rankings[0]["expected_value"] == "0.1825"
+        assert summary.opportunities[0]["net_executable_ev"] == "0.1825"
         assert session.scalar(select(MarketOpportunity)).side == BUY_YES
 
 
@@ -96,6 +98,30 @@ def test_scanner_detects_buy_no_opportunity(tmp_path) -> None:
         assert summary.opportunities[0]["side"] == BUY_NO
 
 
+def test_scanner_rejects_gross_edge_consumed_by_taker_fee(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        _seed_market(
+            session,
+            ticker="FEE_CONSUMED_EDGE",
+            probability=Decimal("0.506"),
+            yes_bid="0.49",
+            no_bid="0.50",
+        )
+
+        summary = scan_opportunities(
+            session,
+            settings=_settings(),
+            min_edge=Decimal("0"),
+            min_score=Decimal("0"),
+        )
+
+        ranking = summary.rankings[0]
+        assert Decimal(ranking["gross_expected_value"]) > 0
+        assert Decimal(ranking["expected_value"]) <= 0
+        assert summary.opportunities_detected == 0
+
+
 def test_scanner_skips_low_edge_market(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
@@ -116,6 +142,22 @@ def test_scanner_skips_low_edge_market(tmp_path) -> None:
 
         assert summary.rankings_inserted == 1
         assert summary.opportunities_detected == 0
+
+
+def test_scanner_keeps_incomplete_rain_horizon_diagnostic_only() -> None:
+    forecast = type(
+        "ForecastStub",
+        (),
+        {
+            "model_name": "weather_v2",
+            "feature_json": (
+                '{"weather_feature_alignment":'
+                '"LATEST_RAIN_RISK_WITHIN_NOAA_HORIZON"}'
+            ),
+        },
+    )()
+
+    assert _forecast_policy_eligible(forecast) is False
 
 
 def test_latest_forecasts_pushes_exact_ticker_scope_into_query(tmp_path) -> None:

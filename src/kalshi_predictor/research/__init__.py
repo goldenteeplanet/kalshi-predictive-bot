@@ -1,2 +1,1 @@
-"""Local deterministic research assistant for opportunity explanations."""
-
+"""Research-only collection and evaluation helpers."""

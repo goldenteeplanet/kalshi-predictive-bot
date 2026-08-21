@@ -85,7 +85,9 @@ def calculate_payout_metrics(
         if estimated_taker_fee is not None
         else None
     )
-    expected_value = gross_expected_value
+    # Executable opportunity truth must include the fee paid to enter. Keep
+    # gross EV as a diagnostic field, but never use it for readiness or rank.
+    expected_value = fee_adjusted_expected_value
     payout_to_risk_ratio = (
         payout_if_correct / downside_if_wrong if downside_if_wrong > ZERO else None
     )

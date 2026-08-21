@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 from decimal import Decimal
 
 from sqlalchemy import desc, select
@@ -135,12 +136,12 @@ class CryptoV2Forecaster:
             )
             return None
 
-        market_mid = _market_midpoint(snapshot)
-        if market_mid is None:
+        price_basis = _market_price_basis(snapshot)
+        if price_basis is None:
             _skip(
                 session,
                 snapshot,
-                "no market midpoint",
+                "no market probability bound",
                 available={
                     "best_yes_bid": snapshot.best_yes_bid,
                     "best_yes_ask": snapshot.best_yes_ask,
@@ -164,14 +165,18 @@ class CryptoV2Forecaster:
 
         direction_detected = "MULTI_COMPONENT" if len(components) > 1 else direction
         adjustment = momentum_score * self.settings.crypto_v2_max_adjustment
-        final_probability = _clamp_probability(market_mid + adjustment)
+        final_probability = _bound_probability(
+            price_basis.anchor + adjustment,
+            lower=price_basis.lower,
+            upper=price_basis.upper,
+        )
 
         return ForecastOutput(
             ticker=snapshot.ticker,
             forecasted_at=snapshot.captured_at,
             model_name=self.model_name,
             yes_probability=final_probability,
-            market_mid_probability=market_mid,
+            market_mid_probability=price_basis.midpoint,
             best_yes_bid=to_decimal(snapshot.best_yes_bid),
             best_yes_ask=to_decimal(snapshot.best_yes_ask),
             feature_json={
@@ -186,7 +191,15 @@ class CryptoV2Forecaster:
                 },
                 "title": title,
                 "direction_detected": direction_detected,
-                "market_mid": str(market_mid),
+                "market_mid": (
+                    str(price_basis.midpoint) if price_basis.midpoint is not None else None
+                ),
+                "market_price_anchor": str(price_basis.anchor),
+                "market_price_basis": price_basis.source,
+                "market_probability_bounds": {
+                    "lower": str(price_basis.lower),
+                    "upper": str(price_basis.upper),
+                },
                 "momentum_score": str(momentum_score),
                 "history_minutes": history_minutes,
                 "adjustment": str(adjustment),
@@ -200,8 +213,8 @@ class CryptoV2Forecaster:
                 ),
             },
             notes=(
-                "crypto_v2 midpoint plus bounded momentum adjustment using "
-                "point-in-time crypto features."
+                "crypto_v2 executable price basis plus bounded momentum adjustment "
+                "using point-in-time crypto features; one-sided books remain intervals."
             ),
         )
 
@@ -215,12 +228,39 @@ def detect_market_direction(text: str) -> str:
     return "UNKNOWN"
 
 
-def _market_midpoint(snapshot: MarketSnapshot) -> Decimal | None:
+@dataclass(frozen=True)
+class MarketPriceBasis:
+    anchor: Decimal
+    lower: Decimal
+    upper: Decimal
+    midpoint: Decimal | None
+    source: str
+
+
+def _market_price_basis(snapshot: MarketSnapshot) -> MarketPriceBasis | None:
     yes_bid = to_decimal(snapshot.best_yes_bid)
     yes_ask = to_decimal(snapshot.best_yes_ask)
     if yes_bid is not None and yes_ask is not None:
-        return midpoint(yes_bid, yes_ask)
-    return to_decimal(snapshot.last_price_dollars)
+        market_mid = midpoint(yes_bid, yes_ask)
+        return MarketPriceBasis(market_mid, yes_bid, yes_ask, market_mid, "TWO_SIDED_MIDPOINT")
+    if yes_bid is not None:
+        return MarketPriceBasis(
+            yes_bid, yes_bid, Decimal("1"), None, "EXECUTABLE_YES_BID_LOWER_BOUND"
+        )
+    if yes_ask is not None:
+        return MarketPriceBasis(
+            yes_ask, Decimal("0"), yes_ask, None, "EXECUTABLE_YES_ASK_UPPER_BOUND"
+        )
+    last_price = to_decimal(snapshot.last_price_dollars)
+    if last_price is not None:
+        return MarketPriceBasis(
+            last_price, Decimal("0"), Decimal("1"), None, "LAST_TRADE_PRICE"
+        )
+    return None
+
+
+def _bound_probability(value: Decimal, *, lower: Decimal, upper: Decimal) -> Decimal:
+    return min(upper, max(lower, _clamp_probability(value)))
 
 
 def _feature_history_minutes(raw_json: str | None) -> int | None:
@@ -520,6 +560,10 @@ def _skip(
         model_name=CryptoV2Forecaster.model_name,
         ticker=snapshot.ticker,
         reason=reason,
-        required_data=["crypto market link", "crypto features", "market midpoint"],
+        required_data=[
+            "crypto market link",
+            "crypto features",
+            "executable market probability bound",
+        ],
         available_data=available,
     )

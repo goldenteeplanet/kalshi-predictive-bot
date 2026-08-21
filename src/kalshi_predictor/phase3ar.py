@@ -216,11 +216,21 @@ def build_crypto_forecast_coverage(
         if repair_snapshots
         else _empty_repair_result()
     )
-    rows = _diagnostic_rows(
-        session,
-        settings=resolved,
-        limit=effective_limit,
-        tickers=ticker_scope or None,
+    # Snapshot repair is the only operation above that can change diagnostic
+    # outcomes.  Reuse the first pass when no repair was attempted instead of
+    # repeating every per-ticker market/snapshot/feature/forecast lookup.
+    # Active refresh normally arrives here with freshly collected books, so
+    # this removes a redundant full diagnostic pass without changing results.
+    diagnostics_reused = int(repair_result.get("attempted") or 0) == 0
+    rows = (
+        before_rows
+        if diagnostics_reused
+        else _diagnostic_rows(
+            session,
+            settings=resolved,
+            limit=effective_limit,
+            tickers=ticker_scope or None,
+        )
     )
     summary = _summary(session, rows, repair_result, settings=resolved, limit=effective_limit)
     return {
@@ -244,6 +254,8 @@ def build_crypto_forecast_coverage(
                 if ticker_scope
                 else "bounded_default_to_keep_report_terminal"
             ),
+            "diagnostic_passes": 1 if diagnostics_reused else 2,
+            "reused_initial_diagnostics": diagnostics_reused,
         },
         "summary": summary,
         "repair_result": repair_result,
@@ -1640,7 +1652,13 @@ def _summary(
     try:
         from kalshi_predictor.phase3ap import build_phase3ap_paper_ready_gate
 
-        gate = build_phase3ap_paper_ready_gate(session, settings=settings, limit=gate_limit)
+        gate = build_phase3ap_paper_ready_gate(
+            session,
+            settings=settings,
+            limit=gate_limit,
+            tickers=[str(row["ticker"]) for row in rows],
+            include_report_metadata=False,
+        )
         gate_summary = gate.get("summary", {}) if isinstance(gate.get("summary"), dict) else {}
         gate_rows = gate.get("rows", []) if isinstance(gate.get("rows"), list) else []
     except Exception as exc:  # noqa: BLE001 - coverage report should still render.

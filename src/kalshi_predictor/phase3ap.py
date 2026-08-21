@@ -12,7 +12,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import desc, select, text
+from sqlalchemy import desc, func, select, text
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
@@ -858,6 +858,8 @@ def build_phase3ap_paper_ready_gate(
     settings: Settings | None = None,
     window_hours: int = 168,
     limit: int = DEFAULT_PHASE3AP_SCAN_LIMIT,
+    tickers: list[str] | None = None,
+    include_report_metadata: bool = True,
 ) -> dict[str, Any]:
     resolved = settings or get_settings()
     rows = _phase3ap_gate_rows(
@@ -865,6 +867,7 @@ def build_phase3ap_paper_ready_gate(
         settings=resolved,
         window_hours=window_hours,
         limit=limit,
+        tickers=tickers,
     )
     reason_counts = Counter(row["primary_blocker"] for row in rows)
     all_positive_rows = [row for row in rows if _phase3ap_positive_ev(row)]
@@ -881,16 +884,36 @@ def build_phase3ap_paper_ready_gate(
         current_positive_rows=current_positive_rows,
         reason_counts=reason_counts,
     )
-    metadata = _phase3ap_metadata(
-        session,
-        settings=resolved,
-        output_dir=output_dir,
-        command="kalshi-bot phase3ap-paper-ready-unblock-report",
-        command_args={
-            "output_dir": str(output_dir),
-            "window_hours": window_hours,
-            "limit": limit,
-        },
+    command_args = {
+        "output_dir": str(output_dir),
+        "window_hours": window_hours,
+        "limit": limit,
+        "ticker_count": len(set(tickers or [])),
+    }
+    metadata = (
+        _phase3ap_metadata(
+            session,
+            settings=resolved,
+            output_dir=output_dir,
+            command="kalshi-bot phase3ap-paper-ready-unblock-report",
+            command_args=command_args,
+        )
+        if include_report_metadata
+        else {
+            "generated_at": utc_now().isoformat(),
+            "git_commit": None,
+            "database_fingerprint": {
+                "status": "NOT_COLLECTED_FOR_EMBEDDED_SCOPED_SUMMARY"
+            },
+            "command_arguments": command_args,
+            "data_watermark": {"status": "NOT_COLLECTED_FOR_EMBEDDED_SCOPED_SUMMARY"},
+            "safety_flags": {
+                "paper_only": True,
+                "live_or_demo_execution": False,
+                "order_submission": False,
+                "paper_trade_creation": False,
+            },
+        }
     )
     return {
         "generated_at": metadata["generated_at"],
@@ -1059,15 +1082,40 @@ def _phase3ap_gate_rows(
     settings: Settings,
     window_hours: int,
     limit: int,
+    tickers: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     now = utc_now()
     cutoff = now - timedelta(hours=window_hours)
+    ticker_scope = sorted(set(tickers or []))
+    if ticker_scope:
+        row_number = (
+            func.row_number()
+            .over(
+                partition_by=MarketRanking.ticker,
+                order_by=[desc(MarketRanking.ranked_at), desc(MarketRanking.id)],
+            )
+            .label("row_number")
+        )
+        latest = (
+            select(MarketRanking.id.label("id"), row_number)
+            .where(
+                MarketRanking.ranked_at >= cutoff,
+                MarketRanking.ticker.in_(ticker_scope),
+            )
+            .subquery()
+        )
+        statement = (
+            select(MarketRanking)
+            .join(latest, MarketRanking.id == latest.c.id)
+            .where(latest.c.row_number == 1)
+        )
+    else:
+        statement = select(MarketRanking).where(MarketRanking.ranked_at >= cutoff)
     rankings = list(
         session.scalars(
-            select(MarketRanking)
-            .where(MarketRanking.ranked_at >= cutoff)
-            .order_by(desc(MarketRanking.ranked_at), desc(MarketRanking.opportunity_score))
-            .limit(limit)
+            statement.order_by(
+                desc(MarketRanking.ranked_at), desc(MarketRanking.opportunity_score)
+            ).limit(limit)
         )
     )
     tickers = sorted({row.ticker for row in rankings})
@@ -1245,6 +1293,7 @@ def _phase3ap_book_probe(
 ) -> dict[str, Any]:
     raw_orderbook = decode_json(snapshot.raw_orderbook_json if snapshot else None)
     prices = parse_orderbook(raw_orderbook)
+    ranked_buy_price = to_decimal(ranking.best_price)
     book = (
         usable_bid_ask_book(
             raw_orderbook,
@@ -1261,7 +1310,10 @@ def _phase3ap_book_probe(
     if not window.get("current_window_eligible"):
         reason = str(window.get("window_status") or MARKET_NOT_OPEN)
         freshness_state = "EXPIRED_WINDOW" if reason == EXPIRED_WINDOW_EXCLUDED else "MARKET_NOT_OPEN"
-    elif not identity.get("kalshi_url_verified"):
+    elif not (
+        identity.get("kalshi_url_verified")
+        or identity.get("exact_market_identity_verified")
+    ):
         status = str(identity.get("kalshi_url_status") or identity.get("url_verification_status"))
         if status in {SYNTHETIC_ONLY, COMPOSITE_LOCAL_ONLY}:
             reason = "SYNTHETIC_OR_COMPOSITE_ONLY"
@@ -1303,12 +1355,31 @@ def _phase3ap_book_probe(
     ask_price = book.ask_price if book is not None else None
     bid_depth = book.bid_depth if book is not None else None
     ask_depth = book.ask_depth if book is not None else None
+    buying_no = str(ranking.best_side or "") == BUY_NO
     return {
         "best_yes_bid": decimal_to_str(prices.best_yes_bid),
         "best_yes_ask": decimal_to_str(prices.best_yes_ask),
         "best_no_bid": decimal_to_str(prices.best_no_bid),
         "best_no_ask": decimal_to_str(prices.best_no_ask),
+        "best_yes_bid_depth": decimal_to_str(ask_depth if buying_no else bid_depth),
+        "best_no_bid_depth": decimal_to_str(bid_depth if buying_no else ask_depth),
         "derived_executable_buy_price": decimal_to_str(ask_price),
+        "ranked_buy_price": decimal_to_str(ranked_buy_price),
+        "buy_price_matches_ranking": bool(
+            ask_price is not None
+            and ranked_buy_price is not None
+            and ask_price == ranked_buy_price
+        ),
+        "actual_buy_side": str(ranking.best_side or ""),
+        "actual_buy_price_source": (
+            "NO_BID_COMPLEMENT" if not buying_no else "YES_BID_COMPLEMENT"
+        ),
+        "minimum_buy_side_size": decimal_to_str(book.min_depth if book is not None else Decimal("1")),
+        "sufficient_buy_side_size": bool(
+            book is not None
+            and ask_depth is not None
+            and ask_depth >= book.min_depth
+        ),
         "visible_depth": decimal_to_str((bid_depth or Decimal("0")) + (ask_depth or Decimal("0"))),
         "depth_at_configured_limit": decimal_to_str(ask_depth),
         "book_source": "market_snapshots.raw_orderbook_json" if snapshot else "missing_snapshot",
