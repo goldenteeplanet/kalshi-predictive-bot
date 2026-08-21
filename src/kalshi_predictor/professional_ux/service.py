@@ -59,6 +59,7 @@ def build_default_shell_context(settings: Settings | None = None) -> dict[str, A
         ),
         "snapshot_as_of": "unknown",
         "snapshot_as_of_label": "unknown",
+        "artifact_timestamp_label": "unknown",
         "timezone": resolved.phase_3x_timezone,
         "phase_3w": {
             "status": "SYSTEM_INCOMPLETE",
@@ -109,6 +110,7 @@ def build_shell_status_context(
             ),
             "snapshot_as_of": generated_at.isoformat(),
             "snapshot_as_of_label": _compact_timestamp_label(generated_at.isoformat()),
+            "artifact_timestamp_label": _artifact_timestamp_label(generated_at),
             "phase_3v": {
                 "status": "NOT_READY",
                 "label": "3V NOT READY",
@@ -563,6 +565,13 @@ def _compact_timestamp_label(value: Any) -> str:
     return _aware(parsed).strftime("%b %d %H:%M")
 
 
+def _artifact_timestamp_label(value: Any) -> str:
+    parsed = parse_datetime(value)
+    if parsed is None:
+        return str(value or "unknown")
+    return _aware(parsed).strftime("%b %d %H:%M:%S UTC")
+
+
 def _shell_status_snapshot_fallback(
     settings: Settings,
     *,
@@ -577,6 +586,7 @@ def _shell_status_snapshot_fallback(
     context["market_freshness"] = status
     context["snapshot_as_of"] = "unknown"
     context["snapshot_as_of_label"] = "snapshot missing"
+    context["artifact_timestamp_label"] = "snapshot missing"
     context["phase_3v"] = {
         "status": "NOT_READY",
         "label": "3V NOT READY",
@@ -608,9 +618,11 @@ def _refresh_loaded_shell_status_labels(
         freshness_status = "STALE" if age_seconds > stale_after_seconds else "FRESH"
         context["snapshot_as_of"] = _aware(generated_at).isoformat()
         context["snapshot_as_of_label"] = _age_label(age_seconds)
+        context["artifact_timestamp_label"] = _artifact_timestamp_label(generated_at)
     else:
         context["snapshot_as_of"] = str(payload.get("generated_at") or "unknown")
         context["snapshot_as_of_label"] = "unknown"
+        context["artifact_timestamp_label"] = "unknown"
     market_freshness = context.get("market_freshness")
     if isinstance(market_freshness, dict):
         market_as_of = parse_datetime(market_freshness.get("as_of"))

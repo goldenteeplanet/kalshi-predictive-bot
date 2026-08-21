@@ -157,7 +157,7 @@ def _sync_settlements_job(session: Session, settings: Settings) -> int:
 
 def _paper_pnl_job(session: Session, settings: Settings) -> PnlSummary:
     del settings
-    return calculate_and_store_pnl(session)
+    return calculate_and_store_pnl(session, refresh_signals=False)
 
 
 def _confidence_job(session: Session, settings: Settings) -> Any:

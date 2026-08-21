@@ -184,6 +184,9 @@ GH2_SCHEDULER_STATUS_PATH = Path(
         "/var/lib/kalshi-bot-gh2/reports/gh2_scheduler_status.json",
     )
 )
+FIXED_RATE_HEALTH_PATH = Path(
+    os.getenv("KALSHI_FIXED_RATE_HEALTH_PATH", "reports/fixed_rate_health_status.json")
+)
 CRYPTO_FRESHNESS_REPORT_HREF = "/reports/phase3bc_r5/phase3bc_r5_crypto_freshness_watch.md"
 PHASE3AP_EXECUTIVE_SUMMARY_HREF = "/reports/phase3ap/EXECUTIVE_SUMMARY.md"
 PHASE3AP_GATE_HREF = "/reports/phase3ap/paper_ready_gate.json"
@@ -1424,6 +1427,7 @@ def paper_only_soak_status(
     history_path: Path = GH2_SOAK_HISTORY_PATH,
     gh1_status_path: Path = GH1_WATCH_STATUS_PATH,
     scheduler_status_path: Path = GH2_SCHEDULER_STATUS_PATH,
+    unified_health_path: Path = FIXED_RATE_HEALTH_PATH,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     return build_gh3_soak_status(
@@ -1431,6 +1435,7 @@ def paper_only_soak_status(
         history_path=history_path,
         gh1_status_path=gh1_status_path,
         scheduler_status_path=scheduler_status_path,
+        unified_health_path=unified_health_path,
         now=now,
     )
 
@@ -1464,6 +1469,20 @@ def crypto_freshness_watch_status(
     )
     guard_status = str(guard.get("status") or "UNKNOWN")
     scheduled_owner_active = bool(guard.get("scheduled_owner_active"))
+    scheduler_status_generated_at = parse_datetime(status_payload.get("generated_at"))
+    scheduled_owner_fresh = (
+        scheduled_owner_active
+        and guard_status == "SCHEDULED_OWNER_HEALTHY"
+        and bool(latest_summary.get("data_freshness_complete"))
+        and int(latest_summary.get("snapshot_stale_rows") or 0) == 0
+        and int(latest_summary.get("forecast_stale_rows") or 0) == 0
+        and int(latest_summary.get("missing_or_stale_ranking_rows") or 0) == 0
+        and scheduler_status_generated_at is not None
+    )
+    if scheduled_owner_fresh and (
+        generated_at is None or scheduler_status_generated_at > generated_at
+    ):
+        generated_at = scheduler_status_generated_at
     guard_recommended_next_action = str(
         guard.get("recommended_next_action")
         or status_payload.get("recommended_next_action")
@@ -1510,7 +1529,10 @@ def crypto_freshness_watch_status(
         label = "Fresh"
         badge_kind = "good"
         description = (
-            "Crypto rankings are inside the configured "
+            "The scheduled refresh reports current snapshots, forecasts, and rankings "
+            f"inside the configured {freshness_window}-minute window."
+            if scheduled_owner_fresh
+            else "Crypto rankings are inside the configured "
             f"{freshness_window}-minute watch window."
         )
     else:

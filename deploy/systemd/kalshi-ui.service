@@ -1,0 +1,18 @@
+[Unit]
+Description=Kalshi local read-only UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/james/kalshi-runtime-src
+ExecStart=/home/james/kalshi-runtime-src/scripts/start_ui_wsl.sh
+Restart=always
+RestartSec=5s
+Environment=UI_READ_ONLY=true
+Environment=EXECUTION_ENABLED=false
+Environment=KALSHI_UI_PORT=8081
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+[Install]
+WantedBy=default.target

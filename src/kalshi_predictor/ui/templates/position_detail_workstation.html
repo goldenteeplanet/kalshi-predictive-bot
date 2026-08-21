@@ -20,6 +20,35 @@
   <div><span>Unrealized P&L</span><strong>{{ current.unrealized_pnl }}</strong></div>
 </section>
 
+{% if active_trade %}
+<section class="section-band">
+  <div class="section-head">
+    <h2>Active Trade Telemetry</h2>
+    <span>
+      <span class="badge {% if active_trade.idempotency_status == 'UNIQUE' %}badge-info{% else %}badge-caution{% endif %}">{{ active_trade.idempotency_status }}</span>
+      <span class="badge {% if active_trade.attribution_status == 'STABLE' %}badge-info{% else %}badge-caution{% endif %}">{{ active_trade.attribution_status }}</span>
+      <span class="badge {% if active_trade.invariant_status == 'HEALTHY' %}badge-info{% else %}badge-caution{% endif %}">INVARIANTS {{ active_trade.invariant_status }}</span>
+    </span>
+  </div>
+  <div class="summary-grid">
+    <div><span>Order / Fill</span><strong>#{{ active_trade.paper_order_id }} / #{{ active_trade.paper_fill_id or 'pending' }}</strong></div>
+    <div><span>Forecast / Pair</span><strong>{{ active_trade.forecast_id }} · {{ active_trade.forecast_snapshot_pair_key or 'n/a' }}</strong></div>
+    <div><span>Fill</span><strong>{{ active_trade.quantity }} {{ active_trade.side }} @ {{ active_trade.fill_price or 'pending' }}</strong></div>
+    <div><span>Latest Mark</span><strong>{{ active_trade.latest_market_price or 'n/a' }}</strong></div>
+    <div><span>Mark-to-market</span><strong>{{ active_trade.unrealized_pnl }}</strong></div>
+    <div><span>Settlement</span><strong>{{ active_trade.settlement_state }}</strong></div>
+    <div><span>Realization</span><strong>{{ active_trade.realization_state }}{% if active_trade.expected_final_pnl is not none %} · expected {{ active_trade.expected_final_pnl }}{% endif %}</strong></div>
+    <div><span>Phase 3M</span><strong>#{{ active_trade.position_sizing_decision_id or 'n/a' }} · {{ active_trade.sizing_tier or 'n/a' }} · {{ active_trade.sizing_executed_contracts or 0 }}</strong></div>
+    <div><span>Phase 3N</span><strong>#{{ active_trade.advanced_risk_decision_id or 'n/a' }} · {{ active_trade.risk_action or 'n/a' }} · risk {{ active_trade.planned_trade_risk or 'n/a' }}</strong></div>
+    <div><span>Identity Counts</span><strong>{{ active_trade.same_forecast_order_count }} order / {{ active_trade.fill_count }} fill</strong></div>
+  </div>
+  <p class="muted">Latest quote: {{ active_trade.latest_snapshot_at or 'unavailable' }}. Explicit operator approval: {{ 'yes' if active_trade.explicit_operator_approval else 'no' }}.</p>
+  {% for alert in active_trade.invariant_alerts %}
+  <p class="alert alert-danger"><strong>{{ alert.code }}</strong>: {{ alert.detail }}</p>
+  {% endfor %}
+</section>
+{% endif %}
+
 <section class="section-band">
   <div class="grid two">
     <div class="mini-panel">

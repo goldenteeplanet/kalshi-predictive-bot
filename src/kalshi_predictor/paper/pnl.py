@@ -72,7 +72,11 @@ def calculate_settled_pnl_from_yes_value(
     return payout - total_cost
 
 
-def calculate_and_store_pnl(session: Session) -> PnlSummary:
+def calculate_and_store_pnl(
+    session: Session,
+    *,
+    refresh_signals: bool = True,
+) -> PnlSummary:
     positions = list(session.scalars(select(PaperPosition).order_by(PaperPosition.ticker)))
     rows_inserted = 0
     total_realized = Decimal("0")
@@ -120,7 +124,8 @@ def calculate_and_store_pnl(session: Session) -> PnlSummary:
         total_realized += realized
         total_unrealized += unrealized
 
-    refresh_signal_performance(session)
+    if refresh_signals:
+        refresh_signal_performance(session)
 
     return PnlSummary(
         positions_evaluated=len(positions),

@@ -117,7 +117,7 @@ def scan_opportunities(
     selected_rankings = rankings[:resolved_limit]
     for ranking in selected_rankings:
         insert_market_ranking(session, ranking)
-        edge = to_decimal(ranking.get("estimated_edge")) or Decimal("0")
+        edge = to_decimal(ranking.get("expected_value")) or Decimal("0")
         score = to_decimal(ranking.get("opportunity_score")) or Decimal("0")
         spread = to_decimal(ranking.get("spread"))
         liquidity = to_decimal(ranking.get("liquidity")) or Decimal("0")
@@ -133,6 +133,7 @@ def scan_opportunities(
             )
             and ranking.get("best_side") is not None
             and ranking.get("best_price") is not None
+            and _forecast_policy_eligible(forecast)
         )
         if qualifies:
             opportunity = {
@@ -143,6 +144,7 @@ def scan_opportunities(
                 "price": ranking["best_price"],
                 "forecast_probability": ranking["forecast_probability"],
                 "estimated_edge": ranking["estimated_edge"],
+                "net_executable_ev": ranking["expected_value"],
                 "opportunity_score": ranking["opportunity_score"],
                 "status": "OPEN",
                 "reason": ranking["reason"],
@@ -190,6 +192,15 @@ def scan_opportunities(
         historical_rows_excluded=historical_rows_excluded,
         first_hard_blocker=_first_hard_blocker(selected_rankings, opportunities, resolved_settings),
     )
+
+
+def _forecast_policy_eligible(forecast: Forecast) -> bool:
+    """Keep non-terminal weather heuristics diagnostic-only."""
+    if forecast.model_name != "weather_v2":
+        return True
+    features = decode_json(forecast.feature_json)
+    alignment = features.get("weather_feature_alignment")
+    return alignment != "LATEST_RAIN_RISK_WITHIN_NOAA_HORIZON"
 
 
 def _latest_snapshots_by_ticker(
@@ -433,14 +444,14 @@ def _first_hard_blocker(
         return "RANKING_NOT_GENERATED_FOR_CURRENT_FORECAST"
     ranking = rankings[0]
     edge = to_decimal(ranking.get("estimated_edge")) or Decimal("0")
-    executable_ev = edge - (to_decimal(ranking.get("spread")) or Decimal("0"))
+    executable_ev = to_decimal(ranking.get("expected_value"))
     score = to_decimal(ranking.get("opportunity_score")) or Decimal("0")
     spread = to_decimal(ranking.get("spread"))
     liquidity = to_decimal(ranking.get("liquidity")) or Decimal("0")
     time_to_close = to_decimal(ranking.get("time_to_close_minutes"))
     if edge <= 0:
         return "EV_NOT_POSITIVE"
-    if executable_ev <= 0:
+    if executable_ev is None or executable_ev <= 0:
         return "EXECUTABLE_EV_NOT_POSITIVE"
     if edge < settings.opportunity_min_edge:
         return "RANKING_FILTERED_BY_EV"

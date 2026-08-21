@@ -282,7 +282,11 @@ def get_latest_weather_features(
         return session.scalar(
             select(WeatherFeature)
             .where(WeatherFeature.location_key == location)
-            .order_by(desc(WeatherFeature.generated_at), WeatherFeature.target_time)
+            .order_by(
+                desc(WeatherFeature.generated_at),
+                desc(WeatherFeature.target_time),
+                desc(WeatherFeature.id),
+            )
             .limit(1)
         )
     requested_target = parse_datetime(target_time)

@@ -34,6 +34,11 @@ class Market(Base):
     first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+    __table_args__ = (
+        Index("ix_markets_event_ticker", "event_ticker"),
+        Index("ix_markets_event_status_close", "event_ticker", "status", "close_time"),
+    )
+
 
 class MarketLeg(Base):
     __tablename__ = "market_legs"
@@ -88,6 +93,85 @@ class MarketSnapshot(Base):
     raw_orderbook_json: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (Index("ix_market_snapshots_ticker_captured", "ticker", "captured_at"),)
+
+
+class CryptoEventQuoteCapture(Base):
+    """Atomic manifest for one coherent, complete sibling quote vector."""
+
+    __tablename__ = "crypto_event_quote_captures"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_ticker: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    series_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    captured_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    coherence_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    bucket_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    vector_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class CryptoCurrentEvent(Base):
+    """Indexed current-event registry populated from active refresh watermarks."""
+
+    __tablename__ = "crypto_current_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    series_ticker: Mapped[str] = mapped_column(String(128), nullable=False)
+    event_ticker: Mapped[str] = mapped_column(String(128), nullable=False)
+    close_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    refreshed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    source_watermark: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    bucket_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    markets_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "series_ticker", "event_ticker", "close_time", name="uq_crypto_current_event_key"
+        ),
+        Index(
+            "ix_crypto_current_events_series_event_close",
+            "series_ticker",
+            "event_ticker",
+            "close_time",
+        ),
+        Index("ix_crypto_current_events_close_series", "close_time", "series_ticker"),
+    )
+
+
+class CryptoEventLiquidityCoverage(Base):
+    """Point-in-time two-sided coverage and non-invented probability bounds."""
+
+    __tablename__ = "crypto_event_liquidity_coverage"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    series_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    family: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    coherence_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    bucket_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    two_sided_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    bid_only_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    ask_only_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    unquoted_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    two_sided_coverage: Mapped[str] = mapped_column(String(80), nullable=False)
+    complete_executable: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    bounds_feasible: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    bounds_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+    __table_args__ = (
+        Index(
+            "ix_crypto_liquidity_event_captured", "event_ticker", "captured_at"
+        ),
+        Index("ix_crypto_liquidity_family_captured", "family", "captured_at"),
+    )
 
 
 class Forecast(Base):

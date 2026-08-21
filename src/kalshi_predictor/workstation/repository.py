@@ -11,6 +11,7 @@ from kalshi_predictor.active_universe import is_inactive_market_status
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.repositories import decode_json, encode_json
 from kalshi_predictor.data.schema import (
+    AdvancedRiskDecisionLog,
     Alert,
     AlertEvent,
     BacktestRun,
@@ -28,11 +29,13 @@ from kalshi_predictor.data.schema import (
     PaperPosition,
     PortfolioSnapshot,
     PositionHistory,
+    PositionSizingDecisionLog,
     Settlement,
     Watchlist,
     WatchlistMarket,
 )
 from kalshi_predictor.opportunities.market_identity import annotated_opportunity_row
+from kalshi_predictor.paper.invariant_monitor import activated_trade_invariant_row
 from kalshi_predictor.paper.ledger import (
     get_latest_snapshot_for_ticker,
     get_paper_summary,
@@ -425,14 +428,18 @@ def _position_rows_from_loaded(
     tickers = [position.ticker for position in positions]
     snapshots = _latest_snapshots_for_tickers(session, tickers)
     markets = _markets_for_tickers(session, tickers)
-    return [
-        _position_row_from_loaded(
+    rows = [
+        {
+            **_position_row_from_loaded(
             position,
             snapshot=snapshots.get(position.ticker),
             market=markets.get(position.ticker),
-        )
+            ),
+            "active_trade": active_trade_telemetry(session, position.ticker),
+        }
         for position in positions
     ]
+    return rows
 
 
 def _latest_snapshots_for_tickers(
@@ -519,11 +526,126 @@ def position_detail(session: Session, ticker: str) -> dict[str, Any] | None:
     current = position_row(session, position) if position else _empty_position_row(ticker, market)
     return {
         "current": current,
+        "active_trade": active_trade_telemetry(session, ticker),
         "history": position_history(session, ticker=ticker, limit=50),
         "recent_fills": recent_fills(session, ticker=ticker, limit=20),
         "forecasts": recent_forecasts(session, ticker=ticker, limit=20),
         "opportunities": recent_opportunities(session, ticker=ticker, limit=20),
         "backtests": recent_backtests(session, ticker=ticker, limit=20),
+    }
+
+
+def active_trade_telemetry(session: Session, ticker: str) -> dict[str, Any] | None:
+    """Return the auditable identity, attribution, MTM, and settlement state of a paper trade."""
+    order = session.scalar(
+        select(PaperOrder)
+        .where(PaperOrder.ticker == ticker)
+        .order_by(desc(PaperOrder.created_at), desc(PaperOrder.id))
+        .limit(1)
+    )
+    if order is None:
+        return None
+    fill = session.scalar(
+        select(PaperFill)
+        .where(PaperFill.paper_order_id == order.id)
+        .order_by(desc(PaperFill.filled_at), desc(PaperFill.id))
+        .limit(1)
+    )
+    sizing = session.scalar(
+        select(PositionSizingDecisionLog)
+        .where(PositionSizingDecisionLog.paper_order_id == order.id)
+        .order_by(desc(PositionSizingDecisionLog.id))
+        .limit(1)
+    )
+    risk = session.scalar(
+        select(AdvancedRiskDecisionLog)
+        .where(AdvancedRiskDecisionLog.paper_order_id == order.id)
+        .order_by(desc(AdvancedRiskDecisionLog.id))
+        .limit(1)
+    )
+    settlement = session.get(Settlement, ticker)
+    pnl = session.scalar(
+        select(PaperPnl)
+        .where(PaperPnl.ticker == ticker)
+        .order_by(desc(PaperPnl.calculated_at), desc(PaperPnl.id))
+        .limit(1)
+    )
+    position = session.get(PaperPosition, ticker)
+    snapshot = get_latest_snapshot_for_ticker(session, ticker)
+    raw = decode_json(order.raw_decision_json)
+    invariant = activated_trade_invariant_row(session, order, raw=raw)
+    same_forecast_orders = int(
+        session.scalar(
+            select(func.count())
+            .select_from(PaperOrder)
+            .where(
+                PaperOrder.ticker == order.ticker,
+                PaperOrder.model_name == order.model_name,
+                PaperOrder.forecast_id == order.forecast_id,
+            )
+        )
+        or 0
+    )
+    fill_count = int(
+        session.scalar(
+            select(func.count())
+            .select_from(PaperFill)
+            .where(PaperFill.paper_order_id == order.id)
+        )
+        or 0
+    )
+    unrealized = calculate_unrealized_pnl(position, snapshot) if position else Decimal("0")
+    return {
+        "paper_order_id": order.id,
+        "paper_fill_id": fill.id if fill else None,
+        "forecast_id": order.forecast_id,
+        "forecast_snapshot_pair_key": raw.get("forecast_snapshot_pair_key"),
+        "explicit_operator_approval": bool(raw.get("explicit_operator_approval")),
+        "order_status": order.status,
+        "side": order.side,
+        "quantity": order.quantity,
+        "fill_price": fill.price if fill else None,
+        "filled_at": fill.filled_at.isoformat() if fill else None,
+        "latest_market_price": decimal_to_str(_market_price(snapshot)),
+        "latest_snapshot_at": snapshot.captured_at.isoformat() if snapshot else None,
+        "unrealized_pnl": decimal_to_str(unrealized) or "0",
+        "settlement_state": (
+            "SETTLED" if settlement and settlement.result else "AWAITING_SETTLEMENT"
+        ),
+        "settlement_result": settlement.result if settlement else None,
+        "settled_at": (
+            settlement.settled_at.isoformat()
+            if settlement and settlement.settled_at
+            else None
+        ),
+        "realized_pnl": pnl.realized_pnl if pnl else (position.realized_pnl if position else "0"),
+        "position_sizing_decision_id": sizing.id if sizing else None,
+        "sizing_mode": sizing.mode if sizing else None,
+        "sizing_tier": sizing.tier if sizing else None,
+        "sizing_executed_contracts": sizing.executed_contracts if sizing else None,
+        "advanced_risk_decision_id": risk.id if risk else None,
+        "risk_mode": risk.mode if risk else None,
+        "risk_action": risk.action if risk else None,
+        "risk_hard_blocks": decode_json(risk.hard_blocks_json) if risk else [],
+        "planned_trade_risk": risk.planned_trade_risk if risk else None,
+        "same_forecast_order_count": same_forecast_orders,
+        "fill_count": fill_count,
+        "idempotency_status": (
+            "UNIQUE" if same_forecast_orders == 1 and fill_count == 1 else "NEEDS_ATTENTION"
+        ),
+        "attribution_status": (
+            "STABLE"
+            if sizing
+            and risk
+            and sizing.executed_contracts == order.quantity
+            and risk.executed_contracts == order.quantity
+            and risk.action == "ALLOW"
+            else "NEEDS_ATTENTION"
+        ),
+        "invariant_status": invariant["status"],
+        "invariant_alerts": invariant["alerts"],
+        "expected_final_pnl": invariant["expected_final_pnl"],
+        "realization_state": invariant["realization_state"],
     }
 
 

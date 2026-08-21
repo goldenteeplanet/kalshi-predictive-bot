@@ -3,10 +3,12 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import upsert_market, upsert_settlement
+from kalshi_predictor.data.schema import PaperOrder, Settlement
 from kalshi_predictor.kalshi.client import KalshiClient
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
@@ -77,6 +79,7 @@ def sync_settlements(
     commit_every: int | None = None,
     session: Session | None = None,
     client: KalshiClient | None = None,
+    recover_paper_tickers: bool = True,
 ) -> int:
     owns_session = session is None
     owns_client = client is None
@@ -114,6 +117,26 @@ def sync_settlements(
             if commit_every is not None and commit_every > 0 and count % commit_every == 0:
                 session.commit()
                 session.expire_all()
+        if recover_paper_tickers:
+            missing_tickers = list(
+                session.scalars(
+                    select(PaperOrder.ticker)
+                    .outerjoin(Settlement, Settlement.ticker == PaperOrder.ticker)
+                    .where(Settlement.ticker.is_(None))
+                    .distinct()
+                )
+            )
+            for ticker in missing_tickers:
+                try:
+                    market = client.get_market(ticker)
+                except Exception as exc:
+                    logger.warning("Exact settlement recovery failed for %s: %s", ticker, exc)
+                    continue
+                if market.get("result") is None and market.get("settlement_value_dollars") is None:
+                    continue
+                upsert_market(session, market)
+                upsert_settlement(session, market)
+                count += 1
         if owns_session:
             session.commit()
     except Exception:

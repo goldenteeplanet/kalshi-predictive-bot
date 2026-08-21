@@ -282,6 +282,7 @@ def run_gh2_single_writer_decision_refresh(
     opportunity_limit: int = 100,
     freshness_minutes: int = 15,
     soak_cycles_required: int = 24,
+    refresh_weather_gate: bool = True,
     guard_active_writer: bool = True,
     writer_monitor_fn: Callable[[], dict[str, Any]] | None = None,
 ) -> GH2Artifacts:
@@ -293,6 +294,7 @@ def run_gh2_single_writer_decision_refresh(
     markdown_path = output_dir / "gh2_active_candidate_refresh.md"
     history_path = output_dir / "gh2_paper_only_soak_history.jsonl"
     stage_path = output_dir / "gh2_stage.json"
+    previous_cycle_payload = _read_json(json_path)
     previous_manifest_tickers = _candidate_manifest_tickers(candidate_manifest_path)
     stage_telemetry = _GH2StageTelemetry(stage_path)
     cycle_started_at = stage_telemetry.cycle_started_at
@@ -470,10 +472,14 @@ def run_gh2_single_writer_decision_refresh(
             opportunity_limit=opportunity_limit,
             phase3bc_limit=forecast_limit,
             freshness_minutes=freshness_minutes,
-            risk_preflight=False,
-            ranking_repair=False,
-            ranking_repair_limit=opportunity_limit,
-            exact_snapshot_refresh=False,
+            risk_preflight=True,
+            ranking_repair=True,
+            # Ranking maintenance must cover the same full active window as
+            # exact snapshot refreshes.  The opportunity output limit is only
+            # 100 and can otherwise leave a transient ranking backlog.
+            ranking_repair_limit=250,
+            exact_snapshot_refresh=True,
+            exact_snapshot_refresh_limit=250,
             near_money_only=False,
             skip_phase3bc_r3_refresh=True,
         )
@@ -482,16 +488,20 @@ def run_gh2_single_writer_decision_refresh(
             r5_payload,
             limit=min(candidate_limit, SNAPSHOT_RECOVERY_LIMIT),
         )
-        mark_stage("refresh_weather_gate")
-        weather_gate = build_phase3ba_r3_weather_paper_gate(
-            session,
-            output_dir=reports_dir / "phase3ba_r3",
-            reports_dir=reports_dir,
-            settings=resolved,
-            limit=max(1, min(forecast_limit, len(weather_decision_tickers))),
-            current_window_lookback_hours=3,
-            tickers=weather_decision_tickers,
-        )
+        if refresh_weather_gate:
+            mark_stage("refresh_weather_gate")
+            weather_gate = build_phase3ba_r3_weather_paper_gate(
+                session,
+                output_dir=reports_dir / "phase3ba_r3",
+                reports_dir=reports_dir,
+                settings=resolved,
+                limit=max(1, min(forecast_limit, len(weather_decision_tickers))),
+                current_window_lookback_hours=3,
+                tickers=weather_decision_tickers,
+            )
+        else:
+            mark_stage("defer_weather_gate_to_read_only_stage")
+            weather_gate = dict(previous_cycle_payload.get("weather_gate") or {})
         mark_stage("select_candidate_manifest")
         candidates_after = select_actionable_ranked_markets(
             session,
@@ -651,6 +661,7 @@ def run_gh2_single_writer_decision_refresh(
             "summary": weather_summary,
             "weather_rows": list(weather_gate.get("weather_rows") or []),
             "next_action": weather_gate.get("next_action") or {},
+            "refreshed_in_cycle": refresh_weather_gate,
         },
         "runtime_roadmap_reports": {
             "mode": "OUT_OF_WRITER_READ_ONLY",
@@ -791,7 +802,10 @@ def _weather_feature_owner_evidence(
     locations = list(
         session.scalars(
             select(WeatherMarketLink.location_key)
-            .where(WeatherMarketLink.ticker.in_(tickers))
+            .where(
+                WeatherMarketLink.ticker.in_(tickers),
+                func.lower(WeatherMarketLink.location_key) != "unknown",
+            )
             .distinct()
             .order_by(WeatherMarketLink.location_key)
             .limit(max_locations)

@@ -2,7 +2,7 @@ import json
 import re
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 
 from sqlalchemy import or_, select
@@ -29,6 +29,32 @@ LOCATION_PATTERNS = {
     "houston": r"\bhouston\b",
     "phoenix": r"\bphoenix\b",
     "san_francisco": r"\b(san francisco|sfo)\b",
+    "st_petersburg": r"\b(st\.? petersburg|saint petersburg)\b",
+}
+
+SERIES_POINT_LOCATIONS = {
+    "KXTEMPNYCH": ("new_york", "KNYC"),
+    "KXRAINAUSM": ("austin", "CLIAUS"),
+    "KXRAINSTPM": ("st_petersburg", "CLISPG"),
+}
+
+LOCATION_STATIONS = {
+    "kansas_city": "KMCI",
+    "new_york": "KNYC",
+    "los_angeles": "KLAX",
+    "chicago": "KORD",
+    "miami": "KMIA",
+    "dallas": "KDFW",
+    "seattle": "KSEA",
+    "denver": "KDEN",
+    "boston": "KBOS",
+    "philadelphia": "KPHL",
+    "atlanta": "KATL",
+    "houston": "KIAH",
+    "phoenix": "KPHX",
+    "san_francisco": "KSFO",
+    "austin": "CLIAUS",
+    "st_petersburg": "CLISPG",
 }
 
 WEATHER_TICKER_PREFIXES = (
@@ -52,6 +78,9 @@ class WeatherLinkDetection:
     target_time: object | None
     confidence: Decimal
     reason: str
+    station_id: str | None = None
+    point_forecast_eligible: bool = False
+    classification: str = "UNSUPPORTED_WEATHER_CONTRACT"
 
 
 @dataclass(frozen=True)
@@ -61,6 +90,8 @@ class WeatherLinkResult:
     by_metric: dict[str, int]
     by_location_key: dict[str, int]
     unknown_location_count: int
+    excluded_by_classification: dict[str, int] = field(default_factory=dict)
+    existing_links_classified: int = 0
 
 
 def link_weather_markets(
@@ -91,19 +122,22 @@ def link_weather_markets(
         if limit is not None:
             statement = statement.limit(limit)
         markets = list(session.scalars(statement))
-    existing_link_tickers = set()
+    existing_links: dict[str, WeatherMarketLink] = {}
     if markets:
-        existing_link_tickers = set(
-            session.scalars(
-                select(WeatherMarketLink.ticker).where(
+        existing_links = {
+            link.ticker: link
+            for link in session.scalars(
+                select(WeatherMarketLink).where(
                     WeatherMarketLink.ticker.in_([market.ticker for market in markets])
-                )
+                ).order_by(WeatherMarketLink.id)
             )
-        )
+        }
     by_metric: Counter[str] = Counter()
     by_location: Counter[str] = Counter()
     unknown_location_count = 0
     links_created = 0
+    existing_links_classified = 0
+    excluded: Counter[str] = Counter()
 
     for index, market in enumerate(markets, start=1):
         if should_stop is not None and should_stop():
@@ -117,7 +151,34 @@ def link_weather_markets(
                 created=links_created,
             )
             break
-        if market.ticker in existing_link_tickers:
+        detection = detect_weather_market(market)
+        existing = existing_links.get(market.ticker)
+        if not detection.point_forecast_eligible or detection.confidence <= 0:
+            excluded[detection.classification] += 1
+            if existing is not None:
+                existing_raw = decode_json(existing.raw_json)
+                existing.raw_json = json.dumps(
+                    {
+                        **existing_raw,
+                        "point_forecast_eligible": False,
+                        "classification": detection.classification,
+                        "station_id": detection.station_id,
+                        "classification_reason": detection.reason,
+                    },
+                    sort_keys=True,
+                )
+                existing_links_classified += 1
+            _emit_progress(
+                progress_callback,
+                progress_every=progress_every,
+                processed=index,
+                total=len(markets),
+                ticker=market.ticker,
+                status=detection.classification,
+                created=links_created,
+            )
+            continue
+        if existing is not None and existing.location_key == detection.location_key:
             _emit_progress(
                 progress_callback,
                 progress_every=progress_every,
@@ -125,18 +186,6 @@ def link_weather_markets(
                 total=len(markets),
                 ticker=market.ticker,
                 status="SKIPPED_EXISTING_LINK",
-                created=links_created,
-            )
-            continue
-        detection = detect_weather_market(market)
-        if detection.confidence <= 0:
-            _emit_progress(
-                progress_callback,
-                progress_every=progress_every,
-                processed=index,
-                total=len(markets),
-                ticker=market.ticker,
-                status="SKIPPED_NO_WEATHER_MATCH",
                 created=links_created,
             )
             continue
@@ -158,10 +207,18 @@ def link_weather_markets(
                 "series_ticker": market.series_ticker,
                 "event_ticker": market.event_ticker,
                 "raw_market": raw_market,
+                "station_id": detection.station_id,
+                "point_forecast_eligible": detection.point_forecast_eligible,
+                "classification": detection.classification,
             },
         )
         links_created += 1
-        existing_link_tickers.add(market.ticker)
+        existing_links[market.ticker] = session.scalar(
+            select(WeatherMarketLink)
+            .where(WeatherMarketLink.ticker == market.ticker)
+            .order_by(WeatherMarketLink.id.desc())
+            .limit(1)
+        )
         by_metric[detection.weather_metric] += 1
         by_location[detection.location_key] += 1
         if detection.location_key == "unknown":
@@ -182,13 +239,15 @@ def link_weather_markets(
         by_metric=dict(by_metric),
         by_location_key=dict(by_location),
         unknown_location_count=unknown_location_count,
+        excluded_by_classification=dict(excluded),
+        existing_links_classified=existing_links_classified,
     )
 
 
 def detect_weather_market(market: Market) -> WeatherLinkDetection:
     text = _market_text(market)
     metric = _detect_metric(text)
-    location = _detect_location(text)
+    location, station_id = _detect_point_location(market, text)
     operator = _detect_operator(text)
     target_value = _detect_target_value(text)
     target_time = (
@@ -197,8 +256,10 @@ def detect_weather_market(market: Market) -> WeatherLinkDetection:
         or market.expiration_time
         or market.settlement_ts
     )
-    confidence = _confidence(metric, location, target_value)
-    reason = _reason(metric, location, operator, target_value)
+    classification = _classification(metric, location, station_id)
+    eligible = classification == "SUPPORTED_POINT_FORECAST"
+    confidence = _confidence(metric, location, target_value) if eligible else Decimal("0")
+    reason = _reason(metric, location, operator, target_value, classification=classification)
     return WeatherLinkDetection(
         location_key=location,
         weather_metric=metric,
@@ -207,6 +268,9 @@ def detect_weather_market(market: Market) -> WeatherLinkDetection:
         target_time=target_time,
         confidence=confidence,
         reason=reason,
+        station_id=station_id,
+        point_forecast_eligible=eligible,
+        classification=classification,
     )
 
 
@@ -240,6 +304,29 @@ def _detect_location(text: str) -> str:
         if re.search(pattern, text, flags=re.IGNORECASE):
             return location_key
     return "unknown"
+
+
+def _detect_point_location(market: Market, text: str) -> tuple[str, str | None]:
+    series = str(market.series_ticker or market.ticker.split("-")[0]).upper()
+    mapped = SERIES_POINT_LOCATIONS.get(series)
+    if mapped is not None:
+        return mapped
+    location = _detect_location(text)
+    station_match = re.search(r"\b(?:at|station)\s+(CLI[A-Z0-9]+|K[A-Z]{3})\b", text, re.I)
+    station_id = station_match.group(1).upper() if station_match else None
+    return location, station_id or LOCATION_STATIONS.get(location)
+
+
+def _classification(metric: str, location: str, station_id: str | None) -> str:
+    if metric == "HURRICANE":
+        return "EXCLUDED_HURRICANE_REGIONAL"
+    if metric not in {"TEMPERATURE", "RAIN"}:
+        return "EXCLUDED_UNSUPPORTED_WEATHER_METRIC"
+    if location == "unknown":
+        return "EXCLUDED_UNSUPPORTED_REGIONAL_OR_UNKNOWN_LOCATION"
+    if station_id is None:
+        return "EXCLUDED_MISSING_CANONICAL_STATION"
+    return "SUPPORTED_POINT_FORECAST"
 
 
 def _detect_operator(text: str) -> str:
@@ -325,10 +412,12 @@ def _reason(
     location_key: str,
     operator: str,
     target_value: Decimal | None,
+    *,
+    classification: str = "SUPPORTED_POINT_FORECAST",
 ) -> str:
     if metric == "UNKNOWN":
         return "No weather keyword match."
-    parts = [f"Metric {metric} detected"]
+    parts = [f"Classification {classification}", f"metric {metric} detected"]
     if location_key != "unknown":
         parts.append(f"location {location_key} detected")
     else:

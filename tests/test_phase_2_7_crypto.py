@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -17,11 +18,7 @@ from kalshi_predictor.crypto.repository import (
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import encode_json, insert_market_snapshot, upsert_market
 from kalshi_predictor.data.schema import ForecastSkipLog, MarketLeg
-from kalshi_predictor.forecasting.crypto_v2 import (
-    CryptoV2Forecaster,
-    _clamp_probability,
-    detect_market_direction,
-)
+from kalshi_predictor.forecasting.crypto_v2 import CryptoV2Forecaster, _clamp_probability
 from kalshi_predictor.utils.time import utc_now
 
 
@@ -84,6 +81,28 @@ def test_crypto_feature_builder_calculates_returns_correctly(tmp_path) -> None:
         assert Decimal(features["return_1h"]) == Decimal("0.1")
         assert features["history_minutes"] == 60
         assert features["trend_direction"] == "UP"
+
+
+def test_crypto_volatility_normalizes_irregular_sampling_intervals(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        now = utc_now()
+        for observed_at, price in (
+            (now - timedelta(minutes=5), "100"),
+            (now - timedelta(minutes=4), "101"),
+            (now, "103.02"),
+        ):
+            insert_crypto_price(
+                session,
+                symbol="BTC",
+                source="test",
+                observed_at=observed_at,
+                price_usd=price,
+            )
+
+        features = calculate_crypto_features(get_crypto_prices(session, "BTC"))
+
+        assert abs(Decimal(features["volatility_1h"])) < Decimal("0.000000000001")
 
 
 def test_linker_detects_btc_market(tmp_path) -> None:
@@ -299,34 +318,26 @@ def test_crypto_v2_adjusts_downward_for_positive_momentum_on_below_market(tmp_pa
         assert forecast.feature_json["direction_detected"] == "BELOW"
 
 
-def test_crypto_v2_recognizes_explicit_fifteen_minute_direction_language() -> None:
-    assert detect_market_direction("BTC price up in next 15 mins?") == "ABOVE"
-    assert detect_market_direction("ETH price down in next 15 mins?") == "BELOW"
-    assert detect_market_direction("Will SOL value be higher?") == "ABOVE"
-    assert detect_market_direction("Will XRP value be lower?") == "BELOW"
-    assert detect_market_direction("DOGE market update") == "UNKNOWN"
-
-
-def test_crypto_v2_scores_supported_fifteen_minute_up_contract(tmp_path) -> None:
+def test_crypto_v2_uses_yes_bid_as_explicit_lower_bound_without_midpoint(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
-        snapshot = _seed_crypto_snapshot(
-            session,
-            ticker="KXBTC15M-26AUG110000-00",
-            title="BTC price up in next 15 mins?",
-        )
+        snapshot = _seed_crypto_snapshot(session, title="Will BTC exceed 70000?")
+        snapshot.best_yes_ask = None
+        snapshot.last_price_dollars = None
         _seed_link_and_features(session, snapshot.ticker, momentum="0.5")
 
         forecast = CryptoV2Forecaster(settings=_settings()).forecast(session, snapshot)
-        skip = session.scalar(
-            select(ForecastSkipLog)
-            .where(ForecastSkipLog.ticker == snapshot.ticker)
-            .order_by(ForecastSkipLog.id.desc())
-        )
 
-        assert forecast is not None, skip.reason if skip is not None else "missing skip reason"
-        assert forecast.yes_probability == Decimal("0.49")
-        assert forecast.feature_json["direction_detected"] == "ABOVE"
+        assert forecast is not None
+        assert forecast.yes_probability == Decimal("0.44")
+        assert forecast.market_mid_probability is None
+        assert forecast.feature_json["market_price_basis"] == (
+            "EXECUTABLE_YES_BID_LOWER_BOUND"
+        )
+        assert forecast.feature_json["market_probability_bounds"] == {
+            "lower": "0.40",
+            "upper": "1",
+        }
 
 
 def test_crypto_v2_scores_multi_component_crypto_link(tmp_path) -> None:
@@ -429,6 +440,15 @@ def test_crypto_backtest_handles_no_evaluated_trades(tmp_path) -> None:
     assert "Crypto Backtest" in text
     assert "crypto_v2" in text
     assert "0" in text
+
+
+def test_crypto_backtest_never_uses_post_forecast_snapshot() -> None:
+    root = Path(__file__).parents[1]
+    implementation = (root / "src/kalshi_predictor/crypto/backtest.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "MarketSnapshot.captured_at <= forecast.forecasted_at" in implementation
 
 
 def _session_factory(tmp_path):

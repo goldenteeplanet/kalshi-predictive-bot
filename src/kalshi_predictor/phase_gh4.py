@@ -16,6 +16,7 @@ DEFAULT_GH2_REPORT_PATH = Path("reports/phase_gh2/gh2_active_candidate_refresh.j
 DEFAULT_GH2_HISTORY_PATH = Path("reports/phase_gh2/gh2_paper_only_soak_history.jsonl")
 DEFAULT_GH1_STATUS_PATH = Path("reports/phase_gh1/watch/status.json")
 DEFAULT_GH2_SCHEDULER_STATUS_PATH = Path("reports/phase_gh2/gh2_scheduler_status.json")
+DEFAULT_FIXED_RATE_HEALTH_PATH = Path("reports/fixed_rate_health_status.json")
 PAPER_ONLY_SAFETY = "SIMULATED_PAPER_ORDERS_ONLY_EXCHANGE_EXECUTION_DISABLED"
 
 
@@ -133,6 +134,7 @@ def build_gh3_soak_status(
     history_path: Path = DEFAULT_GH2_HISTORY_PATH,
     gh1_status_path: Path = DEFAULT_GH1_STATUS_PATH,
     scheduler_status_path: Path = DEFAULT_GH2_SCHEDULER_STATUS_PATH,
+    unified_health_path: Path | None = None,
     now: datetime | None = None,
     cadence_minutes: int = 15,
 ) -> dict[str, Any]:
@@ -141,6 +143,18 @@ def build_gh3_soak_status(
     history = _read_json_lines(history_path)
     gh1_payload = _read_json(gh1_status_path)
     scheduler = _read_json(scheduler_status_path)
+    default_input_scope = (
+        report_path == DEFAULT_GH2_REPORT_PATH
+        and history_path == DEFAULT_GH2_HISTORY_PATH
+        and gh1_status_path == DEFAULT_GH1_STATUS_PATH
+        and scheduler_status_path == DEFAULT_GH2_SCHEDULER_STATUS_PATH
+    )
+    if unified_health_path is not None:
+        unified = _read_json(unified_health_path)
+    elif default_input_scope:
+        unified = _read_json(DEFAULT_FIXED_RATE_HEALTH_PATH)
+    else:
+        unified = {}
     soak = payload.get("soak") or {}
     readiness = payload.get("paper_readiness") or {}
     completed = int(soak.get("consecutive_healthy_cycles") or 0)
@@ -166,6 +180,20 @@ def build_gh3_soak_status(
     weather_gate_summary = weather_gate.get("summary") or {}
     cycle_telemetry = payload.get("cycle_telemetry") or {}
     scheduler_state = str(scheduler.get("status") or "UNAVAILABLE")
+    if unified:
+        completed = int(unified.get("consecutive_healthy_cycles") or 0)
+        required = int(unified.get("required_healthy_cycles") or 24)
+        remaining = max(0, required - completed)
+        scheduler = unified.get("scheduler") or {}
+        scheduler_state = str(scheduler.get("status") or "UNAVAILABLE")
+        scheduler_generated_at = _datetime(unified.get("generated_at"))
+        generated_at = _datetime(unified.get("generated_at"))
+        report_age = _age_minutes(unified.get("generated_at"), resolved_now)
+        report_fresh = report_age is not None and report_age <= max(
+            35, cadence_minutes * 2 + 5
+        )
+        reconnect = _unified_source_health(unified, now=resolved_now)
+        soak_complete = completed >= required
     lock_wait_seconds = _nonnegative_float(
         scheduler.get("lock_wait_seconds") or cycle_telemetry.get("lock_wait_seconds")
     )
@@ -177,7 +205,21 @@ def build_gh3_soak_status(
             writer_runtime_seconds,
             (resolved_now - scheduler_generated_at).total_seconds(),
         )
-    if not payload:
+    if unified:
+        unified_status = str(unified.get("overall_status") or "UNAVAILABLE")
+        if scheduler_state == "RUNNING":
+            status = "RUNNING"
+            status_label = "Fixed-rate refresh running"
+            status_kind = "incomplete"
+        elif unified_status == "HEALTHY":
+            status = "COMPLETE" if remaining == 0 else "RUNNING"
+            status_label = "Active fixed-rate scheduler healthy"
+            status_kind = "healthy"
+        else:
+            status = "NEEDS_ATTENTION"
+            status_label = "Active scheduler completed with attention"
+            status_kind = "blocked"
+    elif not payload:
         status = "UNAVAILABLE"
         status_label = "Soak report unavailable"
         status_kind = "blocked"
@@ -201,7 +243,10 @@ def build_gh3_soak_status(
         "status": status,
         "status_label": status_label,
         "status_kind": status_kind,
-        "generated_at": payload.get("generated_at") or "n/a",
+        "generated_at": (
+            unified.get("generated_at") if unified else payload.get("generated_at")
+        )
+        or "n/a",
         "report_age_minutes": report_age,
         "completed_cycles": completed,
         "required_cycles": required,
@@ -211,7 +256,9 @@ def build_gh3_soak_status(
         if remaining == 0
         else f"about {remaining * cadence_minutes / 60:.1f}h",
         "estimated_completion": _format_datetime(estimated_completion),
-        "next_run": (
+        "next_run": _format_datetime(_datetime(scheduler.get("next_run_at")))
+        if unified and scheduler.get("next_run_at")
+        else (
             "Running now"
             if scheduler_state in {"STAGING", "WAITING_FOR_WRITER", "RUNNING"}
             else _format_datetime(next_run)
@@ -220,13 +267,22 @@ def build_gh3_soak_status(
         "lock_wait_seconds": lock_wait_seconds,
         "writer_runtime_seconds": writer_runtime_seconds,
         "deferred_cycle_reason": _enum_label(
-            scheduler.get("deferred_cycle_reason") or "NONE"
+            (
+                (unified.get("timeout_reasons") or [None])[-1]
+                if unified and unified.get("timeout_reasons")
+                else scheduler.get("deferred_cycle_reason")
+            )
+            or "NONE"
         ),
         "last_successful_completion": _format_datetime(
             _datetime(scheduler.get("last_successful_completion"))
             or (generated_at if bool(soak.get("healthy_cycle")) else None)
         ),
-        "healthy_cycle": bool(soak.get("healthy_cycle")),
+        "healthy_cycle": (
+            str(unified.get("overall_status")) == "HEALTHY"
+            if unified
+            else bool(soak.get("healthy_cycle"))
+        ),
         "paper_ready_seen": bool(soak.get("paper_ready_seen_in_required_window")),
         "current_paper_ready_candidates": current_paper_ready,
         "positive_ev_rows": int(readiness.get("crypto_positive_ev_rows") or 0)
@@ -258,6 +314,76 @@ def build_gh3_soak_status(
         },
         "paper_order_creation_enabled": False,
         "live_execution_enabled": False,
+    }
+
+
+def _unified_source_health(
+    payload: dict[str, Any], *, now: datetime
+) -> dict[str, Any]:
+    sources = payload.get("sources") or {}
+    age = _age_minutes(payload.get("generated_at"), now)
+    websocket = sources.get("websocket") or {}
+    coinbase = sources.get("coinbase") or {}
+    noaa = sources.get("noaa") or {}
+    rows = [
+        {
+            "source": "Kalshi transport: REST scheduler",
+            "status": str(websocket.get("status") or "NOT_APPLICABLE"),
+            "status_kind": "healthy",
+            "age_minutes": age,
+            "detail": str(websocket.get("applicability") or "NOT_USED"),
+            "recovery": str(
+                websocket.get("detail")
+                or (
+                    "The active scheduler collects bounded Kalshi REST snapshots; "
+                    "WebSocket health is not required."
+                )
+            ),
+        },
+        {
+            "source": "Coinbase",
+            "status": str(coinbase.get("status") or "PENDING"),
+            "status_kind": (
+                "healthy" if coinbase.get("status") == "HEALTHY" else "blocked"
+            ),
+            "age_minutes": age,
+            "detail": (
+                f"{int(coinbase.get('prices_imported') or 0)} prices imported; "
+                f"{len(coinbase.get('errors') or [])} errors"
+            ),
+            "recovery": (
+                "The active filesystem quote stage completed."
+                if coinbase.get("status") == "HEALTHY"
+                else "The next fixed-rate cycle retries Coinbase staging."
+            ),
+        },
+        {
+            "source": "NOAA weather",
+            "status": str(noaa.get("status") or "PENDING"),
+            "status_kind": (
+                "healthy" if noaa.get("status") == "HEALTHY" else "blocked"
+            ),
+            "age_minutes": age,
+            "detail": (
+                f"{int(noaa.get('features') or 0)} features; "
+                f"{int(noaa.get('forecasts') or 0)} forecasts"
+            ),
+            "recovery": str(
+                noaa.get("reason")
+                or "The active decision stage reports NOAA output explicitly."
+            ),
+        },
+    ]
+    healthy_states = {"HEALTHY", "NOT_APPLICABLE"}
+    return {
+        "status": (
+            "HEALTHY"
+            if all(row["status"] in healthy_states for row in rows)
+            else "DEGRADED"
+        ),
+        "sources": rows,
+        "unified_health": True,
+        "artifact_age_minutes": age,
     }
 
 

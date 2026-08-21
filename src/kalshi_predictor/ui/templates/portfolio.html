@@ -45,7 +45,7 @@
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Ticker</th><th>Category</th><th>Size</th><th>Avg cost</th><th>Market price</th><th>Realized</th><th>Unrealized</th><th>Total</th><th>Exposure</th></tr></thead>
+      <thead><tr><th>Ticker</th><th>Category</th><th>Size</th><th>Avg cost</th><th>Market price</th><th>Unrealized</th><th>Order / Pair</th><th>Settlement</th><th>Guards</th></tr></thead>
       <tbody>
       {% for row in portfolio.positions %}
         <tr>
@@ -54,10 +54,20 @@
           <td>{{ row.position_size }}</td>
           <td>{{ row.avg_cost or 'n/a' }}</td>
           <td>{{ row.market_price or 'n/a' }}</td>
-          <td>{{ row.realized_pnl }}</td>
           <td>{{ row.unrealized_pnl }}</td>
-          <td>{{ row.total_pnl }}</td>
-          <td>{{ row.exposure }}</td>
+          <td>
+            {% if row.active_trade %}
+              #{{ row.active_trade.paper_order_id }} / fill #{{ row.active_trade.paper_fill_id or 'pending' }}<br>
+              <small>{{ row.active_trade.forecast_snapshot_pair_key or 'pair unavailable' }}</small>
+            {% else %}n/a{% endif %}
+          </td>
+          <td>{% if row.active_trade %}{{ row.active_trade.settlement_state }}{% else %}n/a{% endif %}</td>
+          <td>
+            {% if row.active_trade %}
+              <span class="badge {% if row.active_trade.idempotency_status == 'UNIQUE' %}badge-info{% else %}badge-caution{% endif %}">{{ row.active_trade.idempotency_status }}</span>
+              <span class="badge {% if row.active_trade.attribution_status == 'STABLE' %}badge-info{% else %}badge-caution{% endif %}">{{ row.active_trade.attribution_status }}</span>
+            {% else %}n/a{% endif %}
+          </td>
         </tr>
       {% else %}
         <tr>

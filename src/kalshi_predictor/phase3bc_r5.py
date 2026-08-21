@@ -1473,6 +1473,8 @@ def _snapshot_refresh_candidate_rows(r4_payload: dict[str, Any]) -> list[dict[st
 def _row_needs_exact_snapshot_refresh(row: dict[str, Any]) -> bool:
     if _row_has_stale_snapshot_issue(row):
         return True
+    if _row_is_near_snapshot_stale(row):
+        return True
     if _positive_expected_value(row) and _no_executable_book(row):
         return True
     return _near_positive_expected_value(
@@ -1484,6 +1486,11 @@ def _row_needs_exact_snapshot_refresh(row: dict[str, Any]) -> bool:
 def _row_has_stale_snapshot_issue(row: dict[str, Any]) -> bool:
     freshness_issue = str(row.get("freshness_issue") or "")
     return freshness_issue in SNAPSHOT_REFRESH_ISSUES
+
+
+def _row_is_near_snapshot_stale(row: dict[str, Any]) -> bool:
+    snapshot_age = to_decimal(row.get("snapshot_age_minutes"))
+    return snapshot_age is not None and snapshot_age >= Decimal("12")
 
 
 def _is_active_open_snapshot_candidate(row: dict[str, Any]) -> bool:
@@ -1504,6 +1511,8 @@ def _snapshot_candidate_skip_reason(row: dict[str, Any], *, now: Any) -> str | N
         return "TICKER_CLOSE_TIME_PASSED"
     if _row_has_stale_snapshot_issue(row):
         return None
+    if _row_is_near_snapshot_stale(row):
+        return None
     if not (
         _positive_expected_value(row)
         or _near_positive_expected_value(row, near_miss_band=EV_NEAR_MISS_BAND)
@@ -1516,7 +1525,7 @@ def _snapshot_candidate_skip_reason(row: dict[str, Any], *, now: Any) -> str | N
 
 def _snapshot_refresh_sort_key(
     row: dict[str, Any],
-) -> tuple[int, int, int, int, Decimal, Decimal, Decimal]:
+) -> tuple[int, int, int, int, int, Decimal, Decimal, Decimal]:
     expected_value = to_decimal(row.get("expected_value")) or Decimal("-999")
     spread = to_decimal(row.get("spread"))
     inverse_spread = -spread if spread is not None else Decimal("-999")
@@ -1524,6 +1533,10 @@ def _snapshot_refresh_sort_key(
     return (
         1 if expected_value > 0 else 0,
         1 if _no_executable_book(row) else 0,
+        1
+        if str(row.get("freshness_issue") or "") == "SNAPSHOT_MISSING"
+        or _row_is_near_snapshot_stale(row)
+        else 0,
         1 if _clean_executable_book(row) else 0,
         1 if _liquidity_positive(row) else 0,
         expected_value,

@@ -74,7 +74,10 @@ def run_crypto_model_backtest(
 def _snapshot_for_forecast(session: Session, forecast: Forecast) -> MarketSnapshot | None:
     return session.scalar(
         select(MarketSnapshot)
-        .where(MarketSnapshot.ticker == forecast.ticker)
+        .where(
+            MarketSnapshot.ticker == forecast.ticker,
+            MarketSnapshot.captured_at <= forecast.forecasted_at,
+        )
         .order_by(desc(MarketSnapshot.captured_at), desc(MarketSnapshot.id))
         .limit(1)
     )
@@ -121,4 +124,3 @@ def _settlement_to_y_true(result: str | None) -> int | None:
     if normalized in {"no", "n", "0", "false"}:
         return 0
     return None
-

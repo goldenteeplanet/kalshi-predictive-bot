@@ -159,12 +159,9 @@ def _snapshot_for_forecast(session: Session, forecast: Forecast) -> MarketSnapsh
     )
     if snapshot is not None:
         return snapshot
-    return session.scalar(
-        select(MarketSnapshot)
-        .where(MarketSnapshot.ticker == forecast.ticker)
-        .order_by(desc(MarketSnapshot.captured_at), desc(MarketSnapshot.id))
-        .limit(1)
-    )
+    # Never use a post-forecast snapshot: that would leak future book data into
+    # the simulated entry decision and overstate historical performance.
+    return None
 
 
 def _trade_from_decision(

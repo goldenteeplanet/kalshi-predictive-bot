@@ -120,8 +120,10 @@ def test_phase_3x_opportunities_route_uses_scanner_shell(tmp_path) -> None:
     assert "Fast bounded view" in response.text
     assert "Page generated" in response.text
     assert "UX-TEST" in response.text
-    assert "styles.css?v=phase3bb-r2-model-layout-20260704a" in response.text
-    assert "app.js?v=phase3bb-r2-model-layout-20260704a" in response.text
+    assert "styles.css?v=status-artifact-refresh-20260821a" in response.text
+    assert "app.js?v=status-artifact-refresh-20260821a" in response.text
+    assert "Status artifact" in response.text
+    assert "data-status-artifact-refresh" in response.text
     assert response.headers["cache-control"] == "no-store"
 
 
@@ -242,6 +244,7 @@ def test_phase_3x_shell_status_snapshot_loads_without_live_dashboard(tmp_path) -
     assert shell["market_freshness"]["label"] in {"Fresh", "Stale"}
     assert shell["market_freshness"]["age_label"]
     assert shell["snapshot_as_of_label"]
+    assert shell["artifact_timestamp_label"].endswith(" UTC")
     assert shell["shell_status_snapshot"]["freshness_status"] in {"FRESH", "STALE"}
 
 

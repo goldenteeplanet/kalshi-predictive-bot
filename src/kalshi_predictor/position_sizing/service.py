@@ -39,6 +39,9 @@ from kalshi_predictor.tournament.ranking import classify_forecast_category
 from kalshi_predictor.utils.decimals import decimal_to_str, to_decimal
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
+HISTORICAL_EVIDENCE_CACHE_VERSION = "phase3m_historical_evidence_v1"
+HISTORICAL_EVIDENCE_MAX_AGE_SECONDS = 6 * 60 * 60
+
 
 @dataclass(frozen=True)
 class PaperSizingResult:
@@ -172,11 +175,19 @@ def _input_for_decision(
         settings=settings,
         decision_timestamp=decision_timestamp,
     )
-    historical_accuracy, historical_sample_size, history_evidence = _historical_accuracy(
-        session,
+    cached_history = _cached_historical_accuracy(
+        decision.raw_decision_json.get("position_sizing_historical_evidence_cache"),
         forecast=forecast,
         decision_timestamp=decision_timestamp,
     )
+    if cached_history is None:
+        historical_accuracy, historical_sample_size, history_evidence = _historical_accuracy(
+            session,
+            forecast=forecast,
+            decision_timestamp=decision_timestamp,
+        )
+    else:
+        historical_accuracy, historical_sample_size, history_evidence = cached_history
     configured_portfolio_cap = settings.dynamic_position_sizing_portfolio_cap
     resolved_portfolio_cap = (
         min(portfolio_cap, configured_portfolio_cap)
@@ -299,6 +310,54 @@ def _historical_accuracy(
     if forecast is None:
         return 0.5, 0, {"bucket": "prior", "reason": "missing_forecast"}
     rows = _closed_historical_orders(session, decision_timestamp=decision_timestamp)
+    return _historical_accuracy_from_rows(
+        session,
+        forecast=forecast,
+        rows=rows,
+        decision_timestamp=decision_timestamp,
+    )
+
+
+def prepare_position_sizing_historical_evidence(
+    session: Session,
+    *,
+    forecasts: list[Forecast],
+    decision_timestamp: datetime | None = None,
+) -> dict[str, Any]:
+    """Build the expensive no-lookahead history evidence once for a later fast sizing pass."""
+    prepared_at = decision_timestamp or utc_now()
+    rows = _closed_historical_orders(session, decision_timestamp=prepared_at)
+    entries: dict[str, Any] = {}
+    for forecast in forecasts:
+        accuracy, sample_size, evidence = _historical_accuracy_from_rows(
+            session,
+            forecast=forecast,
+            rows=rows,
+            decision_timestamp=prepared_at,
+        )
+        entries[str(forecast.id)] = {
+            "forecast_id": forecast.id,
+            "ticker": forecast.ticker,
+            "model_name": forecast.model_name,
+            "historical_accuracy": accuracy,
+            "historical_sample_size": sample_size,
+            "evidence": evidence,
+        }
+    return {
+        "version": HISTORICAL_EVIDENCE_CACHE_VERSION,
+        "prepared_at": prepared_at.isoformat(),
+        "lookahead_cutoff": prepared_at.isoformat(),
+        "entries": entries,
+    }
+
+
+def _historical_accuracy_from_rows(
+    session: Session,
+    *,
+    forecast: Forecast,
+    rows: list[dict[str, Any]],
+    decision_timestamp: datetime,
+) -> tuple[float, int, dict[str, Any]]:
     target_category = classify_forecast_category(session, forecast)
     buckets = (
         (
@@ -348,6 +407,47 @@ def _historical_accuracy(
             "lookahead_filter": "settlement.settled_at < decision_timestamp",
         },
     )
+
+
+def _cached_historical_accuracy(
+    cache: Any,
+    *,
+    forecast: Forecast | None,
+    decision_timestamp: datetime,
+) -> tuple[float, int, dict[str, Any]] | None:
+    if forecast is None or not isinstance(cache, dict):
+        return None
+    if cache.get("version") != HISTORICAL_EVIDENCE_CACHE_VERSION:
+        return None
+    prepared_at = parse_datetime(cache.get("prepared_at"))
+    current = decision_timestamp if decision_timestamp.tzinfo else decision_timestamp.replace(tzinfo=UTC)
+    if prepared_at is None:
+        return None
+    if prepared_at.tzinfo is None:
+        prepared_at = prepared_at.replace(tzinfo=UTC)
+    age_seconds = (current - prepared_at).total_seconds()
+    if age_seconds < 0 or age_seconds > HISTORICAL_EVIDENCE_MAX_AGE_SECONDS:
+        return None
+    entry = (cache.get("entries") or {}).get(str(forecast.id))
+    if not isinstance(entry, dict):
+        return None
+    if entry.get("ticker") != forecast.ticker or entry.get("model_name") != forecast.model_name:
+        return None
+    try:
+        accuracy = float(entry["historical_accuracy"])
+        sample_size = int(entry["historical_sample_size"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    evidence = dict(entry.get("evidence") or {})
+    evidence.update(
+        {
+            "source": "cached_no_lookahead_historical_evidence",
+            "cache_version": HISTORICAL_EVIDENCE_CACHE_VERSION,
+            "cache_prepared_at": prepared_at.isoformat(),
+            "cache_age_seconds": age_seconds,
+        }
+    )
+    return accuracy, sample_size, evidence
 
 
 def _closed_historical_orders(
@@ -400,7 +500,12 @@ def _drawdown_inputs(
     max_daily_drawdown = settings.autopilot_max_daily_drawdown
     if max_daily_drawdown <= 0:
         return None, None, {"source": "autopilot_max_daily_drawdown", "missing": True}
-    pnl = current_daily_pnl(session, now=decision_timestamp)
+    pnl = current_daily_pnl(
+        session,
+        now=decision_timestamp,
+        session_timezone=settings.advanced_risk_session_timezone,
+        session_reset_time=settings.advanced_risk_session_reset_time,
+    )
     current_drawdown = max(Decimal("0"), -pnl)
     utilization = current_drawdown / max_daily_drawdown
     return (

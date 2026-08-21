@@ -1,3 +1,4 @@
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -54,7 +55,8 @@ def build_crypto_features(
             "asset": symbol,
             "symbol": symbol,
             "price_source": source,
-            "feature_version": "crypto_features_v2_point_in_time",
+            "feature_version": "crypto_features_v3_interval_normalized",
+            "volatility_unit": "simple_return_per_sqrt_minute",
             "quality_flags": _quality_flags(features),
             "source_first_observed_at": (
                 prices[0].observed_at.isoformat() if prices else None
@@ -151,16 +153,20 @@ def _volatility(
     window = [price for price in prices if price.observed_at >= start]
     if len(window) < 3:
         return None
-    returns: list[float] = []
+    returns_per_sqrt_minute: list[float] = []
     for previous, current in zip(window, window[1:], strict=False):
         previous_price = to_decimal(previous.price_usd)
         current_price = to_decimal(current.price_usd)
         if previous_price is None or current_price is None or previous_price == 0:
             continue
-        returns.append(float((current_price / previous_price) - Decimal("1")))
-    if len(returns) < 2:
+        elapsed_minutes = (current.observed_at - previous.observed_at).total_seconds() / 60.0
+        if elapsed_minutes <= 0:
+            continue
+        interval_return = float((current_price / previous_price) - Decimal("1"))
+        returns_per_sqrt_minute.append(interval_return / math.sqrt(elapsed_minutes))
+    if len(returns_per_sqrt_minute) < 2:
         return None
-    return Decimal(str(pstdev(returns)))
+    return Decimal(str(pstdev(returns_per_sqrt_minute)))
 
 
 def _reference_price(
