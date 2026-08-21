@@ -464,12 +464,12 @@ def _settings() -> Settings:
     )
 
 
-def _seed_crypto_snapshot(session, *, title: str):
+def _seed_crypto_snapshot(session, *, title: str, ticker: str = "BTC-MARKET"):
     now = utc_now()
     return insert_market_snapshot(
         session,
         {
-            "ticker": "BTC-MARKET",
+            "ticker": ticker,
             "status": "open",
             "title": title,
             "yes_bid_dollars": "0.40",

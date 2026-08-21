@@ -63,6 +63,10 @@ def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
         from kalshi_predictor.config import get_settings
         from kalshi_predictor.data.backend import database_url_from_settings
         from kalshi_predictor.data.db import get_session_factory, make_engine
+        from kalshi_predictor.data.locks import db_writer_monitor
+        from kalshi_predictor.gh2_weather_identity_shadow import (
+            append_weather_identity_shadow,
+        )
         from kalshi_predictor.roadmap.runtime_reports import write_runtime_roadmap_reports
 
         try:
@@ -86,6 +90,22 @@ def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
             return 2
 
         reports_root = Path(_fast_option_value(args, "--reports-root", "reports") or "reports")
+        gh2_report_path = Path(
+            _fast_option_value(
+                args,
+                "--gh2-report-path",
+                str(reports_root / "phase_gh2/gh2_active_candidate_refresh.json"),
+            )
+            or ""
+        )
+        gh2_markdown_path = Path(
+            _fast_option_value(
+                args,
+                "--gh2-markdown-path",
+                str(reports_root / "phase_gh2/gh2_active_candidate_refresh.md"),
+            )
+            or ""
+        )
         settings = get_settings()
         engine = make_engine(database_url_from_settings(settings))
         session_factory = get_session_factory(engine)
@@ -98,11 +118,23 @@ def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
                 paper_order_limit=paper_order_limit,
                 ticker_scope=ticker_scope,
             )
+        shadow = append_weather_identity_shadow(
+            report_path=gh2_report_path,
+            markdown_path=gh2_markdown_path,
+            settings=settings,
+            writer_monitor=lambda: db_writer_monitor(settings=settings),
+        )
         print("Runtime roadmap diagnostics")
         print("Mode: READ ONLY")
         print("Database writes: 0")
         print("Paper/live order creation: disabled")
         print(f"Candidate ticker scope: {len(ticker_scope or [])}")
+        print(
+            "Weather identity shadow: "
+            f"{shadow.get('status', 'COMPLETE')} "
+            f"({(shadow.get('summary') or {}).get('authoritative_identity_verified', 0)} "
+            "verified)"
+        )
         for name, path in paths.items():
             print(f"Wrote {name}: {path}")
         return 0
@@ -216,6 +248,7 @@ from kalshi_predictor.data.db import (
     get_session_factory,
     init_db,
     make_engine,
+    make_sqlite_read_only_engine,
 )
 from kalshi_predictor.data.locks import (
     db_writer_monitor,
@@ -312,6 +345,7 @@ from kalshi_predictor.market_legs import (
     generate_link_coverage_report,
     link_coverage_dashboard,
     parse_and_store_market_legs,
+    write_link_coverage_snapshot,
 )
 from kalshi_predictor.memory.archive import archive_memory_to_jsonl
 from kalshi_predictor.memory.backfill import backfill_memory_from_existing_tables
@@ -2498,9 +2532,19 @@ def link_coverage_command(
         bool,
         typer.Option(help="Refresh parsed market legs when --parse-first is used."),
     ] = False,
+    database_read_only: Annotated[
+        bool,
+        typer.Option(
+            help="Require SQLite mode=ro plus PRAGMA query_only=ON; forbids parse options."
+        ),
+    ] = False,
 ) -> None:
     """Show market-leg and linker coverage across crypto/weather/economic/sports/news."""
-    engine = init_db()
+    if database_read_only and (parse_first or parse_limit or refresh):
+        raise typer.BadParameter(
+            "--database-read-only cannot be combined with parsing or refresh options."
+        )
+    engine = make_sqlite_read_only_engine() if database_read_only else init_db()
     session_factory = get_session_factory(engine)
     with session_factory() as session:
         if parse_first:
@@ -2517,11 +2561,15 @@ def link_coverage_command(
             )
         coverage = link_coverage_dashboard(session)
         report_path = generate_link_coverage_report(session, output_path=output, coverage=coverage)
-        snapshot_path = Path("reports/market_coverage/link_coverage.json")
-        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-        snapshot_path.write_text(json.dumps(coverage, indent=2, sort_keys=True), encoding="utf-8")
+        snapshot_path = write_link_coverage_snapshot(coverage)
     console.print("Market link coverage")
     console.print("Mode: PAPER ONLY diagnostics")
+    console.print(
+        "Database: SQLite mode=ro + PRAGMA query_only=ON"
+        if database_read_only
+        else "Database: configured runtime mode"
+    )
+    console.print("Database writes: 0" if database_read_only else "Database writes: not asserted")
     console.print(f"Parsed legs: {coverage['summary_cards'][1]['value']}")
     console.print(f"Linked legs: {coverage['summary_cards'][2]['value']}")
     console.print(f"Partial legs: {coverage['summary_cards'][3]['value']}")
@@ -19743,6 +19791,14 @@ def roadmap_runtime_reports_command(
         Path,
         typer.Option(help="Canonical report root for the signed read-only artifacts."),
     ] = Path("reports"),
+    gh2_report_path: Annotated[
+        Path,
+        typer.Option(help="Canonical GH-2 JSON report enriched by shadow diagnostics."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.json"),
+    gh2_markdown_path: Annotated[
+        Path,
+        typer.Option(help="Canonical GH-2 Markdown report enriched by shadow diagnostics."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.md"),
     candidate_manifest_path: Annotated[
         Path | None,
         typer.Option(help="Optional current candidate manifest used to scope market census."),
@@ -19786,11 +19842,26 @@ def roadmap_runtime_reports_command(
             paper_order_limit=paper_order_limit,
             ticker_scope=ticker_scope,
         )
+    from kalshi_predictor.gh2_weather_identity_shadow import (
+        append_weather_identity_shadow,
+    )
+
+    shadow = append_weather_identity_shadow(
+        report_path=gh2_report_path,
+        markdown_path=gh2_markdown_path,
+        settings=get_settings(),
+        writer_monitor=lambda: db_writer_monitor(settings=get_settings()),
+    )
     console.print("Runtime roadmap diagnostics")
     console.print("Mode: READ ONLY")
     console.print("Database writes: 0")
     console.print("Paper/live order creation: disabled")
     console.print(f"Candidate ticker scope: {len(ticker_scope or [])}")
+    console.print(
+        "Weather identity shadow: "
+        f"{shadow.get('status', 'COMPLETE')} "
+        f"({(shadow.get('summary') or {}).get('authoritative_identity_verified', 0)} verified)"
+    )
     for name, path in paths.items():
         console.print(f"Wrote {name}: {path}")
 
@@ -20243,6 +20314,356 @@ def find_opportunities_command(
     console.print(f"Top opportunity ticker: {summary.top_opportunity_ticker or 'n/a'}")
     console.print(f"Top opportunity score: {summary.top_opportunity_score or 'n/a'}")
     console.print(f"Wrote opportunities report to {report_path}")
+
+
+@app.command("candidate-funnel-audit")
+def candidate_funnel_audit_command(
+    gh2_report_path: Annotated[
+        Path,
+        typer.Option(help="Accepted GH-2 candidate refresh JSON path."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.json"),
+    crypto_r5_path: Annotated[
+        Path,
+        typer.Option(help="Crypto R5 freshness-watch JSON path."),
+    ] = Path("reports/phase3bc_r5/phase3bc_r5_crypto_freshness_watch.json"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Read-only candidate funnel report directory."),
+    ] = Path("reports/candidate_funnel"),
+) -> None:
+    from kalshi_predictor.candidate_funnel_audit import (
+        make_candidate_funnel_read_only_engine,
+        write_candidate_funnel_audit,
+    )
+
+    settings = get_settings()
+    engine = make_candidate_funnel_read_only_engine(
+        database_url_from_settings(settings)
+    )
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        artifacts = write_candidate_funnel_audit(
+            session,
+            gh2_report_path=gh2_report_path,
+            crypto_r5_path=crypto_r5_path,
+            output_dir=output_dir,
+        )
+    console.print("Candidate funnel audit")
+    console.print("Mode: READ ONLY")
+    console.print("Database writes: 0")
+    console.print("Order creation: disabled")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
+@app.command("candidate-coverage-audit")
+def candidate_coverage_audit_command(
+    gh1_manifest_path: Annotated[
+        Path,
+        typer.Option(help="Accepted GH-1 actionable candidate manifest JSON path."),
+    ] = Path("reports/phase_gh1/watch/actionable_tickers.json"),
+    gh2_report_path: Annotated[
+        Path,
+        typer.Option(help="Accepted GH-2 candidate refresh JSON path."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.json"),
+    crypto_r5_path: Annotated[
+        Path,
+        typer.Option(help="Crypto R5 freshness-watch JSON path."),
+    ] = Path("reports/phase3bc_r5/phase3bc_r5_crypto_freshness_watch.json"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Read-only candidate coverage report directory."),
+    ] = Path("reports/candidate_coverage"),
+    freshness_minutes: Annotated[
+        int,
+        typer.Option(help="Fresh snapshot, forecast, and ranking window."),
+    ] = 15,
+    addition_limit: Annotated[
+        int,
+        typer.Option(help="Maximum safe coverage additions to report."),
+    ] = 50,
+) -> None:
+    from kalshi_predictor.candidate_coverage_audit import write_candidate_coverage_audit
+    from kalshi_predictor.candidate_funnel_audit import (
+        make_candidate_funnel_read_only_engine,
+    )
+
+    if freshness_minutes < 1 or addition_limit < 1:
+        raise typer.BadParameter("freshness-minutes and addition-limit must be positive")
+    settings = get_settings()
+    engine = make_candidate_funnel_read_only_engine(
+        database_url_from_settings(settings)
+    )
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        artifacts = write_candidate_coverage_audit(
+            session,
+            gh1_manifest_path=gh1_manifest_path,
+            gh2_report_path=gh2_report_path,
+            crypto_r5_path=crypto_r5_path,
+            output_dir=output_dir,
+            freshness_minutes=freshness_minutes,
+            addition_limit=addition_limit,
+        )
+    console.print("Candidate coverage audit")
+    console.print("Mode: READ ONLY")
+    console.print("Database writes: 0")
+    console.print("GH-2 trigger: disabled")
+    console.print("Order creation: disabled")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
+@app.command("category-coverage-gap-audit")
+def category_coverage_gap_audit_command(
+    gh1_manifest_path: Annotated[
+        Path,
+        typer.Option(help="Accepted GH-1 actionable candidate manifest JSON path."),
+    ] = Path("reports/phase_gh1/watch/actionable_tickers.json"),
+    gh2_report_path: Annotated[
+        Path,
+        typer.Option(help="Accepted GH-2 candidate refresh JSON path."),
+    ] = Path("reports/phase_gh2/gh2_active_candidate_refresh.json"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Read-only category coverage report directory."),
+    ] = Path("reports/category_coverage_gap"),
+    freshness_minutes: Annotated[
+        int,
+        typer.Option(help="Fresh snapshot, forecast, and ranking window."),
+    ] = 15,
+) -> None:
+    from kalshi_predictor.candidate_funnel_audit import (
+        make_candidate_funnel_read_only_engine,
+    )
+    from kalshi_predictor.category_coverage_gap_audit import (
+        write_category_coverage_gap_audit,
+    )
+
+    if freshness_minutes < 1:
+        raise typer.BadParameter("freshness-minutes must be positive")
+    settings = get_settings()
+    engine = make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        artifacts = write_category_coverage_gap_audit(
+            session,
+            gh1_manifest_path=gh1_manifest_path,
+            gh2_report_path=gh2_report_path,
+            output_dir=output_dir,
+            freshness_minutes=freshness_minutes,
+        )
+    console.print("Category coverage gap audit")
+    console.print("Mode: READ ONLY")
+    console.print("Database writes: 0")
+    console.print("GH-2 trigger: disabled")
+    console.print("Order creation: disabled")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
+@app.command("catalog-lineage-repair")
+def catalog_lineage_repair_command(
+    tickers: Annotated[
+        str,
+        typer.Option(help="Comma-separated exact active market tickers."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Repair plan and rollback artifact directory."),
+    ] = Path("reports/catalog_lineage_repair"),
+    limit: Annotated[
+        int,
+        typer.Option(help="Maximum explicit ticker count."),
+    ] = 20,
+    deadline_seconds: Annotated[
+        int,
+        typer.Option(help="Catalog evidence fetch deadline in seconds."),
+    ] = 30,
+    apply: Annotated[
+        bool,
+        typer.Option("--apply", help="Apply source-backed null repairs in one transaction."),
+    ] = False,
+    accepted_plan: Annotated[
+        Path | None,
+        typer.Option(
+            "--accepted-plan",
+            help="Approved zero-write dry-run JSON artifact required by apply mode.",
+        ),
+    ] = None,
+    accepted_plan_sha256: Annotated[
+        str | None,
+        typer.Option(
+            "--accepted-plan-sha256",
+            help="Expected SHA-256 of the approved dry-run JSON artifact.",
+        ),
+    ] = None,
+) -> None:
+    import time
+
+    from kalshi_predictor.candidate_funnel_audit import (
+        make_candidate_funnel_read_only_engine,
+    )
+    from kalshi_predictor.kalshi.client import KalshiClient
+    from kalshi_predictor.series_lineage_repair import (
+        apply_lineage_repair,
+        build_lineage_repair_plan,
+        fetch_exact_catalog_lineage,
+        load_accepted_lineage_plan,
+        normalize_tickers,
+        write_lineage_repair_artifacts,
+    )
+
+    if deadline_seconds < 1:
+        raise typer.BadParameter("deadline-seconds must be positive")
+    if apply and (accepted_plan is None or accepted_plan_sha256 is None):
+        raise typer.BadParameter(
+            "--apply requires --accepted-plan and --accepted-plan-sha256"
+        )
+    if not apply and (accepted_plan is not None or accepted_plan_sha256 is not None):
+        raise typer.BadParameter("accepted-plan options are apply-only")
+    try:
+        scoped_tickers = normalize_tickers(tickers, limit=limit)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    deadline = time.monotonic() + deadline_seconds
+    with KalshiClient() as client:
+        evidence = fetch_exact_catalog_lineage(
+            client,
+            tickers=scoped_tickers,
+            deadline_monotonic=deadline,
+        )
+
+    settings = get_settings()
+    engine = (
+        init_db()
+        if apply
+        else make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
+    )
+    session_factory = get_session_factory(engine)
+    apply_result = None
+    if apply:
+        approved, approved_sha256 = load_accepted_lineage_plan(
+            accepted_plan,
+            expected_sha256=accepted_plan_sha256,
+        )
+        with session_factory.begin() as session:
+            plan = build_lineage_repair_plan(
+                session,
+                tickers=scoped_tickers,
+                catalog_evidence=evidence,
+            )
+            # Persist the exact pre-repair values before entering the write path.
+            write_lineage_repair_artifacts(
+                plan=plan,
+                output_dir=output_dir,
+                dry_run=True,
+            )
+            apply_result = apply_lineage_repair(
+                session,
+                plan=plan,
+                accepted_plan=approved,
+                writer_monitor=lambda: db_writer_monitor(settings=settings),
+            )
+            apply_result["accepted_plan_sha256"] = approved_sha256
+    else:
+        with session_factory() as session:
+            plan = build_lineage_repair_plan(
+                session,
+                tickers=scoped_tickers,
+                catalog_evidence=evidence,
+            )
+    artifacts = write_lineage_repair_artifacts(
+        plan=plan,
+        output_dir=output_dir,
+        dry_run=not apply,
+        apply_result=apply_result,
+    )
+    console.print(f"Mode: {'APPLY' if apply else 'DRY RUN'}")
+    console.print("Historical rankings rewritten: 0")
+    console.print("Candidate selection changed: no")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote rollback evidence: {artifacts.rollback_path}")
+
+
+@app.command("weather-identity-evidence-shadow")
+def weather_identity_evidence_shadow_command(
+    tickers: Annotated[
+        str,
+        typer.Option(help="Comma-separated exact weather market tickers."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for shadow-only JSON and Markdown evidence."),
+    ] = Path("reports/weather_identity_evidence_shadow"),
+    limit: Annotated[
+        int,
+        typer.Option(help="Maximum explicit ticker count."),
+    ] = 20,
+    deadline_seconds: Annotated[
+        int,
+        typer.Option(help="Public protocol evidence deadline in seconds."),
+    ] = 30,
+    cache_max_entries: Annotated[
+        int,
+        typer.Option(help="Maximum invocation-scoped exact protocol cache entries."),
+    ] = 100,
+    evidence_max_age_seconds: Annotated[
+        int,
+        typer.Option(help="Maximum age of invocation-scoped protocol evidence."),
+    ] = 900,
+) -> None:
+    """Collect exact weather identity evidence without changing runtime gates."""
+    import time
+    from datetime import timedelta
+
+    from kalshi_predictor.candidate_funnel_audit import (
+        make_candidate_funnel_read_only_engine,
+    )
+    from kalshi_predictor.kalshi.client import KalshiClient
+    from kalshi_predictor.series_lineage_repair import normalize_tickers
+    from kalshi_predictor.weather_identity_evidence import (
+        BoundedProtocolCache,
+        collect_weather_identity_evidence,
+        write_weather_identity_evidence,
+    )
+
+    if deadline_seconds < 1:
+        raise typer.BadParameter("deadline-seconds must be positive")
+    if cache_max_entries < 1:
+        raise typer.BadParameter("cache-max-entries must be positive")
+    if evidence_max_age_seconds < 1:
+        raise typer.BadParameter("evidence-max-age-seconds must be positive")
+    try:
+        scoped_tickers = normalize_tickers(tickers, limit=limit)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    max_age = timedelta(seconds=evidence_max_age_seconds)
+    cache = BoundedProtocolCache(max_entries=cache_max_entries, max_age=max_age)
+    settings = get_settings()
+    engine = make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
+    session_factory = get_session_factory(engine)
+    try:
+        with KalshiClient(settings=settings) as client, session_factory() as session:
+            payload = collect_weather_identity_evidence(
+                session,
+                client,
+                tickers=scoped_tickers,
+                deadline_monotonic=time.monotonic() + deadline_seconds,
+                max_age=max_age,
+                cache=cache,
+            )
+        artifacts = write_weather_identity_evidence(payload, output_dir=output_dir)
+    finally:
+        engine.dispose()
+    console.print("Authoritative weather identity shadow evidence")
+    console.print("Mode: READ ONLY / DIAGNOSTIC ONLY")
+    console.print("Candidate selection and paper readiness: unchanged")
+    console.print("Database: SQLite mode=ro + PRAGMA query_only=ON")
+    console.print("Database writes: 0")
+    console.print("Portfolio and order APIs: not imported")
+    console.print(f"Wrote JSON: {artifacts.json_path}")
+    console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
 @app.command("explain-opportunity")

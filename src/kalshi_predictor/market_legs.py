@@ -408,7 +408,7 @@ def generate_link_coverage_report(
             "## Category Coverage",
             "",
             "| Category | Current markets | Current linked | Current unlinked | "
-            "Current coverage | All parsed markets | All linked markets | Historical unlinked | "
+            "Eligible coverage | All parsed markets | All linked markets | Historical unlinked | "
             "Derived markets | Verified markets | Partial markets | Unsupported composites | "
             "Current status | Next action |",
             "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
@@ -418,7 +418,7 @@ def generate_link_coverage_report(
     for row in coverage["category_rows"]:
         lines.append(
             "| {category} | {current_parsed_markets} | {current_linked_markets} | "
-            "{current_unlinked_markets} | {current_coverage_percent} | {parsed_markets} | "
+            "{current_unlinked_markets} | {current_coverage_display} | {parsed_markets} | "
             "{linked_markets} | {historical_unlinked_markets} | "
             "{derived_usable_markets} | {verified_schedule_markets} | {partial_markets} | "
             "{current_unsupported_multileg_markets} | {current_status_label} | "
@@ -462,6 +462,19 @@ def generate_link_coverage_report(
         lines.append("- No coverage command is required right now.")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return output_path
+
+
+def write_link_coverage_snapshot(
+    coverage: dict[str, Any],
+    *,
+    output_path: Path = Path("reports/market_coverage/link_coverage.json"),
+) -> Path:
+    """Publish link-coverage evidence without exposing a partially written JSON file."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output_path.with_suffix(f"{output_path.suffix}.tmp")
+    temporary.write_text(json.dumps(coverage, indent=2, sort_keys=True), encoding="utf-8")
+    temporary.replace(output_path)
     return output_path
 
 
@@ -1446,6 +1459,12 @@ def _category_row(
         "current_coverage_percent": _percent(
             current_linked_markets,
             current_linkable_markets,
+        ),
+        "current_coverage_display": (
+            f"{_percent(current_linked_markets, current_linkable_markets)} "
+            f"({current_linked_markets}/{current_linkable_markets} eligible)"
+            if current_linkable_markets
+            else "n/a"
         ),
         "status": status,
         "status_label": _status_label(status),

@@ -6,10 +6,36 @@ from pathlib import Path
 from kalshi_predictor.config import Settings
 from kalshi_predictor.ingest.websocket_orderbooks import StreamSummary
 from kalshi_predictor.ingest.websocket_watch import (
+    DEFAULT_WATCH_SERIES,
     discover_quoted_market_tickers,
     load_actionable_tickers,
     run_reconnecting_websocket_watch,
 )
+
+
+def test_default_watch_includes_supported_liquid_fifteen_minute_crypto_series() -> None:
+    assert {
+        "KXBTC15M",
+        "KXETH15M",
+        "KXSOL15M",
+        "KXXRP15M",
+        "KXDOGE15M",
+    }.issubset(DEFAULT_WATCH_SERIES)
+
+
+def test_default_watch_uses_current_hourly_weather_series() -> None:
+    assert {
+        "KXTEMPNYCH",
+        "KXTEMPCHIH",
+        "KXTEMPMIAH",
+        "KXTEMPAUSH",
+        "KXTEMPLAXH",
+        "KXTEMPBOSH",
+        "KXTEMPDCH",
+    }.issubset(DEFAULT_WATCH_SERIES)
+    assert not {"KXTEMPCHI", "KXTEMPMIA", "KXTEMPAUS", "KXTEMPLAX"}.intersection(
+        DEFAULT_WATCH_SERIES
+    )
 
 
 def test_discovery_keeps_bounded_quoted_books_per_series() -> None:

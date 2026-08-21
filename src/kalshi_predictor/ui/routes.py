@@ -196,6 +196,7 @@ def _link_coverage_for_ui(session: Session) -> dict[str, Any]:
     if snapshot is not None:
         snapshot = dict(snapshot)
         snapshot["data_source"] = "generated_snapshot"
+        _normalize_link_coverage_rows(snapshot)
         _annotate_link_coverage_freshness(snapshot)
         return snapshot
     coverage = link_coverage_dashboard(session)
@@ -215,6 +216,43 @@ def _load_link_coverage_snapshot(path: Path) -> dict[str, Any] | None:
     if not isinstance(payload, dict) or not isinstance(payload.get("category_rows"), list):
         return None
     return payload
+
+
+def _normalize_link_coverage_rows(payload: dict[str, Any]) -> None:
+    rows = payload.get("category_rows")
+    if not isinstance(rows, list):
+        return
+    normalized_rows: list[Any] = []
+    for source_row in rows:
+        if not isinstance(source_row, dict):
+            normalized_rows.append(source_row)
+            continue
+        row = dict(source_row)
+        if "current_coverage_display" not in row:
+            linked = _non_negative_int(row.get("current_linked_markets"))
+            eligible = _positive_int(row.get("current_linkable_markets"))
+            row["current_coverage_display"] = (
+                f"{100 * linked / eligible:.1f}% ({linked}/{eligible} eligible)"
+                if linked is not None and eligible is not None
+                else "n/a"
+            )
+        normalized_rows.append(row)
+    payload["category_rows"] = normalized_rows
+
+
+def _non_negative_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _positive_int(value: Any) -> int | None:
+    parsed = _non_negative_int(value)
+    return parsed if parsed is not None and parsed > 0 else None
 
 
 def _annotate_link_coverage_freshness(payload: dict[str, Any]) -> None:

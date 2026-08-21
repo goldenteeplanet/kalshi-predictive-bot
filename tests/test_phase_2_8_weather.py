@@ -412,6 +412,25 @@ def test_weather_linker_detects_wind_market(tmp_path) -> None:
         assert detection.target_value == Decimal("40")
 
 
+def test_weather_linker_detects_new_hourly_market_locations(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        for ticker, city, location_key in (
+            ("KXTEMPAUSH-TEST", "Austin", "austin"),
+            ("KXTEMPDCH-TEST", "Washington, DC", "washington_dc"),
+        ):
+            market = upsert_market(
+                session,
+                {"ticker": ticker, "title": f"Will the temp in {city} be above 80 degrees?"},
+            )
+
+            detection = detect_weather_market(market)
+
+            assert detection.weather_metric == "TEMPERATURE"
+            assert detection.location_key == location_key
+            assert detection.target_value == Decimal("80")
+
+
 def test_weather_linker_ignores_non_weather_market(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:

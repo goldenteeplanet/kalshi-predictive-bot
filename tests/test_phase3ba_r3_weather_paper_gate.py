@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from kalshi_predictor import phase3ba_r3
 from kalshi_predictor.cli import app
+from kalshi_predictor.opportunities.market_identity import BUILT_FROM_EXACT_CATALOG, VERIFIED
 
 
 def _base_row() -> dict:
@@ -17,6 +18,7 @@ def _base_row() -> dict:
         "current_window_eligible": True,
         "terminal_weather_horizon_complete": True,
         "verified_kalshi_url": True,
+        "kalshi_url_status": VERIFIED,
         "has_snapshot": True,
         "snapshot_fresh": True,
         "has_weather_source_forecast": True,
@@ -82,6 +84,24 @@ def test_phase3ba_r3_summary_counts_ready_and_blockers() -> None:
         "PAPER_READY": 1,
         "SNAPSHOT_STALE": 1,
     }
+
+
+def test_exact_catalog_url_proposal_remains_a_hard_blocker() -> None:
+    row = _base_row()
+    row.update(
+        {
+            "verified_kalshi_url": False,
+            "kalshi_url_status": BUILT_FROM_EXACT_CATALOG,
+        }
+    )
+    row["first_blocker"] = phase3ba_r3._first_weather_paper_blocker(row)
+
+    summary = phase3ba_r3._summary([row])
+
+    assert row["first_blocker"] == "LINK_EXACT_CATALOG_URL_UNCONFIRMED"
+    assert summary["paper_ready_rows"] == 0
+    assert summary["verified_kalshi_url_rows"] == 0
+    assert summary["exact_catalog_url_unconfirmed_rows"] == 1
 
 
 def test_weather_gate_reuses_location_evidence_across_tickers() -> None:

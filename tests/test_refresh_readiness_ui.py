@@ -11,8 +11,25 @@ from kalshi_predictor.roadmap.category_census import (
     write_category_ingestion_census,
 )
 from kalshi_predictor.ui.app import create_app
-from kalshi_predictor.ui.refresh_readiness import build_refresh_readiness_dashboard
+from kalshi_predictor.ui.refresh_readiness import (
+    DEFAULT_HISTORY_PATH,
+    DEFAULT_MANIFEST_PATH,
+    DEFAULT_REFRESH_PATH,
+    build_refresh_readiness_dashboard,
+)
 from kalshi_predictor.utils.time import utc_now
+
+
+def test_refresh_readiness_defaults_to_canonical_runtime_artifacts() -> None:
+    assert DEFAULT_REFRESH_PATH == Path(
+        "/var/lib/kalshi-bot-gh2/reports/gh2_active_candidate_refresh.json"
+    )
+    assert DEFAULT_HISTORY_PATH == Path(
+        "/var/lib/kalshi-bot-gh2/reports/gh2_paper_only_soak_history.jsonl"
+    )
+    assert DEFAULT_MANIFEST_PATH == Path(
+        "/var/lib/kalshi-bot-gh1/watch/actionable_tickers.json"
+    )
 
 
 def test_dashboard_distinguishes_missing_source_from_valid_zero(tmp_path: Path) -> None:

@@ -1,9 +1,7 @@
 [Unit]
-Description=Kalshi guarded supported-city weather runtime refresh
+Description=Kalshi read-only link coverage snapshot refresh
 After=network-online.target
-Wants=network-online.target
 ConditionPathExists=/etc/kalshi-bot/kalshi-bot.env
-ConditionPathExists=/var/lib/kalshi-bot/kalshi_phase1.db
 
 [Service]
 Type=oneshot
@@ -12,12 +10,12 @@ WorkingDirectory=/opt/kalshi-predictive-bot
 EnvironmentFile=/etc/kalshi-bot/kalshi-bot.env
 Environment=UI_READ_ONLY=true
 Environment=EXECUTION_ENABLED=false
-Environment=EXECUTION_DRY_RUN=true
-Environment=EXECUTION_KILL_SWITCH=true
 Environment=AUTOPILOT_ENABLED=false
-Environment=AUTOPILOT_DRY_RUN=true
+Environment=PAPER_ORDER_CREATION_ENABLED=false
+Environment=PAPER_ORDER_KILL_SWITCH=true
+Environment=EXECUTION_KILL_SWITCH=true
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/opt/kalshi-predictive-bot/scripts/cloud/kalshi-nyc-weather-refresh.sh
+ExecStart=/opt/kalshi-predictive-bot/.venv/bin/kalshi-bot link-coverage --database-read-only --output /opt/kalshi-predictive-bot/reports/link_coverage_report.md
 TimeoutStartSec=5min
 NoNewPrivileges=true
 PrivateTmp=true
@@ -28,7 +26,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-MemoryMax=512M
-TasksMax=48
-ReadWritePaths=/var/lib/kalshi-bot
-ReadOnlyPaths=/opt/kalshi-predictive-bot /etc/kalshi-bot
+MemoryMax=384M
+TasksMax=32
+ReadWritePaths=/opt/kalshi-predictive-bot/reports
+ReadOnlyPaths=/opt/kalshi-predictive-bot /etc/kalshi-bot /var/lib/kalshi-bot

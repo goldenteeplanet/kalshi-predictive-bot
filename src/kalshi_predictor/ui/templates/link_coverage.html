@@ -16,7 +16,10 @@
       <span class="muted">{{ coverage.freshness_note }}</span>
       {% endif %}
     </p>
-    <p class="muted">Source: {{ coverage.data_source | default('live_database') }}{% if coverage.generated_at %} · As of {{ coverage.generated_at }}{% endif %}</p>
+    <p class="muted">Source: {{ coverage.data_source | default('live_database') }}{% if coverage.generated_at %} | Generated at {{ coverage.generated_at }}{% endif %}</p>
+    {% if coverage.freshness_status == 'REPORT_STALE' %}
+    <p class="status-pill status-degraded">Stale coverage snapshot: counts are historical diagnostic evidence.</p>
+    {% endif %}
   </div>
   <div class="hero-status">
     <span class="badge badge-demo">{{ coverage.mode }}</span>
@@ -75,7 +78,7 @@
           <th class="numeric">Current Markets</th>
           <th class="numeric">Current Linked</th>
           <th class="numeric">Current Unlinked</th>
-          <th class="numeric">Current Coverage</th>
+          <th class="numeric">Eligible Coverage</th>
           <th class="numeric">All Parsed</th>
           <th class="numeric">All Linked</th>
           <th class="numeric">Historical Unlinked</th>
@@ -94,7 +97,7 @@
           <td class="numeric">{{ row.current_parsed_markets | default(row.parsed_markets) }}</td>
           <td class="numeric">{{ row.current_linked_markets | default(row.linked_markets) }}</td>
           <td class="numeric">{{ row.current_unlinked_markets | default(row.unlinked_markets) }}</td>
-          <td class="numeric">{{ row.current_coverage_percent | default(row.coverage_percent) }}</td>
+          <td class="numeric">{{ row.current_coverage_display | default(row.current_coverage_percent) | default(row.coverage_percent) }}</td>
           <td class="numeric">{{ row.parsed_markets }}</td>
           <td class="numeric">{{ row.linked_markets }}</td>
           <td class="numeric">{{ row.historical_unlinked_markets | default(0) }}</td>

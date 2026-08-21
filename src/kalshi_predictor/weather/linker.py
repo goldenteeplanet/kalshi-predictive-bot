@@ -18,6 +18,8 @@ LOCATION_PATTERNS = {
     "los_angeles": r"\b(los angeles|l\.?a\.?|lax)\b",
     "chicago": r"\bchicago\b",
     "miami": r"\bmiami\b",
+    "austin": r"\baustin\b",
+    "washington_dc": r"\b(washington(?:,? d\.?c\.?)?|d\.?c\.?)\b",
     "dallas": r"\b(dallas|dfw)\b",
     "seattle": r"\bseattle\b",
     "denver": r"\bdenver\b",

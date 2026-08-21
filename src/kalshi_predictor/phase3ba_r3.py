@@ -38,7 +38,10 @@ from kalshi_predictor.data.schema import (
     WeatherMarketLink,
 )
 from kalshi_predictor.learning.config import learning_paper_settings
-from kalshi_predictor.opportunities.market_identity import verify_market_identity
+from kalshi_predictor.opportunities.market_identity import (
+    BUILT_FROM_EXACT_CATALOG,
+    verify_market_identity,
+)
 from kalshi_predictor.opportunities.window_eligibility import current_market_window_status
 from kalshi_predictor.paper.models import BUY_NO
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
@@ -932,6 +935,12 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "current_weather_links": len(rows),
         "verified_kalshi_url_rows": sum(1 for row in rows if row["verified_kalshi_url"]),
+        "exact_catalog_url_unconfirmed_rows": sum(
+            1
+            for row in rows
+            if not row["verified_kalshi_url"]
+            and row.get("kalshi_url_status") == BUILT_FROM_EXACT_CATALOG
+        ),
         "fresh_snapshot_rows": sum(1 for row in rows if row["snapshot_fresh"]),
         "weather_source_rows": sum(
             1

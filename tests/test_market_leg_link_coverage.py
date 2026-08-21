@@ -719,6 +719,8 @@ def test_link_coverage_report_and_ui_render(tmp_path, monkeypatch) -> None:
     text = path.read_text(encoding="utf-8")
     assert "# Market Link Coverage Report" in text
     assert "Category Coverage" in text
+    assert "Eligible coverage" in text
+    assert "0.0% (0/1 eligible)" in text
 
     client = TestClient(create_app(session_factory=session_factory, settings=Settings()))
     response = client.get("/links/coverage")
@@ -746,7 +748,26 @@ def test_link_coverage_ui_uses_matching_generated_snapshot(tmp_path, monkeypatch
     {"label": "Linked Legs", "value": 999, "definition": "Snapshot-only value"}
   ],
   "table_counts": {},
-  "category_rows": [],
+  "category_rows": [
+    {
+      "category": "sports",
+      "current_status_label": "Derived Connected",
+      "current_status_class": "status-healthy",
+      "current_parsed_markets": 11,
+      "current_linked_markets": 5,
+      "current_linkable_markets": 5,
+      "current_unlinked_markets": 0,
+      "current_coverage_percent": "100.0%",
+      "parsed_markets": 57150,
+      "linked_markets": 50319,
+      "historical_unlinked_markets": 0,
+      "derived_usable_markets": 51105,
+      "verified_schedule_markets": 31,
+      "partial_markets": 0,
+      "current_unsupported_multileg_markets": 6,
+      "current_next_action": "No action."
+    }
+  ],
   "bottleneck": {"status": "CONNECTED", "message": "Snapshot coverage.", "next_action": "None."},
   "link_counts": [],
   "count_definitions": [],
@@ -774,7 +795,66 @@ def test_link_coverage_ui_uses_matching_generated_snapshot(tmp_path, monkeypatch
     assert response.status_code == 200
     assert "generated_snapshot" in response.text
     assert "REPORT_STALE" in response.text
+    assert "Stale coverage snapshot" in response.text
+    assert "Generated at 2026-06-29T00:00:00+00:00" in response.text
+    assert "100.0% (5/5 eligible)" in response.text
+    assert '<td class="numeric">11</td>' in response.text
+    assert '<td class="numeric">6</td>' in response.text
     assert "999" in response.text
+
+
+def test_link_coverage_snapshot_zero_or_missing_denominator_is_na(tmp_path, monkeypatch) -> None:
+    snapshot = tmp_path / "link_coverage.json"
+    snapshot.write_text(
+        """{
+  "generated_at": "2026-06-29T00:00:00+00:00",
+  "mode": "PAPER ONLY",
+  "summary_cards": [],
+  "category_rows": [
+    {"category": "weather", "current_linked_markets": 0, "current_linkable_markets": 0},
+    {"category": "news", "current_linked_markets": 0},
+    {"category": "sports", "current_linked_markets": 0, "current_linkable_markets": -1},
+    {"category": "economic", "current_linked_markets": 0, "current_linkable_markets": true},
+    {"category": "general", "current_linked_markets": 0, "current_linkable_markets": "bad"}
+  ],
+  "bottleneck": {"status": "CONNECTED", "message": "Snapshot coverage."},
+  "link_counts": [],
+  "count_definitions": [],
+  "unlinked_examples": [],
+  "partial_examples": [],
+  "next_commands": []
+}""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(ui_routes, "LINK_COVERAGE_SNAPSHOT_PATH", snapshot)
+
+    coverage = ui_routes._link_coverage_for_ui(None)  # type: ignore[arg-type]
+
+    assert [row["current_coverage_display"] for row in coverage["category_rows"]] == [
+        "n/a",
+        "n/a",
+        "n/a",
+        "n/a",
+        "n/a",
+    ]
+
+
+def test_link_coverage_snapshot_preserves_existing_display_values() -> None:
+    payload = {
+        "category_rows": [
+            {"current_coverage_display": "SOURCE VALUE"},
+            {"current_coverage_display": ""},
+            {"current_coverage_display": None},
+        ]
+    }
+
+    ui_routes._normalize_link_coverage_rows(payload)
+
+    assert [row["current_coverage_display"] for row in payload["category_rows"]] == [
+        "SOURCE VALUE",
+        "",
+        None,
+    ]
 
 
 def test_link_coverage_ui_prefers_snapshot_without_live_count_check(

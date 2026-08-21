@@ -204,6 +204,59 @@ def test_ingest_weather_location_key_resolves_known_coordinates(monkeypatch) -> 
     assert captured["committed"] is True
 
 
+def test_ingest_weather_supports_current_hourly_market_locations(monkeypatch) -> None:
+    runner = CliRunner()
+    captured: list[tuple[str, float, float]] = []
+
+    class FakeSession:
+        def commit(self) -> None:
+            return None
+
+    class FakeSessionContext:
+        def __enter__(self) -> FakeSession:
+            return FakeSession()
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    def fake_ingest_weather_location(
+        session,
+        *,
+        location_key: str,
+        latitude: float,
+        longitude: float,
+    ):
+        captured.append((location_key, latitude, longitude))
+        return SimpleNamespace(
+            forecasts_inserted=1,
+            observations_inserted=0,
+            source="test",
+            errors=[],
+        )
+
+    monkeypatch.setattr(cli_module, "init_db", lambda: object())
+    monkeypatch.setattr(cli_module, "get_session_factory", lambda _engine: FakeSessionContext)
+    monkeypatch.setattr(
+        cli_module,
+        "ingest_weather_location",
+        fake_ingest_weather_location,
+    )
+
+    locations = (
+        "chicago",
+        "miami",
+        "austin",
+        "los_angeles",
+        "boston",
+        "washington_dc",
+    )
+    for location in locations:
+        result = runner.invoke(app, ["ingest-weather", "--location-key", location])
+        assert result.exit_code == 0
+
+    assert [row[0] for row in captured] == list(locations)
+
+
 def test_phase_2_9_tournament_cli_command_help() -> None:
     runner = CliRunner()
     for command in ("tournament", "model-diagnostics", "model-weights"):
