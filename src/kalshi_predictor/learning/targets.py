@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from kalshi_predictor.active_universe import is_ticker_eligible_for_new_forecasts
 from kalshi_predictor.config import Settings, get_settings
-from kalshi_predictor.data.schema import LearningTradeTarget, MarketRanking
+from kalshi_predictor.data.schema import LearningTradeTarget, Market, MarketRanking
 from kalshi_predictor.learning.config import learning_categories
 from kalshi_predictor.learning.repository import (
     insert_learning_rejection,
@@ -20,7 +20,7 @@ from kalshi_predictor.phase3ak import (
 )
 from kalshi_predictor.tournament.ranking import classify_market_category
 from kalshi_predictor.utils.decimals import decimal_to_str, to_decimal
-from kalshi_predictor.utils.time import utc_now
+from kalshi_predictor.utils.time import parse_datetime, utc_now
 
 CATEGORY_PRIORITY = {
     "crypto": Decimal("105"),
@@ -30,6 +30,11 @@ CATEGORY_PRIORITY = {
     "sports": Decimal("20"),
     "unknown": Decimal("5"),
 }
+
+SLOW_COMPOSITE_PREFIXES = (
+    "KXMVECROSSCATEGORY-",
+    "KXMVESPORTSMULTIGAMEEXTENDED-",
+)
 
 
 @dataclass(frozen=True)
@@ -108,7 +113,12 @@ def generate_learning_targets(
         seen.add(ranking.ticker)
         spread = to_decimal(ranking.spread)
         liquidity = to_decimal(ranking.liquidity) or Decimal("0")
-        minutes = to_decimal(ranking.time_to_close_minutes)
+        market = session.get(Market, ranking.ticker)
+        minutes = _minutes_to_expected_settlement(
+            market,
+            generated_at=generated_at,
+            fallback=to_decimal(ranking.time_to_close_minutes),
+        )
         category = classify_market_category(
             " ".join(
                 part
@@ -158,6 +168,18 @@ def generate_learning_targets(
                     raw_extra={"phase3ak_gate": phase3ak_gate},
                 )
                 continue
+        if ranking.ticker.startswith(SLOW_COMPOSITE_PREFIXES):
+            _log_target_rejection(
+                session,
+                ranking=ranking,
+                settings=resolved_settings,
+                category=category,
+                spread=spread,
+                liquidity=liquidity,
+                minutes=minutes,
+                reason_override="slow_composite_market",
+            )
+            continue
         if (
             spread is not None
             and spread > resolved_settings.learning_max_spread
@@ -224,6 +246,25 @@ def generate_learning_targets(
             insert_learning_trade_target(session, target)
             inserted += 1
     return LearningTargetsResult(targets=selected, inserted=inserted, scanned=len(rows))
+
+
+def _minutes_to_expected_settlement(
+    market: Market | None,
+    *,
+    generated_at: Any,
+    fallback: Decimal | None,
+) -> Decimal | None:
+    if market is None:
+        return fallback
+    expected = parse_datetime(
+        market.settlement_ts
+        or market.expected_expiration_time
+        or market.expiration_time
+        or market.close_time
+    )
+    if expected is None:
+        return fallback
+    return Decimal(str((expected - generated_at).total_seconds())) / Decimal("60")
 
 
 def latest_learning_target_rows(

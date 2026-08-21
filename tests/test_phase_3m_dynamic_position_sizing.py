@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -23,6 +24,11 @@ from kalshi_predictor.position_sizing.sizer import (
     PositionSizingConfig,
     PositionSizingInput,
     SizingMode,
+)
+from kalshi_predictor.position_sizing import service as sizing_service
+from kalshi_predictor.position_sizing.service import (
+    prepare_position_sizing_historical_evidence,
+    size_paper_decision,
 )
 
 
@@ -302,9 +308,9 @@ def test_historical_accuracy_excludes_future_settlements(tmp_path) -> None:
         )
         decision = _paper_decision("PHASE3M-NO-LOOKAHEAD", forecast.id)
 
-        order = create_paper_order(
+        result = size_paper_decision(
             session,
-            decision,
+            decision=decision,
             settings=_settings(
                 "live",
                 dynamic_position_sizing_live_max_contracts=5,
@@ -319,10 +325,60 @@ def test_historical_accuracy_excludes_future_settlements(tmp_path) -> None:
             .order_by(PositionSizingDecisionLog.id.desc())
         )
 
-    assert order is not None
-    assert order.quantity < 5
+    assert result.decision.proposed_contracts >= 1
+    assert result.decision.executed_contracts < 5
     assert sizing_log is not None
     assert sizing_log.historical_sample_size == 5
+
+
+def test_cached_historical_evidence_skips_expensive_history_rescan(
+    tmp_path, monkeypatch
+) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        _seed_history(session, wins=3, losses=2)
+        forecast = _seed_forecast(
+            session,
+            ticker="PHASE3M-CACHED-HISTORY",
+            probability=Decimal("0.95"),
+        )
+        cache = prepare_position_sizing_historical_evidence(
+            session,
+            forecasts=[forecast],
+        )
+        decision = replace(
+            _paper_decision("PHASE3M-CACHED-HISTORY", forecast.id),
+            raw_decision_json={
+                "position_sizing_historical_evidence_cache": cache,
+            },
+        )
+        monkeypatch.setattr(
+            sizing_service,
+            "_closed_historical_orders",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("final sizing must consume the prepared cache")
+            ),
+        )
+
+        result = size_paper_decision(
+            session,
+            decision=decision,
+            settings=_settings(
+                "live",
+                dynamic_position_sizing_live_max_contracts=5,
+                dynamic_position_sizing_external_risk_cap=5,
+            ),
+        )
+        sizing_log = session.scalar(
+            select(PositionSizingDecisionLog)
+            .where(PositionSizingDecisionLog.ticker == "PHASE3M-CACHED-HISTORY")
+            .order_by(PositionSizingDecisionLog.id.desc())
+        )
+
+    assert result.decision.proposed_contracts >= 1
+    assert sizing_log is not None
+    assert sizing_log.historical_sample_size == 5
+    assert "cached_no_lookahead_historical_evidence" in sizing_log.raw_json
 
 
 def _sizer_config(
@@ -383,7 +439,9 @@ def _seed_forecast(
     probability: Decimal,
     captured_at: datetime | None = None,
 ):
-    now = captured_at or datetime(2026, 1, 2, tzinfo=UTC)
+    # Keep the default candidate tradable regardless of the wall-clock date on
+    # which the suite runs. Historical callers still pass an explicit timestamp.
+    now = captured_at or datetime.now(UTC)
     insert_market_snapshot(
         session,
         {

@@ -1,11 +1,12 @@
 import json
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import desc, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
+from zoneinfo import ZoneInfo
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.repositories import decode_json, encode_json
@@ -222,13 +223,26 @@ def count_open_demo_orders(session: Session) -> int:
     return int(value or 0)
 
 
-def current_daily_pnl(session: Session, *, now: datetime | None = None) -> Decimal:
-    start = _start_of_day(now or utc_now())
-    rows = session.scalars(select(PaperPnl).where(PaperPnl.calculated_at >= start))
-    total = Decimal("0")
-    for row in rows:
-        total += to_decimal(row.total_pnl) or Decimal("0")
-    return total
+def current_daily_pnl(
+    session: Session,
+    *,
+    now: datetime | None = None,
+    session_timezone: str = "UTC",
+    session_reset_time: str = "00:00",
+) -> Decimal:
+    current = now or utc_now()
+    start = _session_start(
+        current,
+        session_timezone=session_timezone,
+        session_reset_time=session_reset_time,
+    )
+    latest = _latest_pnl_totals(session, before_or_at=current)
+    baseline = _latest_pnl_totals(session, strictly_before=start)
+    return sum(
+        (latest.get(ticker, Decimal("0")) - baseline.get(ticker, Decimal("0"))
+         for ticker in set(latest) | set(baseline)),
+        Decimal("0"),
+    )
 
 
 def has_duplicate_attempt(
@@ -282,6 +296,51 @@ def _attempts_from_summary(summary: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _start_of_day(value: datetime) -> datetime:
     aware = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
     return aware.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _session_start(
+    value: datetime,
+    *,
+    session_timezone: str,
+    session_reset_time: str,
+) -> datetime:
+    zone = ZoneInfo(session_timezone)
+    aware = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    local = aware.astimezone(zone)
+    hour, minute = (int(item) for item in session_reset_time.split(":", 1))
+    start = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if local < start:
+        start -= timedelta(days=1)
+    return start.astimezone(UTC)
+
+
+def _latest_pnl_totals(
+    session: Session,
+    *,
+    before_or_at: datetime | None = None,
+    strictly_before: datetime | None = None,
+) -> dict[str, Decimal]:
+    filters = []
+    if before_or_at is not None:
+        filters.append(PaperPnl.calculated_at <= before_or_at)
+    if strictly_before is not None:
+        filters.append(PaperPnl.calculated_at < strictly_before)
+    ranked = (
+        select(
+            PaperPnl,
+            func.row_number().over(
+                partition_by=PaperPnl.ticker,
+                order_by=(desc(PaperPnl.calculated_at), desc(PaperPnl.id)),
+            ).label("row_number"),
+        )
+        .where(*filters)
+        .subquery()
+    )
+    pnl = aliased(PaperPnl, ranked)
+    return {
+        row.ticker: to_decimal(row.total_pnl) or Decimal("0")
+        for row in session.scalars(select(pnl).where(ranked.c.row_number == 1))
+    }
 
 
 def pretty_json(value: Mapping[str, Any] | str | None) -> str:

@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -15,6 +15,7 @@ from kalshi_predictor.config import Settings
 from kalshi_predictor.data.repositories import encode_json
 from kalshi_predictor.data.schema import (
     Forecast,
+    Market,
     MarketSnapshot,
     PaperFill,
     PaperOrder,
@@ -37,7 +38,7 @@ from kalshi_predictor.position_sizing.service import (
 )
 from kalshi_predictor.signals.attribution import attribute_paper_order_signals
 from kalshi_predictor.utils.decimals import ONE_DOLLAR, decimal_to_str, midpoint, to_decimal
-from kalshi_predictor.utils.time import utc_now
+from kalshi_predictor.utils.time import parse_datetime, utc_now
 
 
 def create_paper_order(
@@ -46,6 +47,8 @@ def create_paper_order(
     *,
     settings: Settings | None = None,
 ) -> PaperOrder | None:
+    if not _market_accepts_new_paper_order(session, decision):
+        return None
     forecast_id = decision.forecast_id
     if settings is not None and settings.learning_mode:
         from kalshi_predictor.learning.duplicates import recent_duplicate_order
@@ -105,6 +108,39 @@ def create_paper_order(
 
     capture_paper_order_created(session, order, settings=settings)
     return order
+
+
+def _market_accepts_new_paper_order(
+    session: Session,
+    decision: PaperDecision,
+    *,
+    entry_buffer: timedelta = timedelta(minutes=5),
+) -> bool:
+    """Reject stale decisions before sizing, reserving risk, or creating a fill."""
+    now = utc_now()
+    session.flush()
+    market = session.get(Market, decision.ticker)
+    # Legacy/imported research decisions may not have a market row. When a
+    # market row is present, however, its lifecycle metadata is authoritative.
+    if market is None:
+        return True
+    if str(market.status or "").strip().lower() not in {"open", "active"}:
+        return False
+    if session.get(Settlement, decision.ticker) is not None:
+        return False
+    close_time = parse_datetime(market.close_time)
+    if close_time is None:
+        return True
+    if close_time <= now + entry_buffer:
+        return False
+    if decision.forecast_id is not None:
+        forecast = session.get(Forecast, decision.forecast_id)
+        if forecast is None or forecast.ticker != decision.ticker:
+            return False
+        forecasted_at = parse_datetime(forecast.forecasted_at)
+        if forecasted_at is None or forecasted_at >= close_time:
+            return False
+    return True
 
 
 def get_open_paper_orders(session: Session) -> list[PaperOrder]:

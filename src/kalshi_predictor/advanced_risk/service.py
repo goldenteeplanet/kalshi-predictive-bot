@@ -5,9 +5,10 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import desc, select
-from sqlalchemy.orm import Session
+from sqlalchemy import desc, func, select
+from sqlalchemy.orm import Session, aliased
 
 from kalshi_predictor.advanced_risk.engine import (
     UNKNOWN,
@@ -268,9 +269,22 @@ def _portfolio_snapshot(
         pending_model[str(reservation.model_id or UNKNOWN)] += risk
         pending_instrument[str(reservation.instrument_id or reservation.ticker)] += risk
         total_pending_risk += risk
-    realized, unrealized = _session_pnl(session, decision_timestamp=decision_timestamp)
+    session_start = _session_start(
+        decision_timestamp,
+        session_timezone=settings.advanced_risk_session_timezone,
+        session_reset_time=settings.advanced_risk_session_reset_time,
+    )
+    realized, unrealized = _session_pnl(
+        session,
+        decision_timestamp=decision_timestamp,
+        session_start=session_start,
+    )
     account_equity = settings.advanced_risk_default_account_equity + realized + unrealized
-    high_water = high_water_equity(session, account_key="paper", observed_equity=account_equity)
+    high_water = high_water_equity(
+        session,
+        account_key=f"paper:{session_start.isoformat()}",
+        observed_equity=account_equity,
+    )
     version = (
         f"paper:{len(positions)}:{len(open_orders)}:"
         f"{sum(1 for _ in active_unattached_reservations(session))}"
@@ -526,23 +540,76 @@ def _session_pnl(
     session: Session,
     *,
     decision_timestamp: datetime,
+    session_start: datetime | None = None,
 ) -> tuple[Decimal, Decimal]:
-    start = _session_start(decision_timestamp)
-    rows = list(session.scalars(select(PaperPnl).where(PaperPnl.calculated_at >= start)))
-    if not rows:
-        return Decimal("0"), Decimal("0")
-    realized = sum((to_decimal(row.realized_pnl) or Decimal("0")) for row in rows)
-    unrealized = sum((to_decimal(row.unrealized_pnl) or Decimal("0")) for row in rows)
+    start = session_start or _session_start(decision_timestamp)
+    current = _latest_pnl_by_ticker(session, before_or_at=decision_timestamp)
+    baseline = _latest_pnl_by_ticker(session, strictly_before=start)
+    tickers = set(current) | set(baseline)
+    realized = sum(
+        (
+            (to_decimal(getattr(current.get(ticker), "realized_pnl", None)) or Decimal("0"))
+            - (to_decimal(getattr(baseline.get(ticker), "realized_pnl", None)) or Decimal("0"))
+            for ticker in tickers
+        ),
+        Decimal("0"),
+    )
+    unrealized = sum(
+        (
+            (to_decimal(getattr(current.get(ticker), "unrealized_pnl", None)) or Decimal("0"))
+            - (to_decimal(getattr(baseline.get(ticker), "unrealized_pnl", None)) or Decimal("0"))
+            for ticker in tickers
+        ),
+        Decimal("0"),
+    )
     return realized, unrealized
 
 
-def _session_start(now: datetime) -> datetime:
-    current = _ensure_utc(now)
-    reset = time(hour=0, minute=0, tzinfo=UTC)
-    start = datetime.combine(current.date(), reset, tzinfo=UTC)
+def _session_start(
+    now: datetime,
+    *,
+    session_timezone: str = "UTC",
+    session_reset_time: str = "00:00",
+) -> datetime:
+    zone = ZoneInfo(session_timezone)
+    current = _ensure_utc(now).astimezone(zone)
+    hour, minute = (int(value) for value in session_reset_time.split(":", 1))
+    reset = time(hour=hour, minute=minute, tzinfo=zone)
+    start = datetime.combine(current.date(), reset)
     if current < start:
-        start = start - timedelta(days=1)
-    return start
+        start -= timedelta(days=1)
+    return start.astimezone(UTC)
+
+
+def _latest_pnl_by_ticker(
+    session: Session,
+    *,
+    before_or_at: datetime | None = None,
+    strictly_before: datetime | None = None,
+) -> dict[str, PaperPnl]:
+    filters = []
+    if before_or_at is not None:
+        filters.append(PaperPnl.calculated_at <= before_or_at)
+    if strictly_before is not None:
+        filters.append(PaperPnl.calculated_at < strictly_before)
+    ranked = (
+        select(
+            PaperPnl,
+            func.row_number()
+            .over(
+                partition_by=PaperPnl.ticker,
+                order_by=(desc(PaperPnl.calculated_at), desc(PaperPnl.id)),
+            )
+            .label("row_number"),
+        )
+        .where(*filters)
+        .subquery()
+    )
+    pnl = aliased(PaperPnl, ranked)
+    return {
+        row.ticker: row
+        for row in session.scalars(select(pnl).where(ranked.c.row_number == 1))
+    }
 
 
 def _bid_ask_for_side(snapshot: MarketSnapshot, side: str) -> tuple[Decimal | None, Decimal | None]:
