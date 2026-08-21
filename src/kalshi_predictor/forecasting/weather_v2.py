@@ -1,4 +1,6 @@
+import json
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -10,11 +12,18 @@ from kalshi_predictor.forecasting.base import ForecastOutput
 from kalshi_predictor.forecasting.skip_log import log_forecast_skip
 from kalshi_predictor.utils.decimals import midpoint, to_decimal
 from kalshi_predictor.utils.time import parse_datetime, utc_now
+from kalshi_predictor.weather.monthly_rain import (
+    MonthlyRainCalibration,
+    apply_regularized_isotonic,
+)
+from kalshi_predictor.weather.monthly_rain import (
+    probability_above as monthly_rain_probability_above,
+)
+from kalshi_predictor.weather.observation_shadow import evaluate_knyc_observation
 from kalshi_predictor.weather.repository import (
     get_latest_weather_features,
     get_latest_weather_link_for_ticker,
 )
-from kalshi_predictor.weather.observation_shadow import evaluate_knyc_observation
 from kalshi_predictor.weather.temperature_contracts import (
     parse_point_temperature_ticker,
     validate_point_temperature_market,
@@ -55,11 +64,7 @@ class WeatherV2Forecaster:
             link.location_key,
             self.settings.weather_v2_default_location_key,
         )
-        features = get_latest_weather_features(
-            session,
-            location_key,
-            target_time=link.target_time,
-        )
+        features, feature_alignment = _features_for_link(session, location_key, link)
         if features is None:
             _skip(
                 session,
@@ -115,6 +120,7 @@ class WeatherV2Forecaster:
             "market_mid": str(market_mid),
             "weather_feature_values": _feature_values(features),
             "weather_feature_id": features.id,
+            "weather_feature_alignment": feature_alignment,
             "feature_snapshot_id": features.id,
             "source_observation_ref": _feature_source_reference(features),
             "adjustment": str(adjustment),
@@ -122,6 +128,15 @@ class WeatherV2Forecaster:
             "skip_reason": None,
         }
         notes = "weather_v2 midpoint plus bounded weather adjustment."
+        if link.weather_metric == "RAIN":
+            calibrated_rain = _calibrated_monthly_rain_probability(link)
+            if calibrated_rain is not None:
+                final_probability, rain_evidence = calibrated_rain
+                feature_json["monthly_rain_calibration"] = rain_evidence
+                feature_json["weather_feature_alignment"] = "MONTHLY_RAIN_CALIBRATED"
+                feature_json["final_probability"] = str(final_probability)
+                feature_json["adjustment"] = str(final_probability - market_mid)
+                notes = "weather_v2 calibrated CLIAUS month-to-date plus remaining-amount model."
         if self.settings.weather_v2_knyc_observation_enabled:
             guarded_result = _guarded_knyc_temperature_probability(
                 snapshot=snapshot,
@@ -228,9 +243,7 @@ def _guarded_knyc_temperature_probability(
     if not guard.passed:
         return blocked(guard.blocker or "KNYC_OBSERVATION_NOT_VERIFIED")
 
-    observation_temperature = to_decimal(
-        observation_evidence.get("observation_temperature_f")
-    )
+    observation_temperature = to_decimal(observation_evidence.get("observation_temperature_f"))
     if observation_temperature is None:
         return blocked("OBSERVATION_TEMPERATURE_MISSING")
     lead_time_hours = max(
@@ -296,6 +309,91 @@ def _weather_adjustment(
     if signal is None:
         return None
     return _clamp_signal(signal * operator_direction) * max_adjustment
+
+
+def _features_for_link(
+    session: Session,
+    location_key: str,
+    link: WeatherMarketLink,
+) -> tuple[WeatherFeature | None, str]:
+    """Use exact terminal features, with a disclosed bounded-horizon rain fallback.
+
+    Monthly rain contracts can close beyond NOAA's point-forecast horizon.  The
+    model's rain adjustment consumes the latest rain-risk feature rather than a
+    terminal accumulation estimate, so using the freshest location feature is
+    valid for that bounded adjustment and is explicitly recorded as non-terminal.
+    """
+    features = get_latest_weather_features(
+        session,
+        location_key,
+        target_time=link.target_time,
+    )
+    if features is not None:
+        return features, "EXACT_TARGET_TIME"
+    if link.weather_metric == "RAIN":
+        return (
+            get_latest_weather_features(session, location_key),
+            "LATEST_RAIN_RISK_WITHIN_NOAA_HORIZON",
+        )
+    return None, "NO_COMPATIBLE_FEATURE"
+
+
+def _calibrated_monthly_rain_probability(
+    link: WeatherMarketLink,
+) -> tuple[Decimal, dict[str, Any]] | None:
+    path = Path("reports/phase_gh2/cliaus_monthly_rain_prepare.json")
+    if link.location_key != "austin" or not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if payload.get("activation_permitted") is not True:
+        return None
+    calibration_row = payload.get("calibration") or {}
+    amount_row = payload.get("remaining_amount_model") or {}
+    calibration = MonthlyRainCalibration(
+        sample_count=int(calibration_row.get("sample_count") or 0),
+        bias_inches=to_decimal(calibration_row.get("bias_inches")) or Decimal("0"),
+        residual_sigma_inches=to_decimal(calibration_row.get("residual_sigma_inches")),
+        passed=calibration_row.get("passed") is True,
+        blocker=None,
+    )
+    probability = monthly_rain_probability_above(
+        threshold_inches=to_decimal(link.target_value) or Decimal("0"),
+        month_to_date_inches=to_decimal(payload.get("month_to_date_inches")) or Decimal("0"),
+        remaining_expected_inches=(
+            to_decimal(amount_row.get("expected_remaining_inches")) or Decimal("0")
+        ),
+        calibration=calibration,
+    )
+    if probability is None:
+        return None
+    mappings = payload.get("monotonic_recalibration") or {}
+    blocks = mappings.get(str(to_decimal(link.target_value) or Decimal("0"))) or []
+    raw_probability = probability
+    if calibration.sample_count >= 12 and blocks:
+        probability = Decimal(
+            str(
+                apply_regularized_isotonic(
+                    float(probability),
+                    blocks,
+                    sample_count=calibration.sample_count,
+                    prior_weight=320,
+                )
+            )
+        )
+    return probability, {
+        "station_id": payload.get("station_id"),
+        "month_to_date_inches": payload.get("month_to_date_inches"),
+        "remaining_amount_model": amount_row,
+        "calibration": calibration_row,
+        "raw_probability": str(raw_probability),
+        "monotonic_probability": str(probability),
+        "monotonic_blocks": blocks,
+        "generated_at": payload.get("generated_at"),
+        "no_leakage": True,
+    }
 
 
 def _effective_location_key(link_location_key: str, default_location_key: str) -> str:

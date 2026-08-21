@@ -432,6 +432,14 @@ def build_phase3az_r12_weather_missing_link_apply(
                 skipped_rows.append({"ticker": row["ticker"], "reason": "LINK_ALREADY_EXISTS"})
                 continue
             detection = detect_weather_market(market)
+            if not detection.point_forecast_eligible:
+                skipped_rows.append(
+                    {
+                        "ticker": row["ticker"],
+                        "reason": detection.classification,
+                    }
+                )
+                continue
             inserted = insert_weather_market_link(
                 session,
                 ticker=market.ticker,
@@ -448,6 +456,8 @@ def build_phase3az_r12_weather_missing_link_apply(
                     "market_subtitle": market.subtitle,
                     "series_ticker": market.series_ticker,
                     "event_ticker": market.event_ticker,
+                    "station_id": detection.station_id,
+                    "classification": detection.classification,
                     "fresh_feature_id": row.get("fresh_feature_id"),
                     "fresh_feature_target_time": row.get("fresh_feature_target_time"),
                     "candidate_row": row,

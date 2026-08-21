@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import json
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 
 from typer.testing import CliRunner
@@ -12,6 +15,7 @@ from kalshi_predictor.cli import app
 def _base_row() -> dict:
     return {
         "current_window_eligible": True,
+        "terminal_weather_horizon_complete": True,
         "verified_kalshi_url": True,
         "has_snapshot": True,
         "snapshot_fresh": True,
@@ -36,6 +40,7 @@ def _base_row() -> dict:
 def test_phase3ba_r3_first_weather_paper_blocker_order() -> None:
     cases = [
         ({"current_window_eligible": False}, "MARKET_WINDOW_INELIGIBLE"),
+        ({"terminal_weather_horizon_complete": False}, "RAIN_HORIZON_INCOMPLETE"),
         ({"verified_kalshi_url": False}, "LINK_UNVERIFIED"),
         ({"has_snapshot": False}, "SNAPSHOT_MISSING"),
         ({"snapshot_fresh": False}, "SNAPSHOT_STALE"),
@@ -44,6 +49,10 @@ def test_phase3ba_r3_first_weather_paper_blocker_order() -> None:
         ({"raw_ev": "0"}, "EV_NOT_POSITIVE"),
         ({"executable_ev": "0"}, "EXECUTABLE_EV_NOT_POSITIVE"),
         ({"executable_book": False, "no_book_reason": "INSUFFICIENT_DEPTH"}, "LIQUIDITY_TOO_LOW"),
+        (
+            {"executable_book": False, "no_book_reason": "INSUFFICIENT_BUY_SIDE_SIZE"},
+            "LIQUIDITY_TOO_LOW",
+        ),
         ({"executable_book": False, "no_book_reason": "WIDE_SPREAD"}, "SPREAD_TOO_WIDE"),
         ({"executable_book": False, "no_book_reason": "NO_ORDERBOOK_SNAPSHOT"}, "BOOK_MISSING"),
         ({"settlement_terms_known": False}, "SETTLEMENT_TERMS_UNKNOWN"),
@@ -118,3 +127,111 @@ def test_phase3ba_r3_cli_help_exposes_command() -> None:
 
     assert result.exit_code == 0
     assert "phase3ba-r3-weather-paper-gate" in result.output
+    assert "--deadline-seconds" in result.output
+    assert "--batch-size" in result.output
+
+
+def test_weather_gate_rejects_unknown_location_links() -> None:
+    links = [
+        SimpleNamespace(ticker="UNKNOWN", location_key="unknown"),
+        SimpleNamespace(ticker="NYC", location_key="new_york"),
+    ]
+
+    assert phase3ba_r3._valid_weather_links(links) == [links[1]]
+
+
+def test_weather_gate_progress_is_atomic_and_marks_partial(tmp_path: Path) -> None:
+    path = tmp_path / "progress.json"
+
+    phase3ba_r3._write_gate_progress(
+        path,
+        generated_at="2026-08-20T12:00:00+00:00",
+        rows=[{"ticker": "ONE"}],
+        total=2,
+        deadline_reached=True,
+    )
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["status"] == "PARTIAL_DEADLINE_REACHED"
+    assert payload["rows_processed"] == 1
+    assert payload["complete"] is False
+    assert not path.with_suffix(".json.tmp").exists()
+
+
+def test_weather_book_probe_accepts_exact_identity_and_audits_actual_buy_level() -> None:
+    now = datetime.now(UTC)
+    ranking = SimpleNamespace(
+        best_side="BUY_YES",
+        best_price="0.26",
+        liquidity_score="60",
+        time_to_close_minutes="120",
+    )
+    market = SimpleNamespace(status="active", close_time=now + timedelta(hours=2))
+    snapshot = SimpleNamespace(
+        raw_orderbook_json=json.dumps(
+            {
+                "orderbook_fp": {
+                    "yes_dollars": [["0.18", "100"]],
+                    "no_dollars": [["0.74", "3.78"]],
+                }
+            }
+        )
+    )
+    settings = SimpleNamespace(
+        opportunity_max_spread=Decimal("0.10"),
+        opportunity_min_time_to_close_minutes=Decimal("10"),
+    )
+
+    book = phase3ba_r3._book_probe(
+        ranking=ranking,
+        market=market,
+        identity={"exact_market_identity_verified": True},
+        snapshot=snapshot,
+        snapshot_age=Decimal("1"),
+        settings=settings,
+        window={"current_window_eligible": True},
+    )
+
+    assert book["executable_book"] is True
+    assert book["derived_executable_buy_price"] == "0.26"
+    assert book["ranked_buy_price"] == "0.26"
+    assert book["buy_price_matches_ranking"] is True
+    assert book["actual_buy_price_source"] == "NO_BID_COMPLEMENT"
+    assert book["best_yes_bid_depth"] == "100"
+    assert book["best_no_bid_depth"] == "3.78"
+    assert book["depth_at_configured_limit"] == "3.78"
+    assert book["sufficient_buy_side_size"] is True
+
+
+def test_weather_book_probe_rejects_stale_ranked_price_before_sizing() -> None:
+    now = datetime.now(UTC)
+    book = phase3ba_r3._book_probe(
+        ranking=SimpleNamespace(
+            best_side="BUY_YES",
+            best_price="0.25",
+            liquidity_score="60",
+            time_to_close_minutes="120",
+        ),
+        market=SimpleNamespace(status="active", close_time=now + timedelta(hours=2)),
+        identity={"exact_market_identity_verified": True},
+        snapshot=SimpleNamespace(
+            raw_orderbook_json=json.dumps(
+                {
+                    "orderbook_fp": {
+                        "yes_dollars": [["0.18", "100"]],
+                        "no_dollars": [["0.74", "3.78"]],
+                    }
+                }
+            )
+        ),
+        snapshot_age=Decimal("1"),
+        settings=SimpleNamespace(
+            opportunity_max_spread=Decimal("0.10"),
+            opportunity_min_time_to_close_minutes=Decimal("10"),
+        ),
+        window={"current_window_eligible": True},
+    )
+
+    assert book["executable_book"] is False
+    assert book["no_book_reason"] == "BUY_PRICE_MISMATCH"
+    assert book["buy_price_matches_ranking"] is False

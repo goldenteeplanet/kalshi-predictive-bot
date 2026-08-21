@@ -5,6 +5,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
@@ -12,7 +13,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import desc, func, select, text
+from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
@@ -51,7 +52,6 @@ from kalshi_predictor.phase3ap import (
     _settlement_entry_check,
 )
 from kalshi_predictor.phase3ba_r2 import (
-    _current_weather_links,
     _latest_forecast,
     _latest_ranking,
     _latest_snapshot,
@@ -65,6 +65,7 @@ MODEL_NAME = "weather_v2"
 
 WEATHER_PAPER_BLOCKERS = (
     "MARKET_WINDOW_INELIGIBLE",
+    "RAIN_HORIZON_INCOMPLETE",
     "LINK_UNVERIFIED",
     "SNAPSHOT_MISSING",
     "SOURCE_MISSING",
@@ -106,7 +107,12 @@ def write_phase3ba_r3_weather_paper_gate_report(
     current_window_lookback_hours: int = 3,
     match_tolerance_hours: int = 3,
     tickers: list[str] | tuple[str, ...] | None = None,
+    deadline_seconds: int = 0,
+    batch_size: int = 4,
 ) -> Phase3BAR3ArtifactSet:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    progress_path = output_dir / "weather_paper_gate_progress.json"
+    identity_cache_path = output_dir / "market_identity_cache.json"
     payload = build_phase3ba_r3_weather_paper_gate(
         session,
         output_dir=output_dir,
@@ -117,8 +123,11 @@ def write_phase3ba_r3_weather_paper_gate_report(
         current_window_lookback_hours=current_window_lookback_hours,
         match_tolerance_hours=match_tolerance_hours,
         tickers=tickers,
+        deadline_seconds=deadline_seconds,
+        batch_size=batch_size,
+        progress_path=progress_path,
+        identity_cache_path=identity_cache_path,
     )
-    output_dir.mkdir(parents=True, exist_ok=True)
     executive_summary_path = output_dir / "EXECUTIVE_SUMMARY.md"
     json_path = output_dir / "weather_paper_gate.json"
     markdown_path = output_dir / "weather_paper_gate.md"
@@ -126,10 +135,7 @@ def write_phase3ba_r3_weather_paper_gate_report(
     next_actions_path = output_dir / "NEXT_ACTIONS.md"
     manifest_path = output_dir / "MANIFEST.sha256"
 
-    json_path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, default=str),
-        encoding="utf-8",
-    )
+    _write_json_atomic(json_path, payload)
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     next_actions_path.write_text(_render_next_actions(payload), encoding="utf-8")
@@ -166,6 +172,10 @@ def build_phase3ba_r3_weather_paper_gate(
     current_window_lookback_hours: int = 3,
     match_tolerance_hours: int = 3,
     tickers: list[str] | tuple[str, ...] | None = None,
+    deadline_seconds: int = 0,
+    batch_size: int = 4,
+    progress_path: Path | None = None,
+    identity_cache_path: Path | None = None,
 ) -> dict[str, Any]:
     base_settings = settings or get_settings()
     resolved = learning_paper_settings(base_settings)
@@ -175,13 +185,18 @@ def build_phase3ba_r3_weather_paper_gate(
         settings=base_settings,
         generated_at=now.isoformat(),
         command_args=command_args or [],
+        include_data_watermark=False,
     )
     current_since = now - timedelta(hours=max(current_window_lookback_hours, 0))
-    links = _current_weather_links(
+    candidate_links = _current_valid_weather_links(
         session,
         current_since=current_since,
         limit=limit,
         tickers=tickers,
+    )
+    links = _valid_weather_links(candidate_links)
+    unknown_location_links_rejected = _unknown_current_link_count(
+        session, current_since=current_since, tickers=tickers
     )
     selected_tickers = sorted({link.ticker for link in links})
     sizing = _latest_by_ticker(
@@ -202,22 +217,61 @@ def build_phase3ba_r3_weather_paper_gate(
         links,
         match_tolerance_hours=match_tolerance_hours,
     )
-    rows = [
-        _weather_paper_gate_row(
-            session,
-            link,
-            settings=resolved,
-            now=now,
-            sizing=sizing.get(link.ticker),
-            risk=risk.get(link.ticker),
-            paper_orders=paper_orders,
-            feature=weather_features.get(link.ticker),
-            source_forecast=source_forecasts.get(link.ticker),
+    started = time.monotonic()
+    cache = _read_identity_cache(identity_cache_path)
+    rows: list[dict[str, Any]] = []
+    deadline_reached = False
+    for offset in range(0, len(links), max(1, batch_size)):
+        if deadline_seconds and time.monotonic() - started >= deadline_seconds:
+            deadline_reached = True
+            break
+        for link in links[offset : offset + max(1, batch_size)]:
+            market = session.get(Market, link.ticker)
+            cache_key = _identity_cache_key(market)
+            identity_payload = cache.get(cache_key)
+            if identity_payload is None:
+                ranking = _latest_ranking(session, link.ticker, model_name=MODEL_NAME)
+                identity_payload = verify_market_identity(
+                    session,
+                    ticker=link.ticker,
+                    ranking=ranking,
+                    market=market,
+                    settings=resolved,
+                ).as_dict()
+                cache[cache_key] = identity_payload
+            rows.append(
+                _weather_paper_gate_row(
+                    session,
+                    link,
+                    settings=resolved,
+                    now=now,
+                    sizing=sizing.get(link.ticker),
+                    risk=risk.get(link.ticker),
+                    paper_orders=paper_orders,
+                    feature=weather_features.get(link.ticker),
+                    source_forecast=source_forecasts.get(link.ticker),
+                    identity_payload=identity_payload,
+                )
+            )
+        _write_gate_progress(
+            progress_path,
+            generated_at=now.isoformat(),
+            rows=rows,
+            total=len(links),
+            deadline_reached=False,
         )
-        for link in links
-    ]
+        _write_identity_cache(identity_cache_path, cache)
+    if len(rows) < len(links):
+        deadline_reached = True
+    _write_gate_progress(
+        progress_path,
+        generated_at=now.isoformat(),
+        rows=rows,
+        total=len(links),
+        deadline_reached=deadline_reached,
+    )
     summary = _summary(rows)
-    status = _status(summary)
+    status = "PARTIAL_DEADLINE_REACHED" if deadline_reached else _status(summary)
     return {
         **metadata,
         "phase": "3BA-R3",
@@ -232,6 +286,10 @@ def build_phase3ba_r3_weather_paper_gate(
             "match_tolerance_hours": match_tolerance_hours,
             "ticker_scope_count": len(tickers or ()),
             "active_ticker_scope": tickers is not None,
+            "candidate_links": len(candidate_links),
+            "unknown_location_links_rejected": unknown_location_links_rejected,
+            "deadline_seconds": deadline_seconds,
+            "batch_size": batch_size,
             "model_name": MODEL_NAME,
             "quote_stale_after_minutes": str(QUOTE_STALE_AFTER_MINUTES),
             "min_executable_liquidity_score": str(MIN_EXECUTABLE_LIQUIDITY_SCORE),
@@ -241,6 +299,12 @@ def build_phase3ba_r3_weather_paper_gate(
         "weather_blocker_order": list(WEATHER_PAPER_BLOCKERS),
         "summary": summary,
         "weather_rows": rows,
+        "progress": {
+            "rows_processed": len(rows),
+            "rows_total": len(links),
+            "complete": len(rows) == len(links),
+            "deadline_reached": deadline_reached,
+        },
         "acceptance": _acceptance(summary),
         "next_action": _next_action(status=status, summary=summary),
         "operator_guardrails": _operator_guardrails(),
@@ -258,19 +322,23 @@ def _weather_paper_gate_row(
     paper_orders: set[tuple[str, str, int | None]],
     feature: WeatherFeature | None,
     source_forecast: WeatherForecast | None,
+    identity_payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     market = session.get(Market, link.ticker)
     snapshot = _latest_snapshot(session, link.ticker)
     forecast = _latest_forecast(session, link.ticker, model_name=MODEL_NAME)
     ranking = _latest_ranking(session, link.ticker, model_name=MODEL_NAME)
-    identity = verify_market_identity(
-        session,
-        ticker=link.ticker,
-        ranking=ranking,
-        market=market,
-        settings=settings,
+    if identity_payload is None:
+        identity_payload = verify_market_identity(
+            session,
+            ticker=link.ticker,
+            ranking=ranking,
+            market=market,
+            settings=settings,
+        ).as_dict()
+    exact_identity_verified = (
+        decode_json(link.raw_json).get("exact_market_identity_verified") is True
     )
-    identity_payload = identity.as_dict()
     snapshot_age = _age_minutes(snapshot.captured_at, now) if snapshot is not None else None
     snapshot_fresh = bool(
         snapshot is not None
@@ -317,7 +385,10 @@ def _weather_paper_gate_row(
     book = _book_probe(
         ranking=ranking,
         market=market,
-        identity=identity_payload,
+        identity={
+            **identity_payload,
+            "exact_market_identity_verified": exact_identity_verified,
+        },
         snapshot=snapshot,
         snapshot_age=snapshot_age,
         settings=settings,
@@ -330,6 +401,8 @@ def _weather_paper_gate_row(
         identity=identity_payload,
     )
     forecast_id = _forecast_id_from_ranking(ranking) if ranking is not None else None
+    forecast_features = decode_json(forecast.feature_json) if forecast is not None else {}
+    feature_alignment = forecast_features.get("weather_feature_alignment")
     duplicate = (link.ticker, MODEL_NAME, forecast_id) in paper_orders
     phase3s_proceed = bool(
         ranking is not None
@@ -346,7 +419,9 @@ def _weather_paper_gate_row(
         "link_confidence": link.confidence,
         "market_status": getattr(market, "status", None),
         "market_title": getattr(market, "title", None),
-        "verified_kalshi_url": bool(identity_payload.get("kalshi_url_verified")),
+        "verified_kalshi_url": bool(identity_payload.get("kalshi_url_verified"))
+        or exact_identity_verified,
+        "exact_market_identity_verified": exact_identity_verified,
         "kalshi_url": identity_payload.get("kalshi_url"),
         "kalshi_url_status": identity_payload.get("kalshi_url_status"),
         "source_lineage": identity_payload.get("source_lineage"),
@@ -368,6 +443,10 @@ def _weather_paper_gate_row(
         "weather_feature_age_hours": decimal_to_str(feature_age),
         "weather_feature_target_time": _iso(feature.target_time if feature else None),
         "has_forecast": forecast is not None,
+        "weather_feature_alignment": feature_alignment,
+        "terminal_weather_horizon_complete": (
+            feature_alignment != "LATEST_RAIN_RISK_WITHIN_NOAA_HORIZON"
+        ),
         "has_current_forecast": has_current_forecast,
         "latest_forecast_at": _iso(forecast.forecasted_at if forecast else None),
         "has_ranking": ranking is not None,
@@ -385,15 +464,26 @@ def _weather_paper_gate_row(
         "liquidity": getattr(ranking, "liquidity", None),
         "liquidity_score": getattr(ranking, "liquidity_score", None),
         "executable_book": bool(book.get("executable_book")),
+        "best_yes_bid": book.get("best_yes_bid"),
+        "best_yes_ask": book.get("best_yes_ask"),
+        "best_no_bid": book.get("best_no_bid"),
+        "best_no_ask": book.get("best_no_ask"),
+        "best_yes_bid_depth": book.get("best_yes_bid_depth"),
+        "best_no_bid_depth": book.get("best_no_bid_depth"),
         "book_reason": book.get("book_reason"),
         "no_book_reason": book.get("no_book_reason"),
         "visible_depth": book.get("visible_depth"),
         "depth_at_configured_limit": book.get("depth_at_configured_limit"),
+        "derived_executable_buy_price": book.get("derived_executable_buy_price"),
+        "ranked_buy_price": book.get("ranked_buy_price"),
+        "buy_price_matches_ranking": bool(book.get("buy_price_matches_ranking")),
+        "actual_buy_side": book.get("actual_buy_side"),
+        "actual_buy_price_source": book.get("actual_buy_price_source"),
+        "minimum_buy_side_size": book.get("minimum_buy_side_size"),
+        "sufficient_buy_side_size": bool(book.get("sufficient_buy_side_size")),
         "settlement_terms_known": bool(settlement.get("settlement_terms_known")),
         "settlement_specific_reason": settlement.get("specific_reason_code"),
-        "paper_entry_settlement_eligible": bool(
-            settlement.get("paper_entry_settlement_eligible")
-        ),
+        "paper_entry_settlement_eligible": bool(settlement.get("paper_entry_settlement_eligible")),
         "phase3s_proceed": phase3s_proceed,
         "phase3m_nonzero_size": phase3m_contracts > 0,
         "phase3m_proposed_contracts": phase3m_contracts,
@@ -419,9 +509,139 @@ def _weather_paper_gate_row(
     return row
 
 
+def _identity_cache_key(market: Market | None) -> str:
+    if market is None:
+        return "missing"
+    return f"{market.ticker}|{_iso(market.last_seen_at)}"
+
+
+def _valid_weather_links(links: list[WeatherMarketLink]) -> list[WeatherMarketLink]:
+    return [
+        link for link in links if normalize_location_key(link.location_key) not in {"", "unknown"}
+    ]
+
+
+def _current_valid_weather_links(
+    session: Session,
+    *,
+    current_since: Any,
+    limit: int,
+    tickers: list[str] | tuple[str, ...] | None = None,
+) -> list[WeatherMarketLink]:
+    """Select current, active, normalized links without per-ticker market queries."""
+    ticker_scope = list(dict.fromkeys(str(value).strip() for value in tickers or () if value))
+    if tickers is not None and not ticker_scope:
+        return []
+    filters = [
+        WeatherMarketLink.target_time.is_not(None),
+        WeatherMarketLink.target_time >= current_since,
+        func.lower(func.trim(WeatherMarketLink.location_key)).not_in(("", "unknown")),
+        func.lower(func.coalesce(Market.status, "")).in_(("active", "open")),
+        or_(Market.close_time.is_(None), Market.close_time > utc_now()),
+    ]
+    if tickers is not None:
+        filters.append(WeatherMarketLink.ticker.in_(ticker_scope))
+    statement = (
+        select(WeatherMarketLink)
+        .join(Market, Market.ticker == WeatherMarketLink.ticker)
+        .where(*filters)
+        .order_by(
+            desc(WeatherMarketLink.target_time),
+            WeatherMarketLink.ticker,
+            desc(WeatherMarketLink.detected_at),
+            desc(WeatherMarketLink.id),
+        )
+        .limit(max(limit * 3, limit, 1))
+    )
+    latest: dict[str, WeatherMarketLink] = {}
+    for link in session.scalars(statement):
+        latest.setdefault(link.ticker, link)
+        if len(latest) >= limit:
+            break
+    return list(latest.values())
+
+
+def _unknown_current_link_count(
+    session: Session,
+    *,
+    current_since: Any,
+    tickers: list[str] | tuple[str, ...] | None,
+) -> int:
+    filters = [
+        WeatherMarketLink.target_time >= current_since,
+        func.lower(func.trim(WeatherMarketLink.location_key)) == "unknown",
+    ]
+    if tickers is not None:
+        ticker_scope = [str(value).strip() for value in tickers if str(value).strip()]
+        if not ticker_scope:
+            return 0
+        filters.append(WeatherMarketLink.ticker.in_(ticker_scope))
+    return int(
+        session.scalar(select(func.count(func.distinct(WeatherMarketLink.ticker))).where(*filters))
+        or 0
+    )
+
+
+def _read_identity_cache(path: Path | None) -> dict[str, dict[str, Any]]:
+    if path is None or not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    entries = payload.get("entries") if isinstance(payload, dict) else None
+    return entries if isinstance(entries, dict) else {}
+
+
+def _write_identity_cache(path: Path | None, entries: dict[str, dict[str, Any]]) -> None:
+    if path is not None:
+        _write_json_atomic(path, {"generated_at": utc_now().isoformat(), "entries": entries})
+
+
+def _write_gate_progress(
+    path: Path | None,
+    *,
+    generated_at: str,
+    rows: list[dict[str, Any]],
+    total: int,
+    deadline_reached: bool,
+) -> None:
+    if path is None:
+        return
+    _write_json_atomic(
+        path,
+        {
+            "generated_at": generated_at,
+            "status": (
+                "PARTIAL_DEADLINE_REACHED"
+                if deadline_reached
+                else "COMPLETE"
+                if len(rows) == total
+                else "IN_PROGRESS"
+            ),
+            "rows_processed": len(rows),
+            "rows_total": total,
+            "complete": len(rows) == total,
+            "weather_rows": rows,
+        },
+    )
+
+
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str),
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
 def _first_weather_paper_blocker(row: dict[str, Any]) -> str:
     if not row.get("current_window_eligible"):
         return "MARKET_WINDOW_INELIGIBLE"
+    if not row.get("terminal_weather_horizon_complete", True):
+        return "RAIN_HORIZON_INCOMPLETE"
     if not row.get("verified_kalshi_url"):
         return "LINK_UNVERIFIED"
     if not row.get("has_snapshot"):
@@ -442,7 +662,11 @@ def _first_weather_paper_blocker(row: dict[str, Any]) -> str:
     executable_ev = to_decimal(row.get("executable_ev"))
     if executable_ev is None or executable_ev <= 0:
         return "EXECUTABLE_EV_NOT_POSITIVE"
-    if row.get("no_book_reason") in {"ZERO_VISIBLE_DEPTH", "INSUFFICIENT_DEPTH"}:
+    if row.get("no_book_reason") in {
+        "ZERO_VISIBLE_DEPTH",
+        "INSUFFICIENT_DEPTH",
+        "INSUFFICIENT_BUY_SIDE_SIZE",
+    }:
         return "LIQUIDITY_TOO_LOW"
     if row.get("no_book_reason") == "WIDE_SPREAD":
         return "SPREAD_TOO_WIDE"
@@ -492,7 +716,7 @@ def _book_probe(
 ) -> dict[str, Any]:
     if ranking is None:
         return _empty_book("RANKING_MISSING")
-    return _phase3ap_book_probe(
+    book = _phase3ap_book_probe(
         ranking=ranking,
         market=market,
         identity=identity,
@@ -502,6 +726,28 @@ def _book_probe(
         settings=settings,
         window=window,
     )
+    has_comparable_buy_prices = bool(
+        book.get("derived_executable_buy_price") is not None
+        and book.get("ranked_buy_price") is not None
+    )
+    if has_comparable_buy_prices and not book.get("buy_price_matches_ranking"):
+        book["executable_book"] = False
+        book["no_book_reason"] = "BUY_PRICE_MISMATCH"
+        book["book_reason"] = (
+            "The ranking BUY price does not equal the executable ask derived from the "
+            "opposite-side bid in the same snapshot."
+        )
+    elif (
+        book.get("buy_price_matches_ranking")
+        and not book.get("sufficient_buy_side_size")
+        and book.get("no_book_reason") in {None, "INSUFFICIENT_DEPTH"}
+    ):
+        book["executable_book"] = False
+        book["no_book_reason"] = "INSUFFICIENT_BUY_SIDE_SIZE"
+        book["book_reason"] = (
+            "The actual BUY-side price level has less visible size than the configured minimum."
+        )
+    return book
 
 
 def _empty_book(reason: str) -> dict[str, Any]:
@@ -510,7 +756,15 @@ def _empty_book(reason: str) -> dict[str, Any]:
         "best_yes_ask": None,
         "best_no_bid": None,
         "best_no_ask": None,
+        "best_yes_bid_depth": None,
+        "best_no_bid_depth": None,
         "derived_executable_buy_price": None,
+        "ranked_buy_price": None,
+        "buy_price_matches_ranking": False,
+        "actual_buy_side": None,
+        "actual_buy_price_source": None,
+        "minimum_buy_side_size": None,
+        "sufficient_buy_side_size": False,
         "visible_depth": None,
         "depth_at_configured_limit": None,
         "book_source": "not_checked",
@@ -603,8 +857,7 @@ def _nearest_target_time(
 
     def distance_hours(candidate: Any) -> Decimal:
         candidate_time = _as_utc(
-            getattr(candidate, "target_time", None)
-            or getattr(candidate, "forecast_time", None)
+            getattr(candidate, "target_time", None) or getattr(candidate, "forecast_time", None)
         )
         if candidate_time is None:
             return Decimal("999999")
@@ -694,9 +947,7 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             1 for row in rows if (to_decimal(row.get("raw_ev")) or Decimal("0")) > 0
         ),
         "positive_executable_ev_rows": sum(
-            1
-            for row in rows
-            if (to_decimal(row.get("executable_ev")) or Decimal("0")) > 0
+            1 for row in rows if (to_decimal(row.get("executable_ev")) or Decimal("0")) > 0
         ),
         "executable_book_rows": sum(1 for row in rows if row["executable_book"]),
         "phase3m_nonzero_rows": sum(1 for row in rows if row["phase3m_nonzero_size"]),
@@ -834,6 +1085,7 @@ def _metadata(
     settings: Settings,
     generated_at: str,
     command_args: list[str],
+    include_data_watermark: bool = True,
 ) -> dict[str, Any]:
     db_url = database_url_from_settings(settings)
     redacted_db_url = redact_database_url(db_url)
@@ -854,7 +1106,11 @@ def _metadata(
             "command": "kalshi-bot phase3ba-r3-weather-paper-gate",
             "argv": command_args,
         },
-        "data_watermark": _data_watermark(session),
+        "data_watermark": (
+            _data_watermark(session)
+            if include_data_watermark
+            else {"status": "DEFERRED_FOR_DEADLINE_BUDGET"}
+        ),
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "live_or_demo_execution": False,
         "order_submission": False,
@@ -895,9 +1151,7 @@ def _latest_forecast_iso(session: Session) -> str | None:
 
 def _latest_ranking_iso(session: Session) -> str | None:
     value = session.scalar(
-        select(func.max(MarketRanking.ranked_at)).where(
-            MarketRanking.forecast_model == MODEL_NAME
-        )
+        select(func.max(MarketRanking.ranked_at)).where(MarketRanking.forecast_model == MODEL_NAME)
     )
     return _iso_string(value)
 

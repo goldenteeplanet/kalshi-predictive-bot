@@ -354,6 +354,47 @@ def test_weather_linker_detects_rain_market(tmp_path) -> None:
         assert detection.weather_metric == "RAIN"
         assert detection.location_key == "new_york"
         assert detection.confidence == Decimal("0.8")
+        assert detection.station_id == "KNYC"
+        assert detection.point_forecast_eligible is True
+
+
+def test_weather_linker_maps_exact_rain_series_to_settlement_station(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        market = upsert_market(
+            session,
+            {
+                "ticker": "KXRAINAUSM-26AUG-2",
+                "series_ticker": "KXRAINAUSM",
+                "title": "Rain in Austin above 2 inches?",
+                "rules_primary": "Total precipitation at CLIAUS in Austin.",
+            },
+        )
+
+        detection = detect_weather_market(market)
+
+        assert detection.location_key == "austin"
+        assert detection.station_id == "CLIAUS"
+        assert detection.classification == "SUPPORTED_POINT_FORECAST"
+        assert detection.point_forecast_eligible is True
+
+
+def test_weather_linker_explicitly_excludes_hurricanes(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        market = upsert_market(
+            session,
+            {
+                "ticker": "KXHURRICANENAMES-26DEC01EPAC-TRU",
+                "title": "Will Trudy be a hurricane in the Eastern Pacific?",
+            },
+        )
+
+        detection = detect_weather_market(market)
+
+        assert detection.classification == "EXCLUDED_HURRICANE_REGIONAL"
+        assert detection.point_forecast_eligible is False
+        assert detection.confidence == Decimal("0")
 
 
 def test_weather_linker_detects_wind_market(tmp_path) -> None:
