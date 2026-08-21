@@ -19,6 +19,7 @@ export PAPER_ORDER_KILL_SWITCH=true
 readonly INTERVAL_SECONDS="${KALSHI_REFRESH_INTERVAL_SECONDS:-900}"
 readonly WRITER_LOCK="${KALSHI_WRITER_LOCK:-/home/james/kalshi-local-runtime/kalshi-writer.lock}"
 readonly LOOP_LOCK="${KALSHI_REFRESH_LOOP_LOCK:-/home/james/kalshi-local-runtime/kalshi-refresh-loop.lock}"
+readonly DATABASE_PATH="${KALSHI_DATABASE_PATH:-/home/james/kalshi-predictive-bot-data/kalshi_phase1.db}"
 readonly UI_REPORT_ROOT="${KALSHI_UI_REPORT_ROOT:-/mnt/c/Users/user1/OneDrive/Documents/Dejoia Trading Bot/kalshi-predictive-bot/reports}"
 readonly UI_REPORT_PUBLISH_ENABLED="${KALSHI_UI_REPORT_PUBLISH_ENABLED:-false}"
 readonly HEALTH_STATUS="reports/fixed_rate_health_status.json"
@@ -218,7 +219,7 @@ while true; do
   publish_report_dir phase3ba_r3
 
   .venv/bin/python scripts/crypto_liquidity_window_diagnosis.py \
-    --database /home/james/kalshi-predictive-bot-data/kalshi_phase1.db \
+    --database "$DATABASE_PATH" \
     --output reports/crypto_event_vectors/liquidity_window_diagnosis.json || true
 
   run_health_stage targeted_crypto_capture 180 timeout 180s flock -w 45 "$WRITER_LOCK" \
@@ -235,7 +236,7 @@ while true; do
       --targeted-capture-max-buckets 150 \
       --canary-required 5 --target 100
   .venv/bin/python scripts/crypto_forecast_polytope_alignment.py \
-    --database /home/james/kalshi-predictive-bot-data/kalshi_phase1.db \
+    --database "$DATABASE_PATH" \
     --output reports/crypto_event_vectors/forecast_polytope_alignment.json \
     --model-name crypto_v2 --max-lag-minutes 30 --max-coherence-ms 2500 || true
   .venv/bin/python scripts/crypto_targeted_forecast_telemetry.py \
@@ -243,7 +244,7 @@ while true; do
     --alignment reports/crypto_event_vectors/forecast_polytope_alignment.json \
     --output reports/crypto_event_vectors/targeted_forecast_telemetry.json || true
   .venv/bin/python scripts/crypto_liquidity_coverage_status.py \
-    --database /home/james/kalshi-predictive-bot-data/kalshi_phase1.db \
+    --database "$DATABASE_PATH" \
     --alignment-manifest reports/crypto_event_vectors/forecast_polytope_alignment.json \
     --output reports/crypto_event_vectors/liquidity_coverage_status.json || true
 
@@ -273,13 +274,13 @@ while true; do
   # Recompute after settlement sync. The gate runner records state only after a
   # successful frozen-policy evaluation, so timeouts and failures are retryable.
   .venv/bin/python scripts/crypto_liquidity_coverage_status.py \
-    --database /home/james/kalshi-predictive-bot-data/kalshi_phase1.db \
+    --database "$DATABASE_PATH" \
     --alignment-manifest reports/crypto_event_vectors/forecast_polytope_alignment.json \
     --output reports/crypto_event_vectors/liquidity_coverage_status.json || true
   timeout 930s .venv/bin/python scripts/crypto_cohort_gate_runner.py \
     --status reports/crypto_event_vectors/liquidity_coverage_status.json \
     --state reports/crypto_event_vectors/cohort_gate_state.json \
-    --database /home/james/kalshi-predictive-bot-data/kalshi_phase1.db \
+    --database "$DATABASE_PATH" \
     --output reports/crypto_event_vectors/multiclass_interval_scoring.json \
     --alignment-manifest reports/crypto_event_vectors/forecast_polytope_alignment.json \
     --timeout-seconds 900 || true

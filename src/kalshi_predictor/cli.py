@@ -840,6 +840,7 @@ from kalshi_predictor.reinforcement_learning.repository import (
     persist_drift_snapshot,
     rl_status,
 )
+from kalshi_predictor.runtime_origin import build_runtime_origin, render_runtime_origin_markdown
 from kalshi_predictor.reinforcement_learning.serving import recommend_policy_action
 from kalshi_predictor.research.assistant import research_opportunity
 from kalshi_predictor.research.questions import answer_research_question
@@ -1402,6 +1403,48 @@ def runtime_identity_command(
         json_output.parent.mkdir(parents=True, exist_ok=True)
         json_output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         console.print(f"Wrote JSON: {json_output}")
+
+
+@app.command(
+    "runtime-origin",
+    help="Report canonical development, runtime, data, report, lock, and research paths.",
+)
+def runtime_origin_command(
+    json_output: Annotated[
+        Path | None,
+        typer.Option(help="Optional JSON runtime-origin output path."),
+    ] = None,
+    markdown_output: Annotated[
+        Path | None,
+        typer.Option(help="Optional Markdown runtime-origin output path."),
+    ] = None,
+) -> None:
+    payload = build_runtime_origin(settings=get_settings())
+    console.print("Runtime origin")
+    console.print(f"Status: {payload['status']}")
+    console.print(f"CWD: {payload['cwd']}")
+    console.print(f"Git root: {payload['git_root']}")
+    console.print(f"Runtime source: {payload['runtime_source']}")
+    console.print(f"Installed package source: {payload['installed_package_source']}")
+    console.print(f"Branch: {payload.get('branch') or 'unknown'}")
+    console.print(f"SHA: {payload.get('sha') or 'unknown'}")
+    console.print(f"Deployed SHA: {payload.get('deployed_sha') or 'unknown'}")
+    console.print(f"Python: {payload['python']}")
+    console.print(f"Virtualenv: {payload['virtualenv']}")
+    console.print(f"Database: {payload['database'].get('path') or payload['database']['url']}")
+    console.print(f"Report root: {payload['report_root']}")
+    console.print(f"UI report root: {payload['ui_report_root']}")
+    console.print(f"Research data root: {payload['research_data_root']}")
+    console.print(f"Writer lock: {payload['writer_lock']}")
+    console.print(f"Staging root: {payload['staging_root']}")
+    if json_output is not None:
+        json_output.parent.mkdir(parents=True, exist_ok=True)
+        json_output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        console.print(f"Wrote JSON: {json_output}")
+    if markdown_output is not None:
+        markdown_output.parent.mkdir(parents=True, exist_ok=True)
+        markdown_output.write_text(render_runtime_origin_markdown(payload), encoding="utf-8")
+        console.print(f"Wrote Markdown: {markdown_output}")
 
 
 def _print_workspace_guard(payload: dict[str, object]) -> None:

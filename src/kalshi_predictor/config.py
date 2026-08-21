@@ -41,6 +41,34 @@ class Settings(BaseSettings):
         default="sqlite:///data/kalshi_phase1.db",
         validation_alias=AliasChoices("DATABASE_URL", "KALSHI_DB_URL"),
     )
+    kalshi_development_root: str | None = Field(
+        default=None,
+        validation_alias="KALSHI_DEVELOPMENT_ROOT",
+    )
+    kalshi_runtime_root: str | None = Field(
+        default=None,
+        validation_alias="KALSHI_RUNTIME_ROOT",
+    )
+    kalshi_report_root: str | None = Field(
+        default=None,
+        validation_alias="KALSHI_REPORT_ROOT",
+    )
+    kalshi_ui_report_root: str | None = Field(
+        default=None,
+        validation_alias="KALSHI_UI_REPORT_ROOT",
+    )
+    kalshi_research_data_root: str | None = Field(
+        default=None,
+        validation_alias="KALSHI_RESEARCH_DATA_ROOT",
+    )
+    kalshi_writer_lock: str | None = Field(
+        default=None,
+        validation_alias="KALSHI_WRITER_LOCK",
+    )
+    kalshi_staging_root: str | None = Field(
+        default=None,
+        validation_alias="KALSHI_STAGING_ROOT",
+    )
     db_backend: str = Field(default="sqlite", validation_alias="DB_BACKEND")
     postgres_host: str = Field(default="localhost", validation_alias="POSTGRES_HOST")
     postgres_port: int = Field(default=5432, validation_alias="POSTGRES_PORT")
