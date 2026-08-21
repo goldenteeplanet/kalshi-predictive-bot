@@ -1,0 +1,17 @@
+[Unit]
+Description=Kalshi paper-only fixed-rate refresh and settlement loop
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/james/kalshi-runtime-src
+ExecStart=/home/james/kalshi-runtime-src/scripts/local/kalshi-fixed-rate-refresh.sh
+Restart=always
+RestartSec=15s
+TimeoutStopSec=90s
+KillSignal=SIGTERM
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+[Install]
+WantedBy=default.target

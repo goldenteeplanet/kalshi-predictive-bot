@@ -207,6 +207,14 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "write_runtime_roadmap_reports" not in implementation
     assert "build_weather_features" not in implementation
     assert "DEDICATED_RUNTIME_OWNER_REUSE" in implementation
+    assert "risk_preflight=True" in implementation
+    assert "risk_preflight=False" not in implementation
+    assert "exact_snapshot_refresh=True" in implementation
+    assert "exact_snapshot_refresh=False" not in implementation
+    assert "exact_snapshot_refresh_limit=250" in implementation
+    assert "ranking_repair=True" in implementation
+    assert "ranking_repair=False" not in implementation
+    assert "ranking_repair_limit=250" in implementation
     assert implementation.index('mark_stage("commit_single_writer")') < implementation.index(
         "_write_candidate_manifest(candidate_manifest_path, manifest_candidates)"
     )
@@ -214,8 +222,32 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "_latest_snapshots(session, crypto_link_tickers)" in implementation
     assert "_latest_snapshots(session, weather_decision_tickers)" in implementation
     assert "limit=max(1, min(forecast_limit, len(weather_decision_tickers)))" in implementation
+    assert 'mark_stage("defer_weather_gate_to_read_only_stage")' in implementation
     assert "parse_and_store_market_legs(" in implementation
     assert "tickers=_bounded_unique(" in implementation
+
+
+def test_fixed_rate_scheduler_splits_weather_gate_from_decision_publication() -> None:
+    root = Path(__file__).parents[1]
+    script = (root / "scripts/local/kalshi-fixed-rate-refresh.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "gh2_decision_refresh 300 timeout 300s" in script
+    assert "--active-link-limit 24 --forecast-limit 24" in script
+    assert "--opportunity-limit 20" in script
+    assert "--defer-weather-gate" in script
+    assert "weather_gate_diagnostics 120 timeout 120s" in script
+    assert "phase3ba-r3-weather-paper-gate" in script
+    assert script.index("--defer-weather-gate") < script.index(
+        "phase3ba-r3-weather-paper-gate"
+    )
+    assert "weather_catalog_refresh 180 timeout 180s" in script
+    assert "KXTEMPNYCH KXRAINAUSM KXRAINSTPM" in script
+    assert "supported_weather_prepare 150 timeout 150s" in script
+    assert script.index("supported_weather_prepare.py") < script.index(
+        "gh2-single-writer-decision-refresh"
+    )
 
 
 def test_stage_telemetry_records_per_stage_durations(tmp_path: Path) -> None:
