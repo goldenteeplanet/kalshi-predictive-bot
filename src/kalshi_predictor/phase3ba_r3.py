@@ -646,6 +646,8 @@ def _first_weather_paper_blocker(row: dict[str, Any]) -> str:
     if not row.get("terminal_weather_horizon_complete", True):
         return "RAIN_HORIZON_INCOMPLETE"
     if not row.get("verified_kalshi_url"):
+        if row.get("kalshi_url_status") == BUILT_FROM_EXACT_CATALOG:
+            return "LINK_EXACT_CATALOG_URL_UNCONFIRMED"
         return "LINK_UNVERIFIED"
     if not row.get("has_snapshot"):
         return "SNAPSHOT_MISSING"

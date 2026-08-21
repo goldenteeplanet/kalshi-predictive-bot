@@ -381,7 +381,9 @@ def _seed_forecast(
     probability: Decimal,
     captured_at: datetime | None = None,
 ):
-    now = captured_at or datetime(2026, 1, 2, 12, tzinfo=UTC)
+    # Keep default paper candidates open as the calendar advances. Historical
+    # fixtures still pass an explicit timestamp for no-lookahead evaluation.
+    now = captured_at or datetime.now(UTC)
     insert_market_snapshot(
         session,
         {

@@ -19259,7 +19259,10 @@ def _weather_location_coordinates(location_key: str) -> tuple[float, float] | No
         "kansas_city": (39.0997, -94.5786),
         "new_york": (40.7128, -74.0060),
         "chicago": (41.8781, -87.6298),
+        "miami": (25.7617, -80.1918),
         "los_angeles": (34.0522, -118.2437),
+        "boston": (42.3601, -71.0589),
+        "washington_dc": (38.9072, -77.0369),
         "austin": (30.2672, -97.7431),
         "st_petersburg": (27.7676, -82.6403),
     }

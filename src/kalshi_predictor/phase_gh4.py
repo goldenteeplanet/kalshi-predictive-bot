@@ -334,7 +334,10 @@ def _unified_source_health(
             "detail": str(websocket.get("applicability") or "NOT_USED"),
             "recovery": str(
                 websocket.get("detail")
-                or "The active scheduler collects bounded Kalshi REST snapshots; WebSocket health is not required."
+                or (
+                    "The active scheduler collects bounded Kalshi REST snapshots; "
+                    "WebSocket health is not required."
+                )
             ),
         },
         {

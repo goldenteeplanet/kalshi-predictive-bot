@@ -29,7 +29,6 @@ LOCATION_PATTERNS = {
     "houston": r"\bhouston\b",
     "phoenix": r"\bphoenix\b",
     "san_francisco": r"\b(san francisco|sfo)\b",
-    "austin": r"\baustin\b",
     "st_petersburg": r"\b(st\.? petersburg|saint petersburg)\b",
 }
 

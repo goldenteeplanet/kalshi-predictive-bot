@@ -28,18 +28,18 @@ from kalshi_predictor.data.schema import (
     PaperPnl,
     PaperPosition,
     PortfolioSnapshot,
-    PositionSizingDecisionLog,
     PositionHistory,
+    PositionSizingDecisionLog,
     Settlement,
     Watchlist,
     WatchlistMarket,
 )
 from kalshi_predictor.opportunities.market_identity import annotated_opportunity_row
+from kalshi_predictor.paper.invariant_monitor import activated_trade_invariant_row
 from kalshi_predictor.paper.ledger import (
     get_latest_snapshot_for_ticker,
     get_paper_summary,
 )
-from kalshi_predictor.paper.invariant_monitor import activated_trade_invariant_row
 from kalshi_predictor.paper.models import ORDER_OPEN
 from kalshi_predictor.paper.pnl import calculate_unrealized_pnl
 from kalshi_predictor.utils.decimals import decimal_to_str, midpoint, to_decimal
@@ -613,7 +613,11 @@ def active_trade_telemetry(session: Session, ticker: str) -> dict[str, Any] | No
             "SETTLED" if settlement and settlement.result else "AWAITING_SETTLEMENT"
         ),
         "settlement_result": settlement.result if settlement else None,
-        "settled_at": settlement.settled_at.isoformat() if settlement and settlement.settled_at else None,
+        "settled_at": (
+            settlement.settled_at.isoformat()
+            if settlement and settlement.settled_at
+            else None
+        ),
         "realized_pnl": pnl.realized_pnl if pnl else (position.realized_pnl if position else "0"),
         "position_sizing_decision_id": sizing.id if sizing else None,
         "sizing_mode": sizing.mode if sizing else None,
