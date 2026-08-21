@@ -1,6 +1,6 @@
 # Runtime Origin
 
-Generated: `2026-08-21T21:10:00.205389+00:00`
+Generated: `2026-08-21T21:20:59.101574+00:00`
 Status: `READY`
 All statuses: `READY`
 
@@ -11,8 +11,9 @@ All statuses: `READY`
 - Runtime source: `/home/james/kalshi-runtime-src`
 - Installed package: `/home/james/kalshi-runtime-src/src/kalshi_predictor/__init__.py`
 - Branch: `fix/shadow-preflight-isolation-20260821`
-- Development SHA: `80ea28d648e400ccbd25119de1a07ec17e092a9e`
-- Deployed SHA: `80ea28d648e400ccbd25119de1a07ec17e092a9e`
+- Development SHA: `123259f10cd5d53ca67ce6a92304ab69adf5be56`
+- Deployed SHA: `123259f10cd5d53ca67ce6a92304ab69adf5be56`
+- Runtime-affecting paths current: `True`
 - Python: `/home/james/kalshi-runtime-src/.venv/bin/python`
 - Virtualenv: `/home/james/kalshi-runtime-src/.venv`
 
