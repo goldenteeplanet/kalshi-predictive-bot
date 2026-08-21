@@ -150,6 +150,7 @@ from kalshi_predictor.ui.evidence_viewer import (
     get_cached_evidence_catalog,
     load_evidence_artifact,
 )
+from kalshi_predictor.ui.cohort_progress import load_cohort_progress
 from kalshi_predictor.ui.progress import (
     certification_reports_root,
     get_cached_progress_dashboard,
@@ -823,6 +824,33 @@ def create_router(
             },
         )
 
+    @router.get("/api/ui/status-artifact")
+    def ui_status_artifact() -> JSONResponse:
+        """Return the filesystem-only shell artifact watermark for UI polling."""
+        try:
+            payload = json.loads(DEFAULT_SHELL_STATUS_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+            stat = DEFAULT_SHELL_STATUS_SNAPSHOT_PATH.stat()
+        except (OSError, json.JSONDecodeError) as exc:
+            return JSONResponse(
+                {"status": "UNAVAILABLE", "generated_at": None, "detail": str(exc)},
+                status_code=503,
+            )
+        context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
+        market = (
+            context.get("market_freshness")
+            if isinstance(context.get("market_freshness"), dict)
+            else {}
+        )
+        return JSONResponse(
+            {
+                "status": "AVAILABLE",
+                "schema_version": payload.get("schema_version"),
+                "generated_at": payload.get("generated_at"),
+                "market_as_of": market.get("as_of"),
+                "mtime_ns": stat.st_mtime_ns,
+            }
+        )
+
     @router.get("/system/long-jobs", response_class=HTMLResponse)
     def long_jobs_dashboard(
         request: Request,
@@ -853,6 +881,25 @@ def create_router(
                 "dashboard": build_refresh_readiness_dashboard(),
             },
         )
+
+    @router.get("/research/crypto-cohort", response_class=HTMLResponse)
+    def crypto_cohort_progress_dashboard(
+        request: Request,
+        service: Annotated[DecisionUiService, Depends(get_service)],
+    ) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "crypto_cohort_progress.html",
+            {
+                "request": request,
+                "cohort": load_cohort_progress(),
+                "shell_context": shell_context_for(service),
+            },
+        )
+
+    @router.get("/api/research/crypto-cohort")
+    def crypto_cohort_progress_api() -> dict[str, Any]:
+        return {"ok": True, "read_only": True, "cohort": load_cohort_progress()}
 
     @router.get("/api/system/refresh-readiness")
     def refresh_readiness_api() -> dict[str, Any]:

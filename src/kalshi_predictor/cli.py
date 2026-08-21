@@ -14013,6 +14013,14 @@ def phase3ba_r3_weather_paper_gate_command(
         int,
         typer.Option(help="Allowed weather source/feature target-time match tolerance."),
     ] = 3,
+    deadline_seconds: Annotated[
+        int,
+        typer.Option(help="Soft deadline that leaves time to publish partial progress."),
+    ] = 0,
+    batch_size: Annotated[
+        int,
+        typer.Option(help="Ticker rows processed between atomic progress updates."),
+    ] = 4,
 ) -> None:
     """Diagnose weather_v2 rows against the paper-ready gate without trades."""
     if limit < 1:
@@ -14021,6 +14029,8 @@ def phase3ba_r3_weather_paper_gate_command(
         raise typer.BadParameter("current-window-lookback-hours must be non-negative")
     if match_tolerance_hours < 0:
         raise typer.BadParameter("match-tolerance-hours must be non-negative")
+    if deadline_seconds < 0 or batch_size < 1:
+        raise typer.BadParameter("deadline-seconds must be non-negative and batch-size positive")
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -14035,6 +14045,8 @@ def phase3ba_r3_weather_paper_gate_command(
                 limit=limit,
                 current_window_lookback_hours=current_window_lookback_hours,
                 match_tolerance_hours=match_tolerance_hours,
+                deadline_seconds=deadline_seconds,
+                batch_size=batch_size,
             )
             session.rollback()
     finally:
@@ -14050,6 +14062,85 @@ def phase3ba_r3_weather_paper_gate_command(
     console.print(f"Wrote weather rows: {artifacts.rows_csv_path}")
     console.print(f"Wrote Next Actions: {artifacts.next_actions_path}")
     console.print(f"Wrote Manifest: {artifacts.manifest_path}")
+
+
+@app.command("weather-one-contract-paper-activation")
+def weather_one_contract_paper_activation_command(
+    ticker: Annotated[
+        str,
+        typer.Option(help="Exact weather market ticker approved for one paper contract."),
+    ],
+    soak_path: Annotated[
+        Path,
+        typer.Option(help="Completed three-cycle fast-preflight soak artifact."),
+    ] = Path("reports/phase3ba_r3/weather_fast_preflight_soak.json"),
+    gate_path: Annotated[
+        Path,
+        typer.Option(help="Current Phase 3BA-R3 PAPER_READY gate artifact."),
+    ] = Path("reports/phase3ba_r3/weather_paper_gate.json"),
+    preflight_path: Annotated[
+        Path,
+        typer.Option(help="Fresh coherent Phase 3M/3N preflight artifact."),
+    ] = Path("reports/phase3ba_r3/scoped_weather_depth_preflight.json"),
+    pair_state_path: Annotated[
+        Path,
+        typer.Option(help="Retained forecast/snapshot pair idempotency state."),
+    ] = Path("reports/phase3ba_r3/scoped_weather_preflight_pair_state.json"),
+    historical_cache_path: Annotated[
+        Path,
+        typer.Option(help="Cached historical evidence used by final sizing."),
+    ] = Path("reports/phase3ba_r3/phase3m_historical_evidence_cache.json"),
+    execute: Annotated[
+        bool,
+        typer.Option(help="Create the one-contract paper order after every guard passes."),
+    ] = False,
+    operator_approval: Annotated[
+        str,
+        typer.Option(help="Exact ticker-specific approval phrase; required with --execute."),
+    ] = "",
+) -> None:
+    """Fail-closed, explicitly approved one-contract paper activation."""
+    from kalshi_predictor.paper.activation import (
+        activate_one_contract_paper_order,
+        validate_one_contract_paper_activation,
+    )
+
+    exact_ticker = ticker.strip().upper()
+    if not exact_ticker:
+        raise typer.BadParameter("ticker must be non-empty")
+    settings = get_settings()
+    engine = make_engine(database_url_from_settings(settings))
+    session_factory = get_session_factory(engine)
+    try:
+        with session_factory() as session:
+            candidate = validate_one_contract_paper_activation(
+                session,
+                ticker=exact_ticker,
+                soak_path=soak_path,
+                gate_path=gate_path,
+                preflight_path=preflight_path,
+                pair_state_path=pair_state_path,
+                settings=settings,
+            )
+            result = activate_one_contract_paper_order(
+                session,
+                candidate=candidate,
+                historical_cache_path=historical_cache_path,
+                settings=settings,
+                execute=execute,
+                operator_approval=operator_approval,
+            )
+            if execute and result.get("order_created"):
+                session.commit()
+            else:
+                session.rollback()
+    except RuntimeError as error:
+        raise typer.BadParameter(str(error)) from error
+    finally:
+        engine.dispose()
+    console.print_json(data=result)
+    console.print("Live execution: blocked")
+    console.print("Maximum paper quantity: 1")
 
 
 @app.command("phase3ba-r4-crypto-executable-book-watch")
@@ -16733,7 +16824,7 @@ def ui_summary_command() -> None:
 def sync_markets_command(
     status: Annotated[str | None, typer.Option(help="Market status filter.")] = "open",
     limit: Annotated[int, typer.Option(help="Page size.")] = 100,
-    max_pages: Annotated[int | None, typer.Option(help="Maximum pages to fetch.")] = 1,
+    max_pages: Annotated[int | None, typer.Option(help="Maximum pages to fetch.")] = 10,
     series_ticker: Annotated[str | None, typer.Option(help="Optional series ticker.")] = None,
     event_ticker: Annotated[str | None, typer.Option(help="Optional event ticker.")] = None,
 ) -> None:
@@ -19121,6 +19212,8 @@ def _weather_location_coordinates(location_key: str) -> tuple[float, float] | No
         "new_york": (40.7128, -74.0060),
         "chicago": (41.8781, -87.6298),
         "los_angeles": (34.0522, -118.2437),
+        "austin": (30.2672, -97.7431),
+        "st_petersburg": (27.7676, -82.6403),
     }
     normalized = location_key.strip().lower().replace("-", "_").replace(" ", "_")
     return locations.get(normalized)
@@ -19167,6 +19260,8 @@ def link_weather_markets_command() -> None:
     console.print(f"By metric: {summary.by_metric}")
     console.print(f"By location: {summary.by_location_key}")
     console.print(f"Unknown location count: {summary.unknown_location_count}")
+    console.print(f"Excluded classifications: {summary.excluded_by_classification}")
+    console.print(f"Existing links classified: {summary.existing_links_classified}")
 
 
 @app.command("weather-report")
@@ -19571,6 +19666,16 @@ def gh2_single_writer_decision_refresh_command(
         int,
         typer.Option(help="Consecutive healthy cycles required before operator review."),
     ] = 24,
+    refresh_weather_gate: Annotated[
+        bool,
+        typer.Option(
+            "--refresh-weather-gate/--defer-weather-gate",
+            help=(
+                "Refresh the read-only weather paper gate inside this writer cycle, "
+                "or defer it to a separate bounded scheduler stage."
+            ),
+        ),
+    ] = True,
     guard_active_writer: Annotated[
         bool,
         typer.Option(
@@ -19623,6 +19728,7 @@ def gh2_single_writer_decision_refresh_command(
         opportunity_limit=opportunity_limit,
         freshness_minutes=freshness_minutes,
         soak_cycles_required=soak_cycles_required,
+        refresh_weather_gate=refresh_weather_gate,
         guard_active_writer=guard_active_writer,
         writer_monitor_fn=lambda: writer_monitor_at_start,
     )
@@ -19849,11 +19955,19 @@ def paper_summary_command(
 
 
 @app.command("paper-pnl")
-def paper_pnl_command() -> None:
+def paper_pnl_command(
+    refresh_signals: Annotated[
+        bool,
+        typer.Option(
+            "--refresh-signals/--skip-signal-refresh",
+            help="Refresh expensive aggregate signal-performance metrics after P&L.",
+        ),
+    ] = True,
+) -> None:
     engine = init_db()
     session_factory = get_session_factory(engine)
     with session_factory() as session:
-        summary = calculate_and_store_pnl(session)
+        summary = calculate_and_store_pnl(session, refresh_signals=refresh_signals)
         session.commit()
     console.print("Paper P&L summary")
     console.print(f"Positions evaluated: {summary.positions_evaluated}")

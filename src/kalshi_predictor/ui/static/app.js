@@ -58,9 +58,59 @@ document.addEventListener("submit", async (event) => {
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-payout-calculator]").forEach(updatePayoutCalculator);
+  setupStatusArtifactRefresh();
   setupPageAutoRefresh();
   setupProgressDashboard();
 });
+
+function setupStatusArtifactRefresh() {
+  const root = document.querySelector("[data-status-artifact-refresh]");
+  if (!root) return;
+  const url = root.dataset.statusArtifactUrl;
+  const pollSeconds = Number.parseInt(root.dataset.statusArtifactPollSeconds || "15", 10);
+  let displayedGeneratedAt = root.dataset.statusArtifactGeneratedAt || "";
+  if (!url || !Number.isFinite(pollSeconds) || pollSeconds <= 0) return;
+
+  let timerId;
+  const schedule = () => {
+    window.clearTimeout(timerId);
+    timerId = window.setTimeout(checkForNewArtifact, pollSeconds * 1000);
+  };
+  const checkForNewArtifact = async () => {
+    if (document.visibilityState === "hidden") {
+      schedule();
+      return;
+    }
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      const generatedAt = String(payload.generated_at || "");
+      if (generatedAt && displayedGeneratedAt && generatedAt !== displayedGeneratedAt) {
+        window.location.reload();
+        return;
+      }
+      if (generatedAt) displayedGeneratedAt = generatedAt;
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        console.debug("Status artifact poll failed", error);
+      }
+    } finally {
+      window.clearTimeout(timeoutId);
+      schedule();
+    }
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") checkForNewArtifact();
+  });
+  schedule();
+}
 
 function setupProgressDashboard() {
   const root = document.querySelector("[data-progress-dashboard]");

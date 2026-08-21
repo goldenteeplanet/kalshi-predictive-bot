@@ -2,7 +2,7 @@
 {% set shell = shell_context if shell_context is defined else default_shell_context %}
 {% set build_guard = shell.workspace_guard if shell.workspace_guard is defined else default_shell_context.workspace_guard %}
 {% set current_path = request.url.path if request is defined else '/' %}
-{% set asset_version = 'phase3bb-r2-model-layout-20260704a' %}
+{% set asset_version = 'status-artifact-refresh-20260821a' %}
 <html lang="en" data-theme="{{ shell.theme }}" data-density="{{ shell.density }}">
   <head>
     <meta charset="utf-8">
@@ -16,7 +16,14 @@
       <strong>DEMO ONLY</strong>
       <span>DRY RUN defaults are active. No production live trading controls exist in this UI.</span>
     </div>
-    <section class="professional-status-bar" aria-label="Global system context">
+    <section
+      class="professional-status-bar"
+      aria-label="Global system context"
+      data-status-artifact-refresh
+      data-status-artifact-url="/api/ui/status-artifact"
+      data-status-artifact-generated-at="{{ shell.shell_status_snapshot.generated_at | default(shell.snapshot_as_of) }}"
+      data-status-artifact-poll-seconds="15"
+    >
       <div class="status-item">
         <span>Environment</span>
         <strong>{{ shell.environment }}</strong>
@@ -55,8 +62,10 @@
         </strong>
       </div>
       <div class="status-item">
-        <span>As of</span>
-        <strong title="{{ shell.snapshot_as_of }}">{{ shell.snapshot_as_of_label | default(shell.snapshot_as_of) }}</strong>
+        <span>Status artifact</span>
+        <time datetime="{{ shell.snapshot_as_of }}" title="Generated {{ shell.snapshot_as_of }}">
+          <strong>{{ shell.artifact_timestamp_label | default(shell.snapshot_as_of) }}</strong>
+        </time>
       </div>
       <div class="status-item">
         <span>Prod Cert</span>
@@ -130,6 +139,7 @@
           <a href="/reports/tonight_report.md">Tonight report</a>
           <a href="/reports/market_memory_report.md">Memory report</a>
           <a href="/reports/institutional_dashboard.md">Institutional report</a>
+          <a href="/research/crypto-cohort">Crypto cohort progress</a>
           <a href="/reports/live_readiness_report.md">Live readiness</a>
           <a href="/reports/system_certification/system_certification_report.md">
             System certification

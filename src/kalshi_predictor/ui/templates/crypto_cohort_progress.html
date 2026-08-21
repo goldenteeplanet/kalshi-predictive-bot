@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Crypto Cohort Progress{% endblock %}
+{% block content %}
+<section class="section-band">
+  <div class="section-head">
+    <div>
+      <h1>Crypto interval cohort</h1>
+      <p class="muted">Settlement-weighted progress toward the frozen pessimistic market comparison.</p>
+    </div>
+    <span class="status-pill {{ 'status-healthy' if cohort.statistically_valid else 'status-degraded' }}">
+      {{ 'VALID' if cohort.statistically_valid else 'ACCUMULATING' }}
+    </span>
+  </div>
+  {% if cohort.available %}
+  <div class="summary-grid">
+    <article class="summary-card"><span>Eligible settled</span><strong>{{ cohort.settled }} / {{ cohort.target }}</strong></article>
+    <article class="summary-card"><span>Remaining</span><strong>{{ cohort.remaining }}</strong></article>
+    <article class="summary-card"><span>Events measured</span><strong>{{ cohort.measured }}</strong></article>
+    <article class="summary-card"><span>Interval eligible</span><strong>{{ cohort.interval_eligible }}</strong></article>
+    <article class="summary-card"><span>Forecast/capture aligned</span><strong>{{ cohort.aligned_events }}</strong></article>
+    <article class="summary-card"><span>Estimated time to 10</span><strong>{% if cohort.eta.estimated_days is not none %}{{ cohort.eta.estimated_days }} days{% else %}Awaiting history{% endif %}</strong></article>
+  </div>
+  <p><progress value="{{ cohort.settled }}" max="{{ cohort.target }}">{{ cohort.progress_percent | round(1) }}%</progress> {{ cohort.progress_percent | round(1) }}%</p>
+  <p class="muted">Comparison mode: <code>{{ cohort.comparison_mode }}</code>. Missing quote sides remain bounds, never invented point prices.</p>
+  <p class="muted">ETA: {{ cohort.eta.status }} · {{ cohort.eta.method | default('not available') }} · confidence {{ cohort.eta.confidence }}{% if cohort.eta.estimated_completion_at %} · projected {{ cohort.eta.estimated_completion_at }}{% endif %}</p>
+  <p class="muted">Alignment: <code>{{ cohort.alignment_policy }}</code>. {% for reason, count in cohort.alignment_rejections.items() %}{{ reason }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}no alignment rejections{% endfor %}</p>
+  {% else %}
+  <p>No cohort status artifact is available yet. The scheduled collector will create it.</p>
+  {% endif %}
+</section>
+
+<section class="section-band">
+  {% set telemetry = cohort.targeted_forecast_telemetry %}
+  <div class="section-head"><div><h2>Targeted forecast telemetry</h2><p class="muted">Fresh crypto_v2 forecasts generated immediately before coherent capture.</p></div></div>
+  {% if telemetry.available %}
+  <div class="summary-grid">
+    <article class="summary-card"><span>Forecast success</span><strong>{{ telemetry.forecasted }} / {{ telemetry.attempted }}{% if telemetry.success_rate is not none %} ({{ (telemetry.success_rate * 100) | round(1) }}%){% endif %}</strong>{% if telemetry.success_interval %}<small>95% CI {{ (telemetry.success_interval.lower * 100) | round(1) }}–{{ (telemetry.success_interval.upper * 100) | round(1) }}%, n={{ telemetry.success_interval.sample_size }}</small>{% endif %}</article>
+    <article class="summary-card"><span>Midpoint probe failures</span><strong>{{ telemetry.midpoint_probe_failures }}</strong></article>
+    <article class="summary-card"><span>One-sided bound forecasts</span><strong>{{ telemetry.one_sided_bound_uses | default(0) }}</strong></article>
+    <article class="summary-card"><span>Immediate capture SLA</span><strong>{{ telemetry.immediate_captures_within_budget | default(0) }} / {{ telemetry.immediate_captures_attempted | default(0) }}</strong><small>forecast-matched polytope within 30s</small></article>
+    <article class="summary-card"><span>Mean forecast→capture lag</span><strong>{% if telemetry.mean_forecast_capture_lag_seconds is not none %}{{ telemetry.mean_forecast_capture_lag_seconds | round(2) }}s{% else %}Awaiting aligned capture{% endif %}</strong><small>n={{ telemetry.latency_sample_size | default(0) }}</small></article>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Family</th><th>Forecast success</th><th>Midpoint failures</th><th>Bound forecasts</th><th>Mean lag</th><th>Max lag</th><th>Targeted aligned</th><th>Historical aligned</th><th>Yield improvement</th></tr></thead>
+    <tbody>{% for row in telemetry.families %}<tr>
+      <td><code>{{ row.family }}</code></td><td>{% if row.success_rate is not none %}{{ row.forecasted }}/{{ row.attempted }} ({{ (row.success_rate * 100) | round(1) }}%)<br><small>95% CI {{ (row.success_interval.lower * 100) | round(1) }}–{{ (row.success_interval.upper * 100) | round(1) }}%</small>{% else %}— (n=0){% endif %}</td><td>{{ row.midpoint_probe_failures }}</td><td>{{ row.one_sided_bound_uses | default(0) }}</td>
+      <td>{% if row.mean_forecast_capture_lag_seconds is not none %}{{ row.mean_forecast_capture_lag_seconds | round(2) }}s{% else %}—{% endif %}</td><td>{% if row.maximum_forecast_capture_lag_seconds is not none %}{{ row.maximum_forecast_capture_lag_seconds | round(2) }}s{% else %}—{% endif %}</td>
+      <td>{% if row.targeted_alignment_rate is not none %}{{ (row.targeted_alignment_rate * 100) | round(1) }}% (n={{ row.targeted_alignment_interval.sample_size }})<br><small>95% CI {{ (row.targeted_alignment_interval.lower * 100) | round(1) }}–{{ (row.targeted_alignment_interval.upper * 100) | round(1) }}%</small>{% else %}—{% endif %}</td><td>{% if row.historical_alignment_rate is not none %}{{ (row.historical_alignment_rate * 100) | round(1) }}% (n={{ row.historical_alignment_interval.sample_size }})<br><small>95% CI {{ (row.historical_alignment_interval.lower * 100) | round(1) }}–{{ (row.historical_alignment_interval.upper * 100) | round(1) }}%</small>{% else %}—{% endif %}</td><td>{% if row.aligned_yield_improvement_percentage_points is not none %}{{ '%+.1f' | format(row.aligned_yield_improvement_percentage_points) }} pp<br><small>conservative 95% interval {{ '%+.1f' | format(row.aligned_yield_improvement_interval_percentage_points.lower) }} to {{ '%+.1f' | format(row.aligned_yield_improvement_interval_percentage_points.upper) }} pp</small>{% else %}—{% endif %}</td>
+    </tr>{% else %}<tr><td colspan="9">No targeted event attempts in the latest collector cycle.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="muted">Rolling event-level history: {{ telemetry.history_observations | default(telemetry.attempted) }} observations. Proportion intervals are Wilson 95%; the yield-difference interval conservatively subtracts the component Wilson bounds.</p>
+  {% else %}<p>The next targeted collector cycle will populate this telemetry.</p>{% endif %}
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Liquidity capture window</h2><p class="muted">Observed simultaneous two-sided coverage by time remaining until event close.</p></div></div>
+  {% set window = cohort.liquidity_window.recommended_window | default(none) %}
+  {% if window %}
+  <p><strong>{{ window.window }}</strong> · {{ window.lower_hours }}h to {{ window.upper_hours if window.upper_hours is not none else 'open-ended' }}h before close · average coverage {{ (window.average_simultaneous_two_sided_coverage * 100) | round(1) }}% · n={{ window.observations }}</p>
+  <p class="muted">Scheduling: {{ 'ACTIVE' if cohort.liquidity_window.scheduling_enabled else 'OBSERVING' }}. If no active event falls inside the learned window, the yield-ranked fallback remains enabled.</p>
+  {% else %}<p>No timed observations are available yet.</p>{% endif %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Bucket position</th><th>Observations</th><th>Two-sided</th><th>YES bid</th><th>YES ask from NO bid</th><th>NO-side-only upper bound</th></tr></thead>
+    <tbody>{% for row in cohort.liquidity_window.bucket_position_diagnostics | default([]) %}<tr><td>{{ row.position }}</td><td>{{ row.bucket_observations }}</td><td>{{ (row.two_sided_rate * 100) | round(1) }}%</td><td>{{ (row.native_yes_bid_rate * 100) | round(1) }}%</td><td>{{ (row.no_bid_complement_yes_ask_rate * 100) | round(1) }}%</td><td>{{ (row.no_side_only_upper_bound_rate * 100) | round(1) }}%</td></tr>{% else %}<tr><td colspan="6">No bucket-position observations yet.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="muted">Executable conversion: native YES bid sets the lower bound; one minus native NO bid sets the upper bound. Derived NO asks are not counted as independent liquidity.</p>
+</section>
+
+<section class="section-band">
+  <div class="section-head"><div><h2>Family diagnostics</h2><p class="muted">Latest observation per event, grouped by inferred family.</p></div></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Rank</th><th>Family</th><th>Yield score</th><th>Events</th><th>Avg coverage</th><th>Mean bound width</th><th>Max simplex volume</th><th>Eligible</th><th>Primary blocker</th><th>Rejection reasons</th></tr></thead>
+    <tbody>
+      {% for row in cohort.families %}
+      <tr>
+        <td>{{ row.collection_priority_rank | default('—') }}</td>
+        <td><code>{{ row.family }}</code></td>
+        <td>{{ row.collection_yield_score | default(0) }}</td>
+        <td>{{ row.unique_events }}</td>
+        <td>{{ (row.average_two_sided_coverage * 100) | round(1) }}%</td>
+        <td>{{ row.average_polytope_mean_width | default(1) | round(4) }}</td>
+        <td>{{ row.maximum_polytope_volume_ratio_upper_bound | default(1) | round(6) }}</td>
+        <td>{{ row.interval_eligible_events | default(0) }}</td>
+        <td>{{ row.primary_blocker or 'none' }}</td>
+        <td>{% for reason, count in row.rejection_reason_counts.items() %}{{ reason }}={{ count }}{% if not loop.last %}, {% endif %}{% else %}none{% endfor %}</td>
+      </tr>
+      {% else %}<tr><td colspan="10">No family observations yet.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="section-band">
+  <h2>Automatic frozen-gate rerun</h2>
+  <p><strong>{{ cohort.comparison.decision }}</strong></p>
+  <p class="muted">The unchanged pessimistic multiclass comparison runs automatically after settlement sync when the tenth eligible event appears. A failed run remains retryable.</p>
+  <p class="muted">Eligibility now requires narrow simplex-tightened coordinate bounds and a small conservative feasible-volume upper bound. Two-sided quote coverage remains diagnostic only.</p>
+  {% if cohort.rerun_state.completed_at %}<p>Last completed: {{ cohort.rerun_state.completed_at }} at {{ cohort.rerun_state.settled_events_at_rerun }} settled events.</p>{% endif %}
+  <a class="button" href="/api/research/crypto-cohort">JSON status</a>
+</section>
+{% endblock %}
