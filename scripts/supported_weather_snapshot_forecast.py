@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -24,7 +25,10 @@ def main() -> int:
     parser.add_argument("--preparation", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--limit", type=int, default=300)
+    parser.add_argument("--fetch-workers", type=int, default=4)
     args = parser.parse_args()
+    if args.fetch_workers < 1 or args.fetch_workers > 8:
+        parser.error("--fetch-workers must be between 1 and 8")
     prepared = json.loads(args.preparation.read_text(encoding="utf-8"))
     tickers = _exact_tickers(prepared, args.limit)
     started_at = utc_now()
@@ -32,14 +36,13 @@ def main() -> int:
 
     engine = init_db()
     session_factory = get_session_factory(engine)
-    client = KalshiClient()
+    fetched = _fetch_tickers(tickers, workers=args.fetch_workers)
     try:
         with session_factory() as session:
             snapshots: list[MarketSnapshot] = []
             for ticker in tickers:
-                try:
-                    market = client.get_market(ticker)
-                    orderbook = client.get_orderbook(ticker)
+                market, orderbook, error = fetched[ticker]
+                if error is None:
                     upsert_market(session, market)
                     snapshot = insert_market_snapshot(
                         session, market, orderbook, captured_at=utc_now()
@@ -50,8 +53,8 @@ def main() -> int:
                         snapshot_id=snapshot.id,
                         snapshot_at=snapshot.captured_at.isoformat(),
                     )
-                except Exception as error:  # Keep bounded progress for sparse/closed markets.
-                    rows[ticker].update(snapshot=False, snapshot_error=str(error))
+                else:  # Keep bounded progress for sparse/closed markets.
+                    rows[ticker].update(snapshot=False, snapshot_error=error)
             session.flush()
             forecast_summary = run_forecast_models(
                 session, model_name="weather_v2", snapshots=snapshots
@@ -67,7 +70,6 @@ def main() -> int:
             session.commit()
             _fill_coverage(session, rows, started_at)
     finally:
-        client.close()
         engine.dispose()
 
     snapshot_count = sum(bool(row.get("snapshot")) for row in rows.values())
@@ -96,6 +98,30 @@ def main() -> int:
     _write_atomic(args.output, payload)
     print(json.dumps(payload))
     return 0 if payload["coverage_complete"] else 1
+
+
+def _fetch_tickers(
+    tickers: list[str], *, workers: int
+) -> dict[str, tuple[object | None, object | None, str | None]]:
+    results: dict[str, tuple[object | None, object | None, str | None]] = {}
+    with ThreadPoolExecutor(max_workers=min(workers, max(1, len(tickers)))) as executor:
+        futures = {executor.submit(_fetch_ticker, ticker): ticker for ticker in tickers}
+        for future in as_completed(futures):
+            ticker = futures[future]
+            try:
+                market, orderbook = future.result()
+                results[ticker] = (market, orderbook, None)
+            except Exception as error:
+                results[ticker] = (None, None, str(error))
+    return results
+
+
+def _fetch_ticker(ticker: str) -> tuple[object, object]:
+    client = KalshiClient()
+    try:
+        return client.get_market(ticker), client.get_orderbook(ticker)
+    finally:
+        client.close()
 
 
 def _exact_tickers(payload: dict[str, object], limit: int) -> list[str]:

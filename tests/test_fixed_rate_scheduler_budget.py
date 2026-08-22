@@ -6,6 +6,9 @@ SCRIPT = (
 WEATHER_PREP = (
     Path(__file__).parents[1] / "scripts" / "supported_weather_prepare.py"
 ).read_text(encoding="utf-8")
+WEATHER_SNAPSHOT = (
+    Path(__file__).parents[1] / "scripts" / "supported_weather_snapshot_forecast.py"
+).read_text(encoding="utf-8")
 
 
 def test_scheduler_enforces_completion_based_cooldown() -> None:
@@ -33,3 +36,11 @@ def test_supported_weather_prepare_bounds_feature_rebuilds() -> None:
     assert 'parser.add_argument("--feature-limit", type=int, default=200)' in WEATHER_PREP
     assert '"--limit",' in WEATHER_PREP
     assert 'str(args.feature_limit)' in WEATHER_PREP
+
+
+def test_supported_weather_snapshot_fetches_outside_db_session_in_bounded_pool() -> None:
+    assert 'parser.add_argument("--fetch-workers", type=int, default=4)' in WEATHER_SNAPSHOT
+    assert "ThreadPoolExecutor(max_workers=min(workers" in WEATHER_SNAPSHOT
+    assert WEATHER_SNAPSHOT.find("fetched = _fetch_tickers") < WEATHER_SNAPSHOT.find(
+        "with session_factory() as session"
+    )
