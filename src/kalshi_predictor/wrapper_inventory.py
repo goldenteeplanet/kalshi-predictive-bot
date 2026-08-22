@@ -77,6 +77,25 @@ GUARDED_PAPER_STATEFUL_TOKENS = (
     "sizing",
 )
 
+GH2_SOAK_MODULES = (
+    "phase_gh2.py",
+    "research/fixed_rate_health.py",
+    "roadmap/runtime_reports.py",
+)
+GH2_SOAK_DIRECTORIES = ("live_readiness", "system_certification")
+GH2_PROTECTED_TOKENS = (
+    "counter",
+    "deadline",
+    "invariant",
+    "lock",
+    "scheduler",
+    "soak",
+    "stage",
+    "timestamp",
+    "timeout",
+    "write",
+)
+
 
 def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
     path = cli_path or Path(__file__).with_name("cli.py")
@@ -87,6 +106,7 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
     duplicate_helpers = _current_research_duplicate_helpers(path.parent)
     replay_duplicate_helpers = _historical_replay_duplicate_helpers(path.parent)
     guarded_duplicates = _guarded_paper_duplicate_helpers(path.parent)
+    gh2_duplicates = _gh2_soak_duplicate_helpers(path.parent)
     lane_summary = {
         lane: {
             "commands": sum(1 for row in wrappers if row["lane"] == lane),
@@ -109,6 +129,15 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
         "guarded_paper_eligible_duplicate_helpers": guarded_duplicates["eligible"],
         "guarded_paper_isolated_duplicate_helpers": guarded_duplicates["isolated"],
         "guarded_paper_cross_lane_duplicates": guarded_duplicates["cross_lane"],
+        "gh2_soak_eligible_duplicate_helpers": gh2_duplicates["eligible"],
+        "gh2_soak_isolated_duplicate_helpers": gh2_duplicates["isolated"],
+        "gh2_soak_isolation_policy": {
+            "protected_tokens": list(GH2_PROTECTED_TOKENS),
+            "rule": (
+                "Scheduler controls, timeout decisions, invariant writes, stage timestamps, "
+                "locks, and soak counters are never consolidated without contract proof."
+            ),
+        },
         "violations": violations,
         "consolidations": [
             {
@@ -178,6 +207,15 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
                 "compatibility": (
                     "Learning and paper-readiness callers retain their private aliases; order, "
                     "fill, sizing, risk, settlement, and P&L writers remain isolated."
+                ),
+            },
+            {
+                "canonical_module": "kalshi_predictor.gh2_soak_common",
+                "scope": "Pure GH-2 status parsing and formatting helpers",
+                "helpers": ["as_utc", "json_safe"],
+                "compatibility": (
+                    "Callers retain private aliases; scheduler controls, timeout decisions, "
+                    "invariant writes, stage timestamps, locks, and soak counters remain isolated."
                 ),
             },
         ],
@@ -266,6 +304,21 @@ def render_wrapper_inventory_markdown(payload: dict[str, Any]) -> str:
     for group in payload["guarded_paper_cross_lane_duplicates"]:
         members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
         lines.append(f"- {members}: {group['reason']}")
+    lines.extend(["", "## GH-2 eligible exact duplicates", ""])
+    if not payload["gh2_soak_eligible_duplicate_helpers"]:
+        lines.append("No eligible pure GH-2 helper duplicates remain after consolidation.")
+    for group in payload["gh2_soak_eligible_duplicate_helpers"]:
+        members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
+        lines.append(f"- `{group['fingerprint']}`: {members}")
+    lines.extend(["", "## GH-2 operational helpers kept isolated", ""])
+    if not payload["gh2_soak_isolated_duplicate_helpers"]:
+        lines.append(
+            "No exact protected-helper duplicates were found; the isolation rule remains active."
+        )
+    for group in payload["gh2_soak_isolated_duplicate_helpers"]:
+        members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
+        lines.append(f"- `{group['fingerprint']}` ({group['reason']}): {members}")
+    lines.append(f"- Policy: {payload['gh2_soak_isolation_policy']['rule']}")
     lines.extend(
         [
             "",
@@ -404,6 +457,28 @@ def _guarded_paper_duplicate_helpers(root: Path) -> dict[str, list[dict[str, Any
             }
         ],
     }
+
+
+def _gh2_soak_duplicate_helpers(root: Path) -> dict[str, list[dict[str, Any]]]:
+    files = {root / module for module in GH2_SOAK_MODULES}
+    for directory in GH2_SOAK_DIRECTORIES:
+        files.update((root / directory).rglob("*.py"))
+    groups = _duplicate_helper_groups({path for path in files if path.exists()}, root)
+    eligible: list[dict[str, Any]] = []
+    isolated: list[dict[str, Any]] = []
+    for group in groups:
+        names = " ".join(member["function"].lower() for member in group["members"])
+        if any(token in names for token in GH2_PROTECTED_TOKENS):
+            isolated.append(
+                {
+                    **group,
+                    "disposition": "keep_isolated",
+                    "reason": "protected GH-2 operational-state contract",
+                }
+            )
+        else:
+            eligible.append(group)
+    return {"eligible": eligible, "isolated": isolated}
 
 
 def _duplicate_helper_groups(files: set[Path], root: Path) -> list[dict[str, Any]]:

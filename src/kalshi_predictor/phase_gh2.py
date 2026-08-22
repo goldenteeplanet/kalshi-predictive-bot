@@ -6,7 +6,7 @@ import time
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -28,6 +28,7 @@ from kalshi_predictor.data.schema import (
     WeatherMarketLink,
 )
 from kalshi_predictor.forecasting.registry import run_forecast_models
+from kalshi_predictor.gh2_soak_common import as_utc as _aware
 from kalshi_predictor.ingest.websocket_orderbooks import (
     drain_staged_websocket_orderbooks,
 )
@@ -1155,7 +1156,3 @@ def _decimal(value: Any) -> Decimal:
         return Decimal(str(value or "0"))
     except (InvalidOperation, TypeError, ValueError):
         return Decimal("0")
-
-
-def _aware(value: datetime) -> datetime:
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)

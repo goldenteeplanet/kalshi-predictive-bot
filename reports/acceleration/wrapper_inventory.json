@@ -59,6 +59,15 @@
         "int_or_zero"
       ],
       "scope": "Pure Guarded Paper parsing helpers"
+    },
+    {
+      "canonical_module": "kalshi_predictor.gh2_soak_common",
+      "compatibility": "Callers retain private aliases; scheduler controls, timeout decisions, invariant writes, stage timestamps, locks, and soak counters remain isolated.",
+      "helpers": [
+        "as_utc",
+        "json_safe"
+      ],
+      "scope": "Pure GH-2 status parsing and formatting helpers"
     }
   ],
   "current_research_duplicate_helpers": [],
@@ -89,7 +98,24 @@
       "reason": "The wrappers share a lane but call distinct stage writers and artifact contracts; therefore they are not behaviorally interchangeable."
     }
   ],
-  "generated_at": "2026-08-22T01:46:07.813989+00:00",
+  "generated_at": "2026-08-22T01:56:09.702762+00:00",
+  "gh2_soak_eligible_duplicate_helpers": [],
+  "gh2_soak_isolated_duplicate_helpers": [],
+  "gh2_soak_isolation_policy": {
+    "protected_tokens": [
+      "counter",
+      "deadline",
+      "invariant",
+      "lock",
+      "scheduler",
+      "soak",
+      "stage",
+      "timestamp",
+      "timeout",
+      "write"
+    ],
+    "rule": "Scheduler controls, timeout decisions, invariant writes, stage timestamps, locks, and soak counters are never consolidated without contract proof."
+  },
   "guarded_paper_cross_lane_duplicates": [
     {
       "disposition": "not_merged_cross_lane",
