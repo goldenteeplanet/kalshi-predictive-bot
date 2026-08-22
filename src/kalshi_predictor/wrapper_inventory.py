@@ -52,6 +52,31 @@ HISTORICAL_REPLAY_KEYWORDS = (
     "replay",
 )
 
+GUARDED_PAPER_MODULE_PARTS = ("paper", "learning", "autopilot", "position_sizing")
+GUARDED_PAPER_ROOT_KEYWORDS = (
+    "paper",
+    "learning",
+    "autopilot",
+    "phase3m",
+    "phase3n",
+    "risk",
+    "pnl",
+)
+GUARDED_PAPER_STATEFUL_TOKENS = (
+    "approval",
+    "authorization",
+    "fill",
+    "idempotency",
+    "order",
+    "pending",
+    "pnl",
+    "position",
+    "realize",
+    "risk",
+    "settlement",
+    "sizing",
+)
+
 
 def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
     path = cli_path or Path(__file__).with_name("cli.py")
@@ -61,6 +86,7 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
     weather = [row for row in wrappers if row["command"] in WEATHER_CHAIN_PREFIXES]
     duplicate_helpers = _current_research_duplicate_helpers(path.parent)
     replay_duplicate_helpers = _historical_replay_duplicate_helpers(path.parent)
+    guarded_duplicates = _guarded_paper_duplicate_helpers(path.parent)
     lane_summary = {
         lane: {
             "commands": sum(1 for row in wrappers if row["lane"] == lane),
@@ -80,6 +106,9 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
         "phase3bb_weather_chain": weather,
         "current_research_duplicate_helpers": duplicate_helpers,
         "historical_replay_duplicate_helpers": replay_duplicate_helpers,
+        "guarded_paper_eligible_duplicate_helpers": guarded_duplicates["eligible"],
+        "guarded_paper_isolated_duplicate_helpers": guarded_duplicates["isolated"],
+        "guarded_paper_cross_lane_duplicates": guarded_duplicates["cross_lane"],
         "violations": violations,
         "consolidations": [
             {
@@ -140,6 +169,15 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
                 "compatibility": (
                     "Historical commands retain their public names; no current forecast, paper, "
                     "or GH-2 writer imports this module."
+                ),
+            },
+            {
+                "canonical_module": "kalshi_predictor.guarded_paper_common",
+                "scope": "Pure Guarded Paper parsing helpers",
+                "helpers": ["int_or_zero"],
+                "compatibility": (
+                    "Learning and paper-readiness callers retain their private aliases; order, "
+                    "fill, sizing, risk, settlement, and P&L writers remain isolated."
                 ),
             },
         ],
@@ -214,6 +252,20 @@ def render_wrapper_inventory_markdown(payload: dict[str, Any]) -> str:
     for group in payload["historical_replay_duplicate_helpers"]:
         members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
         lines.append(f"- `{group['fingerprint']}`: {members}")
+    lines.extend(["", "## Guarded Paper eligible exact duplicates", ""])
+    if not payload["guarded_paper_eligible_duplicate_helpers"]:
+        lines.append("No eligible pure helper duplicates remain after consolidation.")
+    for group in payload["guarded_paper_eligible_duplicate_helpers"]:
+        members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
+        lines.append(f"- `{group['fingerprint']}`: {members}")
+    lines.extend(["", "## Guarded Paper stateful duplicates kept isolated", ""])
+    for group in payload["guarded_paper_isolated_duplicate_helpers"]:
+        members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
+        lines.append(f"- `{group['fingerprint']}` ({group['reason']}): {members}")
+    lines.extend(["", "## Cross-lane exact matches not merged", ""])
+    for group in payload["guarded_paper_cross_lane_duplicates"]:
+        members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
+        lines.append(f"- {members}: {group['reason']}")
     lines.extend(
         [
             "",
@@ -307,6 +359,51 @@ def _historical_replay_duplicate_helpers(root: Path) -> list[dict[str, Any]]:
         )
     }
     return _duplicate_helper_groups(files, root)
+
+
+def _guarded_paper_duplicate_helpers(root: Path) -> dict[str, list[dict[str, Any]]]:
+    files = {
+        path
+        for path in root.rglob("*.py")
+        if any(part in GUARDED_PAPER_MODULE_PARTS for part in path.relative_to(root).parts[:-1])
+        or (
+            path.parent == root
+            and any(keyword in path.name.lower() for keyword in GUARDED_PAPER_ROOT_KEYWORDS)
+        )
+    }
+    files.add(root / "phase3bb_r33_cloud_paper_only_operations_readiness.py")
+    groups = _duplicate_helper_groups(files, root)
+    eligible: list[dict[str, Any]] = []
+    isolated: list[dict[str, Any]] = []
+    for group in groups:
+        names = " ".join(member["function"].lower() for member in group["members"])
+        if any(token in names for token in GUARDED_PAPER_STATEFUL_TOKENS):
+            isolated.append(
+                {
+                    **group,
+                    "disposition": "keep_isolated",
+                    "reason": "stateful paper identity or writer contract",
+                }
+            )
+        else:
+            eligible.append(group)
+    return {
+        "eligible": eligible,
+        "isolated": isolated,
+        "cross_lane": [
+            {
+                "members": [
+                    {"module": "paper_trading_gap.py", "function": "_read_json"},
+                    {"module": "phase3bb_r3_activation.py", "function": "_read_json"},
+                ],
+                "disposition": "not_merged_cross_lane",
+                "reason": (
+                    "Guarded Paper and Current-Market Research artifact readers have "
+                    "different lane ownership."
+                ),
+            }
+        ],
+    }
 
 
 def _duplicate_helper_groups(files: set[Path], root: Path) -> list[dict[str, Any]]:

@@ -1,6 +1,6 @@
 # Canonical Wrapper Inventory
 
-Generated: `2026-08-22T01:20:40.417202+00:00`
+Generated: `2026-08-22T01:46:07.813989+00:00`
 Status: `READY`
 
 ## Lane totals
@@ -42,6 +42,7 @@ Status: `READY`
 - `kalshi_predictor.phase3bb_weather_common` owns check, first_line, legacy_check, mark_executable, stdout, tail, target_payload, write_legacy_probe_csv, write_probe_csv, write_rows_csv, write_sorted_rows_csv. Command names, writer callables, outputs, and transactions unchanged.
 - `kalshi_predictor.current_research_common` owns crypto_candidate_sort_key, decode_list, format_cents, int_from_float_or_none, int_or_none, latest_crypto_v2_forecast, latest_market_snapshot, latest_risk_decisions_by_ticker, markdown_cell, read_json, read_json_required. Public commands and private compatibility aliases retain their prior call signatures and return types.
 - `kalshi_predictor.historical_replay_common` owns has_usable_outcome, is_local_derived_composite_ticker, markdown_cell_empty, markdown_cell_none, normalize_result, settlement_to_y_true, source_is_closed_without_outcome, source_is_settled, trade_from_decision. Historical commands retain their public names; no current forecast, paper, or GH-2 writer imports this module.
+- `kalshi_predictor.guarded_paper_common` owns int_or_zero. Learning and paper-readiness callers retain their private aliases; order, fill, sizing, risk, settlement, and P&L writers remain isolated.
 
 ## Remaining exact Current-Market Research duplicates
 
@@ -50,6 +51,18 @@ No exact helper-body duplicates remain in the scanned research families.
 ## Remaining exact Historical Replay duplicates
 
 No exact helper-body duplicates remain in the scanned replay families.
+
+## Guarded Paper eligible exact duplicates
+
+No eligible pure helper duplicates remain after consolidation.
+
+## Guarded Paper stateful duplicates kept isolated
+
+- `73f29a5a7cad` (stateful paper identity or writer contract): `paper/ledger.py:_pending_position`, `position_sizing/service.py:_pending_position`
+
+## Cross-lane exact matches not merged
+
+- `paper_trading_gap.py:_read_json`, `phase3bb_r3_activation.py:_read_json`: Guarded Paper and Current-Market Research artifact readers have different lane ownership.
 
 ## Command consolidation gate
 

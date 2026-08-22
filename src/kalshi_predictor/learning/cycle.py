@@ -14,6 +14,7 @@ from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.repositories import get_recent_snapshots
 from kalshi_predictor.data.schema import PaperOrder
 from kalshi_predictor.forecasting.registry import run_forecast_models
+from kalshi_predictor.guarded_paper_common import int_or_zero as _int
 from kalshi_predictor.ingest.markets import sync_settlements
 from kalshi_predictor.jobs.collect_once import collect_once
 from kalshi_predictor.lanes.metrics import refresh_learning_metrics
@@ -180,13 +181,6 @@ def _counts(steps: Mapping[str, Any]) -> _CycleCounts:
 def _step(steps: Mapping[str, Any], name: str) -> dict[str, Any]:
     value = steps.get(name)
     return value if isinstance(value, dict) else {}
-
-
-def _int(value: Any) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
 
 
 def _quiet_console() -> Console:

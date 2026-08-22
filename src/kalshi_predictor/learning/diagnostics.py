@@ -23,6 +23,7 @@ from kalshi_predictor.data.schema import (
     MarketSnapshot,
     PaperPosition,
 )
+from kalshi_predictor.guarded_paper_common import int_or_zero as _int
 from kalshi_predictor.learning.config import learning_paper_settings
 from kalshi_predictor.learning.duplicates import is_duplicate_candidate
 from kalshi_predictor.learning.repository import recent_learning_rejections, row_to_dict
@@ -1061,10 +1062,3 @@ def _advisor_to_dict(advisor: ThresholdAdvisor) -> dict[str, Any]:
 
 def _count(session: Session, model: type) -> int:
     return int(session.scalar(select(func.count()).select_from(model)) or 0)
-
-
-def _int(value: Any) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0

@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
+from kalshi_predictor.guarded_paper_common import int_or_zero as _int_value
 from kalshi_predictor.phase3bb_acceleration import (
     _metadata,
     _metadata_lines,
@@ -449,13 +450,6 @@ def _check(name: str, passed: bool, detail: str) -> dict[str, Any]:
 
 def _all_false(*values: Any) -> bool:
     return all(not bool(value) for value in values)
-
-
-def _int_value(value: Any) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
 
 
 def _render_executive_summary(payload: dict[str, Any]) -> str:

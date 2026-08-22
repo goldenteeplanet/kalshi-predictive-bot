@@ -51,6 +51,14 @@
         "trade_from_decision"
       ],
       "scope": "Settlement, calibration, walk-forward, tournament, and backtest helpers"
+    },
+    {
+      "canonical_module": "kalshi_predictor.guarded_paper_common",
+      "compatibility": "Learning and paper-readiness callers retain their private aliases; order, fill, sizing, risk, settlement, and P&L writers remain isolated.",
+      "helpers": [
+        "int_or_zero"
+      ],
+      "scope": "Pure Guarded Paper parsing helpers"
     }
   ],
   "current_research_duplicate_helpers": [],
@@ -81,7 +89,43 @@
       "reason": "The wrappers share a lane but call distinct stage writers and artifact contracts; therefore they are not behaviorally interchangeable."
     }
   ],
-  "generated_at": "2026-08-22T01:20:40.417202+00:00",
+  "generated_at": "2026-08-22T01:46:07.813989+00:00",
+  "guarded_paper_cross_lane_duplicates": [
+    {
+      "disposition": "not_merged_cross_lane",
+      "members": [
+        {
+          "function": "_read_json",
+          "module": "paper_trading_gap.py"
+        },
+        {
+          "function": "_read_json",
+          "module": "phase3bb_r3_activation.py"
+        }
+      ],
+      "reason": "Guarded Paper and Current-Market Research artifact readers have different lane ownership."
+    }
+  ],
+  "guarded_paper_eligible_duplicate_helpers": [],
+  "guarded_paper_isolated_duplicate_helpers": [
+    {
+      "disposition": "keep_isolated",
+      "fingerprint": "73f29a5a7cad",
+      "members": [
+        {
+          "function": "_pending_position",
+          "line": 421,
+          "module": "paper/ledger.py"
+        },
+        {
+          "function": "_pending_position",
+          "line": 542,
+          "module": "position_sizing/service.py"
+        }
+      ],
+      "reason": "stateful paper identity or writer contract"
+    }
+  ],
   "historical_replay_duplicate_helpers": [],
   "lane_summary": {
     "CURRENT_MARKET_RESEARCH": {
