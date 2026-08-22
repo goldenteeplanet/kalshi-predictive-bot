@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import kalshi_predictor.research.event_quote_collector as collector
-from kalshi_predictor.data.schema import CryptoCurrentEvent
+from kalshi_predictor.data.schema import CryptoCurrentEvent, WeatherFeature
 from kalshi_predictor.research.event_quote_collector import (
     EventCandidate,
     bucket_interval,
@@ -63,6 +63,18 @@ def test_current_event_registry_has_required_composite_indexes():
     assert indexes["ix_crypto_current_events_close_series"] == (
         "close_time",
         "series_ticker",
+    )
+
+
+def test_weather_feature_latest_lookup_has_composite_index():
+    indexes = {
+        index.name: tuple(column.name for column in index.columns)
+        for index in WeatherFeature.__table__.indexes
+    }
+    assert indexes["ix_weather_features_location_generated_id"] == (
+        "location_key",
+        "generated_at",
+        "id",
     )
 
 

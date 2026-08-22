@@ -809,7 +809,15 @@ class WeatherFeature(Base):
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    __table_args__ = (Index("ix_weather_features_location_target", "location_key", "target_time"),)
+    __table_args__ = (
+        Index("ix_weather_features_location_target", "location_key", "target_time"),
+        Index(
+            "ix_weather_features_location_generated_id",
+            "location_key",
+            "generated_at",
+            "id",
+        ),
+    )
 
 
 class WeatherMarketLink(Base):
