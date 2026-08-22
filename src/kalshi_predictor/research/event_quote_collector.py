@@ -236,6 +236,15 @@ def refresh_targeted_event_forecasts(
     }
 
 
+def capture_request_budget_reason(
+    candidate: EventCandidate, *, bucket_request_budget: int
+) -> str | None:
+    """Reject a coherent capture before fan-out when its API budget cannot fit."""
+    if len(candidate.markets) > max(0, bucket_request_budget):
+        return "CAPTURE_REQUEST_BUDGET_EXCEEDED"
+    return None
+
+
 def _capture_immediate_polytope(
     session: Session,
     client: PublicKalshiClient,

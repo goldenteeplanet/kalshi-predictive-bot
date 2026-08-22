@@ -14,6 +14,7 @@ from kalshi_predictor.research.event_quote_collector import (
     SERIES_SYMBOLS,
     backfill_registry,
     capture_candidate,
+    capture_request_budget_reason,
     cohort_status,
     discover_candidates_from_registry,
     refresh_targeted_event_forecasts,
@@ -116,6 +117,20 @@ def main() -> int:
                 or len(rows) >= args.max_events_attempted
             ):
                 break
+            budget_reason = capture_request_budget_reason(
+                candidate,
+                bucket_request_budget=args.targeted_capture_max_buckets,
+            )
+            if budget_reason:
+                rows.append(
+                    {
+                        "event_ticker": candidate.event_ticker,
+                        "status": "SKIPPED",
+                        "capture_id": None,
+                        "reasons": [budget_reason],
+                    }
+                )
+                continue
             capture, reasons = capture_candidate(
                 session,
                 client,

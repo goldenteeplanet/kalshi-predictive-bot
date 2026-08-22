@@ -6,6 +6,7 @@ from kalshi_predictor.data.schema import CryptoCurrentEvent
 from kalshi_predictor.research.event_quote_collector import (
     EventCandidate,
     bucket_interval,
+    capture_request_budget_reason,
     select_candidates_for_liquidity_window,
     select_candidates_with_fresh_forecasts,
     validate_topology,
@@ -280,3 +281,16 @@ def test_targeted_forecast_defers_before_forecast_when_capture_budget_is_exhaust
     assert result["rows"][0]["reasons"] == [
         "CAPTURE_REQUEST_BUDGET_EXCEEDED_BEFORE_FORECAST"
     ]
+
+
+def test_coherent_capture_rejects_fanout_larger_than_request_budget():
+    candidate = EventCandidate(
+        "EVENT",
+        "KXETH",
+        "ETH",
+        tuple(_market(f"B{index}", "between", floor=index, cap=index + 1) for index in range(26)),
+    )
+    assert capture_request_budget_reason(candidate, bucket_request_budget=25) == (
+        "CAPTURE_REQUEST_BUDGET_EXCEEDED"
+    )
+    assert capture_request_budget_reason(candidate, bucket_request_budget=26) is None
