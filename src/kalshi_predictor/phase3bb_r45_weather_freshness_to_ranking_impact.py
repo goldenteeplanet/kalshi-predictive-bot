@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import json
 import shlex
 from collections import Counter
@@ -11,6 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
+from kalshi_predictor.current_research_common import int_or_none as _int_or_none
 from kalshi_predictor.phase3bb_acceleration import (
     _metadata,
     _metadata_lines,
@@ -33,10 +33,28 @@ from kalshi_predictor.phase3bb_r36_cloud_scheduler_install_handoff import (
     SCHEDULER_TIMER_NAME,
 )
 from kalshi_predictor.phase3bb_r44_weather_catalog_hook_runtime_verification import (
-    _first_line,
     _parse_report_stats,
-    _stdout,
-    _target_payload,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    check as _check,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    first_line as _first_line,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    mark_executable as _mark_executable,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    stdout as _stdout,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    target_payload as _target_payload,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    write_probe_csv as _write_probe_csv,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    write_rows_csv as _write_rows_csv,
 )
 from kalshi_predictor.utils.time import utc_now
 
@@ -121,7 +139,9 @@ def write_phase3bb_r45_weather_freshness_to_ranking_impact_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["impact_checks"])
     _write_rows_csv(blocker_counts_csv_path, payload["weather_blocker_counts"])
@@ -208,7 +228,9 @@ def build_phase3bb_r45_weather_freshness_to_ranking_impact(
     local_r44_payload = _read_json(
         reports_dir / "phase3bb_r44" / "weather_catalog_hook_runtime_verification.json"
     )
-    local_r40_payload = _read_json(reports_dir / "phase3bb_r40" / "cloud_scheduler_runtime_monitor.json")
+    local_r40_payload = _read_json(
+        reports_dir / "phase3bb_r40" / "cloud_scheduler_runtime_monitor.json"
+    )
     parsed = _parse_probe_outputs(
         results,
         local_r44_payload=local_r44_payload,
@@ -278,19 +300,29 @@ def _build_remote_probes(
     service = shlex.quote(scheduler_service_name)
     timer = shlex.quote(scheduler_timer_name)
     report_list = " ".join(shlex.quote(path) for path in WEATHER_IMPACT_REPORT_PATHS)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
-        RemoteProbe("scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds),
-        RemoteProbe("scheduler_journal_tail", f"journalctl -u {service} -n 140 --no-pager || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_journal_tail",
+            f"journalctl -u {service} -n 140 --no-pager || true",
+            timeout_seconds,
+        ),
         RemoteProbe("db_writer_monitor_raw", writer_cmd, timeout_seconds),
         RemoteProbe(
             "weather_report_stats",
             (
                 f"cd {app} && for p in {report_list}; do "
-                "if [ -e \"$p\" ]; then stat -c '%n|%Y|%s' \"$p\"; "
-                "else echo \"$p|MISSING|0\"; fi; done"
+                'if [ -e "$p" ]; then stat -c \'%n|%Y|%s\' "$p"; '
+                'else echo "$p|MISSING|0"; fi; done'
             ),
             timeout_seconds,
         ),
@@ -314,7 +346,9 @@ def _build_remote_probes(
             f"cd {app} && cat reports/phase3bb_r40/cloud_scheduler_runtime_monitor.json 2>/dev/null || true",
             timeout_seconds,
         ),
-        RemoteProbe("weather_db_snapshot", _weather_db_snapshot_command(target.db_path), timeout_seconds),
+        RemoteProbe(
+            "weather_db_snapshot", _weather_db_snapshot_command(target.db_path), timeout_seconds
+        ),
         RemoteProbe(
             "command_registry",
             (
@@ -330,7 +364,7 @@ def _build_remote_probes(
                 "phase3bb-r52-weather-ev-fair-value-diagnostic "
                 "phase3az-r12-weather-activation-preview "
                 "phase3bb-r2-weather-fast-lane; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -460,7 +494,9 @@ def _parse_probe_outputs(
     preview_summary = preview_payload.get("summary") if isinstance(preview_payload, dict) else {}
     if not isinstance(preview_summary, dict):
         preview_summary = {}
-    candidate_rows = preview_payload.get("candidate_rows") if isinstance(preview_payload, dict) else []
+    candidate_rows = (
+        preview_payload.get("candidate_rows") if isinstance(preview_payload, dict) else []
+    )
     if not isinstance(candidate_rows, list):
         candidate_rows = []
     funnel_summary = funnel_payload.get("summary") if isinstance(funnel_payload, dict) else {}
@@ -469,7 +505,9 @@ def _parse_probe_outputs(
     r44_decision = r44_payload.get("hook_runtime_decision") if isinstance(r44_payload, dict) else {}
     if not isinstance(r44_decision, dict):
         r44_decision = {}
-    r44_parsed = r44_payload.get("parsed_hook_runtime_state") if isinstance(r44_payload, dict) else {}
+    r44_parsed = (
+        r44_payload.get("parsed_hook_runtime_state") if isinstance(r44_payload, dict) else {}
+    )
     if not isinstance(r44_parsed, dict):
         r44_parsed = {}
     r40_parsed = r40_payload.get("parsed_runtime_state") if isinstance(r40_payload, dict) else {}
@@ -482,15 +520,17 @@ def _parse_probe_outputs(
     report_freshness = _parse_report_stats(_stdout(by_name.get("weather_report_stats")))
     blocker_counter = Counter(str(row.get("blocker") or "UNKNOWN") for row in candidate_rows)
     freshness_counter = Counter(
-        _freshness_bucket(row)
-        for row in candidate_rows
-        if isinstance(row, dict)
+        _freshness_bucket(row) for row in candidate_rows if isinstance(row, dict)
     )
-    current_linkable_rows = [row for row in candidate_rows if bool(row.get("current_linkable_weather_ticker"))]
+    current_linkable_rows = [
+        row for row in candidate_rows if bool(row.get("current_linkable_weather_ticker"))
+    ]
     return {
         "remote_time_utc": _first_line(_stdout(by_name.get("remote_time_utc"))),
         "scheduler_timer_active_state": _first_line(_stdout(by_name.get("scheduler_timer_active"))),
-        "scheduler_service_active_state": _first_line(_stdout(by_name.get("scheduler_service_active"))),
+        "scheduler_service_active_state": _first_line(
+            _stdout(by_name.get("scheduler_service_active"))
+        ),
         "scheduler_last_failure_reason": _scheduler_failure_reason(scheduler_journal),
         "scheduler_busy_writer_seen": "Status: BUSY_WRITER" in scheduler_journal
         or "Database is busy" in scheduler_journal,
@@ -505,7 +545,9 @@ def _parse_probe_outputs(
         "weather_activation_current_linkable_rows": len(current_linkable_rows),
         "weather_activation_current_linkable_sample": current_linkable_rows[:10],
         "weather_funnel_json_ok": bool(funnel_payload),
-        "weather_funnel_status": funnel_payload.get("status") if isinstance(funnel_payload, dict) else None,
+        "weather_funnel_status": funnel_payload.get("status")
+        if isinstance(funnel_payload, dict)
+        else None,
         "weather_funnel_summary": funnel_summary,
         "r44_json_available": bool(r44_payload),
         "r44_source": "LOCAL_REPORTS_DIR" if local_r44_payload else "REMOTE_REPORTS_DIR",
@@ -518,13 +560,19 @@ def _parse_probe_outputs(
         "r44_scheduler_timer_active_state": r44_parsed.get("scheduler_timer_active_state"),
         "r40_json_available": bool(r40_payload),
         "r40_source": "LOCAL_REPORTS_DIR" if local_r40_payload else "REMOTE_REPORTS_DIR",
-        "r40_status": r40_payload.get("runtime_decision", {}).get("status") if isinstance(r40_payload, dict) else None,
-        "r40_weather_catalog_hook_job_run_count": r40_parsed.get("weather_catalog_hook_job_run_count"),
+        "r40_status": r40_payload.get("runtime_decision", {}).get("status")
+        if isinstance(r40_payload, dict)
+        else None,
+        "r40_weather_catalog_hook_job_run_count": r40_parsed.get(
+            "weather_catalog_hook_job_run_count"
+        ),
         "r40_weather_fast_lane_job_run_count": r40_parsed.get("weather_fast_lane_job_run_count"),
         "r40_weather_catalog_runtime_order_ok": r40_parsed.get("weather_catalog_runtime_order_ok"),
         "weather_db_snapshot_ok": bool(db_snapshot.get("ok")),
         "weather_db_snapshot": db_snapshot,
-        "command_registry_ok": bool(by_name.get("command_registry") and by_name["command_registry"].ok),
+        "command_registry_ok": bool(
+            by_name.get("command_registry") and by_name["command_registry"].ok
+        ),
     }
 
 
@@ -555,14 +603,46 @@ def _impact_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
     funnel_summary = parsed.get("weather_funnel_summary") or {}
     db_links = (parsed.get("weather_db_snapshot") or {}).get("weather_market_links") or {}
     return [
-        _check("scheduler_timer_active", parsed.get("scheduler_timer_active_state") == "active", f"timer={parsed.get('scheduler_timer_active_state')}."),
-        _check("scheduler_service_state_valid", parsed.get("scheduler_service_active_state") in {"active", "activating", "inactive"}, f"service={parsed.get('scheduler_service_active_state')}."),
-        _check("r44_catalog_hook_verified", bool(parsed.get("r44_verification_passed")), f"r44_status={parsed.get('r44_status')}."),
-        _check("r44_catalog_before_fast_lane", parsed.get("r44_weather_catalog_sequence") == "CATALOG_THEN_FAST_LANE_VERIFIED", f"sequence={parsed.get('r44_weather_catalog_sequence')}."),
-        _check("r12_preview_available", bool(parsed.get("weather_activation_preview_json_ok")), "R12 preview JSON exists and parses."),
-        _check("weather_fast_lane_available", bool(parsed.get("weather_funnel_json_ok")), "Weather fast-lane funnel JSON exists and parses."),
-        _check("command_registry_ok", bool(parsed.get("command_registry_ok")), "R40/R44/R12/R2 CLI help is registered on the cloud host."),
-        _check("db_snapshot_readable", bool(parsed.get("weather_db_snapshot_ok")), "Remote weather link/feature DB snapshot is readable in SQLite read-only mode."),
+        _check(
+            "scheduler_timer_active",
+            parsed.get("scheduler_timer_active_state") == "active",
+            f"timer={parsed.get('scheduler_timer_active_state')}.",
+        ),
+        _check(
+            "scheduler_service_state_valid",
+            parsed.get("scheduler_service_active_state") in {"active", "activating", "inactive"},
+            f"service={parsed.get('scheduler_service_active_state')}.",
+        ),
+        _check(
+            "r44_catalog_hook_verified",
+            bool(parsed.get("r44_verification_passed")),
+            f"r44_status={parsed.get('r44_status')}.",
+        ),
+        _check(
+            "r44_catalog_before_fast_lane",
+            parsed.get("r44_weather_catalog_sequence") == "CATALOG_THEN_FAST_LANE_VERIFIED",
+            f"sequence={parsed.get('r44_weather_catalog_sequence')}.",
+        ),
+        _check(
+            "r12_preview_available",
+            bool(parsed.get("weather_activation_preview_json_ok")),
+            "R12 preview JSON exists and parses.",
+        ),
+        _check(
+            "weather_fast_lane_available",
+            bool(parsed.get("weather_funnel_json_ok")),
+            "Weather fast-lane funnel JSON exists and parses.",
+        ),
+        _check(
+            "command_registry_ok",
+            bool(parsed.get("command_registry_ok")),
+            "R40/R44/R12/R2 CLI help is registered on the cloud host.",
+        ),
+        _check(
+            "db_snapshot_readable",
+            bool(parsed.get("weather_db_snapshot_ok")),
+            "Remote weather link/feature DB snapshot is readable in SQLite read-only mode.",
+        ),
         _check(
             "safe_link_gate_closed_or_explicit",
             int(preview_summary.get("rows_safe_to_link") or 0) >= 0
@@ -596,7 +676,9 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
     db_current_links = _int_or_none(db_links.get("target_time_ge_now_minus_3h"))
 
     if failed:
-        if failed[0]["check"] == "scheduler_service_state_valid" and parsed.get("scheduler_busy_writer_seen"):
+        if failed[0]["check"] == "scheduler_service_state_valid" and parsed.get(
+            "scheduler_busy_writer_seen"
+        ):
             status = "BLOCKED_SCHEDULER_WRITER_GATE_FAILURE"
             reason = (
                 "The last scheduler run failed because a write-capable weather catalog step hit BUSY_WRITER "
@@ -633,7 +715,10 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
             "--output-dir reports/phase3bb_r45 --reports-dir reports"
         )
         first_blocker = "SAFE_LINK_WRITE_GATE_READY"
-    elif current_weather_rows == 0 or parsed.get("weather_funnel_status") == "NO_CURRENT_WEATHER_ROWS":
+    elif (
+        current_weather_rows == 0
+        or parsed.get("weather_funnel_status") == "NO_CURRENT_WEATHER_ROWS"
+    ):
         status = "WEATHER_REFRESH_DID_NOT_CREATE_RANKABLE_CURRENT_LINKS"
         reason = (
             "The scheduler hook refreshed the weather catalog and R12 preview, but the fast-lane still "
@@ -656,7 +741,9 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         first_blocker = "RANKING_MISSING"
     else:
         status = "WEATHER_RANKING_IMPACT_PRESENT"
-        reason = "Weather current rows and rankings are present; refresh the unified paper gate next."
+        reason = (
+            "Weather current rows and rankings are present; refresh the unified paper gate next."
+        )
         next_step = "Phase 3BB-R8 - Unified Paper Gate Across Categories"
         command = (
             "kalshi-bot phase3bb-r8-unified-paper-gate "
@@ -839,7 +926,15 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in payload["impact_checks"]:
         lines.append(f"| `{row['check']}` | `{row['passed']}` | {row['detail']} |")
-    lines.extend(["", "## Weather Freshness Metrics", "", "| Source | Metric | Value | Detail |", "|---|---|---:|---|"])
+    lines.extend(
+        [
+            "",
+            "## Weather Freshness Metrics",
+            "",
+            "| Source | Metric | Value | Detail |",
+            "|---|---|---:|---|",
+        ]
+    )
     for row in payload["weather_freshness_rows"]:
         lines.append(
             f"| `{row['source']}` | `{row['metric']}` | `{row.get('value', '')}` | {row.get('detail', '')} |"
@@ -847,7 +942,9 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     lines.extend(["", "## R12 Blocker Counts", "", "| Blocker | Rows |", "|---|---:|"])
     for row in payload["weather_blocker_counts"]:
         lines.append(f"| `{row['blocker']}` | `{row['rows']}` |")
-    lines.extend(["", "## Weather Reports", "", "| Path | Status | Mtime | Size |", "|---|---|---:|---:|"])
+    lines.extend(
+        ["", "## Weather Reports", "", "| Path | Status | Mtime | Size |", "|---|---|---:|---:|"]
+    )
     for row in parsed.get("weather_report_freshness") or []:
         lines.append(
             f"| `{row['path']}` | `{row['status']}` | `{row['mtime_epoch']}` | `{row['size_bytes']}` |"
@@ -895,43 +992,3 @@ def _render_operator_command(payload: dict[str, Any]) -> str:
             "",
         ]
     )
-
-
-def _write_probe_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    fieldnames = ["name", "ok", "exit_code", "duration_seconds", "timed_out", "stdout_excerpt", "stderr_excerpt"]
-    _write_rows_csv(path, [{name: row.get(name) for name in fieldnames} for row in rows], fieldnames=fieldnames)
-
-
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None) -> None:
-    if fieldnames is None:
-        keys: list[str] = []
-        for row in rows:
-            for key in row:
-                if key not in keys:
-                    keys.append(key)
-        fieldnames = keys or ["empty"]
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        if rows:
-            writer.writerows(rows)
-
-
-def _mark_executable(path: Path) -> None:
-    try:
-        path.chmod(path.stat().st_mode | 0o111)
-    except OSError:
-        pass
-
-
-def _check(name: str, passed: bool, detail: str) -> dict[str, Any]:
-    return {"check": name, "passed": bool(passed), "detail": detail}
-
-
-def _int_or_none(value: Any) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None

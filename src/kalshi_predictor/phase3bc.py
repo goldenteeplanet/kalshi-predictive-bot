@@ -22,6 +22,7 @@ from kalshi_predictor.crypto.semantics import (
     parse_crypto_market_terms,
     terms_from_link_payload,
 )
+from kalshi_predictor.current_research_common import markdown_cell as _cell
 from kalshi_predictor.data.schema import (
     CryptoMarketLink,
     Forecast,
@@ -785,7 +786,6 @@ def _append_rows(lines: list[str], rows: list[dict[str, Any]], *, empty: str) ->
             f"{row['strict_turn_on_status']} |"
         )
 
-
 def _append_watch_rows(lines: list[str], rows: list[dict[str, Any]], *, empty: str) -> None:
     if not rows:
         lines.append(f"| _{empty}_ |  |  |  |  |  |  |  |")
@@ -817,7 +817,3 @@ def _append_blocked_rows(lines: list[str], rows: list[dict[str, Any]], *, empty:
             f"{row['structure_status']} | "
             f"{_cell('; '.join(row['blockers']))} |"
         )
-
-
-def _cell(value: Any) -> str:
-    return str(value or "").replace("|", "\\|").replace("\n", " ")

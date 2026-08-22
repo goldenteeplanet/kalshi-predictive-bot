@@ -11,6 +11,12 @@ from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.ticker_windows import crypto_ticker_close_time_utc
+from kalshi_predictor.current_research_common import (
+    markdown_cell as _cell,
+)
+from kalshi_predictor.current_research_common import (
+    read_json_required as _read_json,
+)
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3bc_r4 import write_phase3bc_r4_crypto_ev_risk_diagnostics_report
 from kalshi_predictor.phase3bc_r5 import write_phase3bc_r5_crypto_freshness_watch_report
@@ -565,7 +571,6 @@ def _append_rows(lines: list[str], rows: list[dict[str, Any]], *, empty: str) ->
             f"{row.get('primary_blocker') or ''} |"
         )
 
-
 def _append_blocked_rows(
     lines: list[str],
     rows: list[dict[str, Any]],
@@ -603,11 +608,3 @@ def _append_ready_rows(lines: list[str], rows: list[dict[str, Any]]) -> None:
             f"{row.get('phase3n_risk_state') or ''} | "
             f"{_cell('; '.join(row.get('what_would_make_paper_ready') or []))} |"
         )
-
-
-def _read_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _cell(value: Any) -> str:
-    return str(value or "").replace("|", "\\|").replace("\n", " ")

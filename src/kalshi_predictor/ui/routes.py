@@ -33,7 +33,7 @@ from kalshi_predictor.control_center.reports import (
     build_control_center,
     generate_control_center_report,
 )
-from kalshi_predictor.data.db import get_session_factory, init_db
+from kalshi_predictor.data.db import get_session_factory, init_db, make_sqlite_read_only_engine
 from kalshi_predictor.data.locks import db_writer_monitor
 from kalshi_predictor.data.maintenance import database_status_card
 from kalshi_predictor.data.repositories import decode_json
@@ -496,7 +496,11 @@ def create_router(
     default_shell_context = load_shell_status_context(settings=resolved_settings)
     templates.env.globals["default_shell_context"] = default_shell_context
     if session_factory is None:
-        engine = init_db()
+        engine = (
+            make_sqlite_read_only_engine()
+            if resolved_settings.ui_read_only
+            else init_db()
+        )
         session_factory = get_session_factory(engine)
 
     def get_session() -> Iterator[Session]:
@@ -521,6 +525,21 @@ def create_router(
         "created_at": 0.0,
         "value": None,
     }
+    today_context_cache: dict[str, Any] = {
+        "created_at": 0.0,
+        "value": None,
+    }
+
+    def today_context_for(service: DecisionUiService) -> dict[str, Any]:
+        now = time.monotonic()
+        cached = today_context_cache.get("value")
+        created_at = float(today_context_cache.get("created_at") or 0.0)
+        if isinstance(cached, dict) and now - created_at <= 15.0:
+            return cached
+        context = service.today()
+        today_context_cache["created_at"] = now
+        today_context_cache["value"] = context
+        return context
 
     def shell_context_for(service: DecisionUiService) -> dict[str, Any]:
         now = time.monotonic()
@@ -669,7 +688,7 @@ def create_router(
         request: Request,
         service: Annotated[DecisionUiService, Depends(get_service)],
     ) -> HTMLResponse:
-        context = service.today()
+        context = today_context_for(service)
         return templates.TemplateResponse(
             request,
             "today.html",
@@ -723,7 +742,7 @@ def create_router(
     ) -> HTMLResponse:
         started_at = time.perf_counter()
         logger.debug("today_workspace context start")
-        context = service.today()
+        context = today_context_for(service)
         logger.debug("today_workspace context ready in %.2fs", time.perf_counter() - started_at)
         return templates.TemplateResponse(
             request,

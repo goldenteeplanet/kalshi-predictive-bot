@@ -6,12 +6,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.ticker_windows import crypto_ticker_close_time_utc
-from kalshi_predictor.data.schema import Forecast, MarketSnapshot
+from kalshi_predictor.current_research_common import (
+    latest_crypto_v2_forecast as _latest_forecast,
+)
+from kalshi_predictor.current_research_common import (
+    latest_market_snapshot as _latest_snapshot,
+)
 from kalshi_predictor.learning.config import learning_paper_settings
 from kalshi_predictor.opportunities.repository import insert_market_ranking
 from kalshi_predictor.opportunities.scanner import build_market_ranking
@@ -383,24 +387,6 @@ def _coverage_summary(diagnostics: list[dict[str, Any]]) -> dict[str, Any]:
         "missing_or_stale_ranking_rows": missing_or_stale,
         "repairable_ranking_rows": sum(1 for row in current_rows if row["repairable"]),
     }
-
-
-def _latest_snapshot(session: Session, ticker: str) -> MarketSnapshot | None:
-    return session.scalar(
-        select(MarketSnapshot)
-        .where(MarketSnapshot.ticker == ticker)
-        .order_by(desc(MarketSnapshot.captured_at), desc(MarketSnapshot.id))
-        .limit(1)
-    )
-
-
-def _latest_forecast(session: Session, ticker: str) -> Forecast | None:
-    return session.scalar(
-        select(Forecast)
-        .where(Forecast.ticker == ticker, Forecast.model_name == MODEL_NAME)
-        .order_by(desc(Forecast.forecasted_at), desc(Forecast.id))
-        .limit(1)
-    )
 
 
 def _age_minutes(value: Any, *, now: Any) -> float | None:

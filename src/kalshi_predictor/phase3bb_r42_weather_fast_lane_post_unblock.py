@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import json
 import re
 import shlex
@@ -36,6 +35,24 @@ from kalshi_predictor.phase3bb_r36_cloud_scheduler_install_handoff import (
 from kalshi_predictor.phase3bb_r40_cloud_scheduler_runtime_monitor import (
     DEFAULT_R5_SERVICE_NAME,
     DEFAULT_UI_SERVICE_NAME,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    check as _check,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    first_line as _first_line,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    mark_executable as _mark_executable,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    stdout as _stdout,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    target_payload as _target_payload,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    write_rows_csv as _write_rows_csv,
 )
 from kalshi_predictor.utils.time import utc_now
 
@@ -124,7 +141,9 @@ def write_phase3bb_r42_weather_fast_lane_post_unblock_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["verification_checks"])
     _write_rows_csv(events_csv_path, payload["weather_fast_lane_events"])
@@ -295,8 +314,7 @@ def _build_remote_probes(
     since = f"--since @{int(r41_epoch)} " if r41_epoch else ""
     report_list = " ".join(shlex.quote(path) for path in WEATHER_REPORT_PATHS)
     writer_cmd = (
-        f"cd {app} && set -a && . {env} && set +a && "
-        ".venv/bin/kalshi-bot db-writer-monitor --json"
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
     )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
@@ -306,10 +324,18 @@ def _build_remote_probes(
             f"{writer_cmd} | python3 -m json.tool >/dev/null",
             timeout_seconds,
         ),
-        RemoteProbe("scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds),
-        RemoteProbe("r5_service_active", f"systemctl is-active {r5_service} || true", timeout_seconds),
-        RemoteProbe("ui_service_active", f"systemctl is-active {ui_service} || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "r5_service_active", f"systemctl is-active {r5_service} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "ui_service_active", f"systemctl is-active {ui_service} || true", timeout_seconds
+        ),
         RemoteProbe(
             "scheduler_timer_list",
             f"systemctl list-timers --all {timer} --no-pager || true",
@@ -324,8 +350,8 @@ def _build_remote_probes(
             "weather_report_stats",
             (
                 f"cd {app} && for p in {report_list}; do "
-                "if [ -e \"$p\" ]; then stat -c '%n|%Y|%s' \"$p\"; "
-                "else echo \"$p|MISSING|0\"; fi; done"
+                'if [ -e "$p" ]; then stat -c \'%n|%Y|%s\' "$p"; '
+                'else echo "$p|MISSING|0"; fi; done'
             ),
             timeout_seconds,
         ),
@@ -372,7 +398,9 @@ def _parse_probe_outputs(
         writer_parse_error = str(exc)
     journal = _stdout(by_name.get("scheduler_journal_post_unblock"))
     events = _parse_weather_fast_lane_events(journal)
-    report_freshness = _parse_report_stats(_stdout(by_name.get("weather_report_stats")), r41_epoch=r41_epoch)
+    report_freshness = _parse_report_stats(
+        _stdout(by_name.get("weather_report_stats")), r41_epoch=r41_epoch
+    )
     weather_funnel = _json_from_probe(by_name.get("weather_funnel_json"))
     ranking_activation = _json_from_probe(by_name.get("weather_ranking_activation_json"))
     paper_gate = _json_from_probe(by_name.get("weather_paper_gate_json"))
@@ -388,7 +416,10 @@ def _parse_probe_outputs(
     return {
         "remote_time_utc": _first_line(_stdout(by_name.get("remote_time_utc"))),
         "r41_status": ((r41_payload.get("writer_gate_decision") or {}).get("status")),
-        "r41_unblocked": (r41_payload.get("writer_gate_decision") or {}).get("weather_fast_lane_unblocked") is True,
+        "r41_unblocked": (r41_payload.get("writer_gate_decision") or {}).get(
+            "weather_fast_lane_unblocked"
+        )
+        is True,
         "r41_generated_at": r41_payload.get("generated_at"),
         "r41_epoch": r41_epoch,
         "db_writer_monitor_stdout_bytes": len(raw_writer.encode("utf-8")),
@@ -402,7 +433,9 @@ def _parse_probe_outputs(
         "writer_status": writer_payload.get("status") or "UNKNOWN",
         "writer_pid": writer_payload.get("current_writer_pid"),
         "scheduler_timer_active_state": _first_line(_stdout(by_name.get("scheduler_timer_active"))),
-        "scheduler_service_active_state": _first_line(_stdout(by_name.get("scheduler_service_active"))),
+        "scheduler_service_active_state": _first_line(
+            _stdout(by_name.get("scheduler_service_active"))
+        ),
         "scheduler_timer_next": _extract_timer_next(_stdout(by_name.get("scheduler_timer_list"))),
         "scheduler_timer_last": _extract_timer_last(_stdout(by_name.get("scheduler_timer_list"))),
         "r5_service_active_state": _first_line(_stdout(by_name.get("r5_service_active"))),
@@ -436,7 +469,8 @@ def _verification_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
             "db_writer_monitor_json_valid",
             bool(parsed.get("db_writer_monitor_strict_json_valid"))
             and bool(parsed.get("db_writer_monitor_json_tool_ok")),
-            parsed.get("db_writer_monitor_parse_error") or "db-writer-monitor --json parses cleanly.",
+            parsed.get("db_writer_monitor_parse_error")
+            or "db-writer-monitor --json parses cleanly.",
         ),
         _check(
             "writer_safe_to_start_write",
@@ -504,7 +538,9 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         command = "kalshi-bot phase3bb-r41-writer-gate-normalization --output-dir reports/phase3bb_r41 --reports-dir reports"
     elif not run_count and not report_refreshed:
         status = "WAITING_FOR_NEXT_WEATHER_FAST_LANE_CYCLE"
-        reason = "The gate is open, but no post-R41 scheduler weather_fast_lane cycle is visible yet."
+        reason = (
+            "The gate is open, but no post-R41 scheduler weather_fast_lane cycle is visible yet."
+        )
         next_step = "Phase 3BB-R42 - Rerun After Next Scheduler Tick"
         command = "kalshi-bot phase3bb-r42-weather-fast-lane-post-unblock-verification --output-dir reports/phase3bb_r42 --reports-dir reports"
     elif run_count and not report_refreshed:
@@ -559,7 +595,9 @@ def _weather_summary(
     gate_summary = paper_gate.get("summary") if isinstance(paper_gate, dict) else {}
     if not isinstance(gate_summary, dict):
         gate_summary = {}
-    ranking_summary = ranking_activation.get("summary") if isinstance(ranking_activation, dict) else {}
+    ranking_summary = (
+        ranking_activation.get("summary") if isinstance(ranking_activation, dict) else {}
+    )
     if not isinstance(ranking_summary, dict):
         ranking_summary = {}
     return {
@@ -571,10 +609,18 @@ def _weather_summary(
             ranking_summary,
             keys=("current_weather_rows", "current_rows", "total_current_weather_links"),
         ),
-        "verified_link_rows": _first_number(summary, gate_summary, keys=("verified_link_rows", "verified_rows")),
-        "fresh_source_rows": _first_number(summary, gate_summary, keys=("fresh_source_rows", "source_rows")),
-        "forecast_rows": _first_number(summary, gate_summary, ranking_summary, keys=("forecast_rows", "links_with_forecasts")),
-        "ranking_rows": _first_number(summary, gate_summary, ranking_summary, keys=("ranking_rows", "ranked_rows")),
+        "verified_link_rows": _first_number(
+            summary, gate_summary, keys=("verified_link_rows", "verified_rows")
+        ),
+        "fresh_source_rows": _first_number(
+            summary, gate_summary, keys=("fresh_source_rows", "source_rows")
+        ),
+        "forecast_rows": _first_number(
+            summary, gate_summary, ranking_summary, keys=("forecast_rows", "links_with_forecasts")
+        ),
+        "ranking_rows": _first_number(
+            summary, gate_summary, ranking_summary, keys=("ranking_rows", "ranked_rows")
+        ),
         "positive_ev_rows": _first_number(summary, gate_summary, keys=("positive_ev_rows",)),
         "paper_ready_rows": _first_number(summary, gate_summary, keys=("paper_ready_rows",)),
         "first_hard_blocker": summary.get("first_hard_blocker")
@@ -701,7 +747,15 @@ def _render_markdown(payload: dict[str, Any]) -> str:
             lines.append(f"- `{row['kind']}`: {row['line']}")
     else:
         lines.append("- No weather fast-lane run/skip lines observed after the R41 timestamp.")
-    lines.extend(["", "## Weather Report Freshness", "", "| Path | Status | Mtime | Refreshed After R41 |", "|---|---|---:|---:|"])
+    lines.extend(
+        [
+            "",
+            "## Weather Report Freshness",
+            "",
+            "| Path | Status | Mtime | Refreshed After R41 |",
+            "|---|---|---:|---:|",
+        ]
+    )
     for row in payload["weather_report_freshness"]:
         lines.append(
             f"| `{row['path']}` | `{row['status']}` | `{row['mtime_epoch']}` | `{row['refreshed_after_r41']}` |"
@@ -744,56 +798,6 @@ def _render_operator_command(payload: dict[str, Any]) -> str:
         "# Phase 3BB-R42 next safe operator command.\n"
         f"{payload['post_unblock_decision']['operator_next_command']}\n"
     )
-
-
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    keys: list[str] = []
-    for row in rows:
-        for key in row:
-            if key not in keys:
-                keys.append(key)
-    fieldnames = keys or ["empty"]
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        if rows:
-            writer.writerows(rows)
-
-
-def _mark_executable(path: Path) -> None:
-    try:
-        path.chmod(path.stat().st_mode | 0o111)
-    except OSError:
-        pass
-
-
-def _check(name: str, passed: bool, detail: str) -> dict[str, Any]:
-    return {"check": name, "passed": bool(passed), "detail": detail}
-
-
-def _target_payload(target: CloudBootstrapTarget) -> dict[str, str]:
-    return {
-        "ssh_target": target.ssh_target,
-        "identity_file": target.identity_file,
-        "app_path": target.app_path,
-        "env_path": target.env_path,
-        "db_path": target.db_path,
-        "reports_path": target.reports_path,
-    }
-
-
-def _stdout(result: RemoteProbeResult | None) -> str:
-    if result is None:
-        return ""
-    return result.stdout or ""
-
-
-def _first_line(text: str) -> str:
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    return ""
 
 
 def _extract_timer_next(text: str) -> str:
