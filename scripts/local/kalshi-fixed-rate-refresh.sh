@@ -163,7 +163,7 @@ while true; do
       --historical-calibration reports/phase_gh2/cliaus_historical_monthly_harvest.json \
       --minimum-calibration-samples 12
 
-  run_health_stage supported_weather_snapshot_forecast 120 timeout 120s flock -w 45 "$WRITER_LOCK" \
+  run_health_stage supported_weather_snapshot_forecast 180 timeout 180s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/supported_weather_snapshot_forecast.py \
       --preparation reports/phase_gh2/supported_weather_prepare.json \
       --output reports/phase_gh2/supported_weather_snapshot_forecast.json \
