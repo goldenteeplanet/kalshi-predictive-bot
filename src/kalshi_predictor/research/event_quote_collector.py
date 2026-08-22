@@ -543,16 +543,28 @@ def backfill_registry(
     effective_watermark = source_watermark
     if latest_snapshot is not None:
         effective_watermark = max(source_watermark, latest_snapshot - timedelta(minutes=15))
-    seed_rows = session.execute(
-        select(Market.event_ticker)
-        .join(MarketSnapshot, MarketSnapshot.ticker == Market.ticker)
-        .where(
-            MarketSnapshot.captured_at >= effective_watermark,
-            Market.event_ticker.is_not(None),
-            Market.close_time >= utc_now(),
+    # Keep SQLite on the selective captured_at index. A direct markets-to-snapshots
+    # join is commonly reordered to scan the full historical market catalog first.
+    recent_tickers = list(
+        session.scalars(
+            select(MarketSnapshot.ticker)
+            .where(MarketSnapshot.captured_at >= effective_watermark)
+            .distinct()
         )
-        .distinct()
-    ).all()
+    )
+    seed_rows = (
+        session.execute(
+            select(Market.event_ticker)
+            .where(
+                Market.ticker.in_(recent_tickers),
+                Market.event_ticker.is_not(None),
+                Market.close_time >= utc_now(),
+            )
+            .distinct()
+        ).all()
+        if recent_tickers
+        else []
+    )
     events = sorted({str(event) for (event,) in seed_rows if event})
     updated = 0
     rejected: dict[str, list[str]] = {}
