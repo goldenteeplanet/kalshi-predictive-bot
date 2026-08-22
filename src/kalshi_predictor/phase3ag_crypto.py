@@ -20,6 +20,12 @@ from kalshi_predictor.crypto.semantics import (
     parse_crypto_market_terms,
     select_compatible_crypto_feature,
 )
+from kalshi_predictor.current_research_common import (
+    latest_crypto_v2_forecast as _latest_forecast,
+)
+from kalshi_predictor.current_research_common import (
+    latest_market_snapshot as _latest_snapshot,
+)
 from kalshi_predictor.data.repositories import decode_json
 from kalshi_predictor.data.schema import (
     AdvancedRiskDecisionLog,
@@ -259,24 +265,6 @@ def _compatible_feature_payload(
         "feature_id": compatibility.feature.id if compatibility.feature else None,
         "details": compatibility.details or {},
     }
-
-
-def _latest_snapshot(session: Session, ticker: str) -> MarketSnapshot | None:
-    return session.scalar(
-        select(MarketSnapshot)
-        .where(MarketSnapshot.ticker == ticker)
-        .order_by(desc(MarketSnapshot.captured_at), desc(MarketSnapshot.id))
-        .limit(1)
-    )
-
-
-def _latest_forecast(session: Session, ticker: str) -> Forecast | None:
-    return session.scalar(
-        select(Forecast)
-        .where(Forecast.ticker == ticker, Forecast.model_name == "crypto_v2")
-        .order_by(desc(Forecast.forecasted_at), desc(Forecast.id))
-        .limit(1)
-    )
 
 
 def _latest_opportunity(session: Session, ticker: str) -> MarketOpportunity | None:

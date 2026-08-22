@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import json
 import shlex
 from dataclasses import dataclass
@@ -36,6 +35,18 @@ from kalshi_predictor.phase3bb_r44_weather_catalog_hook_runtime_verification imp
 )
 from kalshi_predictor.phase3bb_r47_weather_current_window_series_discovery import (
     _weather_current_window_snapshot_command,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    legacy_check as _check,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    tail as _tail,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    write_legacy_probe_csv as _write_probe_csv,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    write_sorted_rows_csv as _write_rows_csv,
 )
 from kalshi_predictor.utils.time import utc_now
 
@@ -663,24 +674,6 @@ def _render_operator_command(payload: dict[str, Any]) -> str:
     return "\n".join(["#!/usr/bin/env bash", "set -euo pipefail", command, ""])
 
 
-def _write_probe_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    fields = ["name", "ok", "exit_code", "duration_seconds", "command", "stdout", "stderr"]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fields = sorted({key for row in rows for key in row.keys()}) if rows else ["empty"]
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
-
-
 def _table(rows: list[dict[str, Any]], fields: list[str]) -> list[str]:
     if not rows:
         return ["_No rows._"]
@@ -693,20 +686,10 @@ def _table(rows: list[dict[str, Any]], fields: list[str]) -> list[str]:
     return lines
 
 
-def _check(check: str, passed: bool, detail: str) -> dict[str, Any]:
-    return {"check": check, "passed": bool(passed), "detail": detail}
-
-
 def _cell(value: Any) -> str:
     if value is None:
         return ""
     return str(value).replace("|", "\\|").replace("\n", " ")
-
-
-def _tail(text: str, *, lines: int = 40) -> str:
-    if not text:
-        return ""
-    return "\n".join(text.splitlines()[-lines:])
 
 
 def _int_or_none(value: Any) -> int | None:

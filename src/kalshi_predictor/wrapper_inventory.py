@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +33,15 @@ WEATHER_CHAIN_PREFIXES = (
     "phase3bb-r60-weather-next-window-lead-time-scheduler-repair",
 )
 
+CURRENT_RESEARCH_MODULE_PATTERNS = (
+    "phase3ag_crypto.py",
+    "phase3ar*.py",
+    "phase3bc*.py",
+    "*crypto*.py",
+    "*ranking*.py",
+    "*snapshot*.py",
+)
+
 
 def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
     path = cli_path or Path(__file__).with_name("cli.py")
@@ -38,6 +49,7 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
     wrappers = _command_wrappers(tree)
     lane_contract = build_lane_contract(path)
     weather = [row for row in wrappers if row["command"] in WEATHER_CHAIN_PREFIXES]
+    duplicate_helpers = _current_research_duplicate_helpers(path.parent)
     lane_summary = {
         lane: {
             "commands": sum(1 for row in wrappers if row["lane"] == lane),
@@ -55,6 +67,7 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
         "status": "READY" if not violations else "LANE_VIOLATION",
         "lane_summary": lane_summary,
         "phase3bb_weather_chain": weather,
+        "current_research_duplicate_helpers": duplicate_helpers,
         "violations": violations,
         "consolidations": [
             {
@@ -63,16 +76,41 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
                 "helpers": [
                     "check",
                     "first_line",
+                    "legacy_check",
                     "mark_executable",
                     "stdout",
+                    "tail",
                     "target_payload",
+                    "write_legacy_probe_csv",
                     "write_probe_csv",
                     "write_rows_csv",
+                    "write_sorted_rows_csv",
                 ],
                 "compatibility": (
                     "Command names, writer callables, outputs, and transactions unchanged."
                 ),
-            }
+            },
+            {
+                "canonical_module": "kalshi_predictor.current_research_common",
+                "scope": "Crypto refresh, forecast, ranking, and snapshot-repair helpers",
+                "helpers": [
+                    "crypto_candidate_sort_key",
+                    "decode_list",
+                    "format_cents",
+                    "int_from_float_or_none",
+                    "int_or_none",
+                    "latest_crypto_v2_forecast",
+                    "latest_market_snapshot",
+                    "latest_risk_decisions_by_ticker",
+                    "markdown_cell",
+                    "read_json",
+                    "read_json_required",
+                ],
+                "compatibility": (
+                    "Public commands and private compatibility aliases retain their prior call "
+                    "signatures and return types."
+                ),
+            },
         ],
         "deferred_command_merges": [
             {
@@ -133,6 +171,12 @@ def render_wrapper_inventory_markdown(payload: dict[str, Any]) -> str:
             f"- `{item['canonical_module']}` owns {', '.join(item['helpers'])}. "
             f"{item['compatibility']}"
         )
+    lines.extend(["", "## Remaining exact Current-Market Research duplicates", ""])
+    if not payload["current_research_duplicate_helpers"]:
+        lines.append("No exact helper-body duplicates remain in the scanned research families.")
+    for group in payload["current_research_duplicate_helpers"]:
+        members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
+        lines.append(f"- `{group['fingerprint']}`: {members}")
     lines.extend(
         [
             "",
@@ -203,3 +247,59 @@ def _call_name(call: ast.Call) -> str:
     if isinstance(call.func, ast.Attribute):
         return call.func.attr
     return ""
+
+
+def _current_research_duplicate_helpers(root: Path) -> list[dict[str, Any]]:
+    files: set[Path] = set()
+    for pattern in CURRENT_RESEARCH_MODULE_PATTERNS:
+        files.update(root.glob(pattern))
+    fingerprints: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for path in sorted(files):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            continue
+        helpers = {
+            node.name: node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("_")
+        }
+        raw_fingerprints = {name: _helper_fingerprint(node) for name, node in helpers.items()}
+        for name, node in helpers.items():
+            normalized = ast.FunctionDef(
+                name="_",
+                args=node.args,
+                body=node.body,
+                decorator_list=[],
+                returns=node.returns,
+                type_comment=node.type_comment,
+            )
+            dependencies = sorted(
+                raw_fingerprints[item.id]
+                for item in ast.walk(node)
+                if isinstance(item, ast.Name) and item.id != name and item.id in raw_fingerprints
+            )
+            material = ast.dump(normalized, include_attributes=False) + "|" + "|".join(dependencies)
+            digest = hashlib.sha256(material.encode("utf-8")).hexdigest()[:12]
+            fingerprints[digest].append(
+                {"module": path.name, "function": node.name, "line": node.lineno}
+            )
+    return [
+        {"fingerprint": digest, "members": members, "disposition": "review_before_merge"}
+        for digest, members in sorted(fingerprints.items())
+        if len(members) > 1
+    ]
+
+
+def _helper_fingerprint(node: ast.FunctionDef) -> str:
+    normalized = ast.FunctionDef(
+        name="_",
+        args=node.args,
+        body=node.body,
+        decorator_list=[],
+        returns=node.returns,
+        type_comment=node.type_comment,
+    )
+    return hashlib.sha256(
+        ast.dump(normalized, include_attributes=False).encode("utf-8")
+    ).hexdigest()

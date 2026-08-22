@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
+from kalshi_predictor.current_research_common import int_or_none as _int_or_none
 from kalshi_predictor.phase3bb_acceleration import (
     _metadata,
     _metadata_lines,
@@ -991,12 +992,3 @@ def _render_operator_command(payload: dict[str, Any]) -> str:
             "",
         ]
     )
-
-
-def _int_or_none(value: Any) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None

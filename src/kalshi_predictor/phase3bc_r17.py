@@ -10,6 +10,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
+from kalshi_predictor.current_research_common import (
+    markdown_cell as _cell,
+)
+from kalshi_predictor.current_research_common import (
+    read_json_required as _read_json,
+)
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3bc_r16 import (
     write_phase3bc_r16_crypto_paper_ready_edge_hunt_report,
@@ -413,11 +419,3 @@ def _cents(value: Decimal | None) -> str | None:
     if value is None:
         return None
     return decimal_to_str(value * Decimal("100"))
-
-
-def _read_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _cell(value: Any) -> str:
-    return str(value or "").replace("|", "\\|").replace("\n", " ")

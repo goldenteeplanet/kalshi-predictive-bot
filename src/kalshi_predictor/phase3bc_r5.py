@@ -14,10 +14,23 @@ from kalshi_predictor.active_universe import is_active_market_status
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.assets import DEFAULT_CRYPTO_SYMBOLS
 from kalshi_predictor.crypto.ticker_windows import crypto_ticker_close_time_utc
-from kalshi_predictor.data.repositories import decode_json
+from kalshi_predictor.current_research_common import (
+    crypto_candidate_sort_key as _candidate_sort_key,
+)
+from kalshi_predictor.current_research_common import decode_list
+from kalshi_predictor.current_research_common import (
+    format_cents as _cents,
+)
+from kalshi_predictor.current_research_common import (
+    latest_crypto_v2_forecast as _latest_forecast,
+)
+from kalshi_predictor.current_research_common import (
+    latest_risk_decisions_by_ticker as _latest_risk_decisions_by_ticker,
+)
+from kalshi_predictor.current_research_common import (
+    read_json as _read_json,
+)
 from kalshi_predictor.data.schema import (
-    AdvancedRiskDecisionLog,
-    Forecast,
     MarketRanking,
 )
 from kalshi_predictor.forecasting.registry import (
@@ -28,6 +41,8 @@ from kalshi_predictor.learning.config import learning_paper_settings
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES, PaperDecision
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3ar import repair_crypto_snapshots_for_tickers
+
+_decode_list = decode_list
 from kalshi_predictor.phase3bc_r3 import (
     DEFAULT_CRYPTO_LINK_SCAN_LIMIT,
     DEFAULT_CRYPTO_MARKET_SCAN_LIMIT,
@@ -1852,15 +1867,6 @@ def _paper_decision_for_candidate(
     )
 
 
-def _latest_forecast(session: Session, ticker: str) -> Forecast | None:
-    return session.scalar(
-        select(Forecast)
-        .where(Forecast.ticker == ticker, Forecast.model_name == MODEL_NAME)
-        .order_by(desc(Forecast.forecasted_at), desc(Forecast.id))
-        .limit(1)
-    )
-
-
 def _preflight_settings(settings: Settings) -> Settings:
     paper_settings = learning_paper_settings(settings)
     return paper_settings.model_copy(
@@ -1873,40 +1879,6 @@ def _preflight_settings(settings: Settings) -> Settings:
             "advanced_risk_engine_mode": "shadow",
         }
     )
-
-
-def _latest_risk_decisions_by_ticker(
-    session: Session,
-    tickers: list[str],
-) -> dict[str, dict[str, Any]]:
-    if not tickers:
-        return {}
-    seen: dict[str, dict[str, Any]] = {}
-    rows = session.scalars(
-        select(AdvancedRiskDecisionLog)
-        .where(AdvancedRiskDecisionLog.ticker.in_(tickers))
-        .order_by(
-            desc(AdvancedRiskDecisionLog.decision_timestamp),
-            desc(AdvancedRiskDecisionLog.id),
-        )
-    )
-    for row in rows:
-        if row.ticker in seen:
-            continue
-        seen[row.ticker] = {
-            "id": row.id,
-            "decision_timestamp": row.decision_timestamp.isoformat(),
-            "mode": row.mode,
-            "action": row.action,
-            "phase_3m_tier": row.phase_3m_tier,
-            "phase_3m_proposed_contracts": row.phase_3m_proposed_contracts,
-            "live_candidate_contracts": row.live_candidate_contracts,
-            "executed_contracts": row.executed_contracts,
-            "reason_codes": _decode_list(row.reason_codes_json),
-            "hard_blocks": _decode_list(row.hard_blocks_json),
-            "limiting_factors": _decode_list(row.limiting_factors_json),
-        }
-    return seen
 
 
 def _candidate_payload(
@@ -1936,14 +1908,6 @@ def _candidate_payload(
         "market_status": row.get("market_status"),
         "phase3n_latest": risk,
     }
-
-
-def _candidate_sort_key(row: dict[str, Any]) -> tuple[Decimal, Decimal, Decimal]:
-    return (
-        to_decimal(row.get("expected_value")) or Decimal("-999"),
-        to_decimal(row.get("opportunity_score")) or Decimal("0"),
-        to_decimal(row.get("estimated_edge")) or Decimal("0"),
-    )
 
 
 def _watch_state(
@@ -2326,27 +2290,6 @@ def _history_row(payload: dict[str, Any]) -> dict[str, Any]:
         "summary": payload["summary"],
         "preflight_action_counts": payload["preflight_action_counts"],
     }
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _decode_list(value: str | None) -> list[Any]:
-    decoded = decode_json(value)
-    if isinstance(decoded, list):
-        return decoded
-    if decoded in (None, ""):
-        return []
-    return [decoded]
-
-
-def _cents(value: Decimal | None) -> str | None:
-    if value is None:
-        return None
-    return decimal_to_str((value * Decimal("100")).quantize(Decimal("0.1")))
 
 
 def _cell(value: str) -> str:

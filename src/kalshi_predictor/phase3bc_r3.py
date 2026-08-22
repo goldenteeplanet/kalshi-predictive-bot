@@ -26,6 +26,7 @@ from kalshi_predictor.crypto.ingestion import ingest_crypto_quotes
 from kalshi_predictor.crypto.linker import link_crypto_markets
 from kalshi_predictor.crypto.repository import get_latest_crypto_price, parse_symbols
 from kalshi_predictor.crypto.ticker_windows import crypto_ticker_close_time_utc
+from kalshi_predictor.current_research_common import read_json as _read_json
 from kalshi_predictor.data.repositories import insert_market_snapshot, upsert_market
 from kalshi_predictor.data.schema import MarketRanking, MarketSnapshot
 from kalshi_predictor.forecasting.registry import (
@@ -1671,9 +1672,3 @@ def _recent_complete_refresh_exists(
         return False
     max_age_seconds = min(120, max(30, int(cadence_minutes) * 30))
     return ((now or utc_now()) - generated_at).total_seconds() < max_age_seconds
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))

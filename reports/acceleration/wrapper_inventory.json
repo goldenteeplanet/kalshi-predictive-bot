@@ -6,15 +6,38 @@
       "helpers": [
         "check",
         "first_line",
+        "legacy_check",
         "mark_executable",
         "stdout",
+        "tail",
         "target_payload",
+        "write_legacy_probe_csv",
         "write_probe_csv",
-        "write_rows_csv"
+        "write_rows_csv",
+        "write_sorted_rows_csv"
       ],
       "scope": "Phase 3BB R42-R45 current-market research wrappers"
+    },
+    {
+      "canonical_module": "kalshi_predictor.current_research_common",
+      "compatibility": "Public commands and private compatibility aliases retain their prior call signatures and return types.",
+      "helpers": [
+        "crypto_candidate_sort_key",
+        "decode_list",
+        "format_cents",
+        "int_from_float_or_none",
+        "int_or_none",
+        "latest_crypto_v2_forecast",
+        "latest_market_snapshot",
+        "latest_risk_decisions_by_ticker",
+        "markdown_cell",
+        "read_json",
+        "read_json_required"
+      ],
+      "scope": "Crypto refresh, forecast, ranking, and snapshot-repair helpers"
     }
   ],
+  "current_research_duplicate_helpers": [],
   "deferred_command_merges": [
     {
       "commands": [
@@ -42,7 +65,7 @@
       "reason": "The wrappers share a lane but call distinct stage writers and artifact contracts; therefore they are not behaviorally interchangeable."
     }
   ],
-  "generated_at": "2026-08-22T00:19:13.923317+00:00",
+  "generated_at": "2026-08-22T01:09:30.147233+00:00",
   "lane_summary": {
     "CURRENT_MARKET_RESEARCH": {
       "artifacts": 6,

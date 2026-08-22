@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from kalshi_predictor.current_research_common import int_from_float_or_none as _int_or_none
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
 PHASE3BC_R6_VERSION = "phase3bc_r6_guarded_crypto_freshness_runner"
@@ -999,15 +1000,6 @@ def _seconds_until_timeout(
     if elapsed_seconds is None or timeout_seconds is None:
         return None
     return max(0, timeout_seconds - elapsed_seconds)
-
-
-def _int_or_none(value: Any) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(float(value))
-    except (TypeError, ValueError):
-        return None
 
 
 def _read_pid(path: Path) -> int | None:

@@ -1,6 +1,6 @@
 # Canonical Wrapper Inventory
 
-Generated: `2026-08-22T00:19:13.923317+00:00`
+Generated: `2026-08-22T01:09:30.147233+00:00`
 Status: `READY`
 
 ## Lane totals
@@ -39,7 +39,12 @@ Status: `READY`
 
 ## Consolidated same-lane helpers
 
-- `kalshi_predictor.phase3bb_weather_common` owns check, first_line, mark_executable, stdout, target_payload, write_probe_csv, write_rows_csv. Command names, writer callables, outputs, and transactions unchanged.
+- `kalshi_predictor.phase3bb_weather_common` owns check, first_line, legacy_check, mark_executable, stdout, tail, target_payload, write_legacy_probe_csv, write_probe_csv, write_rows_csv, write_sorted_rows_csv. Command names, writer callables, outputs, and transactions unchanged.
+- `kalshi_predictor.current_research_common` owns crypto_candidate_sort_key, decode_list, format_cents, int_from_float_or_none, int_or_none, latest_crypto_v2_forecast, latest_market_snapshot, latest_risk_decisions_by_ticker, markdown_cell, read_json, read_json_required. Public commands and private compatibility aliases retain their prior call signatures and return types.
+
+## Remaining exact Current-Market Research duplicates
+
+No exact helper-body duplicates remain in the scanned research families.
 
 ## Command consolidation gate
 

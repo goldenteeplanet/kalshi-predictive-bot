@@ -80,3 +80,31 @@ def write_probe_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         [{name: row.get(name) for name in fieldnames} for row in rows],
         fieldnames=fieldnames,
     )
+
+
+def legacy_check(check: str, passed: bool, detail: str) -> dict[str, Any]:
+    return {"check": check, "passed": bool(passed), "detail": detail}
+
+
+def tail(text: str, *, lines: int = 40) -> str:
+    if not text:
+        return ""
+    return "\n".join(text.splitlines()[-lines:])
+
+
+def write_legacy_probe_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    fields = ["name", "ok", "exit_code", "duration_seconds", "command", "stdout", "stderr"]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def write_sorted_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fields = sorted({key for row in rows for key in row.keys()}) if rows else ["empty"]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
