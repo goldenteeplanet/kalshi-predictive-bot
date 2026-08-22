@@ -17,6 +17,7 @@ export PAPER_ORDER_CREATION_ENABLED=false
 export PAPER_ORDER_KILL_SWITCH=true
 
 readonly INTERVAL_SECONDS="${KALSHI_REFRESH_INTERVAL_SECONDS:-900}"
+readonly MIN_POST_CYCLE_COOLDOWN_SECONDS="${KALSHI_MIN_POST_CYCLE_COOLDOWN_SECONDS:-60}"
 readonly WRITER_LOCK="${KALSHI_WRITER_LOCK:-/home/james/kalshi-local-runtime/kalshi-writer.lock}"
 readonly LOOP_LOCK="${KALSHI_REFRESH_LOOP_LOCK:-/home/james/kalshi-local-runtime/kalshi-refresh-loop.lock}"
 readonly DATABASE_PATH="${KALSHI_DATABASE_PATH:-/home/james/kalshi-predictive-bot-data/kalshi_phase1.db}"
@@ -177,11 +178,13 @@ while true; do
       --opportunity-limit 20 --freshness-minutes 15 --soak-cycles-required 24 \
       --defer-weather-gate --guard-active-writer
 
-  run_health_stage weather_gate_diagnostics 120 timeout 120s \
+  # Keep the current-weather diagnostic inside a short API budget. The coherent
+  # preflight below owns exact BUY-side depth for the two guarded candidates.
+  run_health_stage weather_gate_diagnostics 60 timeout 60s \
     .venv/bin/kalshi-bot phase3ba-r3-weather-paper-gate \
       --output-dir reports/phase3ba_r3 --reports-dir reports \
-      --limit 24 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
-      --deadline-seconds 105 --batch-size 4
+      --limit 12 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
+      --deadline-seconds 50 --batch-size 2
 
   # Phase 3M's historical scan is deliberately separated from the fresh-quote
   # transaction. A valid six-hour cache is reused; refreshes remain no-lookahead.
@@ -195,7 +198,7 @@ while true; do
 
   # Capture exact books, forecast, rank, size, and risk-check in one bounded
   # writer stage. Execution and paper-order creation remain disabled above.
-  run_health_stage weather_fast_coherent_preflight 60 timeout 60s flock -w 45 "$WRITER_LOCK" \
+  run_health_stage weather_fast_coherent_preflight 90 timeout 90s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/scoped_weather_depth_preflight.py \
       --gate reports/phase3ba_r3/weather_paper_gate.json \
       --cache reports/phase3ba_r3/phase3m_historical_evidence_cache.json \
@@ -203,11 +206,11 @@ while true; do
       --output reports/phase3ba_r3/scoped_weather_depth_preflight.json \
       --ticker KXRAINAUSM-26AUG-1 --ticker KXRAINAUSM-26AUG-2 || true
 
-  run_health_stage weather_gate_post_preflight 120 timeout 120s \
+  run_health_stage weather_gate_post_preflight 60 timeout 60s \
     .venv/bin/kalshi-bot phase3ba-r3-weather-paper-gate \
       --output-dir reports/phase3ba_r3 --reports-dir reports \
-      --limit 24 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
-      --deadline-seconds 105 --batch-size 4
+      --limit 8 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
+      --deadline-seconds 50 --batch-size 2
 
   .venv/bin/python scripts/weather_fast_preflight_soak.py \
     --cycle-id "$cycle_started_epoch" \
@@ -222,18 +225,34 @@ while true; do
     --database "$DATABASE_PATH" \
     --output reports/crypto_event_vectors/liquidity_window_diagnosis.json || true
 
-  run_health_stage targeted_crypto_capture 180 timeout 180s flock -w 45 "$WRITER_LOCK" \
+  # Shard capture by family and reduce concurrency to avoid Kalshi HTTP 429
+  # bursts. Each shard has an independent deadline and publishes partial
+  # progress, so one slow family cannot consume the whole collection budget.
+  run_health_stage targeted_crypto_capture_major 75 timeout 75s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/crypto_event_quote_collector.py \
       --output reports/crypto_event_vectors/status.json \
       --backfill-report reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json \
-      --series KXBTC,KXETH,KXSOLE,KXXRP,KXDOGE \
-      --coherence-ms 2500 --max-workers 16 \
-      --max-new-events 25 --max-events-attempted 50 \
+      --series KXBTC,KXETH \
+      --coherence-ms 2500 --max-workers 3 \
+      --max-new-events 3 --max-events-attempted 6 \
       --liquidity-window-report reports/crypto_event_vectors/liquidity_window_diagnosis.json \
       --max-forecast-lag-minutes 30 \
-      --targeted-forecast-events 5 \
+      --targeted-forecast-events 1 \
       --targeted-capture-latency-seconds 30 \
-      --targeted-capture-max-buckets 150 \
+      --targeted-capture-max-buckets 50 \
+      --canary-required 5 --target 100
+  run_health_stage targeted_crypto_capture_alt 75 timeout 75s flock -w 45 "$WRITER_LOCK" \
+    .venv/bin/python scripts/crypto_event_quote_collector.py \
+      --output reports/crypto_event_vectors/status.json \
+      --backfill-report reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json \
+      --series KXSOLE,KXXRP,KXDOGE \
+      --coherence-ms 2500 --max-workers 3 \
+      --max-new-events 3 --max-events-attempted 6 \
+      --liquidity-window-report reports/crypto_event_vectors/liquidity_window_diagnosis.json \
+      --max-forecast-lag-minutes 30 \
+      --targeted-forecast-events 1 \
+      --targeted-capture-latency-seconds 30 \
+      --targeted-capture-max-buckets 50 \
       --canary-required 5 --target 100
   .venv/bin/python scripts/crypto_forecast_polytope_alignment.py \
     --database "$DATABASE_PATH" \
@@ -294,7 +313,8 @@ while true; do
 
   next_start_epoch="$((cycle_started_epoch + INTERVAL_SECONDS))"
   now_epoch="$(date +%s)"
-  if (( next_start_epoch <= now_epoch )); then
-    next_start_epoch="$now_epoch"
+  cooldown_start_epoch="$((now_epoch + MIN_POST_CYCLE_COOLDOWN_SECONDS))"
+  if (( next_start_epoch < cooldown_start_epoch )); then
+    next_start_epoch="$cooldown_start_epoch"
   fi
 done
