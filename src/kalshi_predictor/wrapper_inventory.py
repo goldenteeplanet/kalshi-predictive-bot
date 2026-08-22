@@ -42,6 +42,16 @@ CURRENT_RESEARCH_MODULE_PATTERNS = (
     "*snapshot*.py",
 )
 
+HISTORICAL_REPLAY_KEYWORDS = (
+    "settlement",
+    "backtest",
+    "calibration",
+    "walk_forward",
+    "walkforward",
+    "tournament",
+    "replay",
+)
+
 
 def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
     path = cli_path or Path(__file__).with_name("cli.py")
@@ -50,6 +60,7 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
     lane_contract = build_lane_contract(path)
     weather = [row for row in wrappers if row["command"] in WEATHER_CHAIN_PREFIXES]
     duplicate_helpers = _current_research_duplicate_helpers(path.parent)
+    replay_duplicate_helpers = _historical_replay_duplicate_helpers(path.parent)
     lane_summary = {
         lane: {
             "commands": sum(1 for row in wrappers if row["lane"] == lane),
@@ -68,6 +79,7 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
         "lane_summary": lane_summary,
         "phase3bb_weather_chain": weather,
         "current_research_duplicate_helpers": duplicate_helpers,
+        "historical_replay_duplicate_helpers": replay_duplicate_helpers,
         "violations": violations,
         "consolidations": [
             {
@@ -109,6 +121,25 @@ def build_wrapper_inventory(cli_path: Path | None = None) -> dict[str, Any]:
                 "compatibility": (
                     "Public commands and private compatibility aliases retain their prior call "
                     "signatures and return types."
+                ),
+            },
+            {
+                "canonical_module": "kalshi_predictor.historical_replay_common",
+                "scope": "Settlement, calibration, walk-forward, tournament, and backtest helpers",
+                "helpers": [
+                    "has_usable_outcome",
+                    "is_local_derived_composite_ticker",
+                    "markdown_cell_empty",
+                    "markdown_cell_none",
+                    "normalize_result",
+                    "settlement_to_y_true",
+                    "source_is_closed_without_outcome",
+                    "source_is_settled",
+                    "trade_from_decision",
+                ],
+                "compatibility": (
+                    "Historical commands retain their public names; no current forecast, paper, "
+                    "or GH-2 writer imports this module."
                 ),
             },
         ],
@@ -175,6 +206,12 @@ def render_wrapper_inventory_markdown(payload: dict[str, Any]) -> str:
     if not payload["current_research_duplicate_helpers"]:
         lines.append("No exact helper-body duplicates remain in the scanned research families.")
     for group in payload["current_research_duplicate_helpers"]:
+        members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
+        lines.append(f"- `{group['fingerprint']}`: {members}")
+    lines.extend(["", "## Remaining exact Historical Replay duplicates", ""])
+    if not payload["historical_replay_duplicate_helpers"]:
+        lines.append("No exact helper-body duplicates remain in the scanned replay families.")
+    for group in payload["historical_replay_duplicate_helpers"]:
         members = ", ".join(f"`{item['module']}:{item['function']}`" for item in group["members"])
         lines.append(f"- `{group['fingerprint']}`: {members}")
     lines.extend(
@@ -253,6 +290,26 @@ def _current_research_duplicate_helpers(root: Path) -> list[dict[str, Any]]:
     files: set[Path] = set()
     for pattern in CURRENT_RESEARCH_MODULE_PATTERNS:
         files.update(root.glob(pattern))
+    return _duplicate_helper_groups(files, root)
+
+
+def _historical_replay_duplicate_helpers(root: Path) -> list[dict[str, Any]]:
+    files = {
+        path
+        for path in root.rglob("*.py")
+        if "paper" not in path.relative_to(root).parts
+        and (
+            path.name.startswith("phase3aa")
+            or any(
+                keyword in path.name.lower() or keyword in str(path.parent).lower()
+                for keyword in HISTORICAL_REPLAY_KEYWORDS
+            )
+        )
+    }
+    return _duplicate_helper_groups(files, root)
+
+
+def _duplicate_helper_groups(files: set[Path], root: Path) -> list[dict[str, Any]]:
     fingerprints: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for path in sorted(files):
         try:
@@ -282,7 +339,11 @@ def _current_research_duplicate_helpers(root: Path) -> list[dict[str, Any]]:
             material = ast.dump(normalized, include_attributes=False) + "|" + "|".join(dependencies)
             digest = hashlib.sha256(material.encode("utf-8")).hexdigest()[:12]
             fingerprints[digest].append(
-                {"module": path.name, "function": node.name, "line": node.lineno}
+                {
+                    "module": str(path.relative_to(root)),
+                    "function": node.name,
+                    "line": node.lineno,
+                }
             )
     return [
         {"fingerprint": digest, "members": members, "disposition": "review_before_merge"}

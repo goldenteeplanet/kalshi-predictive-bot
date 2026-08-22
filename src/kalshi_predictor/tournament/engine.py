@@ -16,6 +16,7 @@ from kalshi_predictor.data.schema import (
     Settlement,
 )
 from kalshi_predictor.evaluation.metrics import brier_score, log_loss
+from kalshi_predictor.historical_replay_common import settlement_to_y_true as _settlement_to_y_true
 from kalshi_predictor.tournament.diagnostics import generate_model_diagnostics
 from kalshi_predictor.tournament.ranking import (
     TOURNAMENT_MODEL_NAMES,
@@ -323,14 +324,3 @@ def _category_for_ticker(session: Session, ticker: str) -> str:
         )
     )
     return classify_market_category(text)
-
-
-def _settlement_to_y_true(result: str | None) -> int | None:
-    if result is None:
-        return None
-    normalized = result.strip().lower()
-    if normalized in {"yes", "y", "1", "true"}:
-        return 1
-    if normalized in {"no", "n", "0", "false"}:
-        return 0
-    return None

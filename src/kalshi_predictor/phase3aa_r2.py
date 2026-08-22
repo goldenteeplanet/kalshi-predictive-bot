@@ -10,6 +10,21 @@ from sqlalchemy.orm import Session
 
 from kalshi_predictor.data.repositories import upsert_market, upsert_settlement
 from kalshi_predictor.data.schema import Settlement
+from kalshi_predictor.historical_replay_common import (
+    has_usable_outcome as _has_usable_outcome,
+)
+from kalshi_predictor.historical_replay_common import (
+    is_local_derived_composite_ticker as _is_local_derived_composite_ticker,
+)
+from kalshi_predictor.historical_replay_common import (
+    markdown_cell_empty as _md,
+)
+from kalshi_predictor.historical_replay_common import (
+    source_is_closed_without_outcome as _source_is_closed_without_outcome,
+)
+from kalshi_predictor.historical_replay_common import (
+    source_is_settled as _source_is_settled,
+)
 from kalshi_predictor.kalshi.client import KalshiClient, KalshiClientError
 from kalshi_predictor.paper.models import ORDER_FILLED
 from kalshi_predictor.paper.settlement_reconciliation import (
@@ -267,10 +282,6 @@ def _base_harvest_row(ticker: str, paper_rows: list[dict[str, Any]]) -> dict[str
     }
 
 
-def _is_local_derived_composite_ticker(ticker: str) -> bool:
-    return ticker.startswith(LOCAL_DERIVED_TICKER_PREFIXES)
-
-
 def _ticker_family(ticker: str) -> str:
     return ticker.split("-", 1)[0] if ticker else "UNKNOWN"
 
@@ -305,29 +316,6 @@ def _source_fields(payload: Mapping[str, Any], source_ticker: str) -> dict[str, 
         ),
         "source_mve_selected_legs_count": _list_count(payload.get("mve_selected_legs")),
     }
-
-
-def _has_usable_outcome(payload: Mapping[str, Any]) -> bool:
-    result = payload.get("result")
-    if result is not None and str(result).strip():
-        return True
-    return (
-        payload.get("settlement_value_dollars") is not None
-        or payload.get("settlement_value") is not None
-        or payload.get("yes_settlement_value") is not None
-    )
-
-
-def _source_is_closed_without_outcome(payload: Mapping[str, Any]) -> bool:
-    status = str(payload.get("status") or "").strip().lower()
-    return status in SOURCE_CLOSED_STATUSES and not _has_usable_outcome(payload)
-
-
-def _source_is_settled(payload: Mapping[str, Any]) -> bool:
-    status = str(payload.get("status") or "").strip().lower()
-    return status in SOURCE_SETTLED_STATUSES or bool(
-        payload.get("settlement_ts") or payload.get("settled_time") or payload.get("settled_at")
-    )
 
 
 def _custom_strike_keys(payload: Mapping[str, Any]) -> list[str]:
@@ -485,12 +473,6 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         ]
     )
     return "\n".join(lines) + "\n"
-
-
-def _md(value: Any) -> str:
-    if value is None or value == "":
-        return ""
-    return str(value).replace("|", "\\|").replace("\n", " ")
 
 
 def exact_settlement_exists(session: Session, ticker: str) -> bool:
