@@ -18,8 +18,8 @@ def test_scheduler_enforces_completion_based_cooldown() -> None:
 
 
 def test_weather_gate_uses_small_bounded_batches() -> None:
-    assert "run_health_stage weather_gate_diagnostics 60 timeout 60s" in SCRIPT
-    assert "run_health_stage weather_gate_post_preflight 60 timeout 60s" in SCRIPT
+    assert "run_health_stage weather_gate_diagnostics 75 timeout 75s" in SCRIPT
+    assert "run_health_stage weather_gate_post_preflight 75 timeout 75s" in SCRIPT
     assert SCRIPT.count("--deadline-seconds 50 --batch-size 2") == 2
 
 

@@ -188,7 +188,7 @@ while true; do
 
   # Keep the current-weather diagnostic inside a short API budget. The coherent
   # preflight below owns exact BUY-side depth for the two guarded candidates.
-  run_health_stage weather_gate_diagnostics 60 timeout 60s \
+  run_health_stage weather_gate_diagnostics 75 timeout 75s \
     .venv/bin/kalshi-bot phase3ba-r3-weather-paper-gate \
       --output-dir reports/phase3ba_r3 --reports-dir reports \
       --limit 12 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
@@ -214,7 +214,7 @@ while true; do
       --output reports/phase3ba_r3/scoped_weather_depth_preflight.json \
       --ticker KXRAINAUSM-26AUG-1 --ticker KXRAINAUSM-26AUG-2 || true
 
-  run_health_stage weather_gate_post_preflight 60 timeout 60s \
+  run_health_stage weather_gate_post_preflight 75 timeout 75s \
     .venv/bin/kalshi-bot phase3ba-r3-weather-paper-gate \
       --output-dir reports/phase3ba_r3 --reports-dir reports \
       --limit 8 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
