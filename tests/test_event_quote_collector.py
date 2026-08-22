@@ -109,14 +109,14 @@ def test_liquidity_window_selects_in_window_and_falls_back():
 
 def test_capture_candidates_require_fresh_point_in_time_forecast():
     now = datetime.now(UTC)
-    fresh = EventCandidate("FRESH", "KXETH", "ETH", ())
-    stale = EventCandidate("STALE", "KXETH", "ETH", ())
+    fresh = EventCandidate("FRESH", "KXETH", "ETH", ({"ticker": "FRESH-T"},))
+    stale = EventCandidate("STALE", "KXETH", "ETH", ({"ticker": "STALE-T"},))
 
     class _Rows:
         def all(self):
             return [
-                ("FRESH", now - timedelta(minutes=10)),
-                ("STALE", now - timedelta(minutes=31)),
+                    ("FRESH-T", now - timedelta(minutes=10)),
+                    ("STALE-T", now - timedelta(minutes=31)),
             ]
 
     class _Session:
