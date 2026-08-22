@@ -236,31 +236,28 @@ while true; do
   # Shard capture by family and reduce concurrency to avoid Kalshi HTTP 429
   # bursts. Each shard has an independent deadline and publishes partial
   # progress, so one slow family cannot consume the whole collection budget.
-  run_health_stage targeted_crypto_capture_major 75 timeout 75s flock -w 45 "$WRITER_LOCK" \
+  # Alternate one small targeted-capture shard per cycle. Each shard is capped
+  # at two candidate events, so collector research cannot consume two full
+  # stage budgets or overlap the next intended cadence.
+  if (( cycle_started_epoch % 2 == 0 )); then
+    targeted_capture_stage="targeted_crypto_capture_major"
+    targeted_capture_series="KXBTC,KXETH"
+  else
+    targeted_capture_stage="targeted_crypto_capture_alt"
+    targeted_capture_series="KXSOLE,KXXRP,KXDOGE"
+  fi
+  run_health_stage "$targeted_capture_stage" 75 timeout 75s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/crypto_event_quote_collector.py \
       --output reports/crypto_event_vectors/status.json \
       --backfill-report reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json \
-      --series KXBTC,KXETH \
-      --coherence-ms 2500 --max-workers 3 \
-      --max-new-events 3 --max-events-attempted 6 \
+      --series "$targeted_capture_series" \
+      --coherence-ms 2500 --max-workers 2 \
+      --max-new-events 1 --max-events-attempted 2 \
       --liquidity-window-report reports/crypto_event_vectors/liquidity_window_diagnosis.json \
       --max-forecast-lag-minutes 30 \
       --targeted-forecast-events 1 \
       --targeted-capture-latency-seconds 30 \
-      --targeted-capture-max-buckets 50 \
-      --canary-required 5 --target 100
-  run_health_stage targeted_crypto_capture_alt 75 timeout 75s flock -w 45 "$WRITER_LOCK" \
-    .venv/bin/python scripts/crypto_event_quote_collector.py \
-      --output reports/crypto_event_vectors/status.json \
-      --backfill-report reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json \
-      --series KXSOLE,KXXRP,KXDOGE \
-      --coherence-ms 2500 --max-workers 3 \
-      --max-new-events 3 --max-events-attempted 6 \
-      --liquidity-window-report reports/crypto_event_vectors/liquidity_window_diagnosis.json \
-      --max-forecast-lag-minutes 30 \
-      --targeted-forecast-events 1 \
-      --targeted-capture-latency-seconds 30 \
-      --targeted-capture-max-buckets 50 \
+      --targeted-capture-max-buckets 25 \
       --canary-required 5 --target 100
   .venv/bin/python scripts/crypto_forecast_polytope_alignment.py \
     --database "$DATABASE_PATH" \

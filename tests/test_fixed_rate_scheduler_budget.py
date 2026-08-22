@@ -24,12 +24,12 @@ def test_weather_gate_uses_small_bounded_batches() -> None:
 
 
 def test_targeted_capture_is_rate_limited_and_sharded() -> None:
-    assert "run_health_stage targeted_crypto_capture_major 75 timeout 75s" in SCRIPT
-    assert "run_health_stage targeted_crypto_capture_alt 75 timeout 75s" in SCRIPT
-    assert "--series KXBTC,KXETH" in SCRIPT
-    assert "--series KXSOLE,KXXRP,KXDOGE" in SCRIPT
-    assert SCRIPT.count("--coherence-ms 2500 --max-workers 3") == 2
-    assert SCRIPT.count("--max-new-events 3 --max-events-attempted 6") == 2
+    assert 'targeted_capture_stage="targeted_crypto_capture_major"' in SCRIPT
+    assert 'targeted_capture_stage="targeted_crypto_capture_alt"' in SCRIPT
+    assert 'run_health_stage "$targeted_capture_stage" 75 timeout 75s' in SCRIPT
+    assert '--coherence-ms 2500 --max-workers 2' in SCRIPT
+    assert '--max-new-events 1 --max-events-attempted 2' in SCRIPT
+    assert '--targeted-capture-max-buckets 25' in SCRIPT
 
 
 def test_crypto_router_has_an_independent_scheduler_budget() -> None:
