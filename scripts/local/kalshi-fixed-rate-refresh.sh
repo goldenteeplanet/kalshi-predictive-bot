@@ -122,7 +122,7 @@ while true; do
 
   # Stage B performs the bounded current-window ranking write after the fresh
   # snapshot/forecast transaction has committed.
-  run_health_stage active_crypto_ranking_finalize 120 timeout 120s flock -w 45 "$WRITER_LOCK" \
+  run_health_stage active_crypto_ranking_finalize 240 timeout 240s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/kalshi-bot phase3bc-r7-crypto-ranking-coverage-repair \
       --output-dir reports/phase3bc_r7 --limit 1000 \
       --freshness-minutes 15 --repair-rankings --repair-limit 150
@@ -163,7 +163,7 @@ while true; do
       --historical-calibration reports/phase_gh2/cliaus_historical_monthly_harvest.json \
       --minimum-calibration-samples 12
 
-  run_health_stage supported_weather_snapshot_forecast 180 timeout 180s flock -w 45 "$WRITER_LOCK" \
+  run_health_stage supported_weather_snapshot_forecast 240 timeout 240s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/supported_weather_snapshot_forecast.py \
       --preparation reports/phase_gh2/supported_weather_prepare.json \
       --output reports/phase_gh2/supported_weather_snapshot_forecast.json \
@@ -246,7 +246,7 @@ while true; do
     targeted_capture_stage="targeted_crypto_capture_alt"
     targeted_capture_series="KXSOLE,KXXRP,KXDOGE"
   fi
-  run_health_stage "$targeted_capture_stage" 120 timeout 120s flock -w 45 "$WRITER_LOCK" \
+  run_health_stage "$targeted_capture_stage" 180 timeout 180s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/crypto_event_quote_collector.py \
       --output reports/crypto_event_vectors/status.json \
       --backfill-report reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json \

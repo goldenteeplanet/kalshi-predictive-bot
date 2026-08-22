@@ -26,7 +26,7 @@ def test_weather_gate_uses_small_bounded_batches() -> None:
 def test_targeted_capture_is_rate_limited_and_sharded() -> None:
     assert 'targeted_capture_stage="targeted_crypto_capture_major"' in SCRIPT
     assert 'targeted_capture_stage="targeted_crypto_capture_alt"' in SCRIPT
-    assert 'run_health_stage "$targeted_capture_stage" 120 timeout 120s' in SCRIPT
+    assert 'run_health_stage "$targeted_capture_stage" 180 timeout 180s' in SCRIPT
     assert '--coherence-ms 2500 --max-workers 2' in SCRIPT
     assert '--max-new-events 1 --max-events-attempted 2' in SCRIPT
     assert '--targeted-capture-max-buckets 25' in SCRIPT
@@ -36,6 +36,7 @@ def test_crypto_router_has_an_independent_scheduler_budget() -> None:
     assert "--defer-phase3bc-router" in SCRIPT
     assert "run_health_stage active_crypto_router 210 timeout 210s" in SCRIPT
     assert "phase3bc-crypto-clean-opportunity-router" in SCRIPT
+    assert "active_crypto_ranking_finalize 240 timeout 240s" in SCRIPT
 
 
 def test_supported_weather_prepare_bounds_feature_rebuilds() -> None:
