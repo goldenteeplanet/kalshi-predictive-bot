@@ -246,7 +246,7 @@ while true; do
     targeted_capture_stage="targeted_crypto_capture_alt"
     targeted_capture_series="KXSOLE,KXXRP,KXDOGE"
   fi
-  run_health_stage "$targeted_capture_stage" 75 timeout 75s flock -w 45 "$WRITER_LOCK" \
+  run_health_stage "$targeted_capture_stage" 120 timeout 120s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/crypto_event_quote_collector.py \
       --output reports/crypto_event_vectors/status.json \
       --backfill-report reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json \
