@@ -1,0 +1,4376 @@
+{
+  "collisions": [],
+  "generated_at": "2026-08-22T00:05:04.830037+00:00",
+  "known_physical_boundaries": [
+    {
+      "owner": "CURRENT_MARKET_RESEARCH",
+      "resource": "forecasts",
+      "rule": "Historical reconstruction writes backtest/replay evidence, not current forecasts."
+    },
+    {
+      "owner": "HISTORICAL_REPLAY",
+      "resource": "settlements",
+      "rule": "Paper P&L may read outcomes but may not fabricate or rewrite them."
+    },
+    {
+      "owner": "GH2_OPERATIONAL_SOAK",
+      "resource": "fixed-rate-service",
+      "rule": "It is a controller; each child writer is charged to its declared lane."
+    }
+  ],
+  "lane_counts": {
+    "CURRENT_MARKET_RESEARCH": {
+      "artifact": 6,
+      "command": 337,
+      "counter": 4,
+      "table": 55,
+      "writer": 3
+    },
+    "GH2_OPERATIONAL_SOAK": {
+      "artifact": 4,
+      "command": 8,
+      "counter": 2,
+      "table": 9,
+      "writer": 1
+    },
+    "GUARDED_PAPER_LEARNING": {
+      "artifact": 3,
+      "command": 36,
+      "counter": 4,
+      "table": 25,
+      "writer": 2
+    },
+    "HISTORICAL_REPLAY": {
+      "artifact": 3,
+      "command": 51,
+      "counter": 3,
+      "table": 53,
+      "writer": 2
+    }
+  },
+  "lanes": {
+    "CURRENT_MARKET_RESEARCH": {
+      "prohibitions": [
+        "paper orders",
+        "historical-label leakage",
+        "GH-2 soak counters"
+      ],
+      "purpose": "Scan current markets and produce forecasts, rankings, and shadow evidence.",
+      "writes": "Current catalog, source, link, feature, quote, forecast, ranking, and shadow data."
+    },
+    "GH2_OPERATIONAL_SOAK": {
+      "prohibitions": [
+        "research expansion",
+        "paper order creation",
+        "shared training counters"
+      ],
+      "purpose": "Prove bounded operational health and safety.",
+      "writes": "Health, stage, source-readiness, soak, and invariant evidence only."
+    },
+    "GUARDED_PAPER_LEARNING": {
+      "prohibitions": [
+        "live execution",
+        "unapproved paper creation",
+        "shadow-as-paper"
+      ],
+      "purpose": "Create and evaluate explicitly authorized simulated paper positions.",
+      "writes": "Paper orders, fills, positions, P&L, sizing, risk, and paper-learning evidence."
+    },
+    "HISTORICAL_REPLAY": {
+      "prohibitions": [
+        "current paper orders",
+        "post-outcome features",
+        "GH-2 soak counters"
+      ],
+      "purpose": "Produce no-lookahead historical and settled model evaluations.",
+      "writes": "Replay, backtest, settlement, calibration, memory, and evaluation evidence."
+    }
+  },
+  "resources": [
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "advanced_risk_decisions"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "advanced_risk_high_water_marks"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "advanced_risk_reservations"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "alert_events"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "alerts"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "autopilot_cycles"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "autopilot_metrics"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "autopilot_opportunities"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "autopilot_paper_trades"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "autopilot_runs"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "backtest_runs"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "backtest_trades"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "crypto_current_events"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "crypto_event_liquidity_coverage"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "crypto_event_quote_captures"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "crypto_features"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "crypto_market_links"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "crypto_prices"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "economic_events"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "economic_features"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "economic_market_links"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "feature_candidate"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "feature_discovery_run"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "feature_evaluation"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "feature_fold_result"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "feature_holdout_access"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "feature_recommendation"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "feature_relationship"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "feature_segment_result"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "feature_snapshots"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "features"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "forecast_memory"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "forecast_skip_log"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "forecasts"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "forum_consensus_signals"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "learning_cycles"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "learning_metrics"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "learning_opportunities"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "learning_paper_trades"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "learning_rejection_log"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "learning_runs"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "learning_trade_targets"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "live_readiness_certificate"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "live_readiness_certificate_event"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "market_legs"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "market_memory"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "market_opportunities"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "market_rankings"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "market_snapshots"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "markets"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "memory_archive_manifests"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "memory_event_quarantine"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "meta_model_decisions"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "meta_model_features"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "meta_model_performance"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "meta_model_training_examples"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "microstructure_events"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "microstructure_features"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "microstructure_signals"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "model_confidence_scores"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "model_diagnostics"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "model_iteration_metrics"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "model_leaderboard"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "model_tournament_results"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "model_tournament_runs"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "model_weights"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "news_features"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "news_items"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "news_market_links"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "news_signals"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "opportunity_research_snapshots"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "orderbook_depth_snapshots"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "overnight_cycles"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "overnight_runs"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "paper_fills"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "paper_orders"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "paper_pnl"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "paper_positions"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "personal_trader_recommendation_memory"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "portfolio_snapshots"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "position_history"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "position_sizing_decisions"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "readiness_control_result"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "readiness_decision"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "readiness_evidence_manifest"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "readiness_review"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "research_notes"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "research_questions"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "risk_events"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_behavior_decision"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_behavior_policy"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_dataset_manifest"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_drift_snapshot"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_holdout_access_log"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_policy_artifact"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_policy_decision"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_policy_evaluation"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_policy_promotion"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_policy_rollback"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_policy_segment_metric"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_reward_definition"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_reward_ledger"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "rl_run"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "runtime_provenance_events"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "self_evaluation_findings"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "self_evaluation_journals"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "self_evaluation_metrics"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "self_evaluation_runs"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "settlements"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "signal_events"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "signal_forecasts"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "signal_performance"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "signal_skip_log"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "signal_trades"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "signals"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "sports_features"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "sports_games"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "sports_injuries"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "sports_market_links"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "sports_odds"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "sports_signals"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "sports_team_stats"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "sports_teams"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_calibration_result"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_constraint_result"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_contract_registry"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_event_registry"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_listing_check"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_listing_match"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_market_run"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_model_component"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_probability_estimate"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "synthetic_resolution"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "system_certification_artifact"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "system_certification_run"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "trade_memory"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "watchlist_markets"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "watchlists"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "weather_features"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "weather_forecasts"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "weather_market_links"
+    },
+    {
+      "definition": "Primary durable-table owner.",
+      "kind": "table",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "weather_observations"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "accelerate-learning"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "active-crypto-router"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "active-universe-doctor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "advanced-risk-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "analytics-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ask-research"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "autopilot-once"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "autopilot-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "autopilot-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "autopilot-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "backtest"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "best-payouts"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "build-crypto-features"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "build-economic-features"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "build-meta-features"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "build-meta-training"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "build-microstructure-features"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "build-news-features"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "build-sports-features"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "build-weather-features"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "candidate-coverage-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "candidate-funnel-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "catalog-lineage-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "category-coverage-gap-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "collect-once"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "command-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "compare-strategies"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "composite-settlement-resolve"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "control-center-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "crypto-backtest"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "crypto-forecast-doctor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "crypto-history-warmup"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "crypto-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "crypto-watch-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "crypto-window-sync"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "daily-briefing"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "db-doctor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "db-health"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "db-locks"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "db-migrate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "db-revision"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "db-writer-monitor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "derive-sports-schedule"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "economic-news-market-watch"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "explain-opportunity"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "feature-discovery-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "feature-discovery-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "feature-discovery-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "feature-experiment-export"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "find-opportunities"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "forecast"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "forecast-signals"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gap-closure-doctor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1-websocket-orderbook"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1-websocket-orderbook-drain"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1-websocket-orderbook-watch"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1d-liquidity-truth"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1e-discover-quoted"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1f-demo-quote-monitor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1g-liquidity-census"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "gh1h-production-liquidity-calibration"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "gh1i-two-sided-calibration"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1j-ranking-wiring-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1k-liquidity-repair-preview"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1l-guarded-activation"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1m-opportunity-attribution"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1n-timing-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1o-independent-edge-discovery"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1p-current-window-refresh"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "gh1q-forecast-skip-attribution"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "EXECUTE",
+      "name": "gh2-single-writer-decision-refresh"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "EXECUTE",
+      "name": "gh2-stage-crypto-quotes"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "gh4-paper-activation-preflight"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ingest-crypto"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ingest-economic"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ingest-external"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ingest-forum-consensus"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ingest-news"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ingest-sports"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ingest-weather"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "init-db"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "institutional-dashboard-export"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "institutional-dashboard-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "institutional-dashboard-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "leaderboard"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "learning-diagnostics"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "learning-once"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "learning-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "learning-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "learning-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "learning-targets"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "link-coverage"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "link-crypto-markets"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "link-economic-markets"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "link-news-markets"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "link-remediate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "link-sports-markets"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "link-weather-markets"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "EXECUTE",
+      "name": "live-readiness-guard-check"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "EXECUTE",
+      "name": "live-readiness-review"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "EXECUTE",
+      "name": "live-readiness-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "long-job-monitor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "market-coverage-doctor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "market-data-refresh"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "market-legs-parse"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "market-rankings"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "memory-archive"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "memory-backfill"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "memory-dataset"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "memory-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "memory-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "memory-timeline"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "meta-evaluate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "meta-opportunities"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "meta-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "microstructure-backtest"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "microstructure-opportunities"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "microstructure-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "microstructure-sample-watchlist"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "migrate-sqlite-to-postgres"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "model-confidence"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "model-diagnostics"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "model-feature-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "model-health"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "model-link-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "model-metrics-reconcile"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "model-readiness"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "model-readiness-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "model-repair-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "model-repair-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "model-weights"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "models-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "news-backtest"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "news-opportunities"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "news-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "nyc-w3-live-alignment-preview"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "nyc-w4-observation-feature-preview"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "nyc-w5-multi-window-shadow-calibration"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "nyc-w8-live-shadow-drift-certification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "opportunity-link-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "overnight-once"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "overnight-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "overnight-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "overnight-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "paper-pnl"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "paper-reset"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "paper-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "paper-settlement-doctor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "paper-summary"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "paper-trade-funnel"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "paper-trading-gap-analysis"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "personal-trader-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "personal-trader-brief"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "personal-trader-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase-3aj-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase-3ak-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase-3al-diagnostic"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase-orchestrator"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3-overnight-exploratory-paper-seed"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3aa-r2-exact-settlement-harvest"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3aa-r3-residual-settlement-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3aa-r4-settlement-fetch-recovery"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3aa-r5-closed-market-outcome-capture"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3aa-r6-composite-settlement-resolver"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3aa-realize"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3ab-learning-governor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ac-sports-provenance-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ae-fast-market-harvester"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ae-roster-candidate-diagnostics"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ae-verified-sports-connector"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3af-sports-schedule-bootstrap"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ag-crypto-pipeline"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ag-sports-ambiguity-coverage"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ag-sports-link-repair-pass"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ah-r2-player-prop-backfill"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ah-r3-bounded-scan-expansion"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ah-r3-sports-provenance-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ah-roster-participant-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ah-round-placeholder-resolution"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ah-schedule-roster-evidence"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ah-sports-evidence-backfill"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ah-sports-placeholder-watch"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ai-link-reconciliation"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3aj-sports-alias-provenance"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ak-multileg-provenance"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3al-learning-resume"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3am-gap-burndown"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3am-preflight"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3am-sports-verified-upgrade"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-3bb-r2-burndown"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-crypto-feature-completeness"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-crypto-watch-doctor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-crypto-watch-restart-plan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-economic-approval-safety-guard"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-economic-link-event-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-economic-link-event-repair-plan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-economic-morning-operator-handoff"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-economic-news-parser-backfill-plan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-economic-news-watch"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-economic-operator-approval-packet"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-economic-parser-leg-backfill"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-gap-fix-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-general-sources-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-overnight-refresh-continuity"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3an-paper-funnel-explain"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-preflight"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3an-settlement-health-confirm"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-sports-blocker-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3an-usda-date-mismatch-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3ao-learning-reward-pipeline"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ap-book-diagnostic"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ap-night-runner-v2"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3ap-paper-ready-unblock-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ap-refresh-positive-ev-books"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3ap-settlement-check-diagnostic"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3aq-link-and-book-unblock-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3aq-positive-ev-link-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3aq-refresh-verified-opportunity-books"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3aq-self-improvement"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3aq-settlement-check-split"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ar-catalog-stale-diagnostic"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ar-crypto-forecast-coverage"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ar-link-repair-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ar-refresh-books-for-verified-links"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ar-refresh-catalog-for-opportunities"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3ar-settlement-check-noise-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3ar-url-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3ar-url-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3as-active-universe"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3at-active-router"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3at-forecast-ranking-diagnostic"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3at-handoff-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3at-opportunity-funnel"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3au-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3au-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3aw-crash-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3aw-dashboard-truth"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3aw-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ax-gap-analysis"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ax-r9-guarded-refresh-job"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ax-sports-derivation"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ay-category-readiness"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3ay-due-settlement-diagnostic"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ay-free-source-adapter-registry"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ay-free-source-market-scan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ay-free-source-sprint-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ay-health-refresh"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3ay-multicategory-paper-funnel"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ay-positive-ev-accelerator"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3ay-settle-due-paper"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ay-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ay-unattended-guard"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ay-unattended-start"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3az-gap-analysis"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3az-r11-non-crypto-category-activation"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3az-r12-weather-activation-preview"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3az-r12-weather-missing-link-apply"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3az-r13-weather-handoff-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ba-ingestion-stability-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3ba-paper-certification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ba-r1-writer-unlock"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ba-r2-weather-ranking-activation"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3ba-r3-weather-paper-gate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ba-r4-crypto-executable-book-watch"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3ba-r5-paper-ready-truth"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ba-r6-noncrypto-engine-backlog"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ba-r7-composite-market-plan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3ba-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-acceleration-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-cloud-readiness"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-domain-readiness"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "phase3bb-historical-replay-acceleration"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-multicategory-expansion-plan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r1-operator-scheduler"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r10-cloud-readiness-decision"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r11-codex-cloud-bridge"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r12-cloud-bootstrap-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r13-cloud-scheduler-adoption"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r14-cloud-service-plan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r15-cloud-service-install-review"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r16-cloud-service-install-handoff"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r17-cloud-service-install-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r18-cloud-scheduler-runtime-cutover"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r19-cloud-systemd-cutover"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r2-apply-group-source-review"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r2-general-candidate-routing"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r2-general-source-availability"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r2-general-source-evidence"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r2-general-source-intake"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r2-group-source-review"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r2-weather-fast-lane"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r20-cloud-ui-service-plan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r21-cloud-ui-install-review"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r22-cloud-ui-install-handoff"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r23-cloud-ui-install-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r24-cloud-ui-start-tunnel-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r25-cloud-ui-operator-smoke-test"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r26-cloud-ui-access-control-gate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r27-cloud-ui-private-access-auth-draft"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r28-cloud-ui-private-access-operator-review"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r29-cloud-ui-private-access-install-handoff"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r3-composite-operator-preflight"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r3-composite-preview-gate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r3-exact-sports-link"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r3-free-source-inventory"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r3-general-reclassification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r3-safe-parser-reparse"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r3-source-evidence-activation"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r30-cloud-ui-private-access-install-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r31-cloud-ui-private-access-operator-smoke-test"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r32-cloud-ui-dashboard-truth-scheduler-status-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r33-cloud-paper-only-operations-readiness"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r34-cloud-multicategory-refresh-scheduler-review"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r35-cloud-multicategory-scheduler-no-start-dry-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r36-cloud-scheduler-install-handoff"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r37-cloud-scheduler-install-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r38-cloud-scheduler-install-repair-handoff"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r38-cloud-scheduler-timer-start-handoff"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r39-cloud-auto-login-admin-bootstrap"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r4-economic-parser-backfill"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r4-flightaware-review-link-gate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r40-cloud-scheduler-runtime-monitor"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r41-writer-gate-normalization"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r42-weather-fast-lane-post-unblock-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r43-single-writer-coordinator"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r43-weather-catalog-scheduler-hook"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r44-weather-catalog-hook-runtime-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r45-weather-freshness-to-ranking-impact"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r46-cloud-scheduler-weather-writer-gate-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r47-weather-current-window-series-discovery-linkability-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r48-weather-feature-refresh-runtime-verification"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r49-weather-missing-link-apply-after-feature-refresh"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r5-flightaware-date-stable-evidence"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r5-usda-source-activation"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r50-weather-post-link-ranking-fast-lane-recheck"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r51-weather-ranking-path-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r52-weather-ev-fair-value-diagnostic"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r54-weather-missing-link-apply-deferral"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r55-weather-ranking-path-retry"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r57-weather-selected-window-pipeline-speed-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r58-weather-selected-window-forecast-feature-alignment-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r59-weather-catalog-refresh-r57-retry"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r6-sports-provenance-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r60-weather-next-window-lead-time-scheduler-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r61-cloud-dashboard-db-writer-api-reachability-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r7-news-event-discovery"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r8-unified-paper-gate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3bb-r9-learning-acceleration"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-scheduler-plan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-throughput-analysis"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-weather-fast-lane"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bb-workspace-guard"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bc-crypto-clean-opportunity-router"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "phase3bc-r16-crypto-paper-ready-edge-hunt"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bc-r17-crypto-liquidity-actionability"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bc-r3-active-crypto-refresh"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bc-r4-crypto-ev-risk-diagnostics"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bc-r5-crypto-freshness-watch"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bc-r5-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bc-r5-unattended-guard"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bc-r5-unattended-start"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bc-r7-crypto-ranking-coverage-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bd-economic-market-discovery"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bd-r2-economic-calendar-freshness"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bd-r3-economic-value-capture"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bd-r4-verified-consensus-source"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bd-r5-consensus-feed-watch"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bd-r7-economic-opportunity-quality-gate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3bd-r8-economic-evidence-activation"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3x-audit"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3x-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3x-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3y-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "phase3z-r2-sports-provenance-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "pmb-regression-benchmark"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "portfolio-summary"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "report-calibration"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "research-opportunity"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "research-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "rl-dataset"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "rl-drift-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "rl-evaluate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "rl-shadow-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "rl-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "rl-train"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "roadmap-runtime-reports"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "runtime-identity"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "runtime-origin"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "scheduler-plan"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "self-evaluate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "settlement-watch"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "signal-explorer"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "signal-leaderboard"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "signal-performance"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "signal-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "signals-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "signals-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "snapshot"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "snapshot-coverage-repair"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "source-readiness-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "sports-backtest"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "sports-link-cleanup"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "sports-opportunities"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "sports-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "sqlite-backup"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "sqlite-recover"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "sync-markets"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "sync-settlements"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "synthetic-markets-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "synthetic-markets-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "synthetic-markets-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "EXECUTE",
+      "name": "system-certification-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "EXECUTE",
+      "name": "system-certification-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "EXECUTE",
+      "name": "system-certification-status"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "system-lanes"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "system-remediate"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "system-remediation-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "tonight-check"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "tonight-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "tonight-run"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "tournament"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "trade-memory-timeline"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ui"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ui-shell-status-refresh"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "ui-summary"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "EXECUTE",
+      "name": "weather-backtest"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "weather-identity-evidence-shadow"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "EXECUTE",
+      "name": "weather-one-contract-paper-activation"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "weather-report"
+    },
+    {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "EXECUTE",
+      "name": "workspace-guard"
+    },
+    {
+      "definition": "One scheduler-cycle health state.",
+      "kind": "artifact",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "reports/fixed_rate_health_status.json"
+    },
+    {
+      "definition": "Bounded GH-2 decision evidence.",
+      "kind": "artifact",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "reports/phase_gh2/gh2_active_candidate_refresh.json"
+    },
+    {
+      "definition": "Operational freshness-watch status.",
+      "kind": "artifact",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "reports/phase3bc_r5/phase3bc_r5_status.json"
+    },
+    {
+      "definition": "Read-only invariant assessment for authorized paper orders.",
+      "kind": "artifact",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "reports/paper_activation/invariant_status.json"
+    },
+    {
+      "definition": "Current crypto refresh universe and forecast evidence.",
+      "kind": "artifact",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json"
+    },
+    {
+      "definition": "Coherent current-event quote captures.",
+      "kind": "artifact",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "reports/crypto_event_vectors/status.json"
+    },
+    {
+      "definition": "Current forecast-to-quote-polytope alignment.",
+      "kind": "artifact",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "reports/crypto_event_vectors/forecast_polytope_alignment.json"
+    },
+    {
+      "definition": "Targeted current-forecast yield telemetry.",
+      "kind": "artifact",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "reports/crypto_event_vectors/targeted_forecast_telemetry.json"
+    },
+    {
+      "definition": "Current shadow signals; never paper orders.",
+      "kind": "artifact",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "reports/overnight_alpha_factory/shadow_signals.jsonl"
+    },
+    {
+      "definition": "Current simulated shadow ledger.",
+      "kind": "artifact",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "reports/overnight_alpha_factory/shadow_trades.jsonl"
+    },
+    {
+      "definition": "Settled no-lookahead multiclass evaluation.",
+      "kind": "artifact",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "reports/crypto_event_vectors/multiclass_interval_scoring.json"
+    },
+    {
+      "definition": "Settlement realization and reconciliation evidence.",
+      "kind": "artifact",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "reports/phase3aa"
+    },
+    {
+      "definition": "Canonical matching diagnostics; paper lane is read-only consumer.",
+      "kind": "artifact",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "reports/paper_settlement_reconciliation"
+    },
+    {
+      "definition": "Paper eligibility gate; not authorization.",
+      "kind": "artifact",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "reports/phase3ba_r3/weather_paper_gate.json"
+    },
+    {
+      "definition": "Fresh sizing/risk preflight evidence.",
+      "kind": "artifact",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "reports/phase3ba_r3/scoped_weather_depth_preflight.json"
+    },
+    {
+      "definition": "Operator approval and guarded activation preflight evidence.",
+      "kind": "artifact",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "reports/paper_activation/governance_preflight.json"
+    },
+    {
+      "definition": "Health artifact writer under the systemd controller.",
+      "kind": "writer",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "fixed-rate:health-and-soak-stages"
+    },
+    {
+      "definition": "Current catalog/source/feature/forecast/ranking stages.",
+      "kind": "writer",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "fixed-rate:active-crypto-and-weather-refresh"
+    },
+    {
+      "definition": "Current coherent capture and telemetry writer.",
+      "kind": "writer",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "crypto-event-quote-collector"
+    },
+    {
+      "definition": "Artifact-only shadow research writer.",
+      "kind": "writer",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "WRITE",
+      "name": "shadow-signal-and-ledger-scripts"
+    },
+    {
+      "definition": "Canonical external outcomes and evaluated-history writer.",
+      "kind": "writer",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "settlement-refresh-and-replay"
+    },
+    {
+      "definition": "No-lookahead replay/evaluation writer.",
+      "kind": "writer",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "WRITE",
+      "name": "backtest-and-walk-forward-commands"
+    },
+    {
+      "definition": "Only authorized paper-order creation path.",
+      "kind": "writer",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "operator-approved-paper-activation"
+    },
+    {
+      "definition": "Sizing and risk records for guarded paper decisions.",
+      "kind": "writer",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "WRITE",
+      "name": "phase3m-phase3n-paper-transaction"
+    },
+    {
+      "definition": "Completed healthy fixed-rate cycles; research runs never increment it.",
+      "kind": "counter",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "COUNT",
+      "name": "gh2_healthy_cycles"
+    },
+    {
+      "definition": "Critical timeouts per operational cycle.",
+      "kind": "counter",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "COUNT",
+      "name": "gh2_critical_stage_timeouts"
+    },
+    {
+      "definition": "Distinct active semantically supported tickers.",
+      "kind": "counter",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "COUNT",
+      "name": "current_supported_markets"
+    },
+    {
+      "definition": "Distinct current tickers with point-in-time forecasts.",
+      "kind": "counter",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "COUNT",
+      "name": "current_forecasted_markets"
+    },
+    {
+      "definition": "Current fee-adjusted executable candidates with net EV above zero.",
+      "kind": "counter",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "COUNT",
+      "name": "current_positive_net_ev"
+    },
+    {
+      "definition": "Artifact-ledger shadow decisions; excludes paper orders.",
+      "kind": "counter",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "mode": "COUNT",
+      "name": "shadow_decisions"
+    },
+    {
+      "definition": "No-lookahead evaluated contract forecasts.",
+      "kind": "counter",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "COUNT",
+      "name": "replay_evaluated_contracts"
+    },
+    {
+      "definition": "Distinct terminal events weighted once.",
+      "kind": "counter",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "COUNT",
+      "name": "replay_independent_events"
+    },
+    {
+      "definition": "Shadow decisions joined to canonical settlements.",
+      "kind": "counter",
+      "lane": "HISTORICAL_REPLAY",
+      "mode": "COUNT",
+      "name": "settled_shadow_decisions"
+    },
+    {
+      "definition": "Rows in paper_orders; excludes shadow trades.",
+      "kind": "counter",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "COUNT",
+      "name": "guarded_paper_orders"
+    },
+    {
+      "definition": "Rows in paper_fills attributable to guarded paper orders.",
+      "kind": "counter",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "COUNT",
+      "name": "guarded_paper_fills"
+    },
+    {
+      "definition": "Filled paper orders with attributable canonical settlement.",
+      "kind": "counter",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "COUNT",
+      "name": "settled_paper_trades"
+    },
+    {
+      "definition": "Settled paper trades with realized model/P&L evaluation.",
+      "kind": "counter",
+      "lane": "GUARDED_PAPER_LEARNING",
+      "mode": "COUNT",
+      "name": "evaluated_paper_trades"
+    }
+  ],
+  "shared_read_contracts": [
+    "All lanes read the same semantic market definitions.",
+    "All lanes read the same model, feature, EV, and fee definitions.",
+    "Historical Replay owns canonical settlements; Guarded Paper consumes them read-only.",
+    "GH-2 consumes current-market evidence but never increments research or paper counters."
+  ],
+  "status": "READY",
+  "version": "canonical_system_lanes_v1"
+}

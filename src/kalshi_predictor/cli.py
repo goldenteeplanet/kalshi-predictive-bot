@@ -873,6 +873,7 @@ from kalshi_predictor.system_certification.reports import (
     generate_system_certification_report,
     system_certification_card,
 )
+from kalshi_predictor.system_lanes import write_lane_contract
 from kalshi_predictor.system_readiness.remediation import (
     DEFAULT_REPORT_PATH as SYSTEM_REMEDIATION_REPORT_PATH,
 )
@@ -1446,6 +1447,32 @@ def runtime_origin_command(
         markdown_output.parent.mkdir(parents=True, exist_ok=True)
         markdown_output.write_text(render_runtime_origin_markdown(payload), encoding="utf-8")
         console.print(f"Wrote Markdown: {markdown_output}")
+
+
+@app.command(
+    "system-lanes",
+    help="Write the canonical GH-2, current research, replay, and guarded-paper ownership map.",
+)
+def system_lanes_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for the lane ownership JSON and Markdown reports."),
+    ] = Path("reports/acceleration"),
+) -> None:
+    payload = write_lane_contract(
+        json_path=output_dir / "canonical_lanes.json",
+        markdown_path=output_dir / "canonical_lanes.md",
+    )
+    console.print("Canonical system lanes")
+    console.print(f"Status: {payload['status']}")
+    for lane, counts in payload["lane_counts"].items():
+        rendered = ", ".join(f"{kind}={count}" for kind, count in counts.items())
+        console.print(f"{lane}: {rendered}")
+    console.print(f"Ownership collisions: {len(payload['collisions'])}")
+    console.print(f"Wrote JSON: {output_dir / 'canonical_lanes.json'}")
+    console.print(f"Wrote Markdown: {output_dir / 'canonical_lanes.md'}")
+    if payload["collisions"]:
+        raise typer.Exit(1)
 
 
 def _print_workspace_guard(payload: dict[str, object]) -> None:
