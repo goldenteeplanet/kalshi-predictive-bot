@@ -23,7 +23,10 @@ def main() -> int:
     parser.add_argument("--series", default="KXTEMPNYCH,KXRAINAUSM,KXRAINSTPM")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--per-command-timeout", type=int, default=45)
+    parser.add_argument("--feature-limit", type=int, default=200)
     args = parser.parse_args()
+    if args.feature_limit < 1:
+        parser.error("--feature-limit must be positive")
     series = tuple(
         dict.fromkeys(
             value.strip() for value in args.series.split(",") if value.strip()
@@ -58,7 +61,14 @@ def main() -> int:
     for location in locations:
         for command in (
             [str(executable), "ingest-weather", "--location-key", location],
-            [str(executable), "build-weather-features", "--location-key", location],
+            [
+                str(executable),
+                "build-weather-features",
+                "--location-key",
+                location,
+                "--limit",
+                str(args.feature_limit),
+            ],
         ):
             try:
                 result = subprocess.run(
@@ -97,6 +107,7 @@ def main() -> int:
             "existing_links_classified": link_result.existing_links_classified,
         },
         "supported_locations": locations,
+        "feature_limit": args.feature_limit,
         "commands": commands,
         "status": (
             "COMPLETE"

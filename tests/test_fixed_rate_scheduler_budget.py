@@ -3,6 +3,9 @@ from pathlib import Path
 SCRIPT = (
     Path(__file__).parents[1] / "scripts" / "local" / "kalshi-fixed-rate-refresh.sh"
 ).read_text(encoding="utf-8")
+WEATHER_PREP = (
+    Path(__file__).parents[1] / "scripts" / "supported_weather_prepare.py"
+).read_text(encoding="utf-8")
 
 
 def test_scheduler_enforces_completion_based_cooldown() -> None:
@@ -24,3 +27,9 @@ def test_targeted_capture_is_rate_limited_and_sharded() -> None:
     assert "--series KXSOLE,KXXRP,KXDOGE" in SCRIPT
     assert SCRIPT.count("--coherence-ms 2500 --max-workers 3") == 2
     assert SCRIPT.count("--max-new-events 3 --max-events-attempted 6") == 2
+
+
+def test_supported_weather_prepare_bounds_feature_rebuilds() -> None:
+    assert 'parser.add_argument("--feature-limit", type=int, default=200)' in WEATHER_PREP
+    assert '"--limit",' in WEATHER_PREP
+    assert 'str(args.feature_limit)' in WEATHER_PREP
