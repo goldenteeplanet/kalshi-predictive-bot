@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import base64
-import csv
 import json
-import re
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,6 +31,24 @@ from kalshi_predictor.phase3bb_r36_cloud_scheduler_install_handoff import (
     RUNNER_SCRIPT_NAME,
     SCHEDULER_SERVICE_NAME,
     SCHEDULER_TIMER_NAME,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    check as _check,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    first_line as _first_line,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    mark_executable as _mark_executable,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    stdout as _stdout,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    target_payload as _target_payload,
+)
+from kalshi_predictor.phase3bb_weather_common import (
+    write_rows_csv as _write_rows_csv,
 )
 from kalshi_predictor.utils.time import utc_now
 
@@ -122,7 +138,9 @@ def write_phase3bb_r43_weather_catalog_scheduler_hook_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["hook_checks"])
     runner_draft_path.write_text(payload["patched_runner_script"], encoding="utf-8")
@@ -203,9 +221,17 @@ def build_phase3bb_r43_weather_catalog_scheduler_hook(
     parsed = _parse_probe_outputs(results, r42=r42, target=target)
     patched_runner = _patched_runner(parsed.get("runner_script") or "")
     parsed["patched_runner_has_hook"] = HOOK_JOB_ID in patched_runner
-    parsed["runner_patch_required"] = bool(patched_runner and patched_runner != parsed.get("runner_script"))
+    parsed["runner_patch_required"] = bool(
+        patched_runner and patched_runner != parsed.get("runner_script")
+    )
     checks = _hook_checks(parsed=parsed, apply=apply, backup_first=backup_first)
-    install_result: dict[str, Any] = {"attempted": False, "ok": False, "exit_code": None, "stdout": "", "stderr": ""}
+    install_result: dict[str, Any] = {
+        "attempted": False,
+        "ok": False,
+        "exit_code": None,
+        "stdout": "",
+        "stderr": "",
+    }
     verify_after = parsed.get("runner_hook_present", False)
     if apply and _can_apply(checks, parsed):
         install_probe = _build_install_probe(
@@ -250,7 +276,9 @@ def build_phase3bb_r43_weather_catalog_scheduler_hook(
         "ssh_read_only_commands_executed": len(probes),
         "ssh_mutating_commands_executed": 1 if install_result["attempted"] else 0,
         "systemctl_mutating_commands_executed": 0,
-        "scheduler_runner_written_to_system": bool(install_result["attempted"] and install_result["ok"]),
+        "scheduler_runner_written_to_system": bool(
+            install_result["attempted"] and install_result["ok"]
+        ),
         "scheduler_timer_started": False,
         "scheduler_service_started": False,
         "starts_r5_watcher": False,
@@ -291,13 +319,14 @@ def build_phase3bb_r43_weather_catalog_scheduler_hook(
     }
 
 
-def _build_remote_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) -> list[RemoteProbe]:
+def _build_remote_probes(
+    target: CloudBootstrapTarget, *, timeout_seconds: int
+) -> list[RemoteProbe]:
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
     runner_path = shlex.quote(_runner_path(target))
     writer_cmd = (
-        f"cd {app} && set -a && . {env} && set +a && "
-        ".venv/bin/kalshi-bot db-writer-monitor --json"
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
     )
     registry_commands = (
         "sync-markets",
@@ -309,15 +338,31 @@ def _build_remote_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) 
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
         RemoteProbe("db_writer_monitor_raw", writer_cmd, timeout_seconds),
-        RemoteProbe("db_writer_monitor_json_tool", f"{writer_cmd} | python3 -m json.tool >/dev/null", timeout_seconds),
-        RemoteProbe("scheduler_timer_active", f"systemctl is-active {SCHEDULER_TIMER_NAME} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_active", f"systemctl is-active {SCHEDULER_SERVICE_NAME} || true", timeout_seconds),
-        RemoteProbe("scheduler_runner_script", f"test -x {runner_path} && sed -n '1,260p' {runner_path}", timeout_seconds),
+        RemoteProbe(
+            "db_writer_monitor_json_tool",
+            f"{writer_cmd} | python3 -m json.tool >/dev/null",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "scheduler_timer_active",
+            f"systemctl is-active {SCHEDULER_TIMER_NAME} || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "scheduler_service_active",
+            f"systemctl is-active {SCHEDULER_SERVICE_NAME} || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "scheduler_runner_script",
+            f"test -x {runner_path} && sed -n '1,260p' {runner_path}",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "command_registry",
             (
                 f"cd {app} && for cmd in {registry_loop}; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -418,11 +463,18 @@ def _parse_probe_outputs(
         "writer_status": writer_payload.get("status") or "UNKNOWN",
         "writer_pid": writer_payload.get("current_writer_pid"),
         "scheduler_timer_active_state": _first_line(_stdout(by_name.get("scheduler_timer_active"))),
-        "scheduler_service_active_state": _first_line(_stdout(by_name.get("scheduler_service_active"))),
-        "command_registry_ok": bool(by_name.get("command_registry") and by_name["command_registry"].ok),
+        "scheduler_service_active_state": _first_line(
+            _stdout(by_name.get("scheduler_service_active"))
+        ),
+        "command_registry_ok": bool(
+            by_name.get("command_registry") and by_name["command_registry"].ok
+        ),
         "r42_status": r42_decision.get("status"),
-        "r42_first_hard_blocker": r42_decision.get("first_hard_blocker") or r42_summary.get("first_hard_blocker"),
-        "weather_funnel_status": weather_funnel.get("status") if isinstance(weather_funnel, dict) else None,
+        "r42_first_hard_blocker": r42_decision.get("first_hard_blocker")
+        or r42_summary.get("first_hard_blocker"),
+        "weather_funnel_status": weather_funnel.get("status")
+        if isinstance(weather_funnel, dict)
+        else None,
         "current_weather_rows": weather_summary.get("current_weather_rows"),
     }
 
@@ -447,7 +499,11 @@ def _hook_checks(
 ) -> list[dict[str, Any]]:
     service_state = parsed.get("scheduler_service_active_state")
     return [
-        _check("runner_script_found", bool(parsed.get("runner_exists")), f"runner={parsed.get('runner_path')}."),
+        _check(
+            "runner_script_found",
+            bool(parsed.get("runner_exists")),
+            f"runner={parsed.get('runner_path')}.",
+        ),
         _check(
             "runner_has_weather_fast_lane_anchor",
             bool(parsed.get("runner_weather_fast_lane_present")),
@@ -472,7 +528,8 @@ def _hook_checks(
             "db_writer_monitor_json_valid",
             bool(parsed.get("db_writer_monitor_strict_json_valid"))
             and bool(parsed.get("db_writer_monitor_json_tool_ok")),
-            parsed.get("db_writer_monitor_parse_error") or "db-writer-monitor --json parses cleanly.",
+            parsed.get("db_writer_monitor_parse_error")
+            or "db-writer-monitor --json parses cleanly.",
         ),
         _check(
             "scheduler_service_not_running_for_apply",
@@ -527,7 +584,8 @@ def _decision(
         command = "kalshi-bot phase3bb-r43-weather-catalog-scheduler-hook --output-dir reports/phase3bb_r43 --reports-dir reports"
     return {
         "status": status,
-        "hook_ready_or_installed": status in {
+        "hook_ready_or_installed": status
+        in {
             "WEATHER_CATALOG_HOOK_ALREADY_INSTALLED",
             "READY_TO_INSTALL_WEATHER_CATALOG_HOOK",
             "WEATHER_CATALOG_HOOK_INSTALLED",
@@ -659,53 +717,3 @@ def _render_operator_command(payload: dict[str, Any]) -> str:
 
 def _runner_path(target: CloudBootstrapTarget) -> str:
     return f"{target.app_path.rstrip('/')}/scripts/{RUNNER_SCRIPT_NAME}"
-
-
-def _target_payload(target: CloudBootstrapTarget) -> dict[str, str]:
-    return {
-        "ssh_target": target.ssh_target,
-        "identity_file": target.identity_file,
-        "app_path": target.app_path,
-        "env_path": target.env_path,
-        "db_path": target.db_path,
-        "reports_path": target.reports_path,
-    }
-
-
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    keys: list[str] = []
-    for row in rows:
-        for key in row:
-            if key not in keys:
-                keys.append(key)
-    fieldnames = keys or ["empty"]
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        if rows:
-            writer.writerows(rows)
-
-
-def _mark_executable(path: Path) -> None:
-    try:
-        path.chmod(path.stat().st_mode | 0o111)
-    except OSError:
-        pass
-
-
-def _check(name: str, passed: bool, detail: str) -> dict[str, Any]:
-    return {"check": name, "passed": bool(passed), "detail": detail}
-
-
-def _stdout(result: RemoteProbeResult | None) -> str:
-    if result is None:
-        return ""
-    return result.stdout or ""
-
-
-def _first_line(text: str) -> str:
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    return ""

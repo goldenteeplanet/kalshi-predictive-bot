@@ -1,0 +1,261 @@
+{
+  "consolidations": [
+    {
+      "canonical_module": "kalshi_predictor.phase3bb_weather_common",
+      "compatibility": "Command names, writer callables, outputs, and transactions unchanged.",
+      "helpers": [
+        "check",
+        "first_line",
+        "mark_executable",
+        "stdout",
+        "target_payload",
+        "write_probe_csv",
+        "write_rows_csv"
+      ],
+      "scope": "Phase 3BB R42-R45 current-market research wrappers"
+    }
+  ],
+  "deferred_command_merges": [
+    {
+      "commands": [
+        "phase3bb-r2-weather-fast-lane",
+        "phase3bb-weather-fast-lane",
+        "phase3bb-r44-weather-catalog-hook-runtime-verification",
+        "phase3bb-r45-weather-freshness-to-ranking-impact",
+        "phase3bb-r46-cloud-scheduler-weather-writer-gate-repair",
+        "phase3bb-r47-weather-current-window-series-discovery-linkability-repair",
+        "phase3bb-r48-weather-feature-refresh-runtime-verification",
+        "phase3bb-r49-weather-missing-link-apply-after-feature-refresh",
+        "phase3bb-r50-weather-post-link-ranking-fast-lane-recheck",
+        "phase3bb-r51-weather-ranking-path-repair",
+        "phase3bb-r52-weather-ev-fair-value-diagnostic",
+        "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair",
+        "phase3bb-r54-weather-missing-link-apply-deferral",
+        "phase3bb-r55-weather-ranking-path-retry",
+        "phase3bb-r57-weather-selected-window-pipeline-speed-repair",
+        "phase3bb-r58-weather-selected-window-forecast-feature-alignment-repair",
+        "phase3bb-r59-weather-catalog-refresh-r57-retry",
+        "phase3bb-r60-weather-next-window-lead-time-scheduler-repair",
+        "phase3bb-r42-weather-fast-lane-post-unblock-verification",
+        "phase3bb-r43-weather-catalog-scheduler-hook"
+      ],
+      "reason": "The wrappers share a lane but call distinct stage writers and artifact contracts; therefore they are not behaviorally interchangeable."
+    }
+  ],
+  "generated_at": "2026-08-22T00:19:13.923317+00:00",
+  "lane_summary": {
+    "CURRENT_MARKET_RESEARCH": {
+      "artifacts": 6,
+      "commands": 337,
+      "counters": 4,
+      "tables": 55,
+      "writers": 3
+    },
+    "GH2_OPERATIONAL_SOAK": {
+      "artifacts": 6,
+      "commands": 9,
+      "counters": 2,
+      "tables": 9,
+      "writers": 1
+    },
+    "GUARDED_PAPER_LEARNING": {
+      "artifacts": 3,
+      "commands": 36,
+      "counters": 4,
+      "tables": 25,
+      "writers": 2
+    },
+    "HISTORICAL_REPLAY": {
+      "artifacts": 3,
+      "commands": 51,
+      "counters": 3,
+      "tables": 53,
+      "writers": 2
+    }
+  },
+  "phase3bb_weather_chain": [
+    {
+      "command": "phase3bb-r2-weather-fast-lane",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r2_weather_fast_lane_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "commit",
+      "writer_callable": "write_phase3bb_r2_weather_fast_lane_report",
+      "writer_semantics": "current-research database writer"
+    },
+    {
+      "command": "phase3bb-weather-fast-lane",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_weather_fast_lane_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "none",
+      "writer_callable": "write_phase3bb_weather_fast_lane_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r44-weather-catalog-hook-runtime-verification",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r44_weather_catalog_hook_runtime_verification_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r44_weather_catalog_hook_runtime_verification_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r45-weather-freshness-to-ranking-impact",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r45_weather_freshness_to_ranking_impact_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r45_weather_freshness_to_ranking_impact_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r46-cloud-scheduler-weather-writer-gate-repair",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_report",
+      "writer_semantics": "conditional external scheduler writer"
+    },
+    {
+      "command": "phase3bb-r47-weather-current-window-series-discovery-linkability-repair",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r47_weather_current_window_series_discovery_linkability_repair_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r47_weather_current_window_series_discovery_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r48-weather-feature-refresh-runtime-verification",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r48_weather_feature_refresh_runtime_verification_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r48_weather_feature_refresh_runtime_verification_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r49-weather-missing-link-apply-after-feature-refresh",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r49_weather_missing_link_apply_after_feature_refresh_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r49_weather_missing_link_apply_after_feature_refresh_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r50-weather-post-link-ranking-fast-lane-recheck",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r50_weather_post_link_ranking_fast_lane_recheck_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r50_weather_post_link_ranking_fast_lane_recheck_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r51-weather-ranking-path-repair",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r51_weather_ranking_path_repair_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r51_weather_ranking_path_repair_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r52-weather-ev-fair-value-diagnostic",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r52_weather_ev_fair_value_diagnostic_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r52_weather_ev_fair_value_diagnostic_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r53_weather_current_window_cadence_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r53_weather_current_window_cadence_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r54-weather-missing-link-apply-deferral",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r54_weather_missing_link_apply_deferral_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r54_weather_missing_link_apply_deferral_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r55-weather-ranking-path-retry",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r55_weather_ranking_path_retry_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r55_weather_ranking_path_retry_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r57-weather-selected-window-pipeline-speed-repair",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r57_weather_selected_window_pipeline_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r57_weather_selected_window_pipeline_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r58-weather-selected-window-forecast-feature-alignment-repair",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r58_weather_selected_window_alignment_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r58_weather_selected_window_alignment_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r59-weather-catalog-refresh-r57-retry",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r59_weather_catalog_refresh_r57_retry_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r59_weather_catalog_refresh_r57_retry_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r60-weather-next-window-lead-time-scheduler-repair",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r60_weather_next_window_lead_time_scheduler_repair_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r60_weather_next_window_lead_time_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r42-weather-fast-lane-post-unblock-verification",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r42_weather_fast_lane_post_unblock_verification_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r42_weather_fast_lane_post_unblock_report",
+      "writer_semantics": "read-only diagnostic/report writer"
+    },
+    {
+      "command": "phase3bb-r43-weather-catalog-scheduler-hook",
+      "disposition": "compatibility wrapper retained",
+      "handler": "phase3bb_r43_weather_catalog_scheduler_hook_command",
+      "lane": "CURRENT_MARKET_RESEARCH",
+      "transaction": "rollback",
+      "writer_callable": "write_phase3bb_r43_weather_catalog_scheduler_hook_report",
+      "writer_semantics": "conditional external scheduler writer"
+    }
+  ],
+  "status": "READY",
+  "version": "canonical_wrapper_inventory_v1",
+  "violations": []
+}

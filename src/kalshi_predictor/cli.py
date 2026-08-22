@@ -874,6 +874,7 @@ from kalshi_predictor.system_certification.reports import (
     system_certification_card,
 )
 from kalshi_predictor.system_lanes import write_lane_contract
+from kalshi_predictor.wrapper_inventory import write_wrapper_inventory
 from kalshi_predictor.system_readiness.remediation import (
     DEFAULT_REPORT_PATH as SYSTEM_REMEDIATION_REPORT_PATH,
 )
@@ -1472,6 +1473,30 @@ def system_lanes_command(
     console.print(f"Wrote JSON: {output_dir / 'canonical_lanes.json'}")
     console.print(f"Wrote Markdown: {output_dir / 'canonical_lanes.md'}")
     if payload["collisions"]:
+        raise typer.Exit(1)
+
+
+@app.command(
+    "wrapper-inventory",
+    help="Inventory canonical-lane wrappers and same-lane consolidation decisions.",
+)
+def wrapper_inventory_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for wrapper ownership JSON and Markdown reports."),
+    ] = Path("reports/acceleration"),
+) -> None:
+    payload = write_wrapper_inventory(
+        json_path=output_dir / "wrapper_inventory.json",
+        markdown_path=output_dir / "wrapper_inventory.md",
+    )
+    console.print("Canonical wrapper inventory")
+    console.print(f"Status: {payload['status']}")
+    console.print(f"Weather wrappers: {len(payload['phase3bb_weather_chain'])}")
+    console.print(f"Lane violations: {len(payload['violations'])}")
+    console.print(f"Wrote JSON: {output_dir / 'wrapper_inventory.json'}")
+    console.print(f"Wrote Markdown: {output_dir / 'wrapper_inventory.md'}")
+    if payload["violations"]:
         raise typer.Exit(1)
 
 

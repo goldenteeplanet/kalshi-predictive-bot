@@ -1,6 +1,6 @@
 {
   "collisions": [],
-  "generated_at": "2026-08-22T00:05:04.830037+00:00",
+  "generated_at": "2026-08-22T00:19:14.071359+00:00",
   "known_physical_boundaries": [
     {
       "owner": "CURRENT_MARKET_RESEARCH",
@@ -27,8 +27,8 @@
       "writer": 3
     },
     "GH2_OPERATIONAL_SOAK": {
-      "artifact": 4,
-      "command": 8,
+      "artifact": 6,
+      "command": 9,
       "counter": 2,
       "table": 9,
       "writer": 1
@@ -4106,6 +4106,13 @@
       "name": "workspace-guard"
     },
     {
+      "definition": "Primary command lane.",
+      "kind": "command",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "EXECUTE",
+      "name": "wrapper-inventory"
+    },
+    {
       "definition": "One scheduler-cycle health state.",
       "kind": "artifact",
       "lane": "GH2_OPERATIONAL_SOAK",
@@ -4132,6 +4139,20 @@
       "lane": "GH2_OPERATIONAL_SOAK",
       "mode": "WRITE",
       "name": "reports/paper_activation/invariant_status.json"
+    },
+    {
+      "definition": "Canonical command-wrapper ownership and consolidation evidence.",
+      "kind": "artifact",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "reports/acceleration/wrapper_inventory.json"
+    },
+    {
+      "definition": "Human-readable command-wrapper ownership and consolidation evidence.",
+      "kind": "artifact",
+      "lane": "GH2_OPERATIONAL_SOAK",
+      "mode": "WRITE",
+      "name": "reports/acceleration/wrapper_inventory.md"
     },
     {
       "definition": "Current crypto refresh universe and forecast evidence.",

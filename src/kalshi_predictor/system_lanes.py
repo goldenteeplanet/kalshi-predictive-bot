@@ -148,6 +148,20 @@ ARTIFACTS = (
     ),
     OwnedResource(
         "artifact",
+        "reports/acceleration/wrapper_inventory.json",
+        GH2_SOAK,
+        "WRITE",
+        "Canonical command-wrapper ownership and consolidation evidence.",
+    ),
+    OwnedResource(
+        "artifact",
+        "reports/acceleration/wrapper_inventory.md",
+        GH2_SOAK,
+        "WRITE",
+        "Human-readable command-wrapper ownership and consolidation evidence.",
+    ),
+    OwnedResource(
+        "artifact",
         "reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json",
         CURRENT_RESEARCH,
         "WRITE",
@@ -398,6 +412,8 @@ def table_owner(table: str) -> str:
 
 def command_owner(command: str) -> str:
     lowered = command.lower()
+    if lowered == "wrapper-inventory":
+        return GH2_SOAK
     if any(
         token in lowered
         for token in ("paper", "position-sizing", "advanced-risk", "learning", "autopilot", "gh4")
