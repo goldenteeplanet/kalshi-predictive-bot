@@ -110,7 +110,15 @@ while true; do
       --forecast-limit 1000 --opportunity-limit 150 --phase3bc-limit 1000 \
       --forecast-current-windows-only --near-money-only \
       --near-money-per-symbol-limit 8 --near-money-window-limit 4 \
-      --snapshot-fetch-concurrency 4 --skip-opportunity-report --cycles 1
+      --snapshot-fetch-concurrency 4 --skip-opportunity-report \
+      --defer-phase3bc-router --cycles 1
+
+  # The router is report-only but can take several minutes over retained links.
+  # Keep it outside the snapshot/forecast writer transaction so its cost has an
+  # independent deadline and cannot obscure current-market freshness.
+  run_health_stage active_crypto_router 210 timeout 210s flock -w 45 "$WRITER_LOCK" \
+    .venv/bin/kalshi-bot phase3bc-crypto-clean-opportunity-router \
+      --output-dir reports/phase3bc --limit 1000
 
   # Stage B performs the bounded current-window ranking write after the fresh
   # snapshot/forecast transaction has committed.

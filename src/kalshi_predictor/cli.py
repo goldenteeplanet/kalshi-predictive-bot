@@ -13100,6 +13100,13 @@ def phase3bc_r3_active_crypto_refresh_command(
             help="Generate the slower opportunity report during R3.",
         ),
     ] = True,
+    refresh_phase3bc_router: Annotated[
+        bool,
+        typer.Option(
+            "--refresh-phase3bc-router/--defer-phase3bc-router",
+            help="Refresh the slower Phase 3BC router inside this transaction.",
+        ),
+    ] = True,
     near_money_only: Annotated[
         bool,
         typer.Option(
@@ -13159,6 +13166,7 @@ def phase3bc_r3_active_crypto_refresh_command(
                 repair_snapshots=repair_snapshots,
                 forecast_current_windows_only=forecast_current_windows_only,
                 generate_opportunity_report=generate_opportunity_report,
+                refresh_phase3bc_router=refresh_phase3bc_router,
                 market_limit=market_limit,
                 market_max_pages=market_max_pages,
                 crypto_market_scan_limit=crypto_market_scan_limit,

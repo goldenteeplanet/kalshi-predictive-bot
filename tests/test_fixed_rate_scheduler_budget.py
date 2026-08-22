@@ -32,6 +32,12 @@ def test_targeted_capture_is_rate_limited_and_sharded() -> None:
     assert SCRIPT.count("--max-new-events 3 --max-events-attempted 6") == 2
 
 
+def test_crypto_router_has_an_independent_scheduler_budget() -> None:
+    assert "--defer-phase3bc-router" in SCRIPT
+    assert "run_health_stage active_crypto_router 210 timeout 210s" in SCRIPT
+    assert "phase3bc-crypto-clean-opportunity-router" in SCRIPT
+
+
 def test_supported_weather_prepare_bounds_feature_rebuilds() -> None:
     assert 'parser.add_argument("--feature-limit", type=int, default=200)' in WEATHER_PREP
     assert '"--limit",' in WEATHER_PREP
