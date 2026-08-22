@@ -183,7 +183,8 @@ while true; do
       --gh1-staging-dir /home/james/kalshi-local-runtime/gh1-staging \
       --candidate-manifest-path /home/james/kalshi-local-runtime/watch/actionable_tickers.json \
       --candidate-limit 40 --active-link-limit 24 --forecast-limit 24 \
-      --opportunity-limit 20 --freshness-minutes 15 --soak-cycles-required 24 \
+      --opportunity-limit 20 --weather-decision-limit 8 \
+      --freshness-minutes 15 --soak-cycles-required 24 \
       --defer-weather-gate --guard-active-writer
 
   # Keep the current-weather diagnostic inside a short API budget. The coherent
@@ -191,7 +192,7 @@ while true; do
   run_health_stage weather_gate_diagnostics 75 timeout 75s \
     .venv/bin/kalshi-bot phase3ba-r3-weather-paper-gate \
       --output-dir reports/phase3ba_r3 --reports-dir reports \
-      --limit 12 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
+      --limit 8 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
       --deadline-seconds 50 --batch-size 2
 
   # Phase 3M's historical scan is deliberately separated from the fresh-quote

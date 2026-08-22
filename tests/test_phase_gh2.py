@@ -303,10 +303,10 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "risk_preflight=False" not in implementation
     assert "exact_snapshot_refresh=True" in implementation
     assert "exact_snapshot_refresh=False" not in implementation
-    assert "exact_snapshot_refresh_limit=250" in implementation
+    assert "exact_snapshot_refresh_limit=forecast_limit" in implementation
+    assert "ranking_repair_limit=forecast_limit" in implementation
     assert "ranking_repair=True" in implementation
     assert "ranking_repair=False" not in implementation
-    assert "ranking_repair_limit=250" in implementation
     assert implementation.index('mark_stage("commit_single_writer")') < implementation.index(
         "_write_candidate_manifest(candidate_manifest_path, manifest_candidates)"
     )
@@ -329,7 +329,7 @@ def test_fixed_rate_scheduler_splits_weather_gate_from_decision_publication() ->
     assert "--active-link-limit 24 --forecast-limit 24" in script
     assert "--opportunity-limit 20" in script
     assert "--defer-weather-gate" in script
-    assert "weather_gate_diagnostics 120 timeout 120s" in script
+    assert "weather_gate_diagnostics 75 timeout 75s" in script
     assert "phase3ba-r3-weather-paper-gate" in script
     assert script.index("--defer-weather-gate") < script.index(
         "phase3ba-r3-weather-paper-gate"

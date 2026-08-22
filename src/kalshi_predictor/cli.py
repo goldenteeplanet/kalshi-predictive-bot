@@ -19813,6 +19813,10 @@ def gh2_single_writer_decision_refresh_command(
         int,
         typer.Option(help="Maximum rankings/opportunities written per category."),
     ] = 100,
+    weather_decision_limit: Annotated[
+        int,
+        typer.Option(help="Maximum current weather tickers refreshed in the GH-2 writer."),
+    ] = 14,
     freshness_minutes: Annotated[
         int,
         typer.Option(help="Maximum snapshot/ranking age for fresh decision truth."),
@@ -19845,6 +19849,7 @@ def gh2_single_writer_decision_refresh_command(
         active_link_limit,
         forecast_limit,
         opportunity_limit,
+        weather_decision_limit,
         freshness_minutes,
         soak_cycles_required,
     )
@@ -19881,6 +19886,7 @@ def gh2_single_writer_decision_refresh_command(
         active_link_limit=active_link_limit,
         forecast_limit=forecast_limit,
         opportunity_limit=opportunity_limit,
+        weather_decision_limit=weather_decision_limit,
         freshness_minutes=freshness_minutes,
         soak_cycles_required=soak_cycles_required,
         refresh_weather_gate=refresh_weather_gate,

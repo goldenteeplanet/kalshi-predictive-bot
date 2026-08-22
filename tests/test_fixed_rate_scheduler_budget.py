@@ -21,6 +21,8 @@ def test_weather_gate_uses_small_bounded_batches() -> None:
     assert "run_health_stage weather_gate_diagnostics 75 timeout 75s" in SCRIPT
     assert "run_health_stage weather_gate_post_preflight 75 timeout 75s" in SCRIPT
     assert SCRIPT.count("--deadline-seconds 50 --batch-size 2") == 2
+    assert "--opportunity-limit 20 --weather-decision-limit 8" in SCRIPT
+    assert SCRIPT.count("--limit 8 --current-window-lookback-hours 3") == 2
 
 
 def test_targeted_capture_is_rate_limited_and_sharded() -> None:

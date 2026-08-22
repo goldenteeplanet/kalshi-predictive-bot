@@ -19,11 +19,11 @@ from kalshi_predictor.data.schema import (
     PaperOrder,
     PositionSizingDecisionLog,
 )
+from kalshi_predictor.forecasting.registry import run_forecast_models
 from kalshi_predictor.kalshi.client import KalshiClient
 from kalshi_predictor.kalshi.orderbook import usable_bid_ask_book
-from kalshi_predictor.forecasting.registry import run_forecast_models
-from kalshi_predictor.opportunities.scanner import scan_opportunities
 from kalshi_predictor.learning.config import learning_paper_settings
+from kalshi_predictor.opportunities.scanner import scan_opportunities
 from kalshi_predictor.paper.models import PaperDecision
 from kalshi_predictor.position_sizing.service import (
     ensure_paper_decision_sized,
@@ -63,6 +63,7 @@ def main() -> None:
     }
     if set(rows) != tickers:
         raise RuntimeError(f"Missing scoped gate rows: {sorted(tickers - set(rows))}")
+    ineligible: dict[str, str] = {}
     for ticker, row in rows.items():
         if not all(
             (
@@ -79,7 +80,18 @@ def main() -> None:
                 },
             )
         ):
-            raise RuntimeError(f"{ticker} is no longer eligible for scoped sizing")
+            ineligible[ticker] = str(row.get("first_blocker") or "NOT_ELIGIBLE")
+    if ineligible:
+        skipped = {
+            "generated_at": utc_now().isoformat(),
+            "status": "SKIPPED_NO_ELIGIBLE_SCOPED_TICKERS",
+            "paper_order_creation_enabled": False,
+            "ineligible_tickers": ineligible,
+            "results": [],
+        }
+        _write_atomic(args.output, skipped)
+        print(json.dumps(skipped, indent=2, sort_keys=True))
+        return
 
     base = get_settings()
     settings = learning_paper_settings(base).model_copy(
@@ -196,7 +208,8 @@ def main() -> None:
                 price = to_decimal(ranking.best_price)
                 if not book.usable or book.ask_price != price:
                     raise RuntimeError(
-                        f"{ticker}: fresh executable ask {book.ask_price} does not match ranking {price}"
+                        f"{ticker}: fresh executable ask {book.ask_price} "
+                        f"does not match ranking {price}"
                     )
                 depth = book.ask_depth
                 depth_cap = int(depth.to_integral_value(rounding=ROUND_FLOOR)) if depth else 0
