@@ -125,7 +125,7 @@ while true; do
 
   # Publish the global UI freshness strip as soon as the critical market stage
   # is complete. A second refresh after settlement keeps end-of-cycle truth.
-  run_health_stage ui_shell_status_refresh_early 30 timeout 30s \
+  run_health_stage ui_shell_status_refresh_early 60 timeout 60s \
     .venv/bin/kalshi-bot ui-shell-status-refresh \
       --output-path reports/ui/shell_status_snapshot.json
 
