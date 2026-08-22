@@ -44,3 +44,5 @@ def test_supported_weather_snapshot_fetches_outside_db_session_in_bounded_pool()
     assert WEATHER_SNAPSHOT.find("fetched = _fetch_tickers") < WEATHER_SNAPSHOT.find(
         "with session_factory() as session"
     )
+    assert "--limit 8 --fetch-workers 4" in SCRIPT
+    assert 'ticker.split("-", 1)[0]' in WEATHER_SNAPSHOT

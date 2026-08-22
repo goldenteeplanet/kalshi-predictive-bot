@@ -159,7 +159,7 @@ while true; do
     .venv/bin/python scripts/supported_weather_snapshot_forecast.py \
       --preparation reports/phase_gh2/supported_weather_prepare.json \
       --output reports/phase_gh2/supported_weather_snapshot_forecast.json \
-      --limit 300
+      --limit 8 --fetch-workers 4
 
   run_health_stage coinbase_stage 45 timeout 45s \
     .venv/bin/kalshi-bot gh2-stage-crypto-quotes \

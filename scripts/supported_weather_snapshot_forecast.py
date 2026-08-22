@@ -128,9 +128,18 @@ def _exact_tickers(payload: dict[str, object], limit: int) -> list[str]:
     values = payload.get("active_exact_tickers")
     if not isinstance(values, list):
         raise ValueError("preparation artifact lacks active_exact_tickers")
-    return list(dict.fromkeys(str(value).strip() for value in values if str(value).strip()))[
-        : max(0, limit)
-    ]
+    unique = list(
+        dict.fromkeys(str(value).strip() for value in values if str(value).strip())
+    )
+    by_series: dict[str, list[str]] = {}
+    for ticker in unique:
+        by_series.setdefault(ticker.split("-", 1)[0], []).append(ticker)
+    selected: list[str] = []
+    while len(selected) < max(0, limit) and any(by_series.values()):
+        for series in sorted(by_series):
+            if by_series[series] and len(selected) < limit:
+                selected.append(by_series[series].pop(0))
+    return selected
 
 
 def _fill_coverage(
