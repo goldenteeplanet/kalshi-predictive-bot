@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 from datetime import UTC, datetime
 from decimal import ROUND_FLOOR
@@ -17,6 +18,7 @@ from kalshi_predictor.data.schema import (
     MarketRanking,
     PaperOrder,
     PositionSizingDecisionLog,
+    Settlement,
 )
 from kalshi_predictor.kalshi.client import KalshiClient
 from kalshi_predictor.kalshi.orderbook import usable_bid_ask_book
@@ -32,6 +34,45 @@ from kalshi_predictor.utils.decimals import to_decimal
 from kalshi_predictor.utils.time import utc_now
 
 
+def select_scoped_gate_rows(payload, requested_tickers):
+    all_rows = {
+        row["ticker"]: row
+        for row in payload.get("weather_rows", payload.get("rows", []))
+        if row.get("ticker")
+    }
+    requested = set(requested_tickers or ())
+    if requested:
+        missing = requested - set(all_rows)
+        if missing:
+            raise RuntimeError(f"Missing scoped gate rows: {sorted(missing)}")
+        rows = {ticker: all_rows[ticker] for ticker in requested}
+    else:
+        rows = {ticker: row for ticker, row in all_rows.items() if _eligible_for_scoped_sizing(row)}
+        if not rows:
+            raise RuntimeError("Gate has no currently eligible scoped sizing rows")
+    for ticker, row in rows.items():
+        if not _eligible_for_scoped_sizing(row):
+            raise RuntimeError(f"{ticker} is no longer eligible for scoped sizing")
+    return rows
+
+
+def _eligible_for_scoped_sizing(row):
+    return all(
+        (
+            row.get("executable_book") is True,
+            row.get("buy_price_matches_ranking") is True,
+            row.get("sufficient_buy_side_size") is True,
+            row.get("first_blocker")
+            in {
+                "PHASE_3M_ZERO_SIZE",
+                "PHASE_3N_RISK_BLOCK",
+                "SNAPSHOT_STALE",
+                "FORECAST_MISSING",
+                "PAPER_READY",
+            },
+        )
+    )
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--gate", type=Path, required=True)
@@ -39,35 +80,12 @@ def main() -> None:
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--state", type=Path)
-    parser.add_argument("--ticker", action="append", required=True)
+    parser.add_argument("--ticker", action="append")
     args = parser.parse_args()
 
-    tickers = set(args.ticker)
     payload = json.loads(args.gate.read_text(encoding="utf-8"))
-    rows = {
-        row["ticker"]: row
-        for row in payload.get("weather_rows", payload.get("rows", []))
-        if row.get("ticker") in tickers
-    }
-    if set(rows) != tickers:
-        raise RuntimeError(f"Missing scoped gate rows: {sorted(tickers - set(rows))}")
-    for ticker, row in rows.items():
-        if not all(
-            (
-                row.get("executable_book") is True,
-                row.get("buy_price_matches_ranking") is True,
-                row.get("sufficient_buy_side_size") is True,
-                row.get("first_blocker")
-                in {
-                    "PHASE_3M_ZERO_SIZE",
-                    "PHASE_3N_RISK_BLOCK",
-                    "SNAPSHOT_STALE",
-                    "FORECAST_MISSING",
-                    "PAPER_READY",
-                },
-            )
-        ):
-            raise RuntimeError(f"{ticker} is no longer eligible for scoped sizing")
+    rows = select_scoped_gate_rows(payload, args.ticker)
+    tickers = set(rows)
 
     base = get_settings()
     settings = learning_paper_settings(base).model_copy(
@@ -86,6 +104,25 @@ def main() -> None:
             existing_cache = json.loads(args.cache.read_text(encoding="utf-8"))
             if _cache_covers_rows(existing_cache, rows):
                 print(json.dumps({"status": "REUSED", **existing_cache}, indent=2, sort_keys=True))
+                engine.dispose()
+                return
+            with get_session_factory(engine)() as session:
+                latest_settlement_at = session.scalar(select(func.max(Settlement.settled_at)))
+            refreshed_cache = refresh_unchanged_historical_cache(
+                existing_cache,
+                rows,
+                latest_settlement_at=latest_settlement_at,
+                refreshed_at=utc_now(),
+            )
+            if refreshed_cache is not None:
+                _write_atomic(args.cache, refreshed_cache)
+                print(
+                    json.dumps(
+                        {"status": "REFRESHED_UNCHANGED_HISTORY", **refreshed_cache},
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
                 engine.dispose()
                 return
         try:
@@ -337,6 +374,48 @@ def _cache_covers_rows(cache: dict, rows: dict[str, dict]) -> bool:
     }
     return set(rows).issubset(cached_tickers)
 
+
+def refresh_unchanged_historical_cache(
+    cache: dict,
+    rows: dict[str, dict],
+    *,
+    latest_settlement_at: datetime | None,
+    refreshed_at: datetime,
+) -> dict | None:
+    """Refresh cache age only when settlement history provably has not changed."""
+    if cache.get("version") != "phase3m_historical_evidence_v1":
+        return None
+    try:
+        cutoff = datetime.fromisoformat(str(cache["lookahead_cutoff"]).replace("Z", "+00:00"))
+    except (KeyError, TypeError, ValueError):
+        return None
+    if cutoff.tzinfo is None:
+        cutoff = cutoff.replace(tzinfo=UTC)
+    cached_tickers = {
+        entry.get("ticker")
+        for entry in (cache.get("entries") or {}).values()
+        if entry.get("model_name") == "weather_v2"
+    }
+    if not set(rows).issubset(cached_tickers):
+        return None
+    if latest_settlement_at is not None:
+        if latest_settlement_at.tzinfo is None:
+            latest_settlement_at = latest_settlement_at.replace(tzinfo=UTC)
+        if latest_settlement_at > cutoff:
+            return None
+    if refreshed_at.tzinfo is None:
+        refreshed_at = refreshed_at.replace(tzinfo=UTC)
+    refreshed = copy.deepcopy(cache)
+    refreshed["prepared_at"] = refreshed_at.isoformat()
+    refreshed["lookahead_cutoff"] = refreshed_at.isoformat()
+    refreshed["refresh_proof"] = {
+        "reason": "NO_NEW_SETTLEMENTS_SINCE_PRIOR_LOOKAHEAD_CUTOFF",
+        "prior_lookahead_cutoff": cutoff.isoformat(),
+        "latest_settlement_at": (
+            latest_settlement_at.isoformat() if latest_settlement_at is not None else None
+        ),
+    }
+    return refreshed
 
 def _read_state(path: Path | None) -> dict:
     if path is None or not path.exists():

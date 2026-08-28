@@ -189,8 +189,7 @@ while true; do
       --prepare-only \
       --gate reports/phase3ba_r3/weather_paper_gate.json \
       --cache reports/phase3ba_r3/phase3m_historical_evidence_cache.json \
-      --output reports/phase3ba_r3/scoped_weather_depth_preflight.json \
-      --ticker KXRAINAUSM-26AUG-1 --ticker KXRAINAUSM-26AUG-2 || true
+      --output reports/phase3ba_r3/scoped_weather_depth_preflight.json || true
 
   # Capture exact books, forecast, rank, size, and risk-check in one bounded
   # writer stage. Execution and paper-order creation remain disabled above.
@@ -199,8 +198,7 @@ while true; do
       --gate reports/phase3ba_r3/weather_paper_gate.json \
       --cache reports/phase3ba_r3/phase3m_historical_evidence_cache.json \
       --state reports/phase3ba_r3/scoped_weather_preflight_pair_state.json \
-      --output reports/phase3ba_r3/scoped_weather_depth_preflight.json \
-      --ticker KXRAINAUSM-26AUG-1 --ticker KXRAINAUSM-26AUG-2 || true
+      --output reports/phase3ba_r3/scoped_weather_depth_preflight.json || true
 
   run_health_stage weather_gate_post_preflight 120 timeout 120s \
     .venv/bin/kalshi-bot phase3ba-r3-weather-paper-gate \
