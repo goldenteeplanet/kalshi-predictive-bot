@@ -16,12 +16,15 @@ from kalshi_predictor.data.schema import (
     MarketSnapshot,
     PaperFill,
     PaperOrder,
+    Settlement,
 )
 from kalshi_predictor.paper.activation import (
     activate_one_contract_paper_order,
     required_approval_phrase,
     validate_one_contract_paper_activation,
 )
+from kalshi_predictor.paper.ledger import _market_accepts_new_paper_order
+from kalshi_predictor.paper.models import PaperDecision
 
 TICKER = "KXRAINAUSM-26AUG-T1.5"
 
@@ -78,7 +81,7 @@ def _candidate(tmp_path):
         model_confidence_score="1",
         opportunity_score="1",
         reason="test",
-        raw_json="{}",
+        raw_json=json.dumps({"forecast_id": forecast.id}),
     )
     session.add(ranking)
     session.commit()
@@ -286,3 +289,97 @@ def test_current_paper_ready_is_required(tmp_path) -> None:
             pair_state_path=tmp_path / "pairs.json",
             settings=settings,
         )
+
+
+def test_gate_ranking_remains_valid_when_a_newer_ranking_is_created(tmp_path) -> None:
+    session, candidate, settings, _, gate = _candidate(tmp_path)
+    session.add(
+        MarketRanking(
+            ticker=TICKER,
+            ranked_at=datetime.now(UTC),
+            status="active",
+            forecast_model="weather_v2",
+            forecast_probability="0.56",
+            best_side="YES",
+            best_price="0.43",
+            estimated_edge="0.09",
+            liquidity_score="1",
+            spread_score="1",
+            time_score="1",
+            model_confidence_score="1",
+            opportunity_score="1",
+            reason="newer unrelated scheduler ranking",
+            raw_json=json.dumps({"forecast_id": candidate.forecast.id + 1}),
+        )
+    )
+    session.commit()
+
+    validated = validate_one_contract_paper_activation(
+        session,
+        ticker=TICKER,
+        soak_path=tmp_path / "soak.json",
+        gate_path=gate,
+        preflight_path=tmp_path / "preflight.json",
+        pair_state_path=tmp_path / "pairs.json",
+        settings=settings,
+    )
+
+    assert validated.ranking.id == candidate.ranking.id
+
+
+def test_unsettled_placeholder_does_not_block_active_market_order(tmp_path) -> None:
+    session, candidate, _, _, _ = _candidate(tmp_path)
+    session.add(
+        Settlement(
+            ticker=TICKER,
+            settled_at=None,
+            result=None,
+            yes_settlement_value=None,
+            raw_json="{}",
+            updated_at=datetime.now(UTC),
+        )
+    )
+    session.commit()
+    decision = PaperDecision(
+        ticker=TICKER,
+        forecast_id=candidate.forecast.id,
+        model_name="weather_v2",
+        side="BUY_YES",
+        probability="0.55",
+        market_price="0.42",
+        limit_price="0.42",
+        edge="0.10",
+        quantity=1,
+        reason="placeholder lifecycle test",
+    )
+
+    assert _market_accepts_new_paper_order(session, decision) is True
+
+
+def test_terminal_settlement_blocks_new_market_order(tmp_path) -> None:
+    session, candidate, _, _, _ = _candidate(tmp_path)
+    session.add(
+        Settlement(
+            ticker=TICKER,
+            settled_at=datetime.now(UTC),
+            result="yes",
+            yes_settlement_value="1",
+            raw_json="{}",
+            updated_at=datetime.now(UTC),
+        )
+    )
+    session.commit()
+    decision = PaperDecision(
+        ticker=TICKER,
+        forecast_id=candidate.forecast.id,
+        model_name="weather_v2",
+        side="BUY_YES",
+        probability="0.55",
+        market_price="0.42",
+        limit_price="0.42",
+        edge="0.10",
+        quantity=1,
+        reason="terminal lifecycle test",
+    )
+
+    assert _market_accepts_new_paper_order(session, decision) is False

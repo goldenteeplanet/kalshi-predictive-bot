@@ -126,7 +126,12 @@ def _market_accepts_new_paper_order(
         return True
     if str(market.status or "").strip().lower() not in {"open", "active"}:
         return False
-    if session.get(Settlement, decision.ticker) is not None:
+    settlement = session.get(Settlement, decision.ticker)
+    if settlement is not None and (
+        settlement.settled_at is not None
+        or str(settlement.result or "").strip().lower() in {"yes", "no"}
+        or settlement.yes_settlement_value is not None
+    ):
         return False
     close_time = parse_datetime(market.close_time)
     if close_time is None:
