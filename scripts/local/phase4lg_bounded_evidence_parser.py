@@ -13,6 +13,16 @@ from pathlib import PurePosixPath
 from typing import Any
 
 SCHEMA = "phase4lg.bounded-evidence-parser-audit.v1"
+FORBIDDEN_EXTENSION_CAPABILITIES = {
+    "artifact_publication",
+    "database_write",
+    "exchange_access",
+    "network_access",
+    "order_capability",
+    "service_control",
+    "trading_capability",
+    "writer_lock",
+}
 
 
 @dataclass(frozen=True)
@@ -104,6 +114,24 @@ def _safe_path(value: str) -> bool:
     return bool(value) and not path.is_absolute() and "." not in raw_parts and ".." not in raw_parts
 
 
+def _audit_extension_capabilities(value: object, inside_extensions: bool = False) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            nested_extensions = inside_extensions or key == "extensions"
+            normalized = str(key).lower().replace("-", "_")
+            disabled = child is False or child is None or child in ("disabled", "none")
+            if (
+                nested_extensions
+                and normalized in FORBIDDEN_EXTENSION_CAPABILITIES
+                and not disabled
+            ):
+                raise EvidenceParseError("FORBIDDEN_EXTENSION_CAPABILITY")
+            _audit_extension_capabilities(child, nested_extensions)
+    elif isinstance(value, list):
+        for child in value:
+            _audit_extension_capabilities(child, inside_extensions)
+
+
 def _audit(value: object, limits: Limits) -> dict[str, int]:
     stats = {"scalars": 0, "collections": 0, "maximum_depth": 0}
 
@@ -173,6 +201,7 @@ def parse_evidence(
                 parse_float=lambda token: _floating(token, limits),
                 parse_constant=_reject_constant,
             )
+            _audit_extension_capabilities(value)
             stats = _audit(value, limits)
         except (EvidenceParseError, json.JSONDecodeError, RecursionError) as exc:
             errors.append(str(exc).splitlines()[0])

@@ -65,6 +65,15 @@ def test_specialized_collection_limits() -> None:
     assert "EXTENSION_COUNT_EXCEEDED" in _errors(extensions, Limits(extension_count=1))
 
 
+@pytest.mark.parametrize(
+    "capability",
+    ["database_write", "service-control", "writer_lock", "order_capability"],
+)
+def test_capability_bearing_extensions_refuse(capability: str) -> None:
+    document = json.dumps({"extensions": {"vendor.capabilities": {capability: True}}})
+    assert "FORBIDDEN_EXTENSION_CAPABILITY" in _errors(document)
+
+
 def test_maximum_document_read_is_bounded_in_cli_contract() -> None:
     assert Limits().document_bytes == 65_536
     assert Limits().nesting_depth == 32
