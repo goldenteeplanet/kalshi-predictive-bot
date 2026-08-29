@@ -27,7 +27,7 @@ def test_document_byte_boundary() -> None:
 
 def test_duplicate_keys_and_trailing_data_refuse() -> None:
     assert any(error.startswith("DUPLICATE_KEY") for error in _errors('{"a":1,"a":2}'))
-    assert _errors('{"a":1} trailing')
+    assert "MALFORMED_JSON" in _errors('{"a":1} trailing')
 
 
 def test_depth_and_collection_bounds() -> None:

@@ -203,8 +203,14 @@ def parse_evidence(
             )
             _audit_extension_capabilities(value)
             stats = _audit(value, limits)
-        except (EvidenceParseError, json.JSONDecodeError, RecursionError) as exc:
+        except EvidenceParseError as exc:
             errors.append(str(exc).splitlines()[0])
+            value = None
+        except json.JSONDecodeError:
+            errors.append("MALFORMED_JSON")
+            value = None
+        except RecursionError:
+            errors.append("RECURSION_LIMIT")
             value = None
     errors = sorted(set(errors))
     result: dict[str, object] = {
