@@ -13,8 +13,8 @@ burned-nonce set and transaction states, and accepts only a contiguous hash-link
 State widening, nonce-owner duplication, generation gaps, incompatible anchors, token or receipt
 substitution, field loss, and divergent migration results fail closed.
 
-Restoration independently pins the source snapshot hash, source generation, and source head hash;
-none may be inferred solely from the migrated artifact.
+Restoration independently pins the source snapshot hash, source generation, source head hash, and
+prior-snapshot anchor; none may be inferred solely from the migrated artifact.
 
 ## Reproducible evidence
 

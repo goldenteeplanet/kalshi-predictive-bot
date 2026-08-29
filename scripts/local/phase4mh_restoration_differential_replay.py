@@ -94,6 +94,7 @@ def certify_cut(
             expected_snapshot_sha256=snapshot["snapshot_sha256"],
             expected_source_generation=snapshot["source_generation"],
             expected_source_head_sha256=snapshot["source_head_sha256"],
+            expected_prior_snapshot_sha256=snapshot["prior_snapshot_sha256"],
         )
         if restoration["verdict"] != "PASS":
             errors.append("RESTORATION_REFUSED")

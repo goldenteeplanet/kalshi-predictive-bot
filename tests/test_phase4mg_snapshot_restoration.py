@@ -40,6 +40,9 @@ def _restore(artifact, suffix=None, **kwargs):
         expected_source_head_sha256=kwargs.get(
             "expected_source_head_sha256", artifact["source_head_sha256"]
         ),
+        expected_prior_snapshot_sha256=kwargs.get(
+            "expected_prior_snapshot_sha256", artifact["prior_snapshot_sha256"]
+        ),
     )
 
 
@@ -102,6 +105,7 @@ def test_unknown_skipped_and_downgrade_migrations_are_refused(from_version, to_v
         ),
         (lambda row: row.update(source_snapshot_sha256="f" * 64), None),
         (lambda row: row.update(source_head_sha256="f" * 64), None),
+        (lambda row: row.update(prior_snapshot_sha256="f" * 64), None),
         (
             lambda row: row.update(restoration_policy_version="evil.v1"),
             "RESTORATION_POLICY_INVALID",
@@ -123,6 +127,7 @@ def test_field_loss_state_widening_hash_and_policy_substitution_fail(mutation, e
             expected_snapshot_sha256=baseline["source_snapshot_sha256"],
             expected_source_generation=baseline["source_generation"],
             expected_source_head_sha256=baseline["source_head_sha256"],
+            expected_prior_snapshot_sha256=baseline["prior_snapshot_sha256"],
         )
         assert result["verdict"] == "REFUSE"
 

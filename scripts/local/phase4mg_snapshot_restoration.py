@@ -179,6 +179,7 @@ def restore_snapshot(
     expected_snapshot_sha256: str,
     expected_source_generation: int,
     expected_source_head_sha256: str,
+    expected_prior_snapshot_sha256: str,
 ) -> dict[str, object]:
     errors = artifact_errors(artifact)
     source_sha256 = _digest(retained_suffix)
@@ -190,6 +191,8 @@ def restore_snapshot(
         errors.append("SOURCE_GENERATION_ANCHOR_SUBSTITUTION")
     if artifact.get("source_head_sha256") != expected_source_head_sha256:
         errors.append("SOURCE_HEAD_ANCHOR_SUBSTITUTION")
+    if artifact.get("prior_snapshot_sha256") != expected_prior_snapshot_sha256:
+        errors.append("PRIOR_SNAPSHOT_ANCHOR_SUBSTITUTION")
     now = _time(evaluated_at)
     if now is None:
         errors.append("EVALUATION_TIME_INVALID")
