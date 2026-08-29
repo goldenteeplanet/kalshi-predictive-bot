@@ -49,7 +49,7 @@ def test_missing_prefix_interior_version_and_retention_loss_refuse() -> None:
 
 def test_single_damaged_replica_gets_repair_plan_from_matching_quorum() -> None:
     history = _history()
-    replicas = [create_replica(name, history) for name in ALLOWED]
+    replicas = [create_replica(name, history) for name in sorted(ALLOWED)]
     replicas[2]["entries"][0]["baseline_sha256"] = "f" * 64
     result = _recover(replicas, history)
     assert result["verdict"] == "PASS"
