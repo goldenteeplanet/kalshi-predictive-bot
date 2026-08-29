@@ -44,6 +44,7 @@ def test_service_started_early_missing_service_or_premature_health_refuses() -> 
     missing = build_passing_trace()
     missing[-1]["ui_active"] = False
     assert "HEALTH_CLAIM_BEFORE_SERVICES_ACTIVE" in certify_rehearsal(missing)["errors"]
+    assert "HEALTHY:UI_SERVICE_MISSING" in certify_rehearsal(missing)["errors"]
 
 
 def test_stale_checkpoint_restart_loop_and_tamper_refuse() -> None:

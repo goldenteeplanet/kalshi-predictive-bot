@@ -97,8 +97,12 @@ def certify_rehearsal(trace: list[dict[str, object]]) -> dict[str, object]:
             errors.append(f"{transition}:RESTART_LOOP_LIMIT_EXCEEDED")
         if index < 7 and row.get("bot_active") is not False:
             errors.append(f"{transition}:BOT_STARTED_BEFORE_VERIFICATION")
+        if index >= 7 and row.get("bot_active") is not True:
+            errors.append(f"{transition}:BOT_SERVICE_MISSING")
         if index < 8 and row.get("ui_active") is not False:
             errors.append(f"{transition}:UI_STARTED_BEFORE_BOT")
+        if index >= 8 and row.get("ui_active") is not True:
+            errors.append(f"{transition}:UI_SERVICE_MISSING")
         if index >= 6 and row.get("checkpoint_fresh") is not True:
             errors.append(f"{transition}:STALE_CHECKPOINT")
         if transition == "HEALTHY" and (
