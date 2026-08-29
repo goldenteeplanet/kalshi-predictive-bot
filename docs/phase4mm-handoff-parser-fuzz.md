@@ -16,13 +16,13 @@ preserving their refusal class, with a hard attempt limit.
 ## Reproducible evidence
 
 - Real-package fuzz cases refused: 22 of 22 across 15 surfaces.
-- Corpus SHA-256: `892b81229a32ed78d7f7e6cc67d041f07a938e8db26adb0ae5ade633941ef4bb`
+- Corpus SHA-256: `ec6085afeec291717bd7d5cc3a248fd96ce6cd5f42edc597577034d09f839452`
 - Minimization SHA-256:
   `16504f16067537cc2099b87f40188f391b039b676e862d4d553bcbb21d920a06`
 - Deterministic resource-envelope SHA-256:
-  `1184b1693330175fca8ea93370ebf965c0d576c5adc76f3e7da66b64e39a0130`
+  `4386381a20afa05cdf11389e84ef483f59960bdb48e3ad94f5b368f143678483`
 - Complete fuzz certification SHA-256:
-  `ee044cf8b25fe638506e3db70a17532c7e209628dd9a0be996342330897c89ac`
+  `ef3645a298a901d09f1284157939b288dc7965952d0be727fd962dc5b5ef1c3f`
 
 ## Safety and removal
 

@@ -92,6 +92,20 @@ def _component(name: str, payload: object) -> dict[str, object]:
     }
 
 
+def normalize_certification_component(certification: object) -> dict[str, object]:
+    if not isinstance(certification, dict) or certification.get("verdict") != "PASS":
+        raise ValueError("certification must be passing")
+    semantics = json.loads(json.dumps(certification))
+    for field in ("repository", "repository_head_commit", "certification_sha256"):
+        semantics.pop(field, None)
+    return {
+        "schema": "phase4ml.normalized-phase4mj-certification.v1",
+        "verdict": "PASS",
+        "semantics": semantics,
+        "semantics_sha256": _digest(semantics),
+    }
+
+
 def build_package(
     *,
     certification: object,
@@ -119,7 +133,7 @@ def build_package(
     ):
         raise ValueError("invalid commit binding")
     components = [
-        _component("phase4mj-certification", certification),
+        _component("phase4mj-certification", normalize_certification_component(certification)),
         _component("phase4mk-reproducibility", reproducibility_audit),
         _component("test-evidence", test_evidence),
         _component("inventory", inventory),

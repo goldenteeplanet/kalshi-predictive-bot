@@ -60,6 +60,18 @@ def test_package_is_byte_reproducible_and_verifies_offline() -> None:
     assert all(row["write_performed"] is False for row in result["extraction_plan"])
 
 
+def test_descendant_repository_head_inside_certification_is_normalized() -> None:
+    first = _inputs()
+    first["certification"]["repository"] = "/checkout/one"
+    first["certification"]["repository_head_commit"] = "1" * 40
+    first["certification"]["certification_sha256"] = "a" * 64
+    second = json.loads(json.dumps(first))
+    second["certification"]["repository"] = "/checkout/two"
+    second["certification"]["repository_head_commit"] = "2" * 40
+    second["certification"]["certification_sha256"] = "b" * 64
+    assert build_package(**first) == build_package(**second)
+
+
 @pytest.mark.parametrize(
     "mutation,error",
     [

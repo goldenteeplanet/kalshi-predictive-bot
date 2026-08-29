@@ -169,6 +169,14 @@ def bounded_verify(
         "errors": errors,
         "preflight": preflight,
         "semantic_verification_sha256": semantic.get("verification_sha256"),
+        "semantic_summary": {
+            "package_sha256": semantic.get("package_sha256"),
+            "manifest_sha256": semantic.get("manifest_sha256"),
+            "component_count": semantic.get("component_count"),
+            "extraction_plan": semantic.get("extraction_plan", []),
+        }
+        if semantic.get("verdict") == "PASS"
+        else {},
         "resource_envelope": {
             "deterministic_work_units": preflight["metrics"]["processing_work_units"],
             "maximum_work_units": MAX_PACKAGE_BYTES,
