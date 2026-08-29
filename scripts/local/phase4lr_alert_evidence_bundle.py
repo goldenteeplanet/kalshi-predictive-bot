@@ -97,6 +97,9 @@ def build_manifest(artifacts: object) -> dict[str, object]:
             errors.append(f"{prefix}:CONTENT_INVALID")
             continue
         schema = content.get("schema")
+        if not isinstance(schema, str):
+            errors.append(f"{prefix}:SCHEMA_TYPE_INVALID")
+            continue
         hash_field = ARTIFACT_HASH_FIELDS.get(schema)
         if hash_field is None:
             errors.append(f"{prefix}:SCHEMA_NOT_ALLOWLISTED")

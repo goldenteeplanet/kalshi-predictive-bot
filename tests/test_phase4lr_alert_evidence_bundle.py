@@ -134,3 +134,11 @@ def test_bundle_has_no_external_or_action_capability() -> None:
     safety = verify_bundle(build_manifest(_artifacts()), _artifacts())["safety"]
     assert safety["offline_only"] is True
     assert all(value is False for key, value in safety.items() if key != "offline_only")
+
+
+def test_unhashable_schema_type_fails_closed_without_exception() -> None:
+    artifacts = _artifacts()
+    artifacts[0]["content"]["schema"] = ["invalid"]
+    result = build_manifest(artifacts)
+    assert result["verdict"] == "REFUSE"
+    assert "ARTIFACT_0:SCHEMA_TYPE_INVALID" in result["errors"]
