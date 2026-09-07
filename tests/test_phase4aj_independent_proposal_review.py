@@ -165,8 +165,16 @@ def test_mismatched_publication_pair_fails_closed(tmp_path: Path):
 
 def test_missing_history_link_fails_closed(tmp_path: Path):
     f = _fixture(tmp_path)
-    next(f["history"].glob("*.json")).unlink()
+    manifest = json.loads((f["history"] / "manifest.json").read_text())
+    (f["history"] / manifest["entries"][0]["filename"]).unlink()
     with pytest.raises(ValueError, match="HISTORY_INVALID"):
+        _build(f)
+
+
+def test_missing_history_manifest_fails_lineage(tmp_path: Path):
+    f = _fixture(tmp_path)
+    (f["history"] / "manifest.json").unlink()
+    with pytest.raises(ValueError, match="LINEAGE_FAILURE_AC"):
         _build(f)
 
 
