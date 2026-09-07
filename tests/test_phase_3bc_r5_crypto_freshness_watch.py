@@ -26,6 +26,55 @@ from kalshi_predictor.ui.service import crypto_freshness_watch_status
 from kalshi_predictor.utils.time import utc_now
 
 
+def test_artifact_only_risk_preflight_rolls_back_nested_writes(monkeypatch) -> None:
+    class Savepoint:
+        is_active = True
+        rolled_back = False
+
+        def rollback(self) -> None:
+            self.rolled_back = True
+            self.is_active = False
+
+    class Session:
+        def __init__(self) -> None:
+            self.savepoint = Savepoint()
+
+        def begin_nested(self):
+            return self.savepoint
+
+    session = Session()
+    monkeypatch.setattr(
+        phase3bc_r5,
+        "_paper_decision_for_candidate",
+        lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        phase3bc_r5,
+        "ensure_paper_decision_sized",
+        lambda *args, **kwargs: SimpleNamespace(
+            raw_decision_json={
+                "position_sizing_decision_id": 240,
+                "position_sizing_decision": {"tier": "blocked"},
+                "advanced_risk_decision_id": 240,
+                "advanced_risk_decision": {"action": "block"},
+            },
+            quantity=0,
+            reason="artifact-only",
+        ),
+    )
+
+    rows = phase3bc_r5._run_risk_preflight(
+        session,
+        [{"ticker": "KXTEST"}],
+        settings=SimpleNamespace(),
+        persist=False,
+    )
+
+    assert session.savepoint.rolled_back is True
+    assert rows[0]["phase3m_decision_id"] == 240
+    assert rows[0]["phase3n_decision_id"] == 240
+
+
 def test_phase3bc_r5_can_reuse_existing_r3_report(monkeypatch, tmp_path: Path) -> None:
     r3_dir = tmp_path / "phase3bc_r3"
     r3_dir.mkdir()

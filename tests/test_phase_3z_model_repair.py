@@ -11,6 +11,7 @@ from kalshi_predictor.data.schema import MarketLeg
 from kalshi_predictor.phase3z import (
     build_market_coverage_doctor,
     build_model_repair_audit,
+    runtime_identity,
     write_market_coverage_doctor,
     write_model_repair_audit,
 )
@@ -30,6 +31,17 @@ def test_phase3z_audit_keeps_undefined_metrics_null(tmp_path) -> None:
     assert market_implied["paper_trade_metrics"]["roi"] is None
     assert market_implied["paper_trade_metrics"]["win_rate"] is None
     assert audit["runtime_identity"]["sqlite"]["path"].endswith("phase3z.db")
+
+
+def test_bounded_runtime_identity_skips_full_database_scan(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+
+    with session_factory() as session:
+        identity = runtime_identity(session, include_integrity=False)
+
+    assert identity["health"]["status"] in {"READY", "WARNING"}
+    assert identity["sqlite"]["sha256"] is None
+    assert identity["sqlite"]["integrity_check"] == "SKIPPED_BOUNDED_IDENTITY"
 
 
 def test_phase3z_coverage_doctor_uses_null_for_empty_denominator(tmp_path) -> None:

@@ -110,6 +110,7 @@ from kalshi_predictor.personal_trader.service import (
     recommendation_audit_events,
     recommendation_by_id,
 )
+from kalshi_predictor.phase4cd.evidence import cached_evidence_dashboard, evidence_dashboard
 from kalshi_predictor.professional_ux.contracts import DECISION_INCOMPLETE, ROUTE_INVENTORY
 from kalshi_predictor.professional_ux.reports import (
     generate_phase_3x_report,
@@ -965,6 +966,32 @@ def create_router(
     @router.get("/api/system/progress")
     def process_progress_api() -> dict[str, Any]:
         return jsonable_encoder(get_cached_progress_dashboard())
+
+    @router.get("/evidence", response_class=HTMLResponse)
+    def training_evidence_dashboard(
+        request: Request,
+        session: Annotated[Session, Depends(get_session)],
+    ) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "evidence.html",
+            {
+                "request": request,
+                "shell_context": default_shell_context,
+                "evidence": cached_evidence_dashboard(session),
+            },
+        )
+
+    @router.get("/api/evidence")
+    def training_evidence_api(
+        session: Annotated[Session, Depends(get_session)],
+        deep: Annotated[bool, Query()] = False,
+    ) -> dict[str, Any]:
+        return (
+            evidence_dashboard(session, include_deep=True)
+            if deep
+            else cached_evidence_dashboard(session)
+        )
 
     @router.get("/system/progress/certification-export/{kind}")
     def certification_timeline_export(kind: str) -> FileResponse:

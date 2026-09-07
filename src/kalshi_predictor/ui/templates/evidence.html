@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Acceleration &amp; Evidence{% endblock %}
+{% block content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Phase 4 · paper-only acceleration</p>
+    <h1>Acceleration &amp; evidence</h1>
+    <p class="muted">One read-only view of evidence growth, prospective readiness, and the guarded path to a faster decision.</p>
+  </div>
+  <div class="page-actions">
+    <a class="button" href="/system/evidence">Certification catalog</a>
+    <a class="button" href="/api/evidence">Summary JSON</a>
+  </div>
+</section>
+<section class="metric-grid" aria-label="Acceleration status">
+  <article class="card">
+    <p class="eyebrow">Runtime boundary</p>
+    <h2>Paper-only</h2>
+    <p class="status-pill status-incomplete">Live capital blocked</p>
+    <p class="muted">This dashboard cannot create forecasts, decisions, orders, or fills.</p>
+  </article>
+  <article class="card">
+    <p class="eyebrow">Evidence lanes</p>
+    <h2>Strictly separated</h2>
+    <p>Historical, shadow, and guarded paper results are never merged into one P&amp;L claim.</p>
+  </article>
+  <article class="card">
+    <p class="eyebrow">Dashboard query</p>
+    <h2>Fast summary</h2>
+    <p>Deep reconciliation is loaded only on request, keeping navigation responsive.</p>
+    <a href="/api/evidence?deep=true">Open deep diagnostics JSON</a>
+  </article>
+</section>
+<article class="card" aria-label="Evidence response health">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Read-only observability</p>
+      <h2>Summary response health</h2>
+    </div>
+    <span class="status-pill {{ 'status-healthy' if not evidence.partial_data else 'status-incomplete' }}">
+      {{ 'Complete' if not evidence.partial_data else 'Partial' }}
+    </span>
+  </div>
+  <section class="metric-grid">
+    <div><span class="muted">Query duration</span><p class="metric-value">{{ evidence.query_duration_ms }} ms</p></div>
+    <div><span class="muted">Cache</span><p class="metric-value">{{ evidence.cache_status }}</p></div>
+    <div><span class="muted">Cache age</span><p class="metric-value">{{ evidence.cache_age_seconds }} s</p></div>
+    <div><span class="muted">Freshness</span><p class="metric-value">{{ evidence.data_freshness.status }}</p></div>
+  </section>
+  <p class="muted">Generated {{ evidence.generated_at }}. Deep diagnostics: {{ 'included' if evidence.deep_diagnostics_included else 'not loaded' }}.</p>
+  {% if evidence.warnings %}
+  <ul class="warning-list">
+    {% for warning in evidence.warnings %}<li>{{ warning }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</article>
+{% if evidence.prospective_operational_health %}
+<article class="card">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Prospective readiness</p>
+      <h2>Current capture funnel</h2>
+    </div>
+    <span class="status-pill status-incomplete">Observation only</span>
+  </div>
+  <section class="metric-grid">
+    <div><span class="muted">Open markets</span><p class="metric-value">{{ evidence.prospective_operational_health.open_markets }}</p></div>
+    <div><span class="muted">Open snapshots</span><p class="metric-value">{{ evidence.prospective_operational_health.open_snapshots }}</p></div>
+    <div><span class="muted">Eligible pairs</span><p class="metric-value">{{ evidence.prospective_operational_health.eligible_pairs }}</p></div>
+    <div><span class="muted">Two-sided books</span><p class="metric-value">{{ evidence.prospective_operational_health.two_sided_books }}</p></div>
+  </section>
+</article>
+{% endif %}
+<section class="metric-grid" aria-label="Settlement and lineage state">
+  <article class="card">
+    <p class="eyebrow">Settlement &amp; reconciliation</p>
+    <h2>{{ evidence.guarded_paper.settled }} settled</h2>
+    <p>{{ evidence.guarded_paper.evaluated }} guarded-paper evaluations from {{ evidence.guarded_paper.orders }} paper orders.</p>
+    <p class="muted">Observation only; this view never initiates settlement reconciliation.</p>
+  </article>
+  <article class="card">
+    <p class="eyebrow">Evidence lineage</p>
+    <h2>{{ evidence.data_freshness.status }}</h2>
+    <p>Latest source: <strong>{{ evidence.data_freshness.latest_source_at or 'unavailable' }}</strong></p>
+    <p>Lineage sample hash: <code>{{ evidence.prospective_status_lineage.sample_bundle_hash or 'unavailable' }}</code></p>
+  </article>
+</section>
+<article class="card">
+  <h2>Latest research replay</h2>
+  <p>Processed: <strong>{{ evidence.research_replay.processed }}</strong></p>
+  <p>Calibration-only observations: <strong>{{ evidence.research_replay.calibration_observations }}</strong></p>
+  <p class="muted">Calibration observations are not trades and carry no executable P&amp;L.</p>
+  {% for reason, count in evidence.research_replay.dispositions.items() %}
+  <p>{{ reason }}: <strong>{{ count }}</strong></p>
+  {% endfor %}
+</article>
+<article class="card">
+  <h2>Verified evidence expansion</h2>
+  <p>Admitted rows: <strong>{{ evidence.evidence_expansion.admitted or 0 }}</strong></p>
+  <p>Independent events: <strong>{{ evidence.evidence_expansion.independent_events or 0 }}</strong></p>
+  <p>Cohort hash: <code>{{ evidence.evidence_expansion.cohort_hash or 'none' }}</code></p>
+  <p>Attributed rows: <strong>{{ evidence.edge_attribution.rows }}</strong></p>
+  <p>Positive gross / net: <strong>{{ evidence.edge_attribution.positive_gross }} / {{ evidence.edge_attribution.positive_net }}</strong></p>
+</article>
+<article class="card">
+  <h2>Independent-event calibration</h2>
+  {% for model, metrics in evidence.event_calibration.models.items() %}
+  <p>{{ model }} — events: <strong>{{ metrics.events }}</strong>, Brier:
+    <strong>{{ metrics.brier }}</strong>, log loss: <strong>{{ metrics.log_loss }}</strong></p>
+  {% endfor %}
+  <p class="muted">Macro event metrics; not executable P&amp;L.</p>
+</article>
+<article class="card">
+  <h2>Crypto point-in-time lineage</h2>
+  {% for verdict, count in evidence.crypto_lineage.items() %}
+  <p>{{ verdict }}: <strong>{{ count }}</strong></p>
+  {% endfor %}
+  <p class="muted">Only verified or deterministically reconstructable lineage may enter replay.</p>
+</article>
+<section class="metric-grid">
+  <article class="card">
+    <h2>Historical</h2>
+    <p>Evaluated contracts: <strong>{{ evidence.historical.evaluated_contracts }}</strong></p>
+    <p>Independent events: <strong>{{ evidence.historical.independent_events }}</strong></p>
+    <p>Models evaluated: <strong>{{ evidence.historical.models_evaluated }}</strong></p>
+  </article>
+  <article class="card">
+    <h2>Shadow</h2>
+    <p>Decisions: <strong>{{ evidence.shadow.decisions }}</strong></p>
+    <p>Settled: <strong>{{ evidence.shadow.settled }}</strong></p>
+    <p>Evaluated: <strong>{{ evidence.shadow.evaluated }}</strong></p>
+    <p>Independent events: <strong>{{ evidence.shadow.independent_events }}</strong></p>
+  </article>
+  <article class="card">
+    <h2>Guarded paper</h2>
+    <p>Orders: <strong>{{ evidence.guarded_paper.orders }}</strong></p>
+    <p>Fills: <strong>{{ evidence.guarded_paper.fills }}</strong></p>
+    <p>Settled: <strong>{{ evidence.guarded_paper.settled }}</strong></p>
+    <p>Evaluated: <strong>{{ evidence.guarded_paper.evaluated }}</strong></p>
+    <p>Independent events: <strong>{{ evidence.guarded_paper.independent_events }}</strong></p>
+    <p>Realized P&amp;L: <strong>{{ evidence.guarded_paper.realized_pnl }}</strong></p>
+  </article>
+</section>
+<article class="card">
+  <h2>Total independent evaluated events</h2>
+  <p class="metric-value">{{ evidence.total_independent_evaluated_events }}</p>
+  <p class="muted">A labelled support count, not a merged P&amp;L statistic.</p>
+</article>
+{% endblock %}

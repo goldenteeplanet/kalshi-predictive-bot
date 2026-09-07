@@ -300,7 +300,8 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "build_weather_features" not in implementation
     assert "DEDICATED_RUNTIME_OWNER_REUSE" in implementation
     assert "risk_preflight=True" in implementation
-    assert "risk_preflight=False" not in implementation
+    assert "persist_risk_preflight=False" in implementation
+    assert "            risk_preflight=False," not in implementation
     assert "exact_snapshot_refresh=True" in implementation
     assert "exact_snapshot_refresh=False" not in implementation
     assert "exact_snapshot_refresh_limit=250" in implementation

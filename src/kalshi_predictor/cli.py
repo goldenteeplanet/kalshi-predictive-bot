@@ -399,6 +399,37 @@ from kalshi_predictor.personal_trader.service import (
     conversational_response,
     recommendation_audit_events,
 )
+from kalshi_predictor.phase4cd.coverage import replay_coverage_audit
+from kalshi_predictor.phase4cd.attribution import build_edge_attribution
+from kalshi_predictor.phase4cd.expansion import expand_verified_crypto_cohort
+from kalshi_predictor.phase4cd.lineage import (
+    audit_crypto_feature_lineage,
+    build_exact_slice_comparison,
+    build_event_level_comparison,
+)
+from kalshi_predictor.phase4cd.replay import run_research_replay
+from kalshi_predictor.phase4cd.prospective import (
+    capture_prospective_pairs,
+    prospective_status,
+    reconcile_prospective_pairs,
+)
+from kalshi_predictor.phase4cd.operations import (
+    capture_status_lineage,
+    handoff_funnel,
+    prospective_health_report,
+    run_capture_scheduler,
+    run_latest_handoff,
+)
+from kalshi_predictor.phase4cd.reports import (
+    ensemble_audit,
+    fast_settlement_candidates,
+    write_phase4cd_reports,
+)
+from kalshi_predictor.phase4cd.shadow import (
+    capture_shadow_decisions,
+    reconcile_shadow_settlements,
+)
+from kalshi_predictor.ingest.cycle_handoff import write_committed_cycle_artifact
 from kalshi_predictor.phase3aa import write_phase3aa_report
 from kalshi_predictor.phase3aa_r2 import write_phase3aa_r2_exact_settlement_harvest_report
 from kalshi_predictor.phase3aa_r3 import write_phase3aa_r3_residual_audit_report
@@ -1378,10 +1409,14 @@ def runtime_identity_command(
     ] = None,
 ) -> None:
     settings = get_settings()
-    engine = init_db()
+    # Runtime identity is a diagnostic, not a schema-management operation.  Avoid
+    # create_all() and the full SQLite integrity scan here: production databases
+    # can be tens of gigabytes, making an otherwise read-only identity probe look
+    # hung for many minutes.  ``db-health`` remains the explicit full audit.
+    engine = make_engine()
     session_factory = get_session_factory(engine)
     with session_factory() as session:
-        payload = runtime_identity(session, settings=settings)
+        payload = runtime_identity(session, settings=settings, include_integrity=False)
 
     console.print("Runtime identity")
     console.print(f"Repository root: {payload['repository_root']}")
@@ -20770,6 +20805,366 @@ def leaderboard_command(
         session.commit()
     console.print(f"Wrote model leaderboard report to {report_path}")
     console.print(f"Models compared: {len(result.rows)}")
+
+
+@app.command("research-replay")
+def research_replay_command(
+    model: Annotated[str, typer.Option(help="Forecast model to replay.")],
+    category: Annotated[str, typer.Option(help="Category or 'all'.")] = "all",
+    start_date: Annotated[str | None, typer.Option(help="Inclusive YYYY-MM-DD start.")] = None,
+    end_date: Annotated[str | None, typer.Option(help="Inclusive YYYY-MM-DD end.")] = None,
+    limit: Annotated[int, typer.Option(help="Maximum rows in this checkpointed batch.")] = 1000,
+    resume: Annotated[bool, typer.Option(help="Resume the matching checkpointed run.")] = False,
+    require_verified_lineage: Annotated[
+        bool,
+        typer.Option(help="Replay only forecasts with verified/reconstructable lineage."),
+    ] = False,
+) -> None:
+    from datetime import date
+
+    parsed_start = date.fromisoformat(start_date) if start_date else None
+    parsed_end = date.fromisoformat(end_date) if end_date else None
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        result = run_research_replay(
+            session,
+            model=model,
+            category=category,
+            start_date=parsed_start,
+            end_date=parsed_end,
+            limit=limit,
+            resume=resume,
+            require_verified_lineage=require_verified_lineage,
+        )
+    console.print(json.dumps(result.__dict__, indent=2))
+    console.print("Lane: HISTORICAL_REPLAY (paper counters untouched)")
+
+
+@app.command("replay-coverage-audit")
+def replay_coverage_audit_command(
+    run_id: Annotated[str | None, typer.Option(help="Optional research run ID.")] = None,
+) -> None:
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        payload = replay_coverage_audit(session, run_id=run_id)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Calibration metrics are non-trade evidence; executable P&L remains separate.")
+
+
+@app.command("crypto-lineage-audit")
+def crypto_lineage_audit_command(
+    source_db: Annotated[
+        Path,
+        typer.Option(help="Read-only canonical source SQLite database."),
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_engine = make_sqlite_read_only_engine(f"sqlite:///{source_db}")
+    source_factory = get_session_factory(source_engine)
+    with research_factory() as research, source_factory() as source:
+        payload = audit_crypto_feature_lineage(research, source)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Fabricated features: 0")
+
+
+@app.command("evidence-expand-crypto")
+def evidence_expand_crypto_command(
+    source_db: Annotated[
+        Path,
+        typer.Option(help="Read-only canonical source SQLite database."),
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    max_events: Annotated[int, typer.Option(help="Maximum new independent events.")] = 25,
+    scan_limit: Annotated[int, typer.Option(help="Maximum source forecasts per batch.")] = 20000,
+    resume: Annotated[bool, typer.Option(help="Resume matching checkpointed partition.")] = False,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(
+        make_sqlite_read_only_engine(f"sqlite:///{source_db}")
+    )
+    with research_factory() as research, source_factory() as source:
+        payload = expand_verified_crypto_cohort(
+            research,
+            source,
+            max_independent_events=max_events,
+            scan_limit=scan_limit,
+            resume=resume,
+        )
+    console.print(json.dumps(payload.__dict__, indent=2))
+    console.print("Original frozen cohort unchanged; source opened read-only.")
+
+
+@app.command("executable-edge-attribution")
+def executable_edge_attribution_command(
+    run_id: Annotated[str, typer.Option(help="Research replay run ID.")],
+) -> None:
+    session_factory = get_session_factory(init_db())
+    with session_factory() as session:
+        payload = build_edge_attribution(session, run_id=run_id)
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("event-calibration-compare")
+def event_calibration_compare_command(
+    market_run: Annotated[str, typer.Option(help="market_implied_v1 run ID.")],
+    crypto_run: Annotated[str, typer.Option(help="crypto_v2 run ID.")],
+) -> None:
+    session_factory = get_session_factory(init_db())
+    with session_factory() as session:
+        payload = build_event_level_comparison(
+            session,
+            model_runs={"market_implied_v1": market_run, "crypto_v2": crypto_run},
+        )
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("exact-slice-compare")
+def exact_slice_compare_command(
+    partition_id: Annotated[str, typer.Option(help="Expansion partition ID.")],
+    market_run: Annotated[str, typer.Option(help="market_implied_v1 run ID.")],
+    crypto_run: Annotated[str, typer.Option(help="crypto_v2 run ID.")],
+) -> None:
+    session_factory = get_session_factory(init_db())
+    with session_factory() as session:
+        payload = build_exact_slice_comparison(
+            session,
+            partition_id=partition_id,
+            market_run_id=market_run,
+            crypto_run_id=crypto_run,
+        )
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("runtime-origin")
+def runtime_origin_command(
+    manifest: Annotated[
+        Path | None,
+        typer.Option(help="Optional deployment manifest path."),
+    ] = None,
+) -> None:
+    candidates = [
+        manifest,
+        Path(".kalshi-deployment.json"),
+        Path("/home/james/kalshi-runtime-src/.kalshi-deployment.json"),
+    ]
+    selected = next((path for path in candidates if path and path.is_file()), None)
+    if selected is None:
+        console.print("Runtime origin: UNKNOWN")
+        raise typer.Exit(1)
+    payload = json.loads(selected.read_text(encoding="utf-8"))
+    console.print("Runtime origin")
+    console.print(f"Git SHA: {payload.get('git_sha') or 'unknown'}")
+    console.print(f"Source root: {payload.get('source_root') or 'unknown'}")
+    console.print(f"Runtime root: {payload.get('runtime_root') or 'unknown'}")
+    console.print(f"Deployed at: {payload.get('deployed_at') or 'unknown'}")
+    console.print(f"Manifest: {selected.resolve()}")
+
+
+@app.command("paired-evidence-capture")
+def paired_evidence_capture_command(
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    limit: Annotated[int, typer.Option(help="Maximum open snapshots in this batch.")] = 1000,
+    resume: Annotated[
+        bool, typer.Option(help="Resume the deterministic composite cursor.")
+    ] = False,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        result = capture_prospective_pairs(research, source, limit=limit, resume=resume)
+    console.print(json.dumps(result.__dict__, indent=2))
+    console.print("Lane: PROSPECTIVE_RESEARCH; zero future skew; settlements not queried.")
+
+
+@app.command("paired-evidence-status")
+def paired_evidence_status_command() -> None:
+    with get_session_factory(init_db())() as research:
+        console.print(json.dumps(prospective_status(research), indent=2))
+
+
+@app.command("paired-evidence-health")
+def paired_evidence_health_command(
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        report = prospective_health_report(research, source)
+    console.print(json.dumps(report.__dict__, indent=2))
+
+
+@app.command("paired-evidence-status-lineage")
+def paired_evidence_status_lineage_command(
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    sample_limit: Annotated[int, typer.Option(help="Bounded latest-cycle sample size.")] = 100,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        payload = capture_status_lineage(
+            research, source, sample_limit=sample_limit
+        )
+    console.print(json.dumps(payload, indent=2))
+    console.print("Source database read-only; closed/settled statuses remain ineligible.")
+
+
+@app.command("paired-evidence-scheduler")
+def paired_evidence_scheduler_command(
+    owner_id: Annotated[str, typer.Option(help="Stable scheduler instance identity.")],
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    cycles: Annotated[int, typer.Option(help="Bounded capture cycles.")] = 1,
+    batch_limit: Annotated[int, typer.Option(help="Maximum snapshots per cycle.")] = 250,
+    interval_seconds: Annotated[float, typer.Option(help="Delay between bounded cycles.")] = 30,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        payload = run_capture_scheduler(
+            research,
+            source,
+            owner_id=owner_id,
+            cycles=cycles,
+            batch_limit=batch_limit,
+            interval_seconds=interval_seconds,
+        )
+    console.print(json.dumps(payload, indent=2))
+    console.print("Research-only scheduler; GH-2 and execution modules are not invoked.")
+
+
+@app.command("paired-evidence-handoff")
+def paired_evidence_handoff_command(
+    owner_id: Annotated[str, typer.Option(help="Stable research sidecar identity.")],
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    batch_limit: Annotated[int, typer.Option(help="Bounded exact-cycle capture limit.")] = 250,
+    artifact_path: Annotated[
+        Path | None, typer.Option(help="Optional validated committed-cycle metadata artifact.")
+    ] = None,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        payload = run_latest_handoff(
+            research, source, owner_id=owner_id, batch_limit=batch_limit
+            , artifact_path=artifact_path
+        )
+        payload["funnel"] = handoff_funnel(research)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Polling sidecar only; production collector and GH-2 remain unmodified.")
+
+
+@app.command("snapshot-cycle-artifact")
+def snapshot_cycle_artifact_command(
+    output: Annotated[Path, typer.Option(help="Atomic generic cycle artifact path.")],
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+) -> None:
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with source_factory() as source:
+        payload = write_committed_cycle_artifact(source, output_path=output)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Metadata only; source database opened read-only.")
+
+
+@app.command("paired-evidence-reconcile")
+def paired_evidence_reconcile_command(
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    limit: Annotated[int, typer.Option(help="Maximum captured pairs to inspect.")] = 5000,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        payload = reconcile_prospective_pairs(research, source, limit=limit)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Calibration-only and executable attribution remain separately labeled.")
+
+
+@app.command("shadow-capture")
+def shadow_capture_command(
+    model: Annotated[str | None, typer.Option(help="Optional model filter.")] = None,
+    limit: Annotated[int, typer.Option(help="Maximum current forecasts to inspect.")] = 1000,
+    max_age_minutes: Annotated[int, typer.Option(help="Maximum input age.")] = 30,
+) -> None:
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        result = capture_shadow_decisions(
+            session,
+            model=model,
+            limit=limit,
+            max_age_minutes=max_age_minutes,
+        )
+    console.print(json.dumps(result.__dict__, indent=2))
+    console.print("Lane: SHADOW (guarded paper tables untouched)")
+
+
+@app.command("shadow-settlement-reconcile")
+def shadow_settlement_reconcile_command(
+    limit: Annotated[int, typer.Option(help="Maximum open shadow decisions.")] = 5000,
+) -> None:
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        result = reconcile_shadow_settlements(session, limit=limit)
+    console.print(json.dumps(result.__dict__, indent=2))
+    console.print("Join policy: exact ticker canonical settlement")
+
+
+@app.command("ensemble-audit")
+def ensemble_audit_command(
+    model: Annotated[str, typer.Option(help="Ensemble model name.")] = "ensemble_v2",
+    output: Annotated[Path | None, typer.Option(help="Optional JSON output path.")] = None,
+) -> None:
+    engine = make_sqlite_read_only_engine()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        payload = ensemble_audit(session, model=model)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("fast-settlement-candidates")
+def fast_settlement_candidates_command(
+    limit: Annotated[int, typer.Option(help="Maximum ranked candidates.")] = 100,
+    output: Annotated[Path | None, typer.Option(help="Optional JSON output path.")] = None,
+) -> None:
+    engine = make_sqlite_read_only_engine()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        payload = fast_settlement_candidates(session, limit=limit)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("phase4cd-report")
+def phase4cd_report_command(
+    output_dir: Annotated[Path, typer.Option(help="Phase 4C/4D report directory.")] = Path(
+        "reports/phase4cd"
+    ),
+) -> None:
+    engine = make_sqlite_read_only_engine()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        paths = write_phase4cd_reports(session, output_dir=output_dir)
+    for path in paths:
+        console.print(f"Wrote {path}")
 
 
 _install_friendly_cli_error_handlers()

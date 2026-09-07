@@ -123,6 +123,7 @@ def write_phase3bc_r5_crypto_freshness_watch_report(
     freshness_minutes: int = DEFAULT_CRYPTO_REFRESH_CADENCE_MINUTES,
     max_preflight: int = 10,
     risk_preflight: bool = True,
+    persist_risk_preflight: bool = True,
     ranking_repair: bool = True,
     ranking_repair_limit: int = 500,
     exact_snapshot_refresh: bool = True,
@@ -263,6 +264,7 @@ def write_phase3bc_r5_crypto_freshness_watch_report(
             session,
             candidates,
             settings=_preflight_settings(resolved),
+            persist=persist_risk_preflight,
         )
         if risk_preflight
         else []
@@ -1746,42 +1748,48 @@ def _run_risk_preflight(
     candidates: list[dict[str, Any]],
     *,
     settings: Settings,
+    persist: bool = True,
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    for candidate in candidates:
-        decision = _paper_decision_for_candidate(session, candidate, settings=settings)
-        if decision is None:
+    savepoint = session.begin_nested() if not persist else None
+    try:
+        for candidate in candidates:
+            decision = _paper_decision_for_candidate(session, candidate, settings=settings)
+            if decision is None:
+                results.append(
+                    {
+                        **candidate,
+                        "preflight_status": "SKIPPED",
+                        "preflight_reason": "latest ranking or forecast fields were unavailable",
+                    }
+                )
+                continue
+            sized = ensure_paper_decision_sized(session, decision, settings=settings)
+            raw = sized.raw_decision_json
+            sizing = raw.get("position_sizing_decision") or {}
+            risk = raw.get("advanced_risk_decision") or {}
             results.append(
                 {
                     **candidate,
-                    "preflight_status": "SKIPPED",
-                    "preflight_reason": "latest ranking or forecast fields were unavailable",
+                    "preflight_status": "RECORDED",
+                    "phase3m_decision_id": raw.get("position_sizing_decision_id"),
+                    "phase3m_tier": sizing.get("tier"),
+                    "phase3m_proposed_contracts": sizing.get("proposed_contracts"),
+                    "phase3m_executed_contracts": sizing.get("executed_contracts"),
+                    "phase3n_decision_id": raw.get("advanced_risk_decision_id"),
+                    "phase3n_action": risk.get("action"),
+                    "phase3n_mode": risk.get("mode"),
+                    "phase3n_live_candidate_contracts": risk.get("live_candidate_contracts"),
+                    "phase3n_executed_contracts": risk.get("executed_contracts"),
+                    "phase3n_reason_codes": risk.get("reason_codes", []),
+                    "phase3n_hard_blocks": risk.get("hard_blocks", []),
+                    "paper_decision_quantity_after_preflight": sized.quantity,
+                    "preflight_reason": sized.reason,
                 }
             )
-            continue
-        sized = ensure_paper_decision_sized(session, decision, settings=settings)
-        raw = sized.raw_decision_json
-        sizing = raw.get("position_sizing_decision") or {}
-        risk = raw.get("advanced_risk_decision") or {}
-        results.append(
-            {
-                **candidate,
-                "preflight_status": "RECORDED",
-                "phase3m_decision_id": raw.get("position_sizing_decision_id"),
-                "phase3m_tier": sizing.get("tier"),
-                "phase3m_proposed_contracts": sizing.get("proposed_contracts"),
-                "phase3m_executed_contracts": sizing.get("executed_contracts"),
-                "phase3n_decision_id": raw.get("advanced_risk_decision_id"),
-                "phase3n_action": risk.get("action"),
-                "phase3n_mode": risk.get("mode"),
-                "phase3n_live_candidate_contracts": risk.get("live_candidate_contracts"),
-                "phase3n_executed_contracts": risk.get("executed_contracts"),
-                "phase3n_reason_codes": risk.get("reason_codes", []),
-                "phase3n_hard_blocks": risk.get("hard_blocks", []),
-                "paper_decision_quantity_after_preflight": sized.quantity,
-                "preflight_reason": sized.reason,
-            }
-        )
+    finally:
+        if savepoint is not None and savepoint.is_active:
+            savepoint.rollback()
     return results
 
 

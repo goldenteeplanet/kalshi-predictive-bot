@@ -103,6 +103,7 @@ def runtime_identity(
     session: Session,
     *,
     settings: Settings | None = None,
+    include_integrity: bool = True,
 ) -> dict[str, Any]:
     resolved = settings or get_settings()
     db_url = _session_database_url(session) or database_url_from_settings(resolved)
@@ -112,7 +113,9 @@ def runtime_identity(
     python_executable = Path(sys.executable).resolve()
     package_path = Path(kalshi_predictor.__file__).resolve()
     sqlite_path = sqlite_path_from_url(db_url)
-    sqlite_identity = _sqlite_identity(sqlite_path) if sqlite_path else None
+    sqlite_identity = (
+        _sqlite_identity(sqlite_path, deep_checks=include_integrity) if sqlite_path else None
+    )
     return {
         "generated_at": utc_now().isoformat(),
         "phase": "3Z",
@@ -135,7 +138,12 @@ def runtime_identity(
         "database_location": db_location,
         "sqlite": sqlite_identity,
         "migration": migration_status(session=session, settings=resolved, db_url=db_url),
-        "health": database_health(session=session, settings=resolved, db_url=db_url),
+        "health": database_health(
+            session=session,
+            settings=resolved,
+            db_url=db_url,
+            include_integrity=include_integrity,
+        ),
         "split_brain": _split_brain_status(db_url),
     }
 
@@ -1135,7 +1143,11 @@ def _render_metrics_reconcile_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _sqlite_identity(path: Path | None) -> dict[str, Any] | None:
+def _sqlite_identity(
+    path: Path | None,
+    *,
+    deep_checks: bool = True,
+) -> dict[str, Any] | None:
     if path is None or str(path) == ":memory:":
         return None
     resolved = path.expanduser().resolve()
@@ -1152,8 +1164,12 @@ def _sqlite_identity(path: Path | None) -> dict[str, Any] | None:
         {
             "size_bytes": stat.st_size,
             "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
-            "sha256": _sha256_file(resolved),
-            "integrity_check": _sqlite_integrity_check(resolved),
+            "sha256": _sha256_file(resolved) if deep_checks else None,
+            "integrity_check": (
+                _sqlite_integrity_check(resolved)
+                if deep_checks
+                else "SKIPPED_BOUNDED_IDENTITY"
+            ),
         }
     )
     return payload
