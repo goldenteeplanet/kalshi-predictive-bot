@@ -20,22 +20,25 @@ def test_exact_diagnosis_separates_closed_stale_current_and_mismatch(tmp_path) -
     with factory() as session:
         _seed(
             session,
-            "WX-CLOSED",
+            "KXTEMPNYCH-CLOSED",
             close=NOW - timedelta(minutes=1),
             captured=NOW - timedelta(minutes=5),
         )
         _seed(
-            session, "WX-STALE", close=NOW + timedelta(hours=2), captured=NOW - timedelta(hours=7)
+            session,
+            "KXTEMPNYCH-STALE",
+            close=NOW + timedelta(hours=2),
+            captured=NOW - timedelta(hours=7),
         )
         _seed(
             session,
-            "WX-CURRENT",
+            "KXTEMPNYCH-CURRENT",
             close=NOW + timedelta(hours=2),
             captured=NOW - timedelta(minutes=2),
         )
         _seed(
             session,
-            "WX-MISMATCH",
+            "KXTEMPNYCH-MISMATCH",
             close=NOW + timedelta(hours=2),
             captured=NOW - timedelta(minutes=2),
             target=NOW + timedelta(hours=3),
@@ -47,14 +50,18 @@ def test_exact_diagnosis_separates_closed_stale_current_and_mismatch(tmp_path) -
         )
     classes = {row["ticker"]: row["classification"] for row in report["rows"]}
     assert classes == {
-        "WX-CLOSED": "MARKET_CLOSED",
-        "WX-CURRENT": "EXACT_CURRENT_WINDOW_READY",
-        "WX-MISMATCH": "SELECTOR_ELIGIBLE_TARGET_MISMATCH",
-        "WX-STALE": "SELECTOR_ELIGIBLE_SNAPSHOT_STALE",
+        "KXTEMPNYCH-CLOSED": "MARKET_CLOSED",
+        "KXTEMPNYCH-CURRENT": "EXACT_CURRENT_WINDOW_READY",
+        "KXTEMPNYCH-MISMATCH": "SELECTOR_ELIGIBLE_TARGET_MISMATCH",
+        "KXTEMPNYCH-STALE": "SELECTOR_ELIGIBLE_SNAPSHOT_STALE",
     }
     assert report["selector_eligible_count"] == 3
     assert report["exact_current_window_ready_count"] == 1
-    assert {row.ticker for row in selector_rows} == {"WX-CURRENT", "WX-MISMATCH", "WX-STALE"}
+    assert {row.ticker for row in selector_rows} == {
+        "KXTEMPNYCH-CURRENT",
+        "KXTEMPNYCH-MISMATCH",
+        "KXTEMPNYCH-STALE",
+    }
     assert report["guardrails"]["database_writes"] == 0
 
 
@@ -63,7 +70,7 @@ def test_all_closed_rows_require_catalog_refresh_not_selector_relaxation(tmp_pat
     with factory() as session:
         _seed(
             session,
-            "WX-CLOSED",
+            "KXTEMPNYCH-CLOSED",
             close=NOW - timedelta(minutes=1),
             captured=NOW - timedelta(minutes=5),
         )
@@ -91,7 +98,7 @@ def test_partial_snapshot_upsert_preserves_close_time_after_r4_repair(tmp_path) 
     with factory() as session:
         _seed(
             session,
-            "WX-PARTIAL",
+            "KXTEMPNYCH-PARTIAL",
             close=NOW + timedelta(hours=2),
             captured=NOW - timedelta(minutes=2),
             include_close_in_snapshot=False,
