@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from itertools import pairwise
 from typing import Any, Literal
+
+from kalshi_predictor.utils.json_digest import json_payload_digest as _hash
 
 TIMELINE_SCHEMA_VERSION = "phase4gt-dashboard-settlement-timeline-v1"
 TimelineStatus = Literal["PENDING", "SETTLED", "INCOMPLETE", "STALE"]
@@ -272,8 +272,3 @@ def _validate_event_fields(payload: dict[str, Any]) -> None:
             raise DashboardSettlementTimelineError("EVENT_FIELD_INVALID")
     if not isinstance(payload["complete"], bool):
         raise DashboardSettlementTimelineError("EVENT_FIELD_INVALID")
-
-
-def _hash(payload: Any) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()

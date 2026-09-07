@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
+
+from kalshi_predictor.utils.json_digest import json_value_digest as _hash
 
 REPLAY_SCHEMA_VERSION = "phase4ix-component-recovery-differential-replay-v1"
 ReplayStatus = Literal["MATCH", "DRIFT", "SAFETY_REGRESSION", "INCOMPLETE", "TAMPERED"]
@@ -182,9 +182,3 @@ def _validate_fields(fields: dict[str, Any]) -> None:
     for key in ("baseline_safety_proven", "candidate_safety_proven", "complete"):
         if not isinstance(fields[key], bool):
             raise ComponentRecoveryDifferentialReplayError("REPLAY_CASE_FIELD_INVALID")
-
-
-def _hash(value: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()

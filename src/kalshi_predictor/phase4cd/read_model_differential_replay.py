@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -9,6 +8,7 @@ from typing import Any, Literal
 from kalshi_predictor.phase4cd.read_model_provenance_dashboard import (
     validate_provenance_dashboard,
 )
+from kalshi_predictor.utils.json_digest import json_payload_digest as _hash
 
 REPLAY_SCHEMA_VERSION = "phase4fw-read-model-differential-replay-v1"
 ReplayStatus = Literal["MATCH", "DIVERGENCE"]
@@ -104,8 +104,3 @@ def _validated_row(row: Any) -> dict[str, Any]:
     except (TypeError, ValueError) as exc:
         raise DifferentialReplayError("DASHBOARD_INVALID") from exc
     return json.loads(json.dumps(row, sort_keys=True, separators=(",", ":")))
-
-
-def _hash(payload: Any) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()

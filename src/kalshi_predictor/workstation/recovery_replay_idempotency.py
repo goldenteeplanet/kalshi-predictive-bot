@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
+
+from kalshi_predictor.utils.json_digest import json_value_digest as _hash
 
 VERIFICATION_SCHEMA_VERSION = "phase4jr-recovery-replay-idempotency-v1"
 VerificationStatus = Literal["PASS", "FAIL", "INCOMPLETE", "TAMPERED"]
@@ -191,9 +191,3 @@ def _validate_fields(fields: dict[str, Any]) -> None:
             raise RecoveryReplayIdempotencyError("REPLAY_IDEMPOTENCY_CASE_FIELD_INVALID")
     if not isinstance(fields["complete"], bool):
         raise RecoveryReplayIdempotencyError("REPLAY_IDEMPOTENCY_CASE_FIELD_INVALID")
-
-
-def _hash(value: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
