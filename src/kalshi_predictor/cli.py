@@ -794,6 +794,11 @@ from kalshi_predictor.professional_ux.reports import (
     generate_phase_3x_report,
     phase_3x_card,
 )
+from kalshi_predictor.professional_ux.operations import (
+    build_ops_status,
+    write_daily_close,
+    write_morning_briefing,
+)
 from kalshi_predictor.professional_ux.service import (
     DEFAULT_SHELL_STATUS_SNAPSHOT_PATH,
     write_shell_status_snapshot,
@@ -15942,6 +15947,56 @@ def phase_3x_audit_command(
     console.print(f"Phase 3X audit decision: {result['decision']}")
     console.print(f"Artifacts: {len(result['artifacts'])}")
     console.print("Release decision remains INCOMPLETE until evidence gates pass.")
+
+
+@app.command("ops-status")
+def ops_status_command() -> None:
+    """Show the read-only Phase 3X operator status and exact remediation actions."""
+    engine = _init_db_or_exit("Phase 3X operations status")
+    settings = get_settings()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        payload = build_ops_status(session, settings=settings)
+    console.print(f"Operations status: {payload['overall_status']}")
+    console.print(f"Environment: {payload['environment']}")
+    console.print(f"Execution mode: {payload['execution_mode']}")
+    for check in payload["checks"]:
+        console.print(f"[{check['status']}] {check['name']}")
+        console.print(f"  Why: {check['why_it_matters']}")
+        console.print(f"  Next: {check['next_action']}")
+    console.print("Live trading authorized: false")
+
+
+@app.command("morning-briefing")
+def morning_briefing_command(
+    output: Annotated[
+        Path,
+        typer.Option(help="Markdown morning briefing path."),
+    ] = Path("reports/morning_briefing.md"),
+) -> None:
+    engine = _init_db_or_exit("Phase 3X morning briefing")
+    settings = get_settings()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        report_path = write_morning_briefing(session, output_path=output, settings=settings)
+    console.print(f"Wrote morning briefing to {report_path}")
+    console.print("Live trading authorized: false")
+
+
+@app.command("daily-close")
+def daily_close_command(
+    output: Annotated[
+        Path,
+        typer.Option(help="Markdown daily close path."),
+    ] = Path("reports/daily_close.md"),
+) -> None:
+    engine = _init_db_or_exit("Phase 3X daily close")
+    settings = get_settings()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        report_path = write_daily_close(session, output_path=output, settings=settings)
+    console.print(f"Wrote daily close to {report_path}")
+    console.print("Live trading authorized: false")
 
 
 @app.command("ui-shell-status-refresh")
