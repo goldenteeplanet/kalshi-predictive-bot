@@ -40,7 +40,7 @@ DEFAULT_OUTPUT_DIR = Path("reports/phase3bb_r38")
 DEFAULT_REPORTS_DIR = Path("reports")
 DEFAULT_PER_PROBE_TIMEOUT_SECONDS = 45
 CODE_SYNC_ENV_VAR = "PHASE3BB_R38_CODE_SYNC"
-CODE_SYNC_TOKEN = "I_APPROVE_R38_CODE_SYNC"
+CODE_SYNC_TOKEN = "I_APPROVE_R38_CODE_SYNC"  # pragma: allowlist secret
 ROOT_SCRIPT_REMOTE_PATH = "/tmp/phase3bb_r38_root_console_scheduler_install.sh"
 
 

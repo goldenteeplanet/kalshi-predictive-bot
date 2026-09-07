@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from alembic.script import ScriptDirectory
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.maintenance import migration_status
@@ -150,7 +152,8 @@ def test_phase_3w_r_local_integration_captures_dynamic_and_negative_evidence(
 
 
 def test_phase_3w_r_alembic_ancestry_classification(tmp_path) -> None:
-    diagnostics = alembic_graph_diagnostics(["20260824_0016"], root=_repo_root())
+    head = ScriptDirectory(str(_repo_root() / "alembic")).get_current_head()
+    diagnostics = alembic_graph_diagnostics([head], root=_repo_root())
     assert diagnostics["status"] == ALEMBIC_AT_HEAD
 
     behind = alembic_graph_diagnostics(["20260716_0012"], root=_repo_root())
@@ -163,7 +166,7 @@ def test_phase_3w_r_alembic_ancestry_classification(tmp_path) -> None:
     with session_factory() as session:
         status = migration_status(session=session, settings=_settings(tmp_path))
     assert status["graph_status"] in {ALEMBIC_UPGRADE_REQUIRED, ALEMBIC_AT_HEAD}
-    assert status["head_revision"] == "20260824_0016"
+    assert status["head_revision"] == head
 
 
 def test_phase_3w_r_golden_trace_is_deterministic_and_no_exchange_write() -> None:

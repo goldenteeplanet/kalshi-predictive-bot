@@ -13515,6 +13515,8 @@ def _release_phase3bc_r5_cycle_resources(session: Any, engine: Any) -> None:
             expunge_all()
     engine.dispose()
     gc.collect()
+    if sys.platform != "linux":
+        return
     try:
         import ctypes
 
