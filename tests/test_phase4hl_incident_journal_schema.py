@@ -4,6 +4,7 @@ import json
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.incident_journal_schema import (
     GENESIS_ENTRY_HASH,
     JOURNAL_SCHEMA_VERSION,

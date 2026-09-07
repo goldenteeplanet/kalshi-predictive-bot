@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import decode_json, upsert_market, upsert_settlement
@@ -13,7 +15,6 @@ from kalshi_predictor.phase3aa_r6 import (
     write_phase3aa_r6_composite_settlement_resolver_report,
 )
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_phase3aa_r6_dry_run_reports_ready_without_writing(tmp_path) -> None:

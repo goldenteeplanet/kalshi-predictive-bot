@@ -3,6 +3,9 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
+from sqlalchemy import select
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.crypto.repository import insert_crypto_features
@@ -30,8 +33,6 @@ from kalshi_predictor.sports.repository import (
     upsert_sports_team,
 )
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import select
-from typer.testing import CliRunner
 
 
 def test_phase3ak_marks_unsupported_multileg_and_blocks_learning(tmp_path) -> None:

@@ -1,6 +1,7 @@
 from dataclasses import FrozenInstanceError
 
 import pytest
+
 from kalshi_predictor.roadmap.paper_quota import (
     PaperQuotaCandidate,
     select_paper_candidates_by_category,

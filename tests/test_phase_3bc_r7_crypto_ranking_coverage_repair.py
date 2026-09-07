@@ -5,6 +5,9 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
+from sqlalchemy import func, select
+from typer.testing import CliRunner
+
 import kalshi_predictor.phase3bc_r7 as phase3bc_r7
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
@@ -22,8 +25,6 @@ from kalshi_predictor.phase3bc_r7 import (
     write_phase3bc_r7_crypto_ranking_coverage_repair_report,
 )
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import func, select
-from typer.testing import CliRunner
 
 
 def test_phase3bc_r7_classifies_repairable_ranking_gaps() -> None:

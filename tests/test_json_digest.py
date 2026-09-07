@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 import pytest
+
 from kalshi_predictor.phase4cd import read_model_differential_replay
 from kalshi_predictor.ui import dashboard_settlement_timeline
 from kalshi_predictor.workstation import (

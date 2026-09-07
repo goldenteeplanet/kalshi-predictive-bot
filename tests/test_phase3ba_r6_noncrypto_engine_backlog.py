@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3ba_r6
 from kalshi_predictor.cli import app
-from typer.testing import CliRunner
 
 
 def test_phase3ba_r6_selects_sports_after_weather_when_ready() -> None:

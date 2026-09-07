@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.end_to_end_mocked_restart_rehearsal import (
     EndToEndMockedRestartRehearsalError,
     evaluate_end_to_end_mocked_restart_rehearsal,

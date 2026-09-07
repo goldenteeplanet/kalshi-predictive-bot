@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import httpx
+
 from kalshi_predictor.phase_nyc_w4 import write_nyc_w4_report
 
 

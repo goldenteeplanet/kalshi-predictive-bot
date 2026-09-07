@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.phase4cd.evidence_cache_single_flight_proposal import (
     EvidenceCacheSingleFlightError,
     propose_evidence_cache_single_flight,

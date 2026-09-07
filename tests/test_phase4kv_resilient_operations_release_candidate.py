@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.resilient_operations_release_candidate import (
     ResilientOperationsReleaseCandidateError,
     evaluate_resilient_operations_release_candidate,

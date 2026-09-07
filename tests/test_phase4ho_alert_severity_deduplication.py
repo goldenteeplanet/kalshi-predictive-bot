@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.alert_severity_deduplication import (
     AlertSeverityDeduplicationError,
     evaluate_alert_severity_and_deduplication,

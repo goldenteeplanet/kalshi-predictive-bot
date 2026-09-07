@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.recovery_action_capability_model import (
     ACTION_TIMEOUT_LIMITS,
     RecoveryActionCapabilityModelError,

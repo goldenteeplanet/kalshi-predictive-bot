@@ -3,8 +3,8 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from kalshi_predictor.phase4cd.reconciliation_audit import canonical_hash
 
+from kalshi_predictor.phase4cd.reconciliation_audit import canonical_hash
 from scripts.local.phase4dn_opportunity_filter_pushdown import INPUT_SCHEMA, build_report, publish
 
 

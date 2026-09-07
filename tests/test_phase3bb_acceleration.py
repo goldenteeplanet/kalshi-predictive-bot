@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3bb_acceleration as accel
 from kalshi_predictor.cli import app
-from typer.testing import CliRunner
 
 
 def test_throughput_ev_per_day_uses_runtime_hours() -> None:

@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.least_privilege_task_identity_audit import (
     REQUIRED_RIGHTS,
     LeastPrivilegeTaskIdentityAuditError,

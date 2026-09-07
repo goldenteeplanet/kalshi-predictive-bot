@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.crash_boundary_simulation import (
     BOUNDARY_EXPECTATIONS,
     CrashBoundarySimulationError,

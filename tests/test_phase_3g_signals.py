@@ -3,6 +3,8 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import (
@@ -24,7 +26,6 @@ from kalshi_predictor.signals.scoring import refresh_signal_performance
 from kalshi_predictor.signals.signal_types import MARKET_DIVERGENCE_SIGNAL, NEWS_SIGNAL
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import func, select
 
 
 def test_signal_creation_registers_builtin_signals(tmp_path) -> None:

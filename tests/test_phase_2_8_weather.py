@@ -1,6 +1,8 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from sqlalchemy import func, select
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import (
@@ -28,7 +30,6 @@ from kalshi_predictor.weather.repository import (
     insert_weather_forecast,
     insert_weather_market_link,
 )
-from sqlalchemy import func, select
 
 
 def test_noaa_provider_parser_handles_sample_forecast_json() -> None:

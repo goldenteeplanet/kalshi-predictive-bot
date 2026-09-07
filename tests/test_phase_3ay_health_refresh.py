@@ -5,6 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3ay
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
@@ -17,7 +19,6 @@ from kalshi_predictor.phase3ay import (
 )
 from kalshi_predictor.scheduler import scheduler_plan
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_phase3ay_health_refresh_writes_fresh_watch_report(tmp_path, monkeypatch) -> None:

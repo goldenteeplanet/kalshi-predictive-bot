@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
+
 from kalshi_predictor.roadmap.artifacts import verify_signed_artifact
 from kalshi_predictor.roadmap.category_census import (
     build_category_ingestion_census,

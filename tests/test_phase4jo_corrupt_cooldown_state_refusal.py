@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.corrupt_cooldown_state_refusal import (
     CorruptCooldownStateRefusalError,
     evaluate_corrupt_cooldown_state_refusal,

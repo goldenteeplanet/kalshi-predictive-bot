@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from sqlalchemy import select
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_forecast, insert_market_snapshot
@@ -9,7 +11,6 @@ from kalshi_predictor.forecasting.base import ForecastOutput
 from kalshi_predictor.paper.ledger import create_paper_order
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES
 from kalshi_predictor.paper.strategy import generate_paper_decisions
-from sqlalchemy import select
 
 
 def test_strategy_creates_buy_yes_when_edge_above_threshold(tmp_path) -> None:

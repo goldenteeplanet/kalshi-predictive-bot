@@ -2,6 +2,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.workstation.supervisor_exclusion_lock import (
     SupervisorExclusionLockError,
     acquire_supervisor_exclusion_lock,

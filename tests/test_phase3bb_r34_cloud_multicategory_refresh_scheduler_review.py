@@ -6,6 +6,8 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -23,7 +25,6 @@ from kalshi_predictor.phase3bb_r34_cloud_multicategory_refresh_scheduler_review 
     build_phase3bb_r34_cloud_multicategory_refresh_scheduler_review,
     write_phase3bb_r34_cloud_multicategory_refresh_scheduler_review_report,
 )
-from typer.testing import CliRunner
 
 DB_FINGERPRINT = "sha256:r34-test-db"
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -16,7 +18,6 @@ from kalshi_predictor.phase3bb_r47_weather_current_window_series_discovery impor
     patch_runner_weather_feature_refresh,
     write_phase3bb_r47_weather_current_window_series_discovery_report,
 )
-from typer.testing import CliRunner
 
 
 def test_patch_runner_weather_feature_refresh_adds_source_steps() -> None:

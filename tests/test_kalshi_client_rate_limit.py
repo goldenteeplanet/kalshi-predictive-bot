@@ -1,5 +1,6 @@
 import httpx
 import pytest
+
 from kalshi_predictor.kalshi.client import (
     RATE_LIMITED_PARTIAL,
     RATE_LIMITED_RETRY_EXHAUSTED,

@@ -3,6 +3,8 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.crypto.assets import DEFAULT_CRYPTO_SYMBOLS
@@ -23,7 +25,6 @@ from kalshi_predictor.forecasting.status import (
 )
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_expected_model_readiness_rows_are_present(tmp_path) -> None:

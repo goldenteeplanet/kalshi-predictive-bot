@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.network_dns_evidence_capture import (
     NetworkDnsEvidenceCaptureError,
     capture_network_dns_evidence,

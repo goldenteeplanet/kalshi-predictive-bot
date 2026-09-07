@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -16,7 +18,6 @@ from kalshi_predictor.phase3bb_r46_cloud_scheduler_weather_writer_gate_repair im
     patch_runner_midrun_writer_gate,
     write_phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_report,
 )
-from typer.testing import CliRunner
 
 
 def test_patch_runner_adds_midrun_writer_busy_clean_skip() -> None:

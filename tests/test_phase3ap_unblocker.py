@@ -5,6 +5,8 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -36,7 +38,6 @@ from kalshi_predictor.ui.service import (
     _phase3aq_dashboard_status_payload,
 )
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_phase3ap_explains_positive_ev_empty_book_without_lowering_thresholds(tmp_path) -> None:

@@ -3,6 +3,8 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import upsert_market
@@ -12,7 +14,6 @@ from kalshi_predictor.no_opportunity_audit import (
     write_no_opportunity_root_cause_audit,
 )
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_no_opportunity_audit_writes_all_prompt_one_artifacts(tmp_path) -> None:

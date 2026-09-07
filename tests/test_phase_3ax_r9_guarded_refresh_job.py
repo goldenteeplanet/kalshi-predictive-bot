@@ -2,6 +2,9 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+from sqlalchemy import func, select
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3ax_r9
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
@@ -9,8 +12,6 @@ from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.schema import PaperOrder
 from kalshi_predictor.phase3ax_r9 import write_phase3ax_r9_guarded_refresh_job_report
 from kalshi_predictor.phase3bc_r6 import Phase3BCR6UnattendedStart
-from sqlalchemy import func, select
-from typer.testing import CliRunner
 
 
 def test_phase3ax_r9_refuses_duplicate_r5_start(tmp_path, monkeypatch) -> None:

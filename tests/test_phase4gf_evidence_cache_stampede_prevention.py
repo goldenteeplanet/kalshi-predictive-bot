@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.phase4cd.evidence_cache_stampede_prevention import (
     EvidenceCacheStampedeError,
     make_cache_snapshot,

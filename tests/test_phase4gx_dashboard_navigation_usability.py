@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.ui.dashboard_navigation_usability import (
     DashboardNavigationUsabilityError,
     audit_dashboard_navigation_usability,

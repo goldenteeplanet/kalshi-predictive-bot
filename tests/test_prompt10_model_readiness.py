@@ -3,6 +3,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.crypto.repository import insert_crypto_market_link
@@ -16,8 +19,6 @@ from kalshi_predictor.forecasting.skip_log import log_forecast_skip
 from kalshi_predictor.forecasting.weather_v2 import WeatherV2Forecaster
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import select
-from typer.testing import CliRunner
 
 EXPECTED_MODELS = {
     "market_implied_v1",

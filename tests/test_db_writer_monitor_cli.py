@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 
-from kalshi_predictor.cli import app
 from typer.testing import CliRunner
+
+from kalshi_predictor.cli import app
 
 
 def test_db_writer_monitor_json_stdout_is_valid_json(monkeypatch) -> None:

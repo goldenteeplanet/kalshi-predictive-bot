@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.recovery_outcome_notification import (
     RecoveryOutcomeNotificationError,
     build_recovery_outcome_notification,

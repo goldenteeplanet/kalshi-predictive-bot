@@ -1,6 +1,8 @@
 import json
 from datetime import timedelta
 
+from sqlalchemy import select
+
 from kalshi_predictor.data.schema import (
     CalibrationObservation,
     CryptoFeature,
@@ -16,8 +18,6 @@ from kalshi_predictor.phase4cd.lineage import (
     immutable_provenance_hash,
 )
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import select
-
 from tests.test_phase4cd import _count, _factory, _seed
 
 

@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
 
-from kalshi_predictor.data.schema import Base, WeatherFeature
-from kalshi_predictor.weather.repository import get_latest_weather_features
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
+from kalshi_predictor.data.schema import Base, WeatherFeature
+from kalshi_predictor.weather.repository import get_latest_weather_features
 
 
 def test_latest_feature_prefers_latest_target_in_same_build() -> None:

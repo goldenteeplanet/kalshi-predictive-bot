@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.safe_configuration_reload import (
     ALLOWLISTED_FIELDS,
     SafeConfigurationReloadError,

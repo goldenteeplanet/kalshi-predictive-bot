@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from alembic.script import ScriptDirectory
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.maintenance import migration_status
@@ -33,8 +35,6 @@ from kalshi_predictor.system_certification.phase_registry import (
 )
 from kalshi_predictor.system_certification.reports import generate_system_certification_report
 from kalshi_predictor.system_certification.service import SystemCertificationService
-
-from alembic.script import ScriptDirectory
 
 
 def test_phase_3w_r_authoritative_registry_covers_all_required_fields() -> None:

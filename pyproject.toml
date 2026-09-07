@@ -59,6 +59,10 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["B", "E", "F", "I", "UP"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["kalshi_predictor"]
+known-third-party = ["alembic"]
+
 [tool.mypy]
 python_version = "3.11"
 check_untyped_defs = true

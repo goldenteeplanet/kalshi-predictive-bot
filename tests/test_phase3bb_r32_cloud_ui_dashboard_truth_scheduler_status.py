@@ -5,6 +5,8 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -19,7 +21,6 @@ from kalshi_predictor.phase3bb_r32_cloud_ui_dashboard_truth_scheduler_status imp
     build_phase3bb_r32_cloud_ui_dashboard_truth_scheduler_status,
     write_phase3bb_r32_cloud_ui_dashboard_truth_scheduler_status_report,
 )
-from typer.testing import CliRunner
 
 DB_FINGERPRINT = "sha256:test-db"
 

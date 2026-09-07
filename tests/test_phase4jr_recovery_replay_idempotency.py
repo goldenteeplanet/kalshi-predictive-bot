@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.recovery_replay_idempotency import (
     RecoveryReplayIdempotencyError,
     make_replay_idempotency_case,

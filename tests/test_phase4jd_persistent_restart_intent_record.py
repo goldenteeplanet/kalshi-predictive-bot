@@ -2,6 +2,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.workstation.persistent_restart_intent_record import (
     GENESIS_RECORD_HASH,
     PersistentRestartIntentRecordError,

@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+
 from kalshi_predictor.roadmap.category_adapters import (
     adapt_all_category_evidence,
     adapt_category_evidence,

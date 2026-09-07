@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.phase3aa_r4 import (
     build_phase3aa_r4_settlement_fetch_recovery,
     write_phase3aa_r4_settlement_fetch_recovery_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3aa_r4_groups_fetch_errors_and_blocks_sibling_settlement(tmp_path) -> None:

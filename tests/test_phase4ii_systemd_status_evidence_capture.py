@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.systemd_status_evidence_capture import (
     SystemdStatusEvidenceCaptureError,
     capture_systemd_status_evidence,

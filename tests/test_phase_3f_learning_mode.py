@@ -4,6 +4,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.confidence.engine import generate_confidence_weights
 from kalshi_predictor.confidence.repository import insert_model_confidence_score
@@ -35,8 +38,6 @@ from kalshi_predictor.tournament.repository import insert_model_weight
 from kalshi_predictor.ui import routes as ui_routes
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import select
-from typer.testing import CliRunner
 
 
 def test_learning_settings_lower_paper_and_opportunity_thresholds() -> None:

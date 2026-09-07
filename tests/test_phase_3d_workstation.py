@@ -3,6 +3,8 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import event, select
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import (
@@ -39,7 +41,6 @@ from kalshi_predictor.workstation.repository import (
     record_position_history,
     remove_market_from_watchlist,
 )
-from sqlalchemy import event, select
 
 
 def test_portfolio_calculations_and_snapshots(tmp_path) -> None:

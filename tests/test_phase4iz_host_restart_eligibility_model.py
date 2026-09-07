@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.host_restart_eligibility_model import (
     HostRestartEligibilityModelError,
     evaluate_host_restart_eligibility,

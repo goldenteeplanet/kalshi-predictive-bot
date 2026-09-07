@@ -1,8 +1,12 @@
 import sqlite3
 from pathlib import Path
 
-import kalshi_predictor.cli as cli_module
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session, sessionmaker
+from typer.testing import CliRunner
+
+import kalshi_predictor.cli as cli_module
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import init_db
@@ -14,9 +18,6 @@ from kalshi_predictor.data.locks import (
     sqlite_lock_diagnostics,
 )
 from kalshi_predictor.ui.app import create_app
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session, sessionmaker
-from typer.testing import CliRunner
 
 
 def test_explicit_read_only_link_coverage_is_not_classified_as_writer() -> None:

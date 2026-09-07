@@ -7,6 +7,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.phase4cd.reconciliation_audit import canonical_hash
 
 SCRIPT = Path(__file__).parents[1] / "scripts/local/phase4ew_paper_pipeline_airgapped_acceptance.py"

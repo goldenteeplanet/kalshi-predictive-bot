@@ -1,13 +1,14 @@
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.phase3ah_sports import (
     build_phase3ah_sports_evidence_backfill,
     write_phase3ah_sports_evidence_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3ah_groups_failed_close_dates_into_schedule_windows(tmp_path) -> None:

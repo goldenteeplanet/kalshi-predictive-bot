@@ -3,6 +3,9 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
+from sqlalchemy import create_engine, inspect, select
+from sqlalchemy.orm import Session
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.repositories import insert_forecast
 from kalshi_predictor.data.schema import (
@@ -13,8 +16,6 @@ from kalshi_predictor.data.schema import (
     RuntimeProvenanceEvent,
 )
 from kalshi_predictor.opportunities.repository import insert_market_ranking
-from sqlalchemy import create_engine, inspect, select
-from sqlalchemy.orm import Session
 
 
 def _disable_memory_capture(monkeypatch) -> None:

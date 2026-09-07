@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.restart_cancellation_token import (
     RestartCancellationTokenError,
     evaluate_restart_cancellation_token,

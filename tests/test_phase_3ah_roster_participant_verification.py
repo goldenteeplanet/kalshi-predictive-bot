@@ -1,12 +1,13 @@
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.phase3ah_roster import (
     build_phase3ah_roster_verification,
     write_phase3ah_roster_verification_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3ah_roster_validated_row_becomes_verified_evidence(tmp_path) -> None:

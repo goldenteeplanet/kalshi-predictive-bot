@@ -5,6 +5,9 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
+from sqlalchemy import func, select
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -17,8 +20,6 @@ from kalshi_predictor.phase3ay_positive_ev import (
 )
 from kalshi_predictor.phase3bc_r5 import MODEL_NAME
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import func, select
-from typer.testing import CliRunner
 
 
 def test_phase3ay_positive_ev_accelerator_ranks_current_near_miss_only(tmp_path) -> None:

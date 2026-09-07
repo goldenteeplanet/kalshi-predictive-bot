@@ -1,10 +1,11 @@
 import sqlite3
 
 import pytest
-from kalshi_predictor.candidate_coverage_audit import build_candidate_coverage_audit
-from kalshi_predictor.candidate_funnel_audit import make_candidate_funnel_read_only_engine
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
+
+from kalshi_predictor.candidate_coverage_audit import build_candidate_coverage_audit
+from kalshi_predictor.candidate_funnel_audit import make_candidate_funnel_read_only_engine
 
 
 def test_candidate_coverage_builds_monotonic_funnels_and_exclusions() -> None:

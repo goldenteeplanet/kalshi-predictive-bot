@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.operator_recovery_drill import (
     REQUIRED_STEPS,
     OperatorRecoveryDrillError,

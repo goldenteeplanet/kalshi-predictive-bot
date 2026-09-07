@@ -1,6 +1,7 @@
 import json
 
 import pytest
+
 from kalshi_predictor.provenance.triage import build_offline_provenance_triage
 
 

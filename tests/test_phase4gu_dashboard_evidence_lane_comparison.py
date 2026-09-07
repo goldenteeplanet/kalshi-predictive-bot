@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.ui.dashboard_evidence_lane_comparison import (
     DashboardEvidenceLaneComparisonError,
     compare_dashboard_evidence_lanes,

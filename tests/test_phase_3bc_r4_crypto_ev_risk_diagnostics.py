@@ -2,12 +2,13 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.paper.models import BUY_YES
 from kalshi_predictor.phase3bc_r4 import _render_markdown, build_phase3bc_r4_payload
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_phase3bc_r4_groups_no_positive_ev_and_price_improvement() -> None:

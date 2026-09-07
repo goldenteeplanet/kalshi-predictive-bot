@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.authoritative_scheduler_health import (
     AUTHORITATIVE_UNIT,
     make_scheduler_health_observation,

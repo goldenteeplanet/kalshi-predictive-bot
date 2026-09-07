@@ -4,6 +4,9 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.schema import (
     Base,
@@ -22,8 +25,6 @@ from kalshi_predictor.paper.activation import (
 )
 from kalshi_predictor.paper.ledger import _market_accepts_new_paper_order
 from kalshi_predictor.paper.models import PaperDecision
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import Session
 
 TICKER = "KXRAINAUSM-26AUG-T1.5"
 

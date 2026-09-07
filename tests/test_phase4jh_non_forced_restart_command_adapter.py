@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.non_forced_restart_command_adapter import (
     COMMAND_ARGUMENTS,
     EXECUTABLE,

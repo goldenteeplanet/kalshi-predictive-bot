@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.restart_denial_reason_taxonomy import (
     RestartDenialReasonTaxonomyError,
     classify_restart_denial,

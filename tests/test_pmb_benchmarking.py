@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.benchmarking.agents import (
     MomentumAgent,
     PassiveAgent,

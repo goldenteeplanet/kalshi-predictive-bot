@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.ingest.settlement_hints import SCHEMA as HINT_SCHEMA
 from kalshi_predictor.ingest.settlement_hints import artifact_hash as hint_hash
 from kalshi_predictor.phase4cd.reconciliation_audit import settlement_lineage_hash

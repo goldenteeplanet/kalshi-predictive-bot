@@ -1,4 +1,5 @@
 import pytest
+
 from kalshi_predictor.weather.temperature_probability import (
     HIGH_TEMPERATURE_SIGMA,
     LOW_TEMPERATURE_SIGMA,

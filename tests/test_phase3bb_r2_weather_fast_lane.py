@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3bb_r2
 from kalshi_predictor.cli import app
-from typer.testing import CliRunner
 
 
 def test_weather_candidates_merge_ranking_and_gate_rows() -> None:

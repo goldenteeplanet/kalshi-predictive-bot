@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.phase4cd.read_model_crash_simulation import (
     CrashSimulationError,
     build_simulated_artifact,

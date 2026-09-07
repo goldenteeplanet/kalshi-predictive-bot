@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.schema import (
@@ -37,7 +39,6 @@ from kalshi_predictor.phase3bb import (
     write_phase3bb_r3_safe_parser_reparse_report,
 )
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_phase3bb_reports_economic_news_and_general_readiness(tmp_path) -> None:

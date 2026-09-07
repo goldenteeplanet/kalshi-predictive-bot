@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.phase3ah_placeholder_watch import (
     SETTLEMENT_HARVEST_COMMAND,
@@ -10,7 +12,6 @@ from kalshi_predictor.phase3ah_placeholder_watch import (
     build_phase3ah_sports_placeholder_watch,
     write_phase3ah_sports_placeholder_watch_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3ah_placeholder_watch_holds_still_placeholder_rows(tmp_path) -> None:

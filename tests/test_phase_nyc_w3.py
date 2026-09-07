@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import httpx
+
 from kalshi_predictor.phase_nyc_w3 import write_nyc_w3_report
 
 

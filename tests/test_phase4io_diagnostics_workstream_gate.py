@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.diagnostics_workstream_gate import (
     REQUIRED_COMPONENTS,
     DiagnosticsWorkstreamGateError,

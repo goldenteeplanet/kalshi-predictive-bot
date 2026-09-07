@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.ingest.settlement_hints import SCHEMA, artifact_hash
 
 

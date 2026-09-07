@@ -4,6 +4,9 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from sqlalchemy import func, select
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -32,8 +35,6 @@ from kalshi_predictor.reinforcement_learning.engine import run_rl_evaluation
 from kalshi_predictor.reinforcement_learning.reward import reward_for_trade
 from kalshi_predictor.reinforcement_learning.serving import recommend_policy_action
 from kalshi_predictor.scheduler import scheduler_plan
-from sqlalchemy import func, select
-from typer.testing import CliRunner
 
 
 def test_phase_3s_config_blocks_online_exploration_and_ungoverned_gate() -> None:

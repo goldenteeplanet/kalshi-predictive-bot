@@ -3,6 +3,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import (
@@ -22,7 +24,6 @@ from kalshi_predictor.phase3ah import (
 )
 from kalshi_predictor.utils.time import utc_now
 from kalshi_predictor.workstation.repository import market_monitor_rows
-from sqlalchemy import select
 
 
 def test_snapshot_coverage_repair_detects_missing_ranking(tmp_path) -> None:

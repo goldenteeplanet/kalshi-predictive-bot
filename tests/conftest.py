@@ -11,6 +11,7 @@ os.environ.setdefault("NO_COLOR", "1")
 os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
 
 import pytest
+
 from kalshi_predictor.benchmarking.drawdown_guard import (
     write_drawdown_aware_guard_refinement,
 )

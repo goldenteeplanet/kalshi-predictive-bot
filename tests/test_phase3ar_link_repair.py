@@ -5,6 +5,9 @@ from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
+from sqlalchemy import func, select
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3ar as phase3ar_module
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
@@ -43,8 +46,6 @@ from kalshi_predictor.phase3ar import (
 )
 from kalshi_predictor.ui.service import _extend_phase3ar_blockers, _phase3ar_positive_ev_rows_for_ui
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import func, select
-from typer.testing import CliRunner
 
 
 def test_phase3ar_url_builder_exact_identity_and_rejection_rules(tmp_path) -> None:

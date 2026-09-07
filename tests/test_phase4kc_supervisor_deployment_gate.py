@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.supervisor_deployment_gate import (
     REQUIRED_COMPONENTS,
     SupervisorDeploymentGateError,

@@ -4,6 +4,8 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -11,7 +13,6 @@ from kalshi_predictor.phase3bb_r35_cloud_multicategory_scheduler_no_start_dry_ru
     build_phase3bb_r35_cloud_multicategory_scheduler_no_start_dry_run,
     write_phase3bb_r35_cloud_multicategory_scheduler_no_start_dry_run_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3bb_r35_writes_no_start_scheduler_drafts(tmp_path: Path) -> None:

@@ -3,6 +3,8 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_forecast, insert_market_snapshot
@@ -15,7 +17,6 @@ from kalshi_predictor.research.questions import answer_research_question
 from kalshi_predictor.research.reports import generate_research_report
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import func, select
 
 
 def test_evidence_builder_handles_missing_ticker(tmp_path) -> None:

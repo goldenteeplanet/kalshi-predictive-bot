@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -15,7 +17,6 @@ from kalshi_predictor.phase3bb_r44_weather_catalog_hook_runtime_verification imp
     build_phase3bb_r44_weather_catalog_hook_runtime_verification,
     write_phase3bb_r44_weather_catalog_hook_runtime_verification_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3bb_r44_verifies_catalog_hook_and_r40_awareness(tmp_path: Path) -> None:

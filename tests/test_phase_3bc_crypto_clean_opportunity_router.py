@@ -4,6 +4,8 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.repository import insert_crypto_market_link
@@ -15,7 +17,6 @@ from kalshi_predictor.opportunities.repository import insert_market_ranking
 from kalshi_predictor.paper.models import BUY_YES
 from kalshi_predictor.phase3bc import build_phase3bc_crypto_clean_opportunity_router
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_phase3bc_marks_pure_crypto_paper_ready(tmp_path) -> None:

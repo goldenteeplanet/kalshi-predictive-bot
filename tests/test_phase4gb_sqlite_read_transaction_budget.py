@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.phase4cd.settled_count_contention_audit import (
     audit_settled_count_contention,
     make_query_sample,

@@ -1,6 +1,7 @@
 import logging
 
 from fastapi.testclient import TestClient
+
 from kalshi_predictor.ui.app import create_app
 
 

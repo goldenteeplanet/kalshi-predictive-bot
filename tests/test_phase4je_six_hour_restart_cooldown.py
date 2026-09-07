@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.six_hour_restart_cooldown import (
     COOLDOWN_SECONDS,
     SixHourRestartCooldownError,

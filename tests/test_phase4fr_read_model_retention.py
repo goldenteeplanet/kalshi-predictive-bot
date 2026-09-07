@@ -4,6 +4,7 @@ import copy
 from datetime import UTC, datetime, timedelta
 
 import pytest
+
 from kalshi_predictor.phase4cd.read_model_chain import build_chain_node
 from kalshi_predictor.phase4cd.read_model_retention import (
     RetentionPolicyError,

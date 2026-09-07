@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.bounded_diagnostics_collector import (
     BoundedDiagnosticsCollectorError,
     collect_bounded_diagnostics,

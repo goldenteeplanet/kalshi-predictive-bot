@@ -4,6 +4,7 @@ import copy
 from datetime import UTC, datetime, timedelta
 
 import pytest
+
 from kalshi_predictor.phase4cd.read_model_watermark import (
     WatermarkError,
     build_watermark,

@@ -4,6 +4,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -16,7 +18,6 @@ from kalshi_predictor.phase3bb_r39_cloud_auto_login_admin_bootstrap import (
     build_phase3bb_r39_cloud_auto_login_admin_bootstrap,
     write_phase3bb_r39_cloud_auto_login_admin_bootstrap_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3bb_r39_writes_auto_login_and_admin_bootstrap(tmp_path: Path) -> None:

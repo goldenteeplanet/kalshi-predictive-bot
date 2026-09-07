@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.network_failure_non_restart_rule import (
     NETWORK_FAILURE_CODES,
     NetworkFailureNonRestartRuleError,

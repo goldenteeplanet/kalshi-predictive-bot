@@ -1,6 +1,9 @@
 from decimal import Decimal
 from pathlib import Path
 
+from sqlalchemy import func, select
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -12,8 +15,6 @@ from kalshi_predictor.sports.link_cleanup import (
 )
 from kalshi_predictor.sports.repository import insert_sports_market_link
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import func, select
-from typer.testing import CliRunner
 
 
 def test_sports_link_cleanup_dry_run_identifies_noisy_fanout(tmp_path) -> None:

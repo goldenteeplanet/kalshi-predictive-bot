@@ -3,6 +3,7 @@ import hmac
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.configuration_signature_validation import (
     ConfigurationSignatureValidationError,
     make_configuration_signature_envelope,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.ui.dashboard_responsive_layout_audit import (
     DashboardResponsiveLayoutAuditError,
     audit_dashboard_responsive_layout,

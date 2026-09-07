@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.supervisor_self_health_monitor import (
     MAX_HEARTBEAT_AGE_SECONDS,
     MAX_LOOP_DURATION_SECONDS,

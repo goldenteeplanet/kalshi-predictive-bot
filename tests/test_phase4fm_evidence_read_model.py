@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.phase4cd.evidence_read_model import (
     EvidenceReadModelError,
     build_read_model,

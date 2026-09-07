@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.post_boot_wsl_verification import (
     PostBootWslVerificationError,
     evaluate_post_boot_wsl_verification,

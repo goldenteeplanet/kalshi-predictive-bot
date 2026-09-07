@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.five_minute_restart_warning import (
     WARNING_SECONDS,
     FiveMinuteRestartWarningError,

@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy import event
+
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.schema import CanonicalEvaluation
 from kalshi_predictor.phase4cd.evidence import (
@@ -9,7 +11,6 @@ from kalshi_predictor.phase4cd.evidence import (
     cached_evidence_dashboard,
     evidence_dashboard,
 )
-from sqlalchemy import event
 
 
 def test_summary_evidence_skips_deep_reconciliation(tmp_path: Path, monkeypatch) -> None:

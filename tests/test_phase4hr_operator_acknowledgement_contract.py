@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.alert_rate_limit_storm_control import (
     evaluate_alert_rate_limit_and_storm_control,
 )

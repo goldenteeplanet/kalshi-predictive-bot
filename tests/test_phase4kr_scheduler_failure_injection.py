@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.scheduler_failure_injection import (
     SchedulerFailureInjectionError,
     evaluate_scheduler_failure_injection,

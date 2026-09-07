@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -15,7 +17,6 @@ from kalshi_predictor.phase3bb_r57_weather_selected_window_pipeline import (
     build_phase3bb_r57_weather_selected_window_pipeline,
     write_phase3bb_r57_weather_selected_window_pipeline_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3bb_r57_runs_selected_window_per_ticker_pipeline(tmp_path: Path) -> None:

@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-import kalshi_predictor.phase4cd.read_model_concurrent_audit as audit_module
 import pytest
+
+import kalshi_predictor.phase4cd.read_model_concurrent_audit as audit_module
 from kalshi_predictor.phase4cd.read_model_concurrent_audit import (
     ConcurrentReaderAuditError,
     audit_concurrent_readers,

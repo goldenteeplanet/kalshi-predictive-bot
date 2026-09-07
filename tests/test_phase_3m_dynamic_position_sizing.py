@@ -3,6 +3,8 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import (
@@ -28,7 +30,6 @@ from kalshi_predictor.position_sizing.sizer import (
     PositionSizingInput,
     SizingMode,
 )
-from sqlalchemy import select
 
 
 def test_live_low_medium_high_tiers_execute_expected_sizes() -> None:

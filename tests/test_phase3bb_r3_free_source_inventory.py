@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3bb_r3_free_source_inventory as inventory
 from kalshi_predictor.cli import app
-from typer.testing import CliRunner
 
 
 def _row(category: str, score: int, blocker: str = "PAPER_GATE_NOT_OPEN") -> dict[str, object]:

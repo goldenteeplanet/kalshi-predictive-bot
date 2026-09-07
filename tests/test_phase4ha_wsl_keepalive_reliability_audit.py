@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.wsl_keepalive_reliability_audit import (
     WslKeepaliveReliabilityAuditError,
     audit_wsl_keepalive_reliability,

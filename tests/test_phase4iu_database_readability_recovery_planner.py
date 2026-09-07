@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.database_readability_recovery_planner import (
     DatabaseReadabilityRecoveryPlannerError,
     make_database_readability_recovery_context,

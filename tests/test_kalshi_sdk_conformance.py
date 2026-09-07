@@ -4,6 +4,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+
 from kalshi_predictor.conformance.kalshi_sdk import (
     ConformanceFixtureError,
     assert_public_read_only_fixture,

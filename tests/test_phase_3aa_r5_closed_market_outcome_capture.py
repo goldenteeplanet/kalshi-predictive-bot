@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import upsert_market
@@ -8,7 +10,6 @@ from kalshi_predictor.phase3aa_r5 import (
     build_phase3aa_r5_closed_market_outcome_capture,
     write_phase3aa_r5_closed_market_outcome_capture_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3aa_r5_captures_closed_market_fields_without_enabling_pnl(tmp_path) -> None:

@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.recovery_safety_simulation_gate import (
     REQUIRED_COMPONENTS,
     RecoverySafetySimulationGateError,

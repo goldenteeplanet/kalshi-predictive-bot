@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.wsl_boot_identity_monitor import (
     WslBootIdentityMonitorError,
     make_wsl_boot_identity_observation,

@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.restart_authorization_workstream_gate import (
     REQUIRED_COMPONENTS,
     RestartAuthorizationWorkstreamGateError,

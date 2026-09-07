@@ -3,6 +3,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+from typer.testing import CliRunner
+
 from kalshi_predictor.autopilot.runner import run_autopilot_once
 from kalshi_predictor.cli import app
 from kalshi_predictor.confidence.engine import run_model_confidence_engine
@@ -28,8 +31,6 @@ from kalshi_predictor.paper.ledger import create_paper_order
 from kalshi_predictor.paper.models import BUY_YES, PaperDecision
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import func, select
-from typer.testing import CliRunner
 
 
 def test_learning_trades_are_separated_from_autopilot_trades(tmp_path) -> None:

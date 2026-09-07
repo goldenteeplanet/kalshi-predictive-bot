@@ -18,10 +18,11 @@ def test_gh1t_requires_verified_backup_before_session(tmp_path: Path) -> None:
 def test_gh1t_exact_weather_lookup_does_not_fall_back_to_other_targets() -> None:
     from datetime import datetime
 
-    from kalshi_predictor.data.schema import Base
-    from kalshi_predictor.phase_gh1t import _get_exact_weather_feature
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
+
+    from kalshi_predictor.data.schema import Base
+    from kalshi_predictor.phase_gh1t import _get_exact_weather_feature
 
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)

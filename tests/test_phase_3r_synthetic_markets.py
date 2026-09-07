@@ -4,6 +4,9 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from sqlalchemy import func, select
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -25,8 +28,6 @@ from kalshi_predictor.synthetic_markets.contracts import (
 from kalshi_predictor.synthetic_markets.engine import run_synthetic_markets
 from kalshi_predictor.synthetic_markets.policy import build_candidate_from_payload
 from kalshi_predictor.synthetic_markets.repository import synthetic_markets_status
-from sqlalchemy import func, select
-from typer.testing import CliRunner
 
 
 def test_phase_3r_config_blocks_execution_and_opportunity_creation() -> None:

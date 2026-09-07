@@ -2,6 +2,8 @@ import csv
 import json
 from datetime import timedelta
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.alpha_recovery import (
     build_shadow_ledger,
     paper_readiness,
@@ -13,7 +15,6 @@ from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import upsert_market, upsert_settlement
 from kalshi_predictor.data.schema import Forecast, MarketRanking
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_shadow_ledger_requires_preceding_forecast_and_uses_exact_settlement() -> None:

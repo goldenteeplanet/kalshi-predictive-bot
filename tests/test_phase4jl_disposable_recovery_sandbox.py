@@ -2,6 +2,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.workstation.disposable_recovery_sandbox import (
     DisposableRecoverySandboxError,
     make_recovery_sandbox_request,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3bb_r10_cloud_readiness as r10
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
@@ -11,7 +13,6 @@ from kalshi_predictor.phase3bb_r10_cloud_readiness import (
     decide_cloud_readiness,
     write_phase3bb_r10_cloud_readiness_decision_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3bb_r10_cloud_does_not_help_ev_blocker() -> None:

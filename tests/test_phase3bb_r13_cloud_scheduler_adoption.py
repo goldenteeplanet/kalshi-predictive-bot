@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -15,7 +17,6 @@ from kalshi_predictor.phase3bb_r13_cloud_scheduler_adoption import (
     build_phase3bb_r13_cloud_scheduler_adoption,
     write_phase3bb_r13_cloud_scheduler_adoption_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3bb_r13_adopts_healthy_existing_r5(tmp_path: Path) -> None:

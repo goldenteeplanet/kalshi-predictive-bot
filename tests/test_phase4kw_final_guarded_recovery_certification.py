@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.final_guarded_recovery_certification import (
     FinalGuardedRecoveryCertificationError,
     evaluate_final_guarded_recovery_certification,

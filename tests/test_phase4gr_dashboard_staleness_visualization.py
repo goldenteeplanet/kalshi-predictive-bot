@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.ui.dashboard_loading_state_contract import (
     build_dashboard_loading_state_contract,
     make_dashboard_panel_load_observation,

@@ -3,6 +3,9 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
+from sqlalchemy import select
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.repository import insert_crypto_features, insert_crypto_market_link
@@ -17,8 +20,6 @@ from kalshi_predictor.phase3ag_crypto import (
     write_phase3ag_crypto_report,
 )
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import select
-from typer.testing import CliRunner
 
 
 def test_crypto_terms_parse_structured_target_price_market(tmp_path) -> None:

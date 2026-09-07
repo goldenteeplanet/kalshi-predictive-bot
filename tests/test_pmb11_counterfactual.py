@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 
 import pytest
+
 from kalshi_predictor.benchmarking.counterfactual import (
     build_counterfactual_model_comparison,
     write_counterfactual_model_comparison,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.phase4cd.evidence_query_plan_drift_detector import (
     EvidenceQueryPlanDriftError,
     detect_evidence_query_plan_drift,

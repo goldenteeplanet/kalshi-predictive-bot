@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import func, select
+
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.schema import (
     AdvancedRiskDecisionLog,
@@ -25,7 +27,6 @@ from kalshi_predictor.roadmap.runtime_reports import (
     build_runtime_category_census,
     write_runtime_roadmap_reports,
 )
-from sqlalchemy import func, select
 
 
 def _market(ticker: str, now: datetime) -> Market:

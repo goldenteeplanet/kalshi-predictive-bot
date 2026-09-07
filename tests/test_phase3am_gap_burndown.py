@@ -5,6 +5,8 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from sqlalchemy import select
+
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import upsert_market, upsert_settlement
 from kalshi_predictor.data.schema import MarketLeg, PaperOrder, PaperPnl
@@ -19,7 +21,6 @@ from kalshi_predictor.phase3bb import (
     write_phase3bb_group_source_review,
 )
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import select
 
 
 def test_exact_settlement_dry_run_writes_nothing_and_computes_pnl(tmp_path) -> None:

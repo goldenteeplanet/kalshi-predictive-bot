@@ -5,6 +5,8 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -29,7 +31,6 @@ from kalshi_predictor.opportunities.market_identity import (
 from kalshi_predictor.opportunities.repository import insert_market_ranking
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_phase3ao_market_identity_verifies_exact_url_and_blocks_unsafe_rows(tmp_path) -> None:

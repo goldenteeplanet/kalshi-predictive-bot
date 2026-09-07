@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.phase4cd.reconciliation_audit import canonical_hash
 
 S = Path(__file__).parents[1] / "scripts/local/phase4fk_final_certification.py"

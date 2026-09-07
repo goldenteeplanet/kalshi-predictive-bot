@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3bb_r4_economic_parser_backfill as backfill
 from kalshi_predictor.cli import app
 from kalshi_predictor.market_legs import ParsedMarketLeg
-from typer.testing import CliRunner
 
 
 def _parsed_economic_leg(confidence: str = "0.80") -> ParsedMarketLeg:

@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.restart_loop_circuit_breaker import (
     RestartLoopCircuitBreakerError,
     evaluate_restart_loop_circuit_breaker,

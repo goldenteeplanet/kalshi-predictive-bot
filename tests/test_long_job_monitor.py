@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+
 from kalshi_predictor import phase3ay
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db

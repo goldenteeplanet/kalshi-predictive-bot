@@ -1,10 +1,11 @@
 import json
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import upsert_market
-from typer.testing import CliRunner
 
 
 def test_link_crypto_markets_cli_writes_heartbeat_and_checkpoint(tmp_path) -> None:

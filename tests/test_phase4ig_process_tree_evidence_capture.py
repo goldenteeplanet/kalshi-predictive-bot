@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.process_tree_evidence_capture import (
     ProcessTreeEvidenceCaptureError,
     capture_process_tree_evidence,

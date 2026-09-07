@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.keepalive_gap_classifier import (
     KeepaliveGapClassifierError,
     classify_keepalive_gaps,

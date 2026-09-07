@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from kalshi_predictor.active_universe import latest_links_for_table
-from kalshi_predictor.data.schema import CryptoMarketLink
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
+
+from kalshi_predictor.active_universe import latest_links_for_table
+from kalshi_predictor.data.schema import CryptoMarketLink
 
 
 def _engine():

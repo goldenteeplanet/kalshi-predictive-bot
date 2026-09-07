@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from sqlalchemy import select
+
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import (
@@ -20,7 +22,6 @@ from kalshi_predictor.paper.models import BUY_YES, ORDER_FILLED
 from kalshi_predictor.paper.pnl import calculate_and_store_pnl, calculate_settled_pnl
 from kalshi_predictor.paper.settlement_reconciliation import build_paper_settlement_reconciliation
 from kalshi_predictor.paper.simulator import run_paper_trading
-from sqlalchemy import select
 
 
 def test_position_weighted_average_updates_correctly(tmp_path) -> None:

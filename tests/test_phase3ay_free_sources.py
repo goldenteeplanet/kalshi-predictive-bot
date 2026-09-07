@@ -4,6 +4,8 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -16,7 +18,6 @@ from kalshi_predictor.phase3ay_free_sources import (
 )
 from kalshi_predictor.ui.service import free_source_hunt_status
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_free_source_registry_defers_tradingeconomics() -> None:

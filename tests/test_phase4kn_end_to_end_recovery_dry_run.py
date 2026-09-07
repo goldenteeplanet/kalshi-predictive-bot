@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.end_to_end_recovery_dry_run import (
     REQUIRED_STEPS,
     EndToEndRecoveryDryRunError,

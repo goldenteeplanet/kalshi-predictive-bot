@@ -3,6 +3,9 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from sqlalchemy import select
+from typer.testing import CliRunner
+
 from kalshi_predictor import phase3an
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -20,8 +23,6 @@ from kalshi_predictor.data.schema import (
 )
 from kalshi_predictor.ui.service import paper_trade_blocker_status
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import select
-from typer.testing import CliRunner
 
 
 def test_crypto_watcher_overdue_classification(tmp_path, monkeypatch) -> None:

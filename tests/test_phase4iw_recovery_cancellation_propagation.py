@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.recovery_cancellation_command import (
     evaluate_recovery_cancellation_command,
     make_recovery_authority_state,

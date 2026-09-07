@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -14,7 +16,6 @@ from kalshi_predictor.phase3bb_r12_cloud_bootstrap import (
 from kalshi_predictor.phase3bb_r58_weather_selected_window_alignment import (
     write_phase3bb_r58_weather_selected_window_alignment_report,
 )
-from typer.testing import CliRunner
 
 
 def test_phase3bb_r58_reports_r57_patch_and_alignment_gap(tmp_path: Path) -> None:

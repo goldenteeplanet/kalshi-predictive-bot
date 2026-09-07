@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 import pytest
+
 from kalshi_predictor.workstation.diagnostic_redaction_audit import (
     REQUIRED_ARTIFACTS,
     DiagnosticRedactionAuditError,

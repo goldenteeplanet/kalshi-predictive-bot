@@ -4,6 +4,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -33,8 +36,6 @@ from kalshi_predictor.sports.signals import generate_sports_signals
 from kalshi_predictor.sports.team_strength import team_strength_edge
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import func, select
-from typer.testing import CliRunner
 
 
 def test_sports_json_and_csv_ingestion(tmp_path) -> None:

@@ -5,6 +5,8 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -19,7 +21,6 @@ from kalshi_predictor.phase3aj_gap_closure import (
     build_source_readiness_report,
 )
 from kalshi_predictor.utils.time import utc_now
-from typer.testing import CliRunner
 
 
 def test_phase3aj_paper_funnel_classifies_negative_raw_ev(tmp_path) -> None:

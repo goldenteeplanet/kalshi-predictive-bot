@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.runtime_origin import (
@@ -9,7 +11,6 @@ from kalshi_predictor.runtime_origin import (
     READY,
     build_runtime_origin,
 )
-from typer.testing import CliRunner
 
 
 def _settings(tmp_path: Path, **overrides: str) -> Settings:

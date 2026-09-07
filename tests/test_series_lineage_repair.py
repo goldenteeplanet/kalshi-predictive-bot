@@ -4,6 +4,9 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select, text
+from sqlalchemy.exc import OperationalError
+
 from kalshi_predictor.candidate_funnel_audit import make_candidate_funnel_read_only_engine
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -28,8 +31,6 @@ from kalshi_predictor.series_lineage_repair import (
     write_lineage_repair_artifacts,
 )
 from kalshi_predictor.utils.time import utc_now
-from sqlalchemy import select, text
-from sqlalchemy.exc import OperationalError
 
 
 def test_partial_snapshot_preserves_lineage_and_propagates_to_ranking(tmp_path) -> None:

@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+
 from kalshi_predictor.workstation.append_only_incident_writer import (
     AppendOnlyIncidentWriterError,
     append_incident_journal_entry,
