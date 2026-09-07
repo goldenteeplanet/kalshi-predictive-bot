@@ -860,6 +860,18 @@ def create_router(
     def system_certification_alias() -> RedirectResponse:
         return RedirectResponse("/system-certification", status_code=307)
 
+    @router.get("/system-readiness", response_class=HTMLResponse)
+    def system_readiness_alias() -> RedirectResponse:
+        return RedirectResponse("/system", status_code=307)
+
+    @router.get("/calibration", response_class=HTMLResponse)
+    def calibration_alias() -> RedirectResponse:
+        return RedirectResponse("/analytics", status_code=307)
+
+    @router.get("/reports", response_class=HTMLResponse)
+    def reports_alias() -> RedirectResponse:
+        return RedirectResponse("/system/evidence", status_code=307)
+
     @router.get("/system", response_class=HTMLResponse)
     @router.get("/system/health", response_class=HTMLResponse)
     def system_health_dashboard(
