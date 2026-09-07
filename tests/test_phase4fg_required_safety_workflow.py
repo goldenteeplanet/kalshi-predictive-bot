@@ -53,6 +53,15 @@ def test_exact_python_and_complete_suite():
     assert 'python-version: "3.11.9"' in text and "tests/test_phase4*.py" in text
 
 
+def test_workflow_test_paths_resolve():
+    import re
+
+    paths = re.findall(r"tests/[A-Za-z0-9_*.-]+\.py", WORKFLOW.read_text())
+    assert paths
+    for path in paths:
+        assert list(ROOT.glob(path)), f"Workflow references missing tests: {path}"
+
+
 def test_scanner_clean_fixture(tmp_path):
     (tmp_path / "a.py").write_text('token = "short-placeholder"')
     assert M.scan(tmp_path) == []
@@ -61,9 +70,9 @@ def test_scanner_clean_fixture(tmp_path):
 @pytest.mark.parametrize(
     "secret",
     [
-        'api_key = "abcdefghijklmnopqrstuvwxyz123456"',
-        'token: "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"',
-        "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+        'api_key = "abcdefghijklmnopqrstuvwxyz123456"',  # pragma: allowlist secret
+        'token: "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"',  # pragma: allowlist secret
+        "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",  # pragma: allowlist secret
     ],
 )
 def test_scanner_detects_high_confidence_secret(tmp_path, secret):

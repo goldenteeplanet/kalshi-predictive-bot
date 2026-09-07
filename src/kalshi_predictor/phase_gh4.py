@@ -11,7 +11,7 @@ from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.utils.time import utc_now
 
 GH4_VERSION = "GH-4.0"
-GH4_APPROVAL_TOKEN = "I_APPROVE_GH4_PAPER_ORDER_CREATION"
+GH4_APPROVAL_TOKEN = "I_APPROVE_GH4_PAPER_ORDER_CREATION"  # pragma: allowlist secret
 DEFAULT_GH2_REPORT_PATH = Path("reports/phase_gh2/gh2_active_candidate_refresh.json")
 DEFAULT_GH2_HISTORY_PATH = Path("reports/phase_gh2/gh2_paper_only_soak_history.jsonl")
 DEFAULT_GH1_STATUS_PATH = Path("reports/phase_gh1/watch/status.json")

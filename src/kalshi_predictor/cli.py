@@ -835,9 +835,9 @@ from kalshi_predictor.phase3bc_r17 import (
     write_phase3bc_r17_crypto_liquidity_actionability_report,
 )
 from kalshi_predictor.phase3ax_r6 import (
-    write_phase3an_sports_blocker_report,
-    write_phase3aw_dashboard_truth_report,
-    write_phase3ax_gap_analysis_report,
+    write_phase3an_sports_blocker_report as write_phase3an_sports_blocker_artifact_report,
+    write_phase3aw_dashboard_truth_report as write_phase3aw_dashboard_truth_artifact_report,
+    write_phase3ax_gap_analysis_report as write_phase3ax_gap_analysis_artifact_report,
 )
 from kalshi_predictor.phase3y import (
     generate_phase3y_report,
@@ -4415,8 +4415,8 @@ def phase3an_general_sources_status_command(
     console.print(f"Wrote JSON: {artifacts.json_path}")
 
 
-@app.command("phase3an-sports-blocker-report")
-def phase3an_sports_blocker_report_command(
+@app.command("phase3an-sports-blocker-report-artifacts")
+def phase3an_sports_blocker_report_artifacts_command(
     output_dir: Annotated[
         Path,
         typer.Option(help="Directory for Phase 3AN sports blocker artifact."),
@@ -4427,7 +4427,7 @@ def phase3an_sports_blocker_report_command(
     ] = Path("reports"),
 ) -> None:
     """Explain sports placeholder/provenance blockers without upgrades."""
-    artifacts = write_phase3an_sports_blocker_report(
+    artifacts = write_phase3an_sports_blocker_artifact_report(
         output_dir=output_dir,
         reports_dir=reports_dir,
     )
@@ -15041,8 +15041,8 @@ def phase3an_sports_blocker_report_command(
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
-@app.command("phase3aw-dashboard-truth")
-def phase3aw_dashboard_truth_command(
+@app.command("phase3aw-dashboard-truth-artifacts")
+def phase3aw_dashboard_truth_artifacts_command(
     output_dir: Annotated[
         Path,
         typer.Option(help="Directory for Phase 3AW dashboard truth artifacts."),
@@ -15057,7 +15057,7 @@ def phase3aw_dashboard_truth_command(
     ] = 120,
 ) -> None:
     """Report whether sports provenance dashboard inputs are current."""
-    artifacts = write_phase3aw_dashboard_truth_report(
+    artifacts = write_phase3aw_dashboard_truth_artifact_report(
         output_dir=output_dir,
         reports_dir=reports_dir,
         stale_after_minutes=stale_after_minutes,
@@ -15069,8 +15069,8 @@ def phase3aw_dashboard_truth_command(
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
-@app.command("phase3ax-gap-analysis")
-def phase3ax_gap_analysis_command(
+@app.command("phase3ax-gap-analysis-artifacts")
+def phase3ax_gap_analysis_artifacts_command(
     output_dir: Annotated[
         Path,
         typer.Option(help="Directory for Phase 3AX-R6 gap analysis artifacts."),
@@ -15085,7 +15085,7 @@ def phase3ax_gap_analysis_command(
     ] = 120,
 ) -> None:
     """Separate exact safe sports repairs from diagnostic-only rows."""
-    artifacts = write_phase3ax_gap_analysis_report(
+    artifacts = write_phase3ax_gap_analysis_artifact_report(
         output_dir=output_dir,
         reports_dir=reports_dir,
         stale_after_minutes=stale_after_minutes,

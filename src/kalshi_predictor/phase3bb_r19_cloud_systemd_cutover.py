@@ -36,7 +36,7 @@ from kalshi_predictor.utils.time import utc_now
 PHASE3BB_R19_VERSION = "phase3bb_r19_cloud_systemd_cutover_v1"
 DEFAULT_OUTPUT_DIR = Path("reports/phase3bb_r19")
 APPROVAL_ENV_VAR = "PHASE3BB_R19_EXECUTE"
-APPROVAL_TOKEN = "I_APPROVE_R19_CUTOVER"
+APPROVAL_TOKEN = "I_APPROVE_R19_CUTOVER"  # pragma: allowlist secret
 DEFAULT_GRACE_SECONDS = 45
 
 

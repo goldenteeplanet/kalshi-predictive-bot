@@ -171,8 +171,8 @@ def test_phase_3x_opportunities_route_uses_scanner_shell(tmp_path) -> None:
     assert "Fast bounded view" in response.text
     assert "Page generated" in response.text
     assert "UX-TEST" in response.text
-    assert "styles.css?v=status-artifact-refresh-20260821a" in response.text
-    assert "app.js?v=status-artifact-refresh-20260821a" in response.text
+    assert "styles.css?v=evidence-observability-20260827a" in response.text
+    assert "app.js?v=evidence-observability-20260827a" in response.text
     assert "Status artifact" in response.text
     assert "data-status-artifact-refresh" in response.text
     assert response.headers["cache-control"] == "no-store"
