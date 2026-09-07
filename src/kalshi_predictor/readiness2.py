@@ -77,9 +77,7 @@ def build_readiness2_preview(
                 raise ValueError(f"READINESS-1 category metrics conflict: {category}")
         else:
             category_rows[category] = {"category": category, **metrics, "blockers": []}
-        category_rows[category]["blockers"].append(
-            {"blocker": blocker, "affected_rows": count}
-        )
+        category_rows[category]["blockers"].append({"blocker": blocker, "affected_rows": count})
     attribution = [
         {
             "blocker": blocker,

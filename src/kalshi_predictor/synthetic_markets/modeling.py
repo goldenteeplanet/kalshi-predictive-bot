@@ -62,9 +62,7 @@ def build_probability_card_inputs(
         "violations_before": 1 if adjustment else 0,
         "violations_after": 0,
         "warnings": (
-            ["Raw probability clipped to configured floor/ceiling."]
-            if adjustment
-            else []
+            ["Raw probability clipped to configured floor/ceiling."] if adjustment else []
         ),
     }
     estimate_id = stable_phase_3r_id(

@@ -143,13 +143,15 @@ def _rollback_gates(
         if relative in unique:
             safe = False
         unique.add(relative)
-        rows.append({
-            "path": relative,
-            "expected_sha256": expected,
-            "actual_sha256": actual,
-            "matched": matched,
-            "within_rollback_root": within_root,
-        })
+        rows.append(
+            {
+                "path": relative,
+                "expected_sha256": expected,
+                "actual_sha256": actual,
+                "matched": matched,
+                "within_rollback_root": within_root,
+            }
+        )
     return rows, {
         "manifest_complete": bool(files),
         "paths_safe_and_unique": bool(files) and safe,
@@ -191,8 +193,7 @@ def _cycle_gates(cycle: Mapping[str, Any]) -> dict[str, bool]:
         for model in REQUIRED_MODELS
     )
     ticker_sets = all(
-        isinstance(tickers.get(model), list) and bool(tickers[model])
-        for model in REQUIRED_MODELS
+        isinstance(tickers.get(model), list) and bool(tickers[model]) for model in REQUIRED_MODELS
     )
     return {
         "after_event_id_valid": _nonnegative_int(cycle.get("after_event_id")) is not None,
@@ -205,15 +206,11 @@ def _cycle_gates(cycle: Mapping[str, Any]) -> dict[str, bool]:
     }
 
 
-def _attribution_gates(
-    attribution: Mapping[str, Any], cycle: Mapping[str, Any]
-) -> dict[str, bool]:
+def _attribution_gates(attribution: Mapping[str, Any], cycle: Mapping[str, Any]) -> dict[str, bool]:
     summary = attribution.get("summary") if isinstance(attribution.get("summary"), Mapping) else {}
     rows = attribution.get("rows") if isinstance(attribution.get("rows"), list) else []
     model_counts = (
-        summary.get("model_counts")
-        if isinstance(summary.get("model_counts"), Mapping)
-        else {}
+        summary.get("model_counts") if isinstance(summary.get("model_counts"), Mapping) else {}
     )
     exact_rows = bool(rows) and all(
         isinstance(row, Mapping)
@@ -236,8 +233,7 @@ def _attribution_gates(
         "no_failed_or_truncated_events": summary.get("events_failed") == 0
         and summary.get("result_truncated") is False,
         "both_models_nonzero": all(
-            _positive_int(model_counts.get(model)) is not None
-            for model in REQUIRED_MODELS
+            _positive_int(model_counts.get(model)) is not None for model in REQUIRED_MODELS
         ),
         "all_exact_references_present": exact_rows,
         "execution_disabled": attribution.get("guardrails", {}).get("execution_enabled") is False,

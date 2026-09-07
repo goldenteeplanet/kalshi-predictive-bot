@@ -94,4 +94,3 @@ def _metric(value: Any) -> str:
     if isinstance(value, float):
         return f"{value:.6f}"
     return str(value)
-

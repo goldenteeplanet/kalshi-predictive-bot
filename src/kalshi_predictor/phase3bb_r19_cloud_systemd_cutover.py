@@ -195,9 +195,11 @@ def build_phase3bb_r19_cloud_systemd_cutover(
     )
     inspect_target = _target_from_payload(pre_r18["cloud_target"])
     control_target = _control_target(inspect_target, control_ssh_target=control_ssh_target)
-    expected_pid = expected_r5_pid or _to_int(
-        pre_r18.get("runtime_cutover_decision", {}).get("expected_existing_r5_pid")
-    ) or _to_int(pre_r18.get("runtime_cutover_decision", {}).get("current_r5_pid"))
+    expected_pid = (
+        expected_r5_pid
+        or _to_int(pre_r18.get("runtime_cutover_decision", {}).get("expected_existing_r5_pid"))
+        or _to_int(pre_r18.get("runtime_cutover_decision", {}).get("current_r5_pid"))
+    )
     approval_valid = approval_token == APPROVAL_TOKEN
     checks = _cutover_checks(
         pre_r18=pre_r18,
@@ -464,7 +466,7 @@ def _sigterm_command(pid: int, grace_seconds: int) -> str:
             'if ! kill -0 "$pid" 2>/dev/null; then echo "PID_ALREADY_EXITED"; exit 0; fi',
             'cmd="$(ps -p "$pid" -o args= || true)"',
             'case "$cmd" in',
-            '  *phase3bc-r5-crypto-freshness-watch*) ;;',
+            "  *phase3bc-r5-crypto-freshness-watch*) ;;",
             '  *) echo "UNEXPECTED_PROCESS:$cmd"; exit 65 ;;',
             "esac",
             'kill -TERM "$pid"',
@@ -542,8 +544,7 @@ def _cutover_decision(
         status = "CUTOVER_FAILED_REMOTE_COMMAND"
         action = "INSPECT_REMOTE_FAILURE"
         reason = (
-            f"Remote command {failed_remote[0].name} failed with exit "
-            f"{failed_remote[0].exit_code}."
+            f"Remote command {failed_remote[0].name} failed with exit {failed_remote[0].exit_code}."
         )
         command = (
             "kalshi-bot phase3bb-r18-cloud-scheduler-runtime-cutover "
@@ -584,8 +585,7 @@ def _cutover_decision(
         "first_failed_remote_command": failed_remote[0].name if failed_remote else None,
         "preflight_failed_check_count": len(blocking),
         "first_failed_preflight_check": blocking[0]["check"] if blocking else None,
-        "codex_executed_sigterm": _count_mutation(remote_results, "manual_r5_graceful_sigterm")
-        > 0,
+        "codex_executed_sigterm": _count_mutation(remote_results, "manual_r5_graceful_sigterm") > 0,
         "codex_executed_systemd_start": _count_mutation(remote_results, "systemd_start") > 0,
         "operator_next_command": command,
         "next_codex_step": next_step,

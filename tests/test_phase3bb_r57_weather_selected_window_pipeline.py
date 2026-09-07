@@ -43,7 +43,13 @@ def test_phase3bb_r57_runs_selected_window_per_ticker_pipeline(tmp_path: Path) -
                 r53_states=[
                     _r53_state(missing_links=10, feature_rows=0, forecast_rows=0, ranking_rows=0),
                     _r53_state(missing_links=0, feature_rows=0, forecast_rows=0, ranking_rows=0),
-                    _r53_state(missing_links=0, feature_rows=10, forecast_rows=10, ranking_rows=10, positive_rows=2),
+                    _r53_state(
+                        missing_links=0,
+                        feature_rows=10,
+                        forecast_rows=10,
+                        ranking_rows=10,
+                        positive_rows=2,
+                    ),
                 ],
                 paper_gate_summary={
                     "weather_rows": 10,
@@ -65,7 +71,9 @@ def test_phase3bb_r57_runs_selected_window_per_ticker_pipeline(tmp_path: Path) -
     assert payload["r12_apply_summary"]["link_rows_written"] == 10
     assert payload["pipeline_gate"]["allowed"] is True
     assert call_names.index("r12_missing_link_apply") < call_names.index("weather_feature_refresh")
-    assert call_names.index("weather_snapshot_capture") < call_names.index("weather_per_ticker_forecast")
+    assert call_names.index("weather_snapshot_capture") < call_names.index(
+        "weather_per_ticker_forecast"
+    )
     assert "forecast --model weather_v2 --ticker" in forecast_probe.command
     assert "selected_tickers = [" in forecast_probe.command
     assert "KXTEMPNYCH-26JUL1405-T69.99" in forecast_probe.command
@@ -183,7 +191,9 @@ def _fake_probe_runner(
         elif probe.name == "r12_missing_link_apply":
             stdout = json.dumps({"status": "APPLIED", "summary": {"link_rows_written": 10}})
         elif probe.name == "weather_feature_refresh":
-            stdout = "Inserted 156 weather forecast row(s).\nProcessed 4524 weather forecast row(s).\n"
+            stdout = (
+                "Inserted 156 weather forecast row(s).\nProcessed 4524 weather forecast row(s).\n"
+            )
         elif probe.name == "weather_snapshot_capture":
             stdout = "Captured 10 snapshots.\n"
         elif probe.name == "weather_per_ticker_forecast":

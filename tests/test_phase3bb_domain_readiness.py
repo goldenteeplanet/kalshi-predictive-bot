@@ -194,18 +194,14 @@ def test_phase3bb_r2_routes_operational_and_commodity_general_candidates(
         payload = build_phase3bb_general_candidate_routing(session, limit_per_bucket=10)
 
     rows = {row["ticker"]: row for row in payload["route_rows"]}
-    diagnostics = {
-        row["ticker"]: row for row in payload["general_signal_diagnostic_rows"]
-    }
+    diagnostics = {row["ticker"]: row for row in payload["general_signal_diagnostic_rows"]}
     assert payload["summary"]["candidate_buckets"]["operational_or_commodity"] == 3
     assert payload["summary"]["safe_link_upgrade_candidates"] == 0
     assert payload["summary"]["general_signal_diagnostics"]["diagnostic_rows"] == 3
     assert payload["summary"]["general_signal_diagnostics"]["safe_to_apply_rows"] == 0
     assert payload["summary"]["general_signal_diagnostics"]["safe_to_forecast_rows"] == 0
     assert payload["summary"]["general_signal_diagnostics"]["proposed_db_writes"] == 0
-    assert rows["KXAMSAVO-26JUL03-T1.20"]["taxonomy_bucket"] == (
-        "COMMODITY_PRICE_CANDIDATE"
-    )
+    assert rows["KXAMSAVO-26JUL03-T1.20"]["taxonomy_bucket"] == ("COMMODITY_PRICE_CANDIDATE")
     assert rows["KXAMSAVO-26JUL03-T1.20"]["parser_recommendation"] == (
         "commodity_price_source_parser_diagnostic"
     )
@@ -248,10 +244,7 @@ def test_phase3bb_r2_routes_operational_and_commodity_general_candidates(
     assert capacity_diag["parsed_fields"]["region"] == "Americas"
     assert capacity_diag["parsed_fields"]["time_window"] == "2026"
     assert all(row["safe_to_apply"] is False for row in payload["route_rows"])
-    assert all(
-        row["safe_to_apply"] is False
-        for row in payload["general_signal_diagnostic_rows"]
-    )
+    assert all(row["safe_to_apply"] is False for row in payload["general_signal_diagnostic_rows"])
 
 
 def test_phase3bb_r2_general_source_evidence_reports_exact_local_matches(
@@ -346,9 +339,7 @@ def test_phase3bb_r2_general_source_evidence_reports_exact_local_matches(
     assert payload["summary"]["proposed_db_writes"] == 0
     assert payload["safety_gate"]["writes_links"] is False
     assert payload["safety_gate"]["writes_forecasts"] is False
-    assert rows["KXAMSAVO-26JUL03-T1.20"]["evidence_status"] == (
-        "EXACT_EVIDENCE_READY_FOR_REVIEW"
-    )
+    assert rows["KXAMSAVO-26JUL03-T1.20"]["evidence_status"] == ("EXACT_EVIDENCE_READY_FOR_REVIEW")
     assert rows["KXUSFLYCAN-26JUL03-T3000"]["evidence_status"] == (
         "EXACT_EVIDENCE_READY_FOR_REVIEW"
     )
@@ -544,8 +535,7 @@ def test_phase3bb_r2_general_source_availability_watches_pending_publications(
         "PENDING_SOURCE_PUBLICATION"
     )
     assert all(
-        row["remote_check"]["status"] == "NOT_REQUESTED"
-        for row in payload["availability_rows"]
+        row["remote_check"]["status"] == "NOT_REQUESTED" for row in payload["availability_rows"]
     )
     assert "Keep Phase 3BB-R2 active" in payload["recommended_next_action"]
 
@@ -808,12 +798,14 @@ def test_phase3bb_r2_general_source_intake_creates_requested_report_bundle(
     assert "Cushman" in " ".join(
         taxonomy_rows["INFRASTRUCTURE_CAPACITY_CANDIDATE"]["known_blockers"]
     )
-    assert "NEEDS_PHASE_3AH_EVIDENCE" in taxonomy_rows[
-        "SPORTS_OR_CROSS_CATEGORY_LEAKAGE"
-    ]["leakage_diagnostic"]["reason_codes"]
-    assert "needs human review" in taxonomy_rows["GENERAL_UNCLASSIFIED"][
-        "unclassified_diagnostic"
-    ]["reason_codes"]
+    assert (
+        "NEEDS_PHASE_3AH_EVIDENCE"
+        in taxonomy_rows["SPORTS_OR_CROSS_CATEGORY_LEAKAGE"]["leakage_diagnostic"]["reason_codes"]
+    )
+    assert (
+        "needs human review"
+        in taxonomy_rows["GENERAL_UNCLASSIFIED"]["unclassified_diagnostic"]["reason_codes"]
+    )
 
     matrix = {row["source_name"]: row for row in matrix_payload["data"]}
     assert matrix["USDA"]["link_safe"] is False
@@ -988,8 +980,7 @@ def test_phase3bb_r3_groups_reclassification_and_manual_review_rows(tmp_path) ->
     assert payload["safety_gate"]["writes_links"] is False
     assert payload["safety_gate"]["safe_to_reparse"] is True
     categories = {
-        row["ticker"]: row["proposed_category"]
-        for row in payload["reclassification_candidates"]
+        row["ticker"]: row["proposed_category"] for row in payload["reclassification_candidates"]
     }
     assert categories["KXMVESPORTSMULTIGAMEEXTENDED-R3"] == "sports"
     assert categories["KXMVECROSSCATEGORY-R3"] == "cross_category"
@@ -1289,9 +1280,7 @@ def test_phase3bb_writer_outputs_artifacts(tmp_path) -> None:
     assert artifacts.json_path.exists()
     assert artifacts.markdown_path.exists()
     assert artifacts.rows_path.exists()
-    assert "Phase 3BB Domain Readiness" in artifacts.markdown_path.read_text(
-        encoding="utf-8"
-    )
+    assert "Phase 3BB Domain Readiness" in artifacts.markdown_path.read_text(encoding="utf-8")
 
     with session_factory() as session:
         r2_artifacts = write_phase3bb_general_candidate_routing_report(

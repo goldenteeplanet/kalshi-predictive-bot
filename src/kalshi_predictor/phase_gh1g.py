@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, time as clock_time, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
+from datetime import time as clock_time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.phase_gh1f import run_gh1f_monitor
@@ -24,7 +26,7 @@ def run_gh1g_census(
     max_markets_per_series: int,
     max_quoted_per_category: int,
     stream_max_seconds: float,
-    now_fn: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    now_fn: Callable[[], datetime] = lambda: datetime.now(UTC),
     monitor_fn: MonitorFn = run_gh1f_monitor,
 ) -> Path:
     parsed_windows = [_parse_window(value) for value in windows_utc]
@@ -32,7 +34,7 @@ def run_gh1g_census(
     cycles: list[dict[str, Any]] = []
     certification_report: str | None = None
     for cycle in range(1, poll_cycles + 1):
-        now = now_fn().astimezone(timezone.utc)
+        now = now_fn().astimezone(UTC)
         active_window = _active_window(now, parsed_windows, windows_utc)
         row: dict[str, Any] = {
             "cycle": cycle,

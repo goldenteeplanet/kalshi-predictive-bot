@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-
 REQUIRED_WORKSTREAMS = {"pmb", "prov", "nyc_weather", "gh_liquidity", "readiness"}
 
 
@@ -19,7 +18,9 @@ def certify_cloud_snapshot_parity(
     failures: list[str] = []
     warnings: list[str] = []
     captured_at = _time(snapshot.get("generated_at"))
-    age = None if captured_at is None else max(0, int((reference_time - captured_at).total_seconds()))
+    age = (
+        None if captured_at is None else max(0, int((reference_time - captured_at).total_seconds()))
+    )
     if age is None:
         failures.append("CAPTURE_TIMESTAMP_INVALID")
     elif age > max_age_seconds:
@@ -39,14 +40,19 @@ def certify_cloud_snapshot_parity(
     scheduler = snapshot.get("scheduler") if isinstance(snapshot.get("scheduler"), Mapping) else {}
     if scheduler.get("service") != authoritative.get("bounded_service"):
         failures.append("SCHEDULER_SERVICE_STALE")
-    if authoritative.get("legacy_enabled") is not False or authoritative.get("legacy_active") is not False:
+    if (
+        authoritative.get("legacy_enabled") is not False
+        or authoritative.get("legacy_active") is not False
+    ):
         failures.append("LEGACY_WATCHER_NOT_DISABLED")
     if authoritative.get("bounded_timer_enabled") is not True:
         failures.append("BOUNDED_TIMER_NOT_ENABLED")
     if authoritative.get("bounded_timer_active") is False:
         warnings.append("BOUNDED_TIMER_INTENTIONALLY_ISOLATED")
 
-    workstreams = snapshot.get("workstreams") if isinstance(snapshot.get("workstreams"), list) else []
+    workstreams = (
+        snapshot.get("workstreams") if isinstance(snapshot.get("workstreams"), list) else []
+    )
     ids = {str(row.get("id")) for row in workstreams if isinstance(row, Mapping)}
     missing = sorted(REQUIRED_WORKSTREAMS - ids)
     if missing:
@@ -57,14 +63,25 @@ def certify_cloud_snapshot_parity(
         failures.append("TWENTY_PHASE_ROADMAP_MISSING")
 
     reports = snapshot.get("reports") if isinstance(snapshot.get("reports"), list) else []
-    has_r5 = any(str(row.get("phase", "")).startswith("R5-RECOVERY-9") for row in reports if isinstance(row, Mapping))
+    has_r5 = any(
+        str(row.get("phase", "")).startswith("R5-RECOVERY-9")
+        for row in reports
+        if isinstance(row, Mapping)
+    )
     if not has_r5:
         failures.append("R5_RECOVERY9_EVIDENCE_MISSING")
-    prov = next((row for row in workstreams if isinstance(row, Mapping) and row.get("id") == "prov"), {})
+    prov = next(
+        (row for row in workstreams if isinstance(row, Mapping) and row.get("id") == "prov"), {}
+    )
     prov14b = snapshot.get("prov14b") if isinstance(snapshot.get("prov14b"), Mapping) else {}
     explicit_prov_state = str(prov14b.get("state", "")).upper()
     legacy_prov_phase = str(prov.get("current_phase", "")).upper()
-    if explicit_prov_state not in {"QUEUED", "WAITING", "RUNNING", "PASSED"} and legacy_prov_phase not in {"PROV-14B", "PROV-14"}:
+    if explicit_prov_state not in {
+        "QUEUED",
+        "WAITING",
+        "RUNNING",
+        "PASSED",
+    } and legacy_prov_phase not in {"PROV-14B", "PROV-14"}:
         failures.append("PROV14B_STATUS_MISSING")
 
     return {

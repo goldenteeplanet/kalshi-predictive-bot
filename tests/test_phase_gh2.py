@@ -322,9 +322,7 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
 
 def test_fixed_rate_scheduler_splits_weather_gate_from_decision_publication() -> None:
     root = Path(__file__).parents[1]
-    script = (root / "scripts/local/kalshi-fixed-rate-refresh.sh").read_text(
-        encoding="utf-8"
-    )
+    script = (root / "scripts/local/kalshi-fixed-rate-refresh.sh").read_text(encoding="utf-8")
 
     assert "gh2_decision_refresh 300 timeout 300s" in script
     assert "--active-link-limit 24 --forecast-limit 24" in script
@@ -332,9 +330,7 @@ def test_fixed_rate_scheduler_splits_weather_gate_from_decision_publication() ->
     assert "--defer-weather-gate" in script
     assert "weather_gate_diagnostics 75 timeout 75s" in script
     assert "phase3ba-r3-weather-paper-gate" in script
-    assert script.index("--defer-weather-gate") < script.index(
-        "phase3ba-r3-weather-paper-gate"
-    )
+    assert script.index("--defer-weather-gate") < script.index("phase3ba-r3-weather-paper-gate")
     assert "weather_catalog_refresh 180 timeout 180s" in script
     assert "KXTEMPNYCH KXRAINAUSM KXRAINSTPM" in script
     assert "supported_weather_prepare 150 timeout 150s" in script
@@ -501,9 +497,7 @@ def test_active_rollover_catalog_does_not_rejuvenate_stale_discovery(tmp_path: P
         json.dumps(
             {
                 "generated_at": (utc_now() - timedelta(hours=2)).isoformat(),
-                "markets": [
-                    {"ticker": "KXBTC-STALE", "series_ticker": "KXBTC", "status": "open"}
-                ],
+                "markets": [{"ticker": "KXBTC-STALE", "series_ticker": "KXBTC", "status": "open"}],
             }
         ),
         encoding="utf-8",

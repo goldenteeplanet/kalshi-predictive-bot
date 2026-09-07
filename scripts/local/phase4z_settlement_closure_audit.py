@@ -72,8 +72,7 @@ def audit(
     ):
         captures_by_ticker[row["ticker"]].append(row)
     evaluated = {
-        row[0]
-        for row in research.execute("SELECT capture_id FROM prospective_pair_evaluations")
+        row[0] for row in research.execute("SELECT capture_id FROM prospective_pair_evaluations")
     }
     rows: list[dict[str, Any]] = []
     for hint in hints:
@@ -109,9 +108,7 @@ def audit(
                 "evaluated_count": evaluated_count,
                 "canonical_present": canonical,
                 "settled_at": None if settlement is None else settlement["settled_at"],
-                "settlement_updated_at": (
-                    None if settlement is None else settlement["updated_at"]
-                ),
+                "settlement_updated_at": (None if settlement is None else settlement["updated_at"]),
                 "status": status,
             }
         )

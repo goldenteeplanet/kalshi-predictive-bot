@@ -39,9 +39,7 @@ def learning_config_payload(settings: Settings) -> Mapping[str, Any]:
         "LEARNING_MODEL_NAME": settings.learning_model_name,
         "LEARNING_TARGET_SETTLED_TRADES": settings.learning_target_settled_trades,
         "LEARNING_MIN_EDGE": decimal_to_str(settings.learning_min_edge),
-        "LEARNING_MIN_OPPORTUNITY_SCORE": decimal_to_str(
-            settings.learning_min_opportunity_score
-        ),
+        "LEARNING_MIN_OPPORTUNITY_SCORE": decimal_to_str(settings.learning_min_opportunity_score),
         "LEARNING_MAX_PAPER_ORDER_QTY": settings.learning_max_paper_order_qty,
         "LEARNING_MAX_PAPER_POSITIONS_PER_MARKET": (
             settings.learning_max_paper_positions_per_market
@@ -59,9 +57,7 @@ def learning_config_payload(settings: Settings) -> Mapping[str, Any]:
         "LEARNING_MAX_SPREAD": decimal_to_str(settings.learning_max_spread),
         "LEARNING_DUPLICATE_COOLDOWN_HOURS": settings.learning_duplicate_cooldown_hours,
         "LEARNING_CANDIDATE_SCAN_LIMIT": settings.learning_candidate_scan_limit,
-        "MODEL_CONFIDENCE_MIN_SETTLED_TRADES": (
-            settings.model_confidence_min_settled_trades
-        ),
+        "MODEL_CONFIDENCE_MIN_SETTLED_TRADES": (settings.model_confidence_min_settled_trades),
         "MODEL_CONFIDENCE_EXPLORATION_WEIGHT": decimal_to_str(
             settings.model_confidence_exploration_weight
         ),

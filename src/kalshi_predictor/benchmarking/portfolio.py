@@ -27,10 +27,12 @@ def write_portfolio_benchmark(output_dir: Path, limits: PortfolioLimits | None =
     policy = limits or PortfolioLimits()
     episode, categories = _portfolio_episode()
     frames = replay_episode(episode)
-    forecasts = {"SYN-BTC": Decimal("0.62"), "SYN-NYC-WEATHER": Decimal("0.56"),
-                 "SYN-SPORTS": Decimal("0.57")}
-    correlation = {"SYN-BTC": "macro", "SYN-NYC-WEATHER": "event_risk",
-                   "SYN-SPORTS": "event_risk"}
+    forecasts = {
+        "SYN-BTC": Decimal("0.62"),
+        "SYN-NYC-WEATHER": Decimal("0.56"),
+        "SYN-SPORTS": Decimal("0.57"),
+    }
+    correlation = {"SYN-BTC": "macro", "SYN-NYC-WEATHER": "event_risk", "SYN-SPORTS": "event_risk"}
     cash = policy.initial_cash
     positions: dict[str, Decimal] = {}
     costs: dict[str, Decimal] = {}
@@ -47,8 +49,13 @@ def write_portfolio_benchmark(output_dir: Path, limits: PortfolioLimits | None =
             edge = forecasts[frame.ticker] - ask if ask is not None else None
             requested = min(Decimal("10"), policy.max_ticker_exposure)
             blocker = _allocation_blocker(
-                ticker=frame.ticker, requested=requested, categories=categories,
-                correlation=correlation, costs=costs, limits=policy, cash=cash,
+                ticker=frame.ticker,
+                requested=requested,
+                categories=categories,
+                correlation=correlation,
+                costs=costs,
+                limits=policy,
+                cash=cash,
             )
             if edge is None or edge <= Decimal("0.02"):
                 blocker = blocker or "EDGE_NOT_POSITIVE"
@@ -62,12 +69,19 @@ def write_portfolio_benchmark(output_dir: Path, limits: PortfolioLimits | None =
                     costs[frame.ticker] = spent
                     decisions.append(_decision(frame, requested, spent, "ALLOCATED", None))
                 else:
-                    decisions.append(_decision(frame, requested, Decimal("0"), "REJECTED",
-                                               "INSUFFICIENT_LIQUIDITY"))
+                    decisions.append(
+                        _decision(
+                            frame, requested, Decimal("0"), "REJECTED", "INSUFFICIENT_LIQUIDITY"
+                        )
+                    )
             else:
                 decisions.append(_decision(frame, requested, Decimal("0"), "REJECTED", blocker))
-        curve.append({"timestamp": frame.timestamp.isoformat(),
-                      "equity": str(_marked_equity(cash, positions, books))})
+        curve.append(
+            {
+                "timestamp": frame.timestamp.isoformat(),
+                "equity": str(_marked_equity(cash, positions, books)),
+            }
+        )
 
     final_cash = cash + sum(
         size for ticker, size in positions.items() if episode.settlements[ticker] == "yes"
@@ -75,16 +89,24 @@ def write_portfolio_benchmark(output_dir: Path, limits: PortfolioLimits | None =
     exposure = _exposure_summary(costs, categories, correlation)
     canonical = json.dumps(decisions, sort_keys=True, separators=(",", ":")).encode()
     report = {
-        "phase": "PMB-9", "mode": "LOCAL_SYNTHETIC_MULTI_MARKET_READ_ONLY",
-        "database_writes": 0, "execution_enabled": False,
+        "phase": "PMB-9",
+        "mode": "LOCAL_SYNTHETIC_MULTI_MARKET_READ_ONLY",
+        "database_writes": 0,
+        "execution_enabled": False,
         "external_replay_data_used": False,
         "limits": {key: str(value) for key, value in asdict(policy).items()},
-        "episode": {"episode_id": episode.episode_id, "market_count": len(categories),
-                    "categories": categories},
-        "allocation_decisions": decisions, "exposure": exposure,
+        "episode": {
+            "episode_id": episode.episode_id,
+            "market_count": len(categories),
+            "categories": categories,
+        },
+        "allocation_decisions": decisions,
+        "exposure": exposure,
         "positions": {ticker: str(size) for ticker, size in sorted(positions.items())},
-        "initial_cash": str(policy.initial_cash), "final_cash": str(final_cash),
-        "final_pnl": str(final_cash - policy.initial_cash), "equity_curve": curve,
+        "initial_cash": str(policy.initial_cash),
+        "final_cash": str(final_cash),
+        "final_pnl": str(final_cash - policy.initial_cash),
+        "equity_curve": curve,
         "deterministic_digest": hashlib.sha256(canonical).hexdigest(),
         "summary": {
             "allocated_markets": len(positions),
@@ -105,13 +127,26 @@ def _portfolio_episode():
         events.extend(payload["events"])
         settlements.update(payload["settlements"])
         categories.update({ticker: category for ticker in payload["settlements"]})
-    return load_synthetic_episode({"episode_id": "synthetic-multi-market-portfolio",
-        "category": "portfolio", "events": events, "settlements": settlements}), categories
+    return load_synthetic_episode(
+        {
+            "episode_id": "synthetic-multi-market-portfolio",
+            "category": "portfolio",
+            "events": events,
+            "settlements": settlements,
+        }
+    ), categories
 
 
-def _allocation_blocker(*, ticker: str, requested: Decimal, categories: dict[str, str],
-                        correlation: dict[str, str], costs: dict[str, Decimal],
-                        limits: PortfolioLimits, cash: Decimal) -> str | None:
+def _allocation_blocker(
+    *,
+    ticker: str,
+    requested: Decimal,
+    categories: dict[str, str],
+    correlation: dict[str, str],
+    costs: dict[str, Decimal],
+    limits: PortfolioLimits,
+    cash: Decimal,
+) -> str | None:
     if requested > cash:
         return "CAPITAL_INSUFFICIENT"
     if sum(costs.values(), Decimal("0")) + requested > limits.max_gross_exposure:
@@ -127,15 +162,22 @@ def _allocation_blocker(*, ticker: str, requested: Decimal, categories: dict[str
     return None
 
 
-def _decision(frame, requested: Decimal, allocated: Decimal, status: str,
-              blocker: str | None) -> dict[str, Any]:
-    return {"timestamp": frame.timestamp.isoformat(), "ticker": frame.ticker,
-            "requested_capital": str(requested), "allocated_capital": str(allocated),
-            "status": status, "blocker": blocker}
+def _decision(
+    frame, requested: Decimal, allocated: Decimal, status: str, blocker: str | None
+) -> dict[str, Any]:
+    return {
+        "timestamp": frame.timestamp.isoformat(),
+        "ticker": frame.ticker,
+        "requested_capital": str(requested),
+        "allocated_capital": str(allocated),
+        "status": status,
+        "blocker": blocker,
+    }
 
 
-def _marked_equity(cash: Decimal, positions: dict[str, Decimal],
-                   books: dict[str, LocalOrderbook]) -> Decimal:
+def _marked_equity(
+    cash: Decimal, positions: dict[str, Decimal], books: dict[str, LocalOrderbook]
+) -> Decimal:
     value = cash
     for ticker, size in positions.items():
         midpoint = books.get(ticker).midpoint if ticker in books else None
@@ -144,22 +186,34 @@ def _marked_equity(cash: Decimal, positions: dict[str, Decimal],
     return value
 
 
-def _exposure_summary(costs: dict[str, Decimal], categories: dict[str, str],
-                      correlation: dict[str, str]) -> dict[str, Any]:
-    by_category = {category: str(sum(v for k, v in costs.items() if categories[k] == category))
-                   for category in sorted(set(categories.values()))}
-    by_group = {group: str(sum(v for k, v in costs.items() if correlation[k] == group))
-                for group in sorted(set(correlation.values()))}
-    return {"gross": str(sum(costs.values(), Decimal("0"))),
-            "by_ticker": {k: str(v) for k, v in sorted(costs.items())},
-            "by_category": by_category, "by_correlation_group": by_group}
+def _exposure_summary(
+    costs: dict[str, Decimal], categories: dict[str, str], correlation: dict[str, str]
+) -> dict[str, Any]:
+    by_category = {
+        category: str(sum(v for k, v in costs.items() if categories[k] == category))
+        for category in sorted(set(categories.values()))
+    }
+    by_group = {
+        group: str(sum(v for k, v in costs.items() if correlation[k] == group))
+        for group in sorted(set(correlation.values()))
+    }
+    return {
+        "gross": str(sum(costs.values(), Decimal("0"))),
+        "by_ticker": {k: str(v) for k, v in sorted(costs.items())},
+        "by_category": by_category,
+        "by_correlation_group": by_group,
+    }
 
 
 def _limits_respected(exposure: dict[str, Any], limits: PortfolioLimits) -> bool:
     return (
         Decimal(exposure["gross"]) <= limits.max_gross_exposure
         and all(Decimal(v) <= limits.max_ticker_exposure for v in exposure["by_ticker"].values())
-        and all(Decimal(v) <= limits.max_category_exposure for v in exposure["by_category"].values())
-        and all(Decimal(v) <= limits.max_correlated_exposure
-                for v in exposure["by_correlation_group"].values())
+        and all(
+            Decimal(v) <= limits.max_category_exposure for v in exposure["by_category"].values()
+        )
+        and all(
+            Decimal(v) <= limits.max_correlated_exposure
+            for v in exposure["by_correlation_group"].values()
+        )
     )

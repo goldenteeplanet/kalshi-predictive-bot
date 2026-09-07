@@ -121,9 +121,7 @@ def test_fee_adjusted_ev_cannot_become_positive_by_lowering_gate(tmp_path) -> No
         settings = get_settings().model_copy(
             update={"paper_default_fee_per_contract": Decimal("0.35")}
         )
-        result = run_research_replay(
-            session, model="crypto_v2", limit=10, settings=settings
-        )
+        result = run_research_replay(session, model="crypto_v2", limit=10, settings=settings)
         assert result.evaluated == 0
 
 

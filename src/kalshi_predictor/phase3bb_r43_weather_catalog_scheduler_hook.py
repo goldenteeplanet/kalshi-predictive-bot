@@ -404,7 +404,8 @@ if runner.exists():
     except PermissionError:
         pass
     if {backup_literal}:
-        backup = runner.with_name(runner.name + '.phase3bb-r43.' + time.strftime('%Y%m%d%H%M%S') + '.bak')
+        backup = runner.with_name(runner.name + '.phase3bb-r43.' + \
+time.strftime('%Y%m%d%H%M%S') + '.bak')
         shutil.copy2(runner, backup)
     else:
         backup = None
@@ -558,12 +559,18 @@ def _decision(
         status = "BLOCKED_WEATHER_CATALOG_HOOK"
         reason = f"First failing check: {failed[0]['check']}."
         next_step = "Phase 3BB-R43 - Resolve Weather Catalog Hook Preconditions"
-        command = "kalshi-bot phase3bb-r43-weather-catalog-scheduler-hook --output-dir reports/phase3bb_r43 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r43-weather-catalog-scheduler-hook --output-dir "
+            "reports/phase3bb_r43 --reports-dir reports"
+        )
     elif parsed.get("runner_hook_present") and not apply:
         status = "WEATHER_CATALOG_HOOK_ALREADY_INSTALLED"
         reason = "The scheduler runner already contains weather_current_catalog_refresh."
         next_step = "Phase 3BB-R44 - Weather Catalog Hook Runtime Verification"
-        command = "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir reports/phase3bb_r40 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir "
+            "reports/phase3bb_r40 --reports-dir reports"
+        )
     elif not apply:
         status = "READY_TO_INSTALL_WEATHER_CATALOG_HOOK"
         reason = "Patched runner is ready; rerun R43 with --apply --backup-first to install it."
@@ -574,14 +581,23 @@ def _decision(
         )
     elif install_result.get("ok") and verify_after:
         status = "WEATHER_CATALOG_HOOK_INSTALLED"
-        reason = "The cloud scheduler runner was backed up and updated with weather_current_catalog_refresh."
+        reason = (
+            "The cloud scheduler runner was backed up and updated with "
+            "weather_current_catalog_refresh."
+        )
         next_step = "Phase 3BB-R44 - Weather Catalog Hook Runtime Verification"
-        command = "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir reports/phase3bb_r40 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir "
+            "reports/phase3bb_r40 --reports-dir reports"
+        )
     else:
         status = "BLOCKED_WEATHER_CATALOG_HOOK_INSTALL"
         reason = "The install command did not verify the weather catalog hook in the cloud runner."
         next_step = "Phase 3BB-R43 - Inspect Weather Catalog Hook Install Failure"
-        command = "kalshi-bot phase3bb-r43-weather-catalog-scheduler-hook --output-dir reports/phase3bb_r43 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r43-weather-catalog-scheduler-hook --output-dir "
+            "reports/phase3bb_r43 --reports-dir reports"
+        )
     return {
         "status": status,
         "hook_ready_or_installed": status

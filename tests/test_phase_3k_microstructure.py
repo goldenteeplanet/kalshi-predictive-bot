@@ -277,9 +277,7 @@ def test_microstructure_sampler_creates_repeated_snapshots_and_features(tmp_path
         )
         session.commit()
         snapshot_count = session.scalar(
-            select(func.count(MarketSnapshot.id)).where(
-                MarketSnapshot.ticker == "MICRO-SAMPLE"
-            )
+            select(func.count(MarketSnapshot.id)).where(MarketSnapshot.ticker == "MICRO-SAMPLE")
         )
         feature_count = session.scalar(
             select(func.count(MicrostructureFeature.id)).where(

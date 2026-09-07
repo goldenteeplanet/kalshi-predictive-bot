@@ -68,12 +68,9 @@ def test_phase3ae_fast_market_harvester_routes_ranked_and_unranked_fast_markets(
     assert payload["live_or_demo_execution"] is False
     assert payload["order_submission"] is False
     assert payload["top_fast_ranked_candidates"][0]["ticker"] == "KXFAST-RANKED"
-    assert payload["open_0_24h_markets_missing_current_ranking"][0]["ticker"] == (
-        "KXFAST-UNRANKED"
-    )
+    assert payload["open_0_24h_markets_missing_current_ranking"][0]["ticker"] == ("KXFAST-UNRANKED")
     assert any(
-        "forecast --model ensemble_v2" in row["command"]
-        for row in payload["recommended_commands"]
+        "forecast --model ensemble_v2" in row["command"] for row in payload["recommended_commands"]
     )
 
 

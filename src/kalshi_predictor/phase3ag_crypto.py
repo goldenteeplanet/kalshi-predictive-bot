@@ -433,9 +433,7 @@ def _forecast_count_by_symbol(forecasts: list[Forecast]) -> dict[str, int]:
 
 def _skip_reasons(session: Session) -> dict[str, int]:
     rows = list(
-        session.scalars(
-            select(ForecastSkipLog).where(ForecastSkipLog.model_name == "crypto_v2")
-        )
+        session.scalars(select(ForecastSkipLog).where(ForecastSkipLog.model_name == "crypto_v2"))
     )
     counts: dict[str, int] = {}
     for row in rows:
@@ -453,9 +451,7 @@ def _watermarks(session: Session) -> dict[str, Any]:
     return {
         "latest_crypto_link_at": latest_link.isoformat() if latest_link else None,
         "latest_crypto_feature_at": latest_feature.isoformat() if latest_feature else None,
-        "latest_crypto_v2_forecast_at": latest_forecast.isoformat()
-        if latest_forecast
-        else None,
+        "latest_crypto_v2_forecast_at": latest_forecast.isoformat() if latest_forecast else None,
         "latest_settlement_updated_at": latest_settlement.isoformat()
         if latest_settlement
         else None,
@@ -582,9 +578,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         ]
     )
     for row in payload["top_exact_rows"][:20]:
-        features = ",".join(
-            item["symbol"] for item in row["compatible_features"] if item.get("ok")
-        )
+        features = ",".join(item["symbol"] for item in row["compatible_features"] if item.get("ok"))
         lines.append(
             f"| {row['ticker']} | {row['symbol']} | {row['linked']} | "
             f"{features or 'none'} | {row['latest_crypto_v2_forecast_id'] or 'none'} | "

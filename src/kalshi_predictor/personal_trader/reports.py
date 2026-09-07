@@ -61,9 +61,7 @@ def render_personal_trader_report(brief: dict[str, Any]) -> str:
         "",
     ]
     if brief["recommendations"]:
-        lines.append(
-            "| Rank | Ticker | Side | Size | Net EV | Risk LCB | Expires |"
-        )
+        lines.append("| Rank | Ticker | Side | Size | Net EV | Risk LCB | Expires |")
         lines.append("|---:|---|---|---:|---:|---:|---|")
         for card in brief["recommendations"]:
             lines.append(
@@ -162,8 +160,6 @@ def personal_trader_status_report(
         **status,
         "audit_event_count": len(events),
         "read_only": all(
-            value is False
-            for key, value in READ_ONLY_BOUNDARY.items()
-            if key.startswith("allow_")
+            value is False for key, value in READ_ONLY_BOUNDARY.items() if key.startswith("allow_")
         ),
     }

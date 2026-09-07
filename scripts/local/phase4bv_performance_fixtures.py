@@ -110,9 +110,8 @@ def validate_pack(pack: dict[str, Any]) -> None:
     fixtures = pack.get("fixtures")
     if not isinstance(manifest, dict) or not isinstance(fixtures, list):
         raise ValueError("PHASE4BV_PACK_SHAPE_INVALID")
-    if (
-        manifest.get("schema") != MANIFEST_SCHEMA
-        or manifest.get("artifact_hash") != _hash(manifest)
+    if manifest.get("schema") != MANIFEST_SCHEMA or manifest.get("artifact_hash") != _hash(
+        manifest
     ):
         raise ValueError("PHASE4BV_MANIFEST_SCHEMA_OR_HASH_INVALID")
     if pack.get("manifest_hash") != manifest["artifact_hash"]:
@@ -126,9 +125,8 @@ def validate_pack(pack: dict[str, Any]) -> None:
         raise ValueError("PHASE4BV_FIXTURE_ORDER_INVALID")
     for fixture, entry in zip(fixtures, entries, strict=True):
         name = fixture.get("name")
-        if (
-            fixture.get("schema") != FIXTURE_SCHEMA
-            or fixture.get("artifact_hash") != _hash(fixture)
+        if fixture.get("schema") != FIXTURE_SCHEMA or fixture.get("artifact_hash") != _hash(
+            fixture
         ):
             raise ValueError("PHASE4BV_FIXTURE_SCHEMA_OR_HASH_INVALID")
         if name not in SPECIFICATIONS or fixture.get("specification") != SPECIFICATIONS[name]:

@@ -39,9 +39,7 @@ def build_proposal(evidence: dict[str, Any]) -> dict[str, Any]:
         capabilities = provider["capabilities"]
         if not isinstance(capabilities, list):
             raise ValueError("PHASE4CC_CAPABILITIES_MISSING")
-        mechanisms = [
-            row.get("mechanism") for row in capabilities if isinstance(row, dict)
-        ]
+        mechanisms = [row.get("mechanism") for row in capabilities if isinstance(row, dict)]
         if mechanisms != list(MECHANISMS):
             raise ValueError("PHASE4CC_CAPABILITY_COVERAGE_OR_ORDER_INVALID")
         normalized = []

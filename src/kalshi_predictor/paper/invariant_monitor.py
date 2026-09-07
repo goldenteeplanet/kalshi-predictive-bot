@@ -78,9 +78,7 @@ def activated_trade_invariant_row(
     )
     fills = list(
         session.scalars(
-            select(PaperFill)
-            .where(PaperFill.paper_order_id == order.id)
-            .order_by(PaperFill.id)
+            select(PaperFill).where(PaperFill.paper_order_id == order.id).order_by(PaperFill.id)
         )
     )
     sizing_ids = set(
@@ -113,7 +111,11 @@ def activated_trade_invariant_row(
         and str(pnl.settlement_result or "").strip().lower() == settlement_result
         and (pnl.notes or "").strip().lower() == "settled market realized paper p&l"
     )
-    expected_pnl = _expected_final_pnl(order, fills[0], settlement_result) if fills and settlement_result else None
+    expected_pnl = (
+        _expected_final_pnl(order, fills[0], settlement_result)
+        if fills and settlement_result
+        else None
+    )
     recorded_pnl = to_decimal(pnl.realized_pnl) if realized and pnl else None
     alerts: list[dict[str, Any]] = []
 
@@ -165,9 +167,7 @@ def activated_trade_invariant_row(
         "settlement_state": "SETTLED" if settlement_result else "AWAITING_SETTLEMENT",
         "settlement_result": settlement_result or None,
         "settled_at": (
-            settlement.settled_at.isoformat()
-            if settlement and settlement.settled_at
-            else None
+            settlement.settled_at.isoformat() if settlement and settlement.settled_at else None
         ),
         "realization_state": "REALIZED" if realized else "PENDING",
         "fill_price": fills[0].price if fills else None,
@@ -179,9 +179,7 @@ def activated_trade_invariant_row(
     }
 
 
-def _expected_final_pnl(
-    order: PaperOrder, fill: PaperFill, settlement_result: str
-) -> Decimal:
+def _expected_final_pnl(order: PaperOrder, fill: PaperFill, settlement_result: str) -> Decimal:
     price = to_decimal(fill.price) or Decimal("0")
     fee = to_decimal(fill.fee) or Decimal("0")
     quantity = Decimal(fill.quantity)

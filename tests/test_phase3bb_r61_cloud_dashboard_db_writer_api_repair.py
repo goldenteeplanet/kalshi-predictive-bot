@@ -200,7 +200,7 @@ def _fake_remote_runner(*, ui_active: bool):
             )
         elif probe.name == "ui_local_listener":
             stdout = (
-                "LISTEN 0 2048 127.0.0.1:8080 0.0.0.0:* users:((\"uvicorn\",pid=2468,fd=7))"
+                'LISTEN 0 2048 127.0.0.1:8080 0.0.0.0:* users:(("uvicorn",pid=2468,fd=7))'
                 if ui_active
                 else ""
             )

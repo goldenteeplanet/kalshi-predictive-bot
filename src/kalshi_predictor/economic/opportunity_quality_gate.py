@@ -498,9 +498,7 @@ def _summary(
         and SPREAD_BLOCKED not in row["blockers"]
         and MISSING_EXECUTABLE_PRICE not in row["blockers"]
     ]
-    risk_ready_rows = [
-        row for row in rows if row["phase3n_risk_state"] in {"AVAILABLE", "REDUCED"}
-    ]
+    risk_ready_rows = [row for row in rows if row["phase3n_risk_state"] in {"AVAILABLE", "REDUCED"}]
     summary = {
         "economic_rankings_scanned": len(rows),
         "fresh_rows": len(fresh_rows),
@@ -803,8 +801,7 @@ def _recommended_next_action(summary: dict[str, Any]) -> str:
         return "Refresh economic features/forecasts/rankings before evaluating preflight quality."
     if status == "WAITING_FOR_POSITIVE_EV":
         return (
-            "No economic paper preflight yet; wait for price/model movement to "
-            "create positive EV."
+            "No economic paper preflight yet; wait for price/model movement to create positive EV."
         )
     if status == "WAITING_FOR_CLEAN_EXECUTION":
         return "Wait for executable spread/liquidity before economic risk preflight."
@@ -844,17 +841,13 @@ def _what_would_make_ready(
     if MISSING_EXECUTABLE_PRICE in blockers:
         actions.append("Need a current executable best price.")
     if EV_NOT_POSITIVE in blockers:
-        actions.append(
-            f"Expected value must exceed {thresholds['min_expected_value']}."
-        )
+        actions.append(f"Expected value must exceed {thresholds['min_expected_value']}.")
     if EDGE_BELOW_THRESHOLD in blockers:
         actions.append(f"Model edge must be at least {thresholds['min_edge']}.")
     if SCORE_BELOW_THRESHOLD in blockers:
         actions.append(f"Opportunity score must be at least {thresholds['min_score']}.")
     if LIQUIDITY_BLOCKED in blockers:
-        actions.append(
-            f"Liquidity score must be at least {thresholds['min_liquidity_score']}."
-        )
+        actions.append(f"Liquidity score must be at least {thresholds['min_liquidity_score']}.")
     if SPREAD_BLOCKED in blockers:
         actions.append(f"Spread must be at or below {thresholds['max_spread']}.")
     if RISK_BLOCKED in blockers:
@@ -894,9 +887,7 @@ def _decode_list(value: str | None) -> list[Any]:
 def _age_minutes(value: Any, *, now: Any) -> str | None:
     if value is None:
         return None
-    return decimal_to_str(
-        Decimal(str((now - value).total_seconds() / 60)).quantize(Decimal("0.1"))
-    )
+    return decimal_to_str(Decimal(str((now - value).total_seconds() / 60)).quantize(Decimal("0.1")))
 
 
 def _cents(value: Decimal | None) -> str | None:

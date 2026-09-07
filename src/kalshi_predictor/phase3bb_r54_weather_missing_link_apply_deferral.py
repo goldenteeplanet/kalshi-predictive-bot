@@ -120,7 +120,9 @@ def write_phase3bb_r54_weather_missing_link_apply_deferral_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(wait_checks_csv_path, payload["writer_wait_checks"])
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(apply_summary_csv_path, [payload.get("r12_apply_summary") or {}])
@@ -237,7 +239,9 @@ def build_phase3bb_r54_weather_missing_link_apply_deferral(
         )
         r53_payload = _read_json(r53_artifacts.json_path)
 
-    gate = _apply_gate(r53_payload, writer_wait=writer_wait, min_minutes_before_target=min_minutes_before_target)
+    gate = _apply_gate(
+        r53_payload, writer_wait=writer_wait, min_minutes_before_target=min_minutes_before_target
+    )
     if gate["allowed"]:
         apply_probe = _r12_apply_probe(
             target,
@@ -256,7 +260,10 @@ def build_phase3bb_r54_weather_missing_link_apply_deferral(
                 output_dir=r53_output_dir,
                 reports_dir=reports_dir,
                 settings=resolved,
-                command_args=["phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair", "--post-r12-apply"],
+                command_args=[
+                    "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair",
+                    "--post-r12-apply",
+                ],
                 ssh_target=ssh_target,
                 identity_file=identity_file,
                 app_path=app_path,
@@ -283,8 +290,8 @@ def build_phase3bb_r54_weather_missing_link_apply_deferral(
         "paper_only": True,
         "weather_missing_link_apply_deferral": True,
         "ssh_read_only_commands_executed": writer_wait["read_only_probe_count"]
-        + (len((r53_payload.get("remote_probe_results") or [])) if r53_payload else 0)
-        + (len((post_r53_payload.get("remote_probe_results") or [])) if post_r53_payload else 0),
+        + (len(r53_payload.get("remote_probe_results") or []) if r53_payload else 0)
+        + (len(post_r53_payload.get("remote_probe_results") or []) if post_r53_payload else 0),
         "ssh_write_capable_commands_executed": 1 if apply_result is not None else 0,
         "remote_db_write_capable_apply_executed": apply_result is not None,
         "runs_missing_link_apply": apply_result is not None,
@@ -320,8 +327,12 @@ def build_phase3bb_r54_weather_missing_link_apply_deferral(
         "r53_gate_payload": _r53_compact(r53_payload),
         "r53_post_apply_payload": _r53_compact(post_r53_payload),
         "r12_apply_gate": gate,
-        "r12_apply_summary": r12_apply_payload.get("summary") if isinstance(r12_apply_payload, dict) else {},
-        "r12_apply_status": r12_apply_payload.get("status") if isinstance(r12_apply_payload, dict) else None,
+        "r12_apply_summary": r12_apply_payload.get("summary")
+        if isinstance(r12_apply_payload, dict)
+        else {},
+        "r12_apply_status": r12_apply_payload.get("status")
+        if isinstance(r12_apply_payload, dict)
+        else None,
         "r12_apply_payload": r12_apply_payload,
         "remote_probe_results": [_result_payload(result) for result in probe_results],
         "decision": decision,
@@ -350,7 +361,9 @@ def _wait_for_writer_clear(
     unexpected_writer = False
     final_writer: dict[str, Any] = {}
     for index in range(max_checks):
-        probe = _writer_probe(target, name=f"writer_gate_check_{index + 1}", timeout_seconds=timeout_seconds)
+        probe = _writer_probe(
+            target, name=f"writer_gate_check_{index + 1}", timeout_seconds=timeout_seconds
+        )
         result = runner(probe, target)
         results.append(result)
         writer = _json_from_probe(result)
@@ -392,7 +405,9 @@ def _wait_for_writer_clear(
 def _writer_probe(target: CloudBootstrapTarget, *, name: str, timeout_seconds: int) -> RemoteProbe:
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
-    command = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    command = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return RemoteProbe(name, command, timeout_seconds)
 
 
@@ -504,7 +519,10 @@ def _decision(
     elif links_written > 0 and post_missing == 0:
         status = "WEATHER_MISSING_LINK_APPLY_COMPLETED"
         blocker = "RANKING_PATH_NEXT"
-        reason = "R12 wrote missing weather links and post-apply R53 confirms the selected window link gap closed."
+        reason = (
+            "R12 wrote missing weather links and post-apply R53 confirms the selected window "
+            "link gap closed."
+        )
         command = (
             "kalshi-bot phase3bb-r51-weather-ranking-path-repair "
             "--output-dir reports/phase3bb_r51 --reports-dir reports"
@@ -513,7 +531,10 @@ def _decision(
     elif links_written > 0:
         status = "WEATHER_MISSING_LINK_APPLY_PARTIAL"
         blocker = "POST_APPLY_R53_STILL_HAS_MISSING_LINKS"
-        reason = "R12 wrote links, but the post-apply R53 gate still reports missing selected-window links."
+        reason = (
+            "R12 wrote links, but the post-apply R53 gate still reports missing "
+            "selected-window links."
+        )
         command = (
             "kalshi-bot phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair "
             "--output-dir reports/phase3bb_r53 --reports-dir reports"
@@ -525,7 +546,8 @@ def _decision(
         reason = "R12 apply completed but wrote no weather links."
         command = (
             "kalshi-bot phase3az-r12-weather-activation-preview "
-            "--output-dir reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 --match-tolerance-hours 3"
+            "--output-dir reports/phase3az_r12_weather --limit 2000 --fresh-window-hours "
+            "24 --match-tolerance-hours 3"
         )
         next_step = "Phase 3AZ-R12 - Inspect preview rows"
     return {
@@ -534,7 +556,9 @@ def _decision(
         "primary_reason": reason,
         "writer_cleared": bool(writer_wait.get("cleared")),
         "r53_status": (r53_payload.get("decision") or {}).get("status") if r53_payload else None,
-        "r12_apply_status": r12_apply_payload.get("status") if isinstance(r12_apply_payload, dict) else None,
+        "r12_apply_status": r12_apply_payload.get("status")
+        if isinstance(r12_apply_payload, dict)
+        else None,
         "link_rows_written": links_written,
         "post_apply_missing_links": post_missing if post_r53_payload else None,
         "operator_next_command": command,
@@ -604,7 +628,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             decision["operator_next_command"],
             "```",
             "",
-            "R54 does not stop R5, start services, create paper trades, submit live/demo orders, or lower thresholds.",
+            "R54 does not stop R5, start services, create paper trades, submit live/demo "
+            "orders, or lower thresholds.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -637,34 +662,51 @@ def _render_markdown(payload: dict[str, Any]) -> str:
             )
             + " |"
         )
-    lines.extend(["", "## Guardrails", "", "- Paper-only.", "- No paper trades.", "- No live/demo orders.", "- No threshold lowering."])
+    lines.extend(
+        [
+            "",
+            "## Guardrails",
+            "",
+            "- Paper-only.",
+            "- No paper trades.",
+            "- No live/demo orders.",
+            "- No threshold lowering.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
 def _render_next_actions(payload: dict[str, Any]) -> str:
     decision = payload["decision"]
-    return "\n".join(
-        [
-            "# Next Actions",
-            "",
-            f"Status: `{decision['status']}`",
-            f"First hard blocker: `{decision['first_hard_blocker']}`",
-            "",
-            "```bash",
-            decision["operator_next_command"],
-            "```",
-            "",
-            "Guardrails:",
-            "- Do not stop R5 from this phase.",
-            "- Do not create paper trades unless a downstream paper-ready gate opens.",
-            "- Do not submit/cancel/replace live or demo orders.",
-            "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Next Actions",
+                "",
+                f"Status: `{decision['status']}`",
+                f"First hard blocker: `{decision['first_hard_blocker']}`",
+                "",
+                "```bash",
+                decision["operator_next_command"],
+                "```",
+                "",
+                "Guardrails:",
+                "- Do not stop R5 from this phase.",
+                "- Do not create paper trades unless a downstream paper-ready gate opens.",
+                "- Do not submit/cancel/replace live or demo orders.",
+                "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
-    return "#!/usr/bin/env bash\nset -euo pipefail\n" + payload["decision"]["operator_next_command"] + "\n"
+    return (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + payload["decision"]["operator_next_command"]
+        + "\n"
+    )
 
 
 def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -677,7 +719,16 @@ def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def _write_probe_csv(path: Path, results: list[dict[str, Any]]) -> None:
-    fields = ["name", "ok", "exit_code", "duration_seconds", "timed_out", "stdout_excerpt", "stderr_excerpt", "command"]
+    fields = [
+        "name",
+        "ok",
+        "exit_code",
+        "duration_seconds",
+        "timed_out",
+        "stdout_excerpt",
+        "stderr_excerpt",
+        "command",
+    ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()

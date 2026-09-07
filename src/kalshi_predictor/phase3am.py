@@ -463,9 +463,7 @@ def build_economic_news_market_watch(
             "news_compatible_active_markets": active_compatible["news"],
             "parsed_market_count": active_compatible["economic"] + active_compatible["news"],
             "context_ready_count": context_ready["economic"] + context_ready["news"],
-            "economic_current_parsed_markets": economic_handoff["counts"][
-                "current_parsed_markets"
-            ],
+            "economic_current_parsed_markets": economic_handoff["counts"]["current_parsed_markets"],
             "news_current_parsed_markets": news_handoff["counts"]["current_parsed_markets"],
             "economic_exact_linked_current_markets": economic_handoff["counts"][
                 "exact_linked_current_markets"
@@ -522,9 +520,7 @@ def build_phase3am_sports_gap_watch(*, reports_dir: Path = Path("reports")) -> d
     evidence = _load_json(
         reports_dir / "phase3ah_sports" / "phase3ah_sports_evidence_backfill.json"
     )
-    phase3z = _load_json(
-        reports_dir / "phase3z_r2" / "phase3z_r2_sports_provenance_repair.json"
-    )
+    phase3z = _load_json(reports_dir / "phase3z_r2" / "phase3z_r2_sports_provenance_repair.json")
     placeholder_summary = _summary(placeholder)
     evidence_summary = _summary(evidence)
     z_summary = _summary(phase3z)
@@ -726,7 +722,7 @@ def write_phase3am_gap_burndown_report(
             burn_path,
             summary_path,
             next_actions_path,
-            *( [output_dir / "due_settlement_apply.json"] if settlement_apply_exact_only else [] ),
+            *([output_dir / "due_settlement_apply.json"] if settlement_apply_exact_only else []),
         ],
     )
     return Phase3AMBurnDownArtifactSet(
@@ -890,8 +886,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     ]
     for row in payload["provenance_rows"]:
         lines.append(
-            f"| {row['name']} | {row['value']} | {row['trust']} | "
-            f"{row['learning_policy']} |"
+            f"| {row['name']} | {row['value']} | {row['trust']} | {row['learning_policy']} |"
         )
     lines.extend(
         [
@@ -912,10 +907,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         ]
     )
     for row in payload["multi_leg_examples"][:20]:
-        lines.append(
-            f"| `{row['ticker']}` | {row.get('reason')} | "
-            f"{_md(row.get('next_action'))} |"
-        )
+        lines.append(f"| `{row['ticker']}` | {row.get('reason')} | {_md(row.get('next_action'))} |")
     if not payload["multi_leg_examples"]:
         lines.append("| none |  |  |")
     lines.extend(["", "## Verified Upgrade Summary", ""])
@@ -1044,10 +1036,7 @@ def _database_health_skipped_for_bounded_preflight(
 def _migration_revision(session: Session) -> str | None:
     try:
         exists = session.execute(
-            text(
-                "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name='alembic_version'"
-            )
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'")
         ).first()
         if exists is None:
             return None
@@ -1157,9 +1146,7 @@ def _due_reconciliation_rows(reconciliation: dict[str, Any]) -> list[dict[str, A
     for row in rows if isinstance(rows, list) else []:
         if row.get("status") != ORDER_FILLED:
             continue
-        if row.get("close_time_bucket") in {"overdue", "0-6h"} or row.get(
-            "eligible_to_settle_now"
-        ):
+        if row.get("close_time_bucket") in {"overdue", "0-6h"} or row.get("eligible_to_settle_now"):
             due_rows.append(row)
     return due_rows
 
@@ -1170,8 +1157,7 @@ def _due_trade_row(session: Session, row: dict[str, Any]) -> dict[str, Any]:
     return {
         **row,
         "primary_state": state,
-        "safe_to_apply": state == "EXACT_SETTLEMENT_READY"
-        and financials.get("payout") is not None,
+        "safe_to_apply": state == "EXACT_SETTLEMENT_READY" and financials.get("payout") is not None,
         "blocker": None if state == "EXACT_SETTLEMENT_READY" else _state_blocker(state),
         **financials,
     }
@@ -1245,9 +1231,7 @@ def _trade_financials(session: Session, row: dict[str, Any]) -> dict[str, Any]:
         "roi": decimal_to_str(roi),
         "idempotency_key": _idempotency_key(order, row, outcome),
         "proposed_ledger_mutation": (
-            "INSERT paper_pnl settled-market row"
-            if payout is not None
-            else "NO_MUTATION_BLOCKED"
+            "INSERT paper_pnl settled-market row" if payout is not None else "NO_MUTATION_BLOCKED"
         ),
     }
 
@@ -1303,9 +1287,10 @@ def _idempotency_key(
         "settled_at": row.get("settled_at"),
         "outcome": decimal_to_str(outcome),
     }
-    return "phase3am:" + hashlib.sha256(
-        json.dumps(payload, sort_keys=True).encode("utf-8")
-    ).hexdigest()[:16]
+    return (
+        "phase3am:"
+        + hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    )
 
 
 def _settlement_proposal_row(session: Session, row: dict[str, Any]) -> dict[str, Any]:
@@ -1393,8 +1378,7 @@ def _settle_due_next_action(*, apply: bool, applied: int, safe: int) -> str:
         return "No exact settlement rows were applied; review blockers in this report."
     if safe:
         return (
-            "Dry-run found exact rows. Rerun with --apply --backup-first --exact-only "
-            "after review."
+            "Dry-run found exact rows. Rerun with --apply --backup-first --exact-only after review."
         )
     return "No due paper trade is exact-settlement-ready; keep the watch running."
 
@@ -1528,9 +1512,7 @@ def _market_current_conditions(now: datetime) -> tuple[Any, ...]:
 def _parsed_market_count(session: Session, domain: str) -> int:
     return int(
         session.scalar(
-            select(func.count(func.distinct(MarketLeg.ticker))).where(
-                MarketLeg.category == domain
-            )
+            select(func.count(func.distinct(MarketLeg.ticker))).where(MarketLeg.category == domain)
         )
         or 0
     )
@@ -1569,10 +1551,7 @@ def _exact_linked_current_market_count(
         statement = statement.join(MarketLeg, MarketLeg.ticker == Market.ticker).where(
             MarketLeg.category == domain
         )
-    return int(
-        session.scalar(statement)
-        or 0
-    )
+    return int(session.scalar(statement) or 0)
 
 
 def _economic_news_handoff_rows(
@@ -1776,8 +1755,7 @@ def _economic_news_handoff_next_action(handoff: dict[str, Any]) -> str:
     }
     if "READY_FOR_FORECASTS" in blockers.values():
         return (
-            "Run the existing economic/news forecast diagnostics for exact-linked "
-            "current markets."
+            "Run the existing economic/news forecast diagnostics for exact-linked current markets."
         )
     if "CURRENT_EXACT_LINKS_NEED_PARSER_BACKFILL" in blockers.values():
         return (
@@ -2023,10 +2001,7 @@ def _render_burndown_summary(payload: dict[str, Any]) -> str:
         f"1. Were any due paper trades safely settled? {settled}.",
         f"2. If not, why not? {no_settlement_reason}",
         f"3. Exact-settlement-ready trades: {states.get('EXACT_SETTLEMENT_READY', 0)}.",
-        (
-            "4. Waiting for market settlement: "
-            f"{states.get('AWAITING_EXACT_MARKET_SETTLEMENT', 0)}."
-        ),
+        (f"4. Waiting for market settlement: {states.get('AWAITING_EXACT_MARKET_SETTLEMENT', 0)}."),
         f"5. Composite/local trades: {states.get('COMPOSITE_LOCAL_REQUIRES_RESOLVER', 0)}.",
         f"6. Rejected for sibling/ambiguous tickers: {rejected_sibling_count}.",
         (

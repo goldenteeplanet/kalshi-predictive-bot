@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from kalshi_predictor.benchmarking.export_custody import certify_export_custody
 from kalshi_predictor.benchmarking.runtime_export_import import import_runtime_export_manifest
-
 
 DATASET_KEYS = {
     "decisions": ("ticker", "category", "target_time"),
@@ -18,11 +18,17 @@ DATASET_KEYS = {
 }
 PROVENANCE_FIELDS = {
     "decisions": {
-        "candidate_forecast_id", "reference_forecast_id",
-        "current_market_snapshot_id", "reference_market_snapshot_id",
+        "candidate_forecast_id",
+        "reference_forecast_id",
+        "current_market_snapshot_id",
+        "reference_market_snapshot_id",
     },
     "rankings": {
-        "forecast_id", "feature_ref", "observation_ref", "market_snapshot_id", "model_version",
+        "forecast_id",
+        "feature_ref",
+        "observation_ref",
+        "market_snapshot_id",
+        "model_version",
     },
     "forecasts": {"forecast_id", "model_version", "generated_at", "target_time"},
     "books": {"market_snapshot_id", "captured_at", "target_time"},
@@ -34,7 +40,9 @@ def _row_key(dataset: str, row: Mapping[str, Any]) -> str:
     return "|".join(str(row.get(field, "")) for field in DATASET_KEYS[dataset])
 
 
-def _index(dataset: str, rows: list[Mapping[str, Any]]) -> tuple[dict[str, Mapping[str, Any]], list[str]]:
+def _index(
+    dataset: str, rows: list[Mapping[str, Any]]
+) -> tuple[dict[str, Mapping[str, Any]], list[str]]:
     indexed: dict[str, Mapping[str, Any]] = {}
     diagnostics = []
     for row in rows:
@@ -67,7 +75,8 @@ def compare_export_datasets(
                 fields = ["ROW_REMOVED"]
             else:
                 fields = sorted(
-                    field for field in set(before[key]) | set(after[key])
+                    field
+                    for field in set(before[key]) | set(after[key])
                     if before[key].get(field) != after[key].get(field)
                 )
                 if not fields:
@@ -79,29 +88,31 @@ def compare_export_datasets(
                 if explained:
                     used_declarations.add(identifier)
                 provenance_breaking = (
-                    field in {"ROW_ADDED", "ROW_REMOVED"}
-                    or field in PROVENANCE_FIELDS[dataset]
+                    field in {"ROW_ADDED", "ROW_REMOVED"} or field in PROVENANCE_FIELDS[dataset]
                 )
-                schema_change = (
-                    field not in {"ROW_ADDED", "ROW_REMOVED"}
-                    and ((field in before.get(key, {})) != (field in after.get(key, {})))
+                schema_change = field not in {"ROW_ADDED", "ROW_REMOVED"} and (
+                    (field in before.get(key, {})) != (field in after.get(key, {}))
                 )
-                changes.append({
-                    "change_id": identifier,
-                    "dataset": dataset,
-                    "row_key": key,
-                    "field": field,
-                    "before": before.get(key, {}).get(field),
-                    "after": after.get(key, {}).get(field),
-                    "explained": explained,
-                    "schema_change": schema_change,
-                    "provenance_breaking": provenance_breaking,
-                })
+                changes.append(
+                    {
+                        "change_id": identifier,
+                        "dataset": dataset,
+                        "row_key": key,
+                        "field": field,
+                        "before": before.get(key, {}).get(field),
+                        "after": after.get(key, {}).get(field),
+                        "explained": explained,
+                        "schema_change": schema_change,
+                        "provenance_breaking": provenance_breaking,
+                    }
+                )
                 if not explained:
                     diagnostics.append(f"UNEXPLAINED_DRIFT:{identifier}")
                 if provenance_breaking and not explained:
                     diagnostics.append(f"PROVENANCE_BREAKING_DRIFT:{identifier}")
-    diagnostics.extend(f"DECLARED_CHANGE_NOT_OBSERVED:{item}" for item in sorted(declared - used_declarations))
+    diagnostics.extend(
+        f"DECLARED_CHANGE_NOT_OBSERVED:{item}" for item in sorted(declared - used_declarations)
+    )
     canonical = json.dumps(changes, sort_keys=True, separators=(",", ":")).encode()
     return {
         "certified": not diagnostics,

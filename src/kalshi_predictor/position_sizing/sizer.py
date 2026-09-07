@@ -93,10 +93,7 @@ class PositionSizingConfig:
         if not (0.0 <= self.medium_score_threshold < self.high_score_threshold <= 1.0):
             raise ValueError("Score thresholds must satisfy 0 <= medium < high <= 1.")
         if not (
-            0.0
-            <= self.liquidity_one_contract_below
-            < self.liquidity_three_contracts_below
-            <= 1.0
+            0.0 <= self.liquidity_one_contract_below < self.liquidity_three_contracts_below <= 1.0
         ):
             raise ValueError("Liquidity thresholds must be ordered within [0, 1].")
         if not (
@@ -275,9 +272,7 @@ class DynamicPositionSizer:
         live_candidate = (
             0 if hard_blocked else self.bucket_down(min(proposed_contracts, *caps.values()))
         )
-        limiting_factors = tuple(
-            name for name, value in caps.items() if value < proposed_contracts
-        )
+        limiting_factors = tuple(name for name, value in caps.items() if value < proposed_contracts)
         reasons = self._reason_codes(
             tier=tier,
             sample_size=item.historical_sample_size,
@@ -503,12 +498,8 @@ def position_sizing_config_from_settings(settings: Settings) -> PositionSizingCo
         global_max_contracts=settings.dynamic_position_sizing_global_max_contracts,
         medium_score_threshold=float(settings.dynamic_position_sizing_medium_score),
         high_score_threshold=float(settings.dynamic_position_sizing_high_score),
-        medium_min_confidence=float(
-            settings.dynamic_position_sizing_medium_min_confidence
-        ),
-        medium_min_opportunity=float(
-            settings.dynamic_position_sizing_medium_min_opportunity
-        ),
+        medium_min_confidence=float(settings.dynamic_position_sizing_medium_min_confidence),
+        medium_min_opportunity=float(settings.dynamic_position_sizing_medium_min_opportunity),
         high_min_confidence=float(settings.dynamic_position_sizing_high_min_confidence),
         high_min_opportunity=float(settings.dynamic_position_sizing_high_min_opportunity),
         high_min_adjusted_accuracy=float(
@@ -521,16 +512,12 @@ def position_sizing_config_from_settings(settings: Settings) -> PositionSizingCo
         liquidity_three_contracts_below=float(
             settings.dynamic_position_sizing_liquidity_three_contracts_below
         ),
-        drawdown_one_contract_at=float(
-            settings.dynamic_position_sizing_drawdown_one_contract_at
-        ),
+        drawdown_one_contract_at=float(settings.dynamic_position_sizing_drawdown_one_contract_at),
         drawdown_three_contracts_at=float(
             settings.dynamic_position_sizing_drawdown_three_contracts_at
         ),
         drawdown_kill_at=float(settings.dynamic_position_sizing_drawdown_kill_at),
-        history_prior_accuracy=float(
-            settings.dynamic_position_sizing_history_prior_accuracy
-        ),
+        history_prior_accuracy=float(settings.dynamic_position_sizing_history_prior_accuracy),
         history_prior_weight=settings.dynamic_position_sizing_history_prior_weight,
         missing_external_risk_cap_defaults_to_one=(
             settings.dynamic_position_sizing_missing_external_risk_cap_defaults_to_one
@@ -539,11 +526,7 @@ def position_sizing_config_from_settings(settings: Settings) -> PositionSizingCo
             confidence=float(settings.dynamic_position_sizing_weight_confidence),
             opportunity=float(settings.dynamic_position_sizing_weight_opportunity),
             liquidity=float(settings.dynamic_position_sizing_weight_liquidity),
-            historical_accuracy=float(
-                settings.dynamic_position_sizing_weight_historical_accuracy
-            ),
-            drawdown_health=float(
-                settings.dynamic_position_sizing_weight_drawdown_health
-            ),
+            historical_accuracy=float(settings.dynamic_position_sizing_weight_historical_accuracy),
+            drawdown_health=float(settings.dynamic_position_sizing_weight_drawdown_health),
         ),
     )

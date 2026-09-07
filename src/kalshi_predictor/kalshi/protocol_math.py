@@ -72,9 +72,7 @@ def is_valid_market_price(market: Mapping[str, Any], price: Any) -> bool:
     tick = tick_size_for_price(market, value)
     if value is None or tick is None or value < ZERO or value > ONE_DOLLAR:
         return False
-    price_range = next(
-        item for item in price_ranges_from_market(market) if item.contains(value)
-    )
+    price_range = next(item for item in price_ranges_from_market(market) if item.contains(value))
     return (value - price_range.start) % tick == ZERO
 
 

@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from kalshi_predictor.benchmarking.joint_surface import build_joint_robust_decision_surface
 from kalshi_predictor.benchmarking.tail_stress import _run_level
-
 
 FACTOR_GRIDS: dict[str, tuple[str | int, ...]] = {
     "forecast_bias": ("0", "-0.01", "-0.02", "-0.04", "-0.06", "-0.08", "-0.10"),
@@ -46,15 +44,17 @@ def build_factor_isolated_breakpoint_attribution() -> dict[str, Any]:
             (row for row in rows if not row["comparison"]["both_advantages_survived"]),
             None,
         )
-        factors.append({
-            "factor": factor,
-            "grid": list(values),
-            "rows": rows,
-            "first_drawdown_break": _summary(drawdown_break),
-            "first_capital_efficiency_break": _summary(efficiency_break),
-            "first_any_break": _summary(any_break),
-            "bounded_grid_preserved_strict_advantage": any_break is None,
-        })
+        factors.append(
+            {
+                "factor": factor,
+                "grid": list(values),
+                "rows": rows,
+                "first_drawdown_break": _summary(drawdown_break),
+                "first_capital_efficiency_break": _summary(efficiency_break),
+                "first_any_break": _summary(any_break),
+                "bounded_grid_preserved_strict_advantage": any_break is None,
+            }
+        )
     factors.sort(key=lambda row: row["factor"])
     causal = [row["factor"] for row in factors if row["first_any_break"] is not None]
     canonical = json.dumps(factors, sort_keys=True, separators=(",", ":")).encode()
@@ -81,7 +81,8 @@ def build_factor_isolated_breakpoint_attribution() -> dict[str, Any]:
             "evaluated_levels": sum(len(row["rows"]) for row in factors),
             "all_attribution_complete": all(
                 level["summary"]["all_attribution_complete"]
-                for factor in factors for level in factor["rows"]
+                for factor in factors
+                for level in factor["rows"]
             ),
             "deterministic_digest": hashlib.sha256(canonical).hexdigest(),
         },

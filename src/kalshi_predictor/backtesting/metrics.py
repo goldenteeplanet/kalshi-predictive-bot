@@ -55,4 +55,3 @@ def _max_drawdown(trades: list[dict[str, Any]]) -> Decimal:
         if drawdown > max_drawdown:
             max_drawdown = drawdown
     return max_drawdown
-

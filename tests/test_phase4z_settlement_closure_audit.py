@@ -83,9 +83,7 @@ def test_closure_audit_classifies_every_hint_without_writing(tmp_path: Path) -> 
     _databases(source, research)
     _artifact(hints, ["UNRESOLVED", "CANONICAL", "EVALUATED", "PARTIAL", "MISSING"])
     before = (source.read_bytes(), research.read_bytes())
-    result = _module().audit(
-        source, research, hints, now=datetime(2026, 8, 25, 3, tzinfo=UTC)
-    )
+    result = _module().audit(source, research, hints, now=datetime(2026, 8, 25, 3, tzinfo=UTC))
     assert result["source_mode"] == "ro/query_only"
     assert result["research_mode"] == "ro/query_only"
     assert result["status_counts"] == {

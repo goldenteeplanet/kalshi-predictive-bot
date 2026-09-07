@@ -89,9 +89,7 @@ def _render_crypto_report(session: Session, symbols: list[str]) -> str:
         lines.append("| _No linked crypto markets_ |  |  |  |")
     else:
         for link in links:
-            lines.append(
-                f"| {link.ticker} | {link.symbol} | {link.confidence} | {link.reason} |"
-            )
+            lines.append(f"| {link.ticker} | {link.symbol} | {link.confidence} | {link.reason} |")
     lines.extend(
         [
             "",

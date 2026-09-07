@@ -113,9 +113,7 @@ def inspect_workspace(root: Path, *, max_artifact_bytes: int) -> RecoveryState:
             temporary,
             max_artifact_bytes=max_artifact_bytes,
         )
-        temporary_state = (
-            "VALID" if temporary_artifact is not None else "INVALID"
-        )
+        temporary_state = "VALID" if temporary_artifact is not None else "INVALID"
     if current.exists() and current_artifact is None:
         raise CrashSimulationError("CURRENT_ARTIFACT_INVALID")
     if current_artifact is None:

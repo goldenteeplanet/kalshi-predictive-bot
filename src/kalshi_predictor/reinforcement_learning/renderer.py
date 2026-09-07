@@ -8,9 +8,7 @@ def render_rl_policy_markdown(result: RLEvaluationResult) -> str:
     improvement = estimator.improvement if estimator else None
     lower = estimator.lower_bound if estimator else None
     upper = estimator.upper_bound if estimator else None
-    candidate_name = (
-        f"{result.candidate_policy.policy_id}@{result.candidate_policy.policy_version}"
-    )
+    candidate_name = f"{result.candidate_policy.policy_id}@{result.candidate_policy.policy_version}"
     baseline_name = f"{result.baseline_policy.policy_id}@{result.baseline_policy.policy_version}"
     reward_name = (
         f"{result.reward_definition.reward_definition_id}@"

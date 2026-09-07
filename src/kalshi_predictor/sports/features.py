@@ -206,4 +206,3 @@ def _clamp_probability_delta(value: Decimal) -> Decimal:
 
 def serialize_feature_value(value: Any) -> str:
     return decimal_to_str(value) or "0"
-

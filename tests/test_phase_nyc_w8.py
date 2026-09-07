@@ -11,24 +11,26 @@ def _write_window(root: Path, number: int, *, offset: int = 540, applied: bool =
         "feature_flag": "WEATHER_V2_KNYC_OBSERVATION_ENABLED=false",
         "execution_enabled": False,
         "database_writes": 0,
-        "rows": [{
-            "ticker": f"KXTEMPNYCH-26JUL160{number}-T78.99",
-            "target_utc_time": target,
-            "passed": True,
-            "runtime_applied": applied,
-            "baseline_probability": baseline,
-            "runtime_probability": "0.45" if applied else baseline,
-            "shadow_probability": "0.45",
-            "shadow_change": "0.05",
-            "provenance": {
-                "evidence_source": "NOAA_KNYC",
-                "evidence_role": "NON_SETTLEMENT_POINT_OBSERVATION",
-                "settlement_source": "THE_WEATHER_COMPANY",
-                "station_id": "KNYC",
+        "rows": [
+            {
+                "ticker": f"KXTEMPNYCH-26JUL160{number}-T78.99",
                 "target_utc_time": target,
-                "offset_seconds": offset,
-            },
-        }],
+                "passed": True,
+                "runtime_applied": applied,
+                "baseline_probability": baseline,
+                "runtime_probability": "0.45" if applied else baseline,
+                "shadow_probability": "0.45",
+                "shadow_change": "0.05",
+                "provenance": {
+                    "evidence_source": "NOAA_KNYC",
+                    "evidence_role": "NON_SETTLEMENT_POINT_OBSERVATION",
+                    "settlement_source": "THE_WEATHER_COMPANY",
+                    "station_id": "KNYC",
+                    "target_utc_time": target,
+                    "offset_seconds": offset,
+                },
+            }
+        ],
     }
     directory = root / f"phase_nyc_w7_live_{number}"
     directory.mkdir()

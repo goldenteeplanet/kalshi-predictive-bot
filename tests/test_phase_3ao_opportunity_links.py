@@ -78,7 +78,9 @@ def test_phase3ao_market_identity_verifies_exact_url_and_blocks_unsafe_rows(tmp_
         session.flush()
 
         assert (
-            verify_market_identity(session, ranking=verified, settings=settings).url_verification_status
+            verify_market_identity(
+                session, ranking=verified, settings=settings
+            ).url_verification_status
             == VERIFIED
         )
         no_url_identity = verify_market_identity(session, ranking=no_url, settings=settings)
@@ -91,35 +93,51 @@ def test_phase3ao_market_identity_verifies_exact_url_and_blocks_unsafe_rows(tmp_
             == MISSING_MARKET_TICKER
         )
         assert (
-            verify_market_identity(session, ticker="KXP3AO-MISSING", settings=settings).url_verification_status
+            verify_market_identity(
+                session, ticker="KXP3AO-MISSING", settings=settings
+            ).url_verification_status
             == MARKET_NOT_IN_CATALOG
         )
         assert (
-            verify_market_identity(session, ranking=synthetic, settings=settings).url_verification_status
+            verify_market_identity(
+                session, ranking=synthetic, settings=settings
+            ).url_verification_status
             == SYNTHETIC_ONLY
         )
         assert (
-            verify_market_identity(session, ranking=composite, settings=settings).url_verification_status
+            verify_market_identity(
+                session, ranking=composite, settings=settings
+            ).url_verification_status
             == COMPOSITE_LOCAL_ONLY
         )
         assert (
-            verify_market_identity(session, ranking=placeholder, settings=settings).url_verification_status
+            verify_market_identity(
+                session, ranking=placeholder, settings=settings
+            ).url_verification_status
             == PLACEHOLDER_BLOCKED
         )
         assert (
-            verify_market_identity(session, ranking=partial, settings=settings).url_verification_status
+            verify_market_identity(
+                session, ranking=partial, settings=settings
+            ).url_verification_status
             == PARTIAL_PROVENANCE_BLOCKED
         )
         assert (
-            verify_market_identity(session, ranking=general, settings=settings).url_verification_status
+            verify_market_identity(
+                session, ranking=general, settings=settings
+            ).url_verification_status
             == GENERAL_SOURCE_NOT_SAFE
         )
         assert (
-            verify_market_identity(session, ranking=stale, settings=settings).url_verification_status
+            verify_market_identity(
+                session, ranking=stale, settings=settings
+            ).url_verification_status
             == STALE_CATALOG
         )
         assert (
-            verify_market_identity(session, ranking=closed, settings=settings).url_verification_status
+            verify_market_identity(
+                session, ranking=closed, settings=settings
+            ).url_verification_status
             == VERIFIED_BUT_CLOSED
         )
 

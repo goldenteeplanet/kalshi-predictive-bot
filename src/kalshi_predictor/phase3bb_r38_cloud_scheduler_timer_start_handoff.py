@@ -107,7 +107,9 @@ def write_phase3bb_r38_cloud_scheduler_timer_start_handoff_report(
     )
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_checks_csv(checks_csv_path, payload["timer_start_checks"])
-    operator_handoff_script_path.write_text(_render_operator_handoff_script(payload), encoding="utf-8")
+    operator_handoff_script_path.write_text(
+        _render_operator_handoff_script(payload), encoding="utf-8"
+    )
     _mark_executable(operator_handoff_script_path)
     root_console_script_path.write_text(_render_root_console_script(payload), encoding="utf-8")
     _mark_executable(root_console_script_path)
@@ -259,9 +261,15 @@ def _build_remote_probes(
             ),
             timeout_seconds,
         ),
-        RemoteProbe("scheduler_timer_enabled", f"systemctl is-enabled {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_timer_enabled", f"systemctl is-enabled {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds
+        ),
         RemoteProbe(
             "r8_command_registry",
             f"cd {app} && .venv/bin/kalshi-bot phase3bb-r8-unified-paper-gate --help "
@@ -322,8 +330,7 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         "r8_registered": bool(
             by_name.get("r8_command_registry") and by_name["r8_command_registry"].ok
         ),
-        "sudo_noninteractive_true": "SUDO_N_OK"
-        in _stdout(by_name.get("sudo_noninteractive_true")),
+        "sudo_noninteractive_true": "SUDO_N_OK" in _stdout(by_name.get("sudo_noninteractive_true")),
         "r5_status": r5_status,
         "r5_running": bool((process or {}).get("phase3bc_r5_process_running")),
         "r5_pid": r5_pid,
@@ -414,8 +421,7 @@ def _timer_start_checks(
         ),
         _check(
             "r5_guard_healthy",
-            parsed.get("guard_status") == "RUNNING"
-            and parsed.get("guard_should_stop") is False,
+            parsed.get("guard_status") == "RUNNING" and parsed.get("guard_should_stop") is False,
             (
                 f"guard_status={parsed.get('guard_status')}, "
                 f"guard_should_stop={parsed.get('guard_should_stop')}."
@@ -521,18 +527,18 @@ def _render_operator_handoff_script(payload: dict[str, Any]) -> str:
         f"COPY_ROOT_SCRIPT={_shell_quote(commands['copy_root_console_timer_start'])}",
         f"START_TIMER={_shell_quote(commands['start_timer_with_sudo_n'])}",
         "",
-        "if [[ \"$TOKEN\" != \"$REQUIRED\" ]]; then",
+        'if [[ "$TOKEN" != "$REQUIRED" ]]; then',
         "  echo '[phase3bb-r38] dry-run command list:'",
         "  printf '  %s\\n' \"$COPY_ROOT_SCRIPT\"",
         "  printf '  %s\\n' \"$START_TIMER\"",
         "  echo '[phase3bb-r38] no timer start executed'",
-        f"  echo \"[phase3bb-r38] to execute: {APPROVAL_ENV_VAR}=$REQUIRED bash $0\"",
+        f'  echo "[phase3bb-r38] to execute: {APPROVAL_ENV_VAR}=$REQUIRED bash $0"',
         "  exit 0",
         "fi",
         "",
         "echo '[phase3bb-r38] approval token accepted'",
-        "bash -lc \"$COPY_ROOT_SCRIPT\"",
-        "if bash -lc \"$START_TIMER\"; then",
+        'bash -lc "$COPY_ROOT_SCRIPT"',
+        'if bash -lc "$START_TIMER"; then',
         "  echo '[phase3bb-r38] scheduler timer started via sudo -n'",
         "else",
         "  echo '[phase3bb-r38] sudo -n timer start failed; use root console:'",
@@ -553,16 +559,16 @@ def _render_root_console_script(payload: dict[str, Any]) -> str:
         f"TIMER={_shell_quote(SCHEDULER_TIMER_NAME)}",
         f"SERVICE={_shell_quote(SCHEDULER_SERVICE_NAME)}",
         "",
-        "if [[ \"$(id -u)\" -ne 0 ]]; then",
+        'if [[ "$(id -u)" -ne 0 ]]; then',
         "  echo '[phase3bb-r38] run this script as root from the cloud console'",
         "  exit 2",
         "fi",
         "",
         "echo '[phase3bb-r38] starting scheduler timer only'",
-        "systemctl start \"${TIMER}\"",
-        "systemctl is-active \"${TIMER}\"",
-        "systemctl list-timers --all \"${TIMER}\" --no-pager || true",
-        "systemctl status \"${TIMER}\" \"${SERVICE}\" --no-pager || true",
+        'systemctl start "${TIMER}"',
+        'systemctl is-active "${TIMER}"',
+        'systemctl list-timers --all "${TIMER}" --no-pager || true',
+        'systemctl status "${TIMER}" "${SERVICE}" --no-pager || true',
         "echo '[phase3bb-r38] timer start complete; rerun R37/R40 monitor next'",
         "",
     ]

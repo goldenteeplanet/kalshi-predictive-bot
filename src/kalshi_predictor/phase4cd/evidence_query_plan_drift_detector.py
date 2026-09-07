@@ -169,9 +169,7 @@ def validate_query_plan_drift(drift: Any) -> None:
     unsigned.pop("detector_hash")
     unsigned["schema_version"] = DETECTOR_SCHEMA_VERSION
     unsigned["reasons"] = sorted(unsigned["reasons"])
-    unsigned["drifted_query_fingerprints"] = list(
-        unsigned["drifted_query_fingerprints"]
-    )
+    unsigned["drifted_query_fingerprints"] = list(unsigned["drifted_query_fingerprints"])
     if drift.detector_hash != _hash(unsigned):
         raise EvidenceQueryPlanDriftError("DETECTOR_HASH_MISMATCH")
 

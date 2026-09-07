@@ -146,4 +146,3 @@ def _report_text(
         ]
     )
     return "\n".join(lines) + "\n"
-

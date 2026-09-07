@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import httpx
 
@@ -13,7 +14,9 @@ from kalshi_predictor.utils.time import utc_now
 PRODUCTION_PUBLIC_REST_URL = "https://api.elections.kalshi.com/trade-api/v2"
 
 
-def analyze_public_orderbook(*, ticker: str, category: str, payload: Mapping[str, Any]) -> dict[str, Any]:
+def analyze_public_orderbook(
+    *, ticker: str, category: str, payload: Mapping[str, Any]
+) -> dict[str, Any]:
     book = LocalOrderbook(ticker)
     book.apply_rest_snapshot(payload, resume_sequence=0)
     legacy = parse_orderbook(dict(payload))
@@ -69,7 +72,11 @@ def write_gh1h_report(
                 continue
             response = client.get(
                 "/markets",
-                params={"limit": max_markets_per_series, "status": "open", "series_ticker": series_ticker},
+                params={
+                    "limit": max_markets_per_series,
+                    "status": "open",
+                    "series_ticker": series_ticker,
+                },
             )
             response.raise_for_status()
             for market in response.json().get("markets", [])[:max_markets_per_series]:
@@ -83,7 +90,9 @@ def write_gh1h_report(
                 container = payload.get("orderbook_fp", {})
                 if not (container.get("yes_dollars") or container.get("no_dollars")):
                     continue
-                rows.append(analyze_public_orderbook(ticker=ticker, category=category, payload=payload))
+                rows.append(
+                    analyze_public_orderbook(ticker=ticker, category=category, payload=payload)
+                )
                 if sum(row["category"] == category for row in rows) >= max_quoted_per_category:
                     break
     report = {
@@ -102,7 +111,9 @@ def write_gh1h_report(
             "weather_quoted": sum(row["category"] == "weather" for row in rows),
             "crypto_quoted": sum(row["category"] == "crypto" for row in rows),
             "legacy_parser_consistent": sum(row["legacy_parser_consistent"] for row in rows),
-            "ranking_liquidity_usable": sum(row["ranking_effect"]["liquidity_usable"] for row in rows),
+            "ranking_liquidity_usable": sum(
+                row["ranking_effect"]["liquidity_usable"] for row in rows
+            ),
             "risk_gate_pass": sum(row["risk_effect"]["gate_pass"] for row in rows),
         },
     }
@@ -113,7 +124,11 @@ def write_gh1h_report(
 
 
 def _category(series_ticker: str) -> str:
-    return "crypto" if series_ticker.upper().startswith(("KXBTC", "KXETH", "KXSOL", "KXXRP", "KXDOGE")) else "weather"
+    return (
+        "crypto"
+        if series_ticker.upper().startswith(("KXBTC", "KXETH", "KXSOL", "KXXRP", "KXDOGE"))
+        else "weather"
+    )
 
 
 def _string(value: Decimal | None) -> str | None:

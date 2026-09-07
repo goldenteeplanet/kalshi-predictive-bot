@@ -56,8 +56,7 @@ def test_phase3ah_separates_team_aliases_from_roster_evidence(tmp_path) -> None:
     assert payload["summary"]["player_prop_rows"] == 2
     assert gate["phase3ah_auto_upgrades_created"] == 0
     assert any(
-        row["reason"] == "PLAYER_PROP_REQUIRES_ROSTER_MAPPING"
-        for row in gate["blocked_breakdown"]
+        row["reason"] == "PLAYER_PROP_REQUIRES_ROSTER_MAPPING" for row in gate["blocked_breakdown"]
     )
 
 

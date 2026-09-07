@@ -163,9 +163,7 @@ def build_gh3_soak_status(
     generated_at = _datetime(payload.get("generated_at"))
     scheduler_generated_at = _datetime(scheduler.get("generated_at"))
     next_run_base = scheduler_generated_at or generated_at
-    next_run = (
-        next_run_base + timedelta(minutes=cadence_minutes) if next_run_base else None
-    )
+    next_run = next_run_base + timedelta(minutes=cadence_minutes) if next_run_base else None
     estimated_completion = resolved_now + timedelta(minutes=remaining * cadence_minutes)
     reconnect = build_source_reconnect_health(
         gh2_payload=payload,
@@ -200,9 +198,7 @@ def build_gh3_soak_status(
         scheduler_generated_at = _datetime(unified.get("generated_at"))
         generated_at = _datetime(unified.get("generated_at"))
         report_age = _age_minutes(unified.get("generated_at"), resolved_now)
-        report_fresh = report_age is not None and report_age <= max(
-            35, cadence_minutes * 2 + 5
-        )
+        report_fresh = report_age is not None and report_age <= max(35, cadence_minutes * 2 + 5)
         reconnect = _unified_source_health(unified, now=resolved_now)
         soak_complete = completed >= required
     lock_wait_seconds = _nonnegative_float(
@@ -254,9 +250,7 @@ def build_gh3_soak_status(
         "status": status,
         "status_label": status_label,
         "status_kind": status_kind,
-        "generated_at": (
-            unified.get("generated_at") if unified else payload.get("generated_at")
-        )
+        "generated_at": (unified.get("generated_at") if unified else payload.get("generated_at"))
         or "n/a",
         "report_age_minutes": report_age,
         "completed_cycles": completed,
@@ -333,9 +327,7 @@ def build_gh3_soak_status(
     }
 
 
-def _unified_source_health(
-    payload: dict[str, Any], *, now: datetime
-) -> dict[str, Any]:
+def _unified_source_health(payload: dict[str, Any], *, now: datetime) -> dict[str, Any]:
     sources = payload.get("sources") or {}
     age = _age_minutes(payload.get("generated_at"), now)
     websocket = sources.get("websocket") or {}
@@ -359,9 +351,7 @@ def _unified_source_health(
         {
             "source": "Coinbase",
             "status": str(coinbase.get("status") or "PENDING"),
-            "status_kind": (
-                "healthy" if coinbase.get("status") == "HEALTHY" else "blocked"
-            ),
+            "status_kind": ("healthy" if coinbase.get("status") == "HEALTHY" else "blocked"),
             "age_minutes": age,
             "detail": (
                 f"{int(coinbase.get('prices_imported') or 0)} prices imported; "
@@ -376,26 +366,21 @@ def _unified_source_health(
         {
             "source": "NOAA weather",
             "status": str(noaa.get("status") or "PENDING"),
-            "status_kind": (
-                "healthy" if noaa.get("status") == "HEALTHY" else "blocked"
-            ),
+            "status_kind": ("healthy" if noaa.get("status") == "HEALTHY" else "blocked"),
             "age_minutes": age,
             "detail": (
                 f"{int(noaa.get('features') or 0)} features; "
                 f"{int(noaa.get('forecasts') or 0)} forecasts"
             ),
             "recovery": str(
-                noaa.get("reason")
-                or "The active decision stage reports NOAA output explicitly."
+                noaa.get("reason") or "The active decision stage reports NOAA output explicitly."
             ),
         },
     ]
     healthy_states = {"HEALTHY", "NOT_APPLICABLE"}
     return {
         "status": (
-            "HEALTHY"
-            if all(row["status"] in healthy_states for row in rows)
-            else "DEGRADED"
+            "HEALTHY" if all(row["status"] in healthy_states for row in rows) else "DEGRADED"
         ),
         "sources": rows,
         "unified_health": True,
@@ -434,9 +419,7 @@ def _weather_candidate_gate_rows(
                     else "n/a"
                 ),
                 "spread_label": str(raw.get("spread") or "n/a"),
-                "ranking_label": (
-                    "Current" if bool(raw.get("has_current_ranking")) else "Missing"
-                ),
+                "ranking_label": ("Current" if bool(raw.get("has_current_ranking")) else "Missing"),
                 "risk_label": (
                     "Ready"
                     if bool(raw.get("phase3s_proceed"))
@@ -451,8 +434,7 @@ def _weather_candidate_gate_rows(
                 ),
                 "failed_gate": blocker,
                 "failed_gate_label": ", ".join(
-                    _enum_label(item)
-                    for item in (raw.get("failed_gates") or [blocker])
+                    _enum_label(item) for item in (raw.get("failed_gates") or [blocker])
                 ),
                 "next_action": _weather_gate_next_action(blocker),
             }

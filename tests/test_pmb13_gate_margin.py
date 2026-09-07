@@ -40,9 +40,10 @@ def test_pmb13_exact_quantized_margin_flips_pass_and_reject_decisions():
 
 def test_pmb13_classifies_non_edge_blockers_as_not_forecast_flippable():
     report = build_exact_gate_margin_report()
-    assert all(row["active_blocker_type"] in {
-        "NONE", "EDGE", "LIQUIDITY", "EXPOSURE", "OTHER"
-    } for row in report["decisions"])
+    assert all(
+        row["active_blocker_type"] in {"NONE", "EDGE", "LIQUIDITY", "EXPOSURE", "OTHER"}
+        for row in report["decisions"]
+    )
     liquidity = _decision(
         forecast="0.80", ask="0.55", blocker="INSUFFICIENT_LIQUIDITY", status="REJECTED"
     )
@@ -54,10 +55,16 @@ def test_pmb13_classifies_non_edge_blockers_as_not_forecast_flippable():
 
 def _decision(*, forecast, ask, blocker, status):
     return {
-        "timestamp": "2026-07-17T00:00:00+00:00", "ticker": "SYN",
-        "category": "crypto", "status": status, "blocker": blocker,
-        "forecast_probability": forecast, "best_yes_ask": ask,
-        "model_name": "crypto_v2", "model_version": "2.0.0",
-        "feature_ref": {"id": 1}, "observation_ref": {"id": 2},
+        "timestamp": "2026-07-17T00:00:00+00:00",
+        "ticker": "SYN",
+        "category": "crypto",
+        "status": status,
+        "blocker": blocker,
+        "forecast_probability": forecast,
+        "best_yes_ask": ask,
+        "model_name": "crypto_v2",
+        "model_version": "2.0.0",
+        "feature_ref": {"id": 1},
+        "observation_ref": {"id": 2},
         "orderbook_ref": {"id": 3},
     }

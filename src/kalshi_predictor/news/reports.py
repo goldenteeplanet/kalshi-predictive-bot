@@ -268,18 +268,16 @@ def _render_news_opportunities(rows: list[dict[str, Any]], *, model_name: str) -
         "|---|---|---|---|---|---:|---:|---:|---|---|",
     ]
     if not rows:
-        lines.append(
-            "| _No news-driven rows_ |  |  |  |  |  |  |  | Need features/forecasts. |  |"
-        )
+        lines.append("| _No news-driven rows_ |  |  |  |  |  |  |  | Need features/forecasts. |  |")
     for row in rows:
-        linked_titles = "; ".join(
-            item.get("title", "untitled") for item in row["linked_news"][:3]
-        )
+        linked_titles = "; ".join(item.get("title", "untitled") for item in row["linked_news"][:3])
         link = row["kalshi_url"] if row.get("kalshi_url_verified") else row["kalshi_url_status"]
         lines.append(
             f"| {row['ticker']} | {row['market']} | {link} | {linked_titles or 'n/a'} | "
             f"{row['signal_name']} {row['signal_strength']} | "
-            f"{row['news_v1_probability']} | {row['market_price']} | {row['edge']} | {row['risk']} | "
+            f"{row['news_v1_probability']} | "
+            f"{row['market_price']} | {row['edge']} | "
+            f"{row['risk']} | "
             f"{row['recommendation']} |"
         )
     lines.extend(

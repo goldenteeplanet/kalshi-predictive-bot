@@ -88,9 +88,7 @@ def test_phase3ax_uses_phase3bb_r4_followup_task(tmp_path) -> None:
         "Phase 3BB-R5 FlightAware Date-Stable Evidence Capture"
     )
     assert source_status["flightaware_status"] == "BLOCKED"
-    assert source_status["first_hard_blocker"] == (
-        "DATE_STABLE_FLIGHTAWARE_SOURCE_MISSING"
-    )
+    assert source_status["first_hard_blocker"] == ("DATE_STABLE_FLIGHTAWARE_SOURCE_MISSING")
 
 
 def test_phase3bb_r4_cli_help_registered() -> None:

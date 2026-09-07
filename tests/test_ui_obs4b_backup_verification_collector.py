@@ -91,9 +91,7 @@ def test_local_proc_collector_discovers_only_exact_verification_target(tmp_path:
     database.write_bytes(b"sqlite-placeholder")
     process = proc / "42"
     process.mkdir()
-    (process / "cmdline").write_bytes(
-        f"sqlite3\0{database}\0PRAGMA integrity_check;\0".encode()
-    )
+    (process / "cmdline").write_bytes(f"sqlite3\0{database}\0PRAGMA integrity_check;\0".encode())
     fields = ["0"] * 22
     fields[0] = "42"
     fields[1] = "(sqlite3)"

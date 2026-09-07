@@ -20,7 +20,8 @@ BASE_VERSIONS = {"crypto_v2": "2.0.0", "weather_v2": "2.0.0", "sports_v1": "1.0.
 
 
 def build_sensitivity_grid(
-    *, perturbations: tuple[Decimal, ...] = PERTURBATIONS,
+    *,
+    perturbations: tuple[Decimal, ...] = PERTURBATIONS,
     limits: PortfolioLimits | None = None,
 ) -> dict[str, Any]:
     if not perturbations or any(abs(value) > Decimal("0.10") for value in perturbations):
@@ -30,9 +31,7 @@ def build_sensitivity_grid(
     variants = []
     for values in itertools.product(perturbations, repeat=len(tickers)):
         deltas = dict(zip(tickers, values, strict=True))
-        forecasts = {
-            ticker: BASELINE_FORECASTS[ticker] + deltas[ticker] for ticker in tickers
-        }
+        forecasts = {ticker: BASELINE_FORECASTS[ticker] + deltas[ticker] for ticker in tickers}
         versions = {
             MODEL_BY_TICKER[ticker]: _revision(MODEL_BY_TICKER[ticker], deltas[ticker])
             for ticker in tickers
@@ -42,23 +41,32 @@ def build_sensitivity_grid(
         allocated_categories = {
             row["category"] for row in run["decisions"] if row["status"] == "ALLOCATED"
         }
-        variants.append({
-            "variant_id": variant_id,
-            "forecast_deltas": {ticker: str(deltas[ticker]) for ticker in tickers},
-            "model_versions": versions,
-            "trade_count": run["metrics"]["trade_count"],
-            "allocated_capital": run["metrics"]["allocated_capital"],
-            "final_pnl": run["metrics"]["final_pnl"],
-            "max_drawdown": run["metrics"]["max_drawdown"],
-            "category_coverage": len(allocated_categories),
-            "gate_outcomes": run["gate_outcomes"],
-            "ticker_outcomes": _ticker_outcomes(run["decisions"], tickers),
-            "attribution_complete": all(
-                all(row.get(field) for field in (
-                    "feature_ref", "observation_ref", "orderbook_ref", "model_version"
-                )) for row in run["decisions"]
-            ),
-        })
+        variants.append(
+            {
+                "variant_id": variant_id,
+                "forecast_deltas": {ticker: str(deltas[ticker]) for ticker in tickers},
+                "model_versions": versions,
+                "trade_count": run["metrics"]["trade_count"],
+                "allocated_capital": run["metrics"]["allocated_capital"],
+                "final_pnl": run["metrics"]["final_pnl"],
+                "max_drawdown": run["metrics"]["max_drawdown"],
+                "category_coverage": len(allocated_categories),
+                "gate_outcomes": run["gate_outcomes"],
+                "ticker_outcomes": _ticker_outcomes(run["decisions"], tickers),
+                "attribution_complete": all(
+                    all(
+                        row.get(field)
+                        for field in (
+                            "feature_ref",
+                            "observation_ref",
+                            "orderbook_ref",
+                            "model_version",
+                        )
+                    )
+                    for row in run["decisions"]
+                ),
+            }
+        )
     variants.sort(key=lambda row: row["variant_id"])
     stability = _stability(variants, tickers)
     frontier_ids = _frontier(variants)
@@ -76,9 +84,7 @@ def build_sensitivity_grid(
             "variants": variants,
         },
         "decision_stability": stability,
-        "robustness_frontier": [
-            row for row in variants if row["variant_id"] in frontier_ids
-        ],
+        "robustness_frontier": [row for row in variants if row["variant_id"] in frontier_ids],
         "summary": {
             "stable_tickers": sum(row["classification"] == "STABLE" for row in stability),
             "fragile_tickers": sum(row["classification"] == "FRAGILE" for row in stability),
@@ -122,15 +128,17 @@ def _stability(variants: list[dict[str, Any]], tickers: tuple[str, ...]) -> list
     rows = []
     for ticker in tickers:
         outcomes = sorted({row["ticker_outcomes"][ticker] for row in variants})
-        rows.append({
-            "ticker": ticker,
-            "classification": "STABLE" if len(outcomes) == 1 else "FRAGILE",
-            "outcomes": outcomes,
-            "allocated_variants": sum(
-                row["ticker_outcomes"][ticker] == "ALLOCATED" for row in variants
-            ),
-            "total_variants": len(variants),
-        })
+        rows.append(
+            {
+                "ticker": ticker,
+                "classification": "STABLE" if len(outcomes) == 1 else "FRAGILE",
+                "outcomes": outcomes,
+                "allocated_variants": sum(
+                    row["ticker_outcomes"][ticker] == "ALLOCATED" for row in variants
+                ),
+                "total_variants": len(variants),
+            }
+        )
     return rows
 
 

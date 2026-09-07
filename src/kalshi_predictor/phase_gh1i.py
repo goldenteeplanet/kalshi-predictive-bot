@@ -62,7 +62,11 @@ def write_gh1i_report(
                 continue
             response = client.get(
                 "/markets",
-                params={"limit": max_markets_per_series, "status": "open", "series_ticker": series_ticker},
+                params={
+                    "limit": max_markets_per_series,
+                    "status": "open",
+                    "series_ticker": series_ticker,
+                },
             )
             response.raise_for_status()
             for market in response.json().get("markets", [])[:max_markets_per_series]:
@@ -98,8 +102,12 @@ def write_gh1i_report(
         "two_sided_books": rows,
         "thresholds": {
             "opportunity_max_spread": str(settings.opportunity_max_spread),
-            "advanced_risk_spread_preferred_max_ticks": str(settings.advanced_risk_spread_preferred_max_ticks),
-            "advanced_risk_spread_executable_max_ticks": str(settings.advanced_risk_spread_executable_max_ticks),
+            "advanced_risk_spread_preferred_max_ticks": str(
+                settings.advanced_risk_spread_preferred_max_ticks
+            ),
+            "advanced_risk_spread_executable_max_ticks": str(
+                settings.advanced_risk_spread_executable_max_ticks
+            ),
             "depth_contracts": "1",
             "tick_size": str(TICK_SIZE),
         },
@@ -113,8 +121,12 @@ def write_gh1i_report(
             "weather_two_sided": sum(row["category"] == "weather" for row in rows),
             "crypto_two_sided": sum(row["category"] == "crypto" for row in rows),
             "ranking_advance": sum(row["calibration"]["ranking_advance"] for row in rows),
-            "risk_preferred_advance": sum(row["calibration"]["risk_preferred_advance"] for row in rows),
-            "risk_executable_advance": sum(row["calibration"]["risk_executable_advance"] for row in rows),
+            "risk_preferred_advance": sum(
+                row["calibration"]["risk_preferred_advance"] for row in rows
+            ),
+            "risk_executable_advance": sum(
+                row["calibration"]["risk_executable_advance"] for row in rows
+            ),
         },
     }
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -128,8 +140,11 @@ def _distribution(values: list[Decimal]) -> dict[str, str | int | None]:
     if not ordered:
         return {"count": 0, "min": None, "p25": None, "median": None, "p75": None, "max": None}
     return {
-        "count": len(ordered), "min": str(ordered[0]), "p25": str(_percentile(ordered, 0.25)),
-        "median": str(_percentile(ordered, 0.50)), "p75": str(_percentile(ordered, 0.75)),
+        "count": len(ordered),
+        "min": str(ordered[0]),
+        "p25": str(_percentile(ordered, 0.25)),
+        "median": str(_percentile(ordered, 0.50)),
+        "p75": str(_percentile(ordered, 0.75)),
         "max": str(ordered[-1]),
     }
 
@@ -139,4 +154,8 @@ def _percentile(values: list[Decimal], fraction: float) -> Decimal:
 
 
 def _category(series_ticker: str) -> str:
-    return "crypto" if series_ticker.upper().startswith(("KXBTC", "KXETH", "KXSOL", "KXXRP", "KXDOGE")) else "weather"
+    return (
+        "crypto"
+        if series_ticker.upper().startswith(("KXBTC", "KXETH", "KXSOL", "KXXRP", "KXDOGE"))
+        else "weather"
+    )

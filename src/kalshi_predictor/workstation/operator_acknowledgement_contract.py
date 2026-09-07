@@ -239,9 +239,10 @@ def _validated_record(value: Any) -> OperatorAcknowledgementRecord:
 def _validate_record_fields(payload: dict[str, Any]) -> None:
     if payload["action"] not in {"ACKNOWLEDGED", "DECLINED", "REQUESTED_DIAGNOSTICS"}:
         raise OperatorAcknowledgementContractError("ACKNOWLEDGEMENT_FIELD_INVALID")
-    if not isinstance(payload["acknowledgement_id"], str) or not payload[
-        "acknowledgement_id"
-    ].strip():
+    if (
+        not isinstance(payload["acknowledgement_id"], str)
+        or not payload["acknowledgement_id"].strip()
+    ):
         raise OperatorAcknowledgementContractError("ACKNOWLEDGEMENT_FIELD_INVALID")
     for key in ("incident_id_hash", "alert_admission_hash", "operator_identity_hash"):
         if not _is_sha256(payload[key]):

@@ -17,7 +17,11 @@ from kalshi_predictor.phase3bb_acceleration import (
     _safety_flags,
     _write_manifest,
 )
-from kalshi_predictor.phase3bb_r12_cloud_bootstrap import ProbeRunner, _result_payload, _run_ssh_probe
+from kalshi_predictor.phase3bb_r12_cloud_bootstrap import (
+    ProbeRunner,
+    _result_payload,
+    _run_ssh_probe,
+)
 from kalshi_predictor.phase3bb_r18_cloud_scheduler_runtime_cutover import (
     DEFAULT_PER_PROBE_TIMEOUT_SECONDS,
     DEFAULT_REPORTS_DIR,
@@ -94,7 +98,9 @@ def write_phase3bb_r23_cloud_ui_install_verification_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_probe_csv(probe_csv_path, payload["remote_ui_probe_results"])
     _write_checks_csv(checks_csv_path, payload["verification_checks"])
     operator_command_path.write_text(_render_operator_command(payload), encoding="utf-8")
@@ -266,7 +272,9 @@ def _verification_checks(
         _check(
             "ui_service_not_started",
             not bool(ui_state.get("service_started")),
-            f"ActiveState={ui_state.get('service_active_state')}; pid={ui_state.get('service_exec_main_pid')}.",
+            f"ActiveState="
+            f"{ui_state.get('service_active_state')}; pid="
+            f"{ui_state.get('service_exec_main_pid')}.",
         ),
         _check(
             "no_duplicate_ui_process",
@@ -306,7 +314,10 @@ def _verification_decision(
         next_step = "Phase 3BB-R23 - Resolve Cloud UI Install Verification"
     else:
         status = "VERIFIED_UI_ENABLE_NO_START_HANDOFF"
-        reason = "The UI service is installed and enabled, but it has not been started or exposed publicly."
+        reason = (
+            "The UI service is installed and enabled, but it has not been started or exposed "
+            "publicly."
+        )
         next_command = "systemctl status kalshi-ui.service --no-pager"
         next_step = "Phase 3BB-R24 - Operator-Approved Cloud UI Start + SSH Tunnel Verification"
     return {
@@ -349,7 +360,9 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- UI service enabled: `{decision['ui_service_enabled']}`",
             f"- UI service started: `{decision['ui_service_started']}`",
             f"- UI port listening: `{decision['ui_port_listening']}`",
-            f"- Public HTTP/HTTPS listening: `{decision['public_http_listening']}` / `{decision['public_https_listening']}`",
+            f"- Public HTTP/HTTPS listening: `"
+            f"{decision['public_http_listening']}` / `"
+            f"{decision['public_https_listening']}`",
             f"- First failed check: `{decision['first_failed_check']}`",
             f"- Reason: {decision['primary_reason']}",
             "",
@@ -377,13 +390,24 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     for row in payload["verification_checks"]:
         marker = "PASS" if row["passed"] else "FAIL"
         lines.append(f"- `{marker}` `{row['check']}` - {row['detail']}")
-    lines.extend(["", "## Parsed UI State", "", "```json", json.dumps(payload["parsed_ui_state"], indent=2, sort_keys=True), "```"])
+    lines.extend(
+        [
+            "",
+            "## Parsed UI State",
+            "",
+            "```json",
+            json.dumps(payload["parsed_ui_state"], indent=2, sort_keys=True),
+            "```",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
     decision = payload["verification_decision"]
-    return "\n".join(["#!/usr/bin/env bash", "set -euo pipefail", "", decision["operator_next_command"], ""])
+    return "\n".join(
+        ["#!/usr/bin/env bash", "set -euo pipefail", "", decision["operator_next_command"], ""]
+    )
 
 
 def _render_next_actions(payload: dict[str, Any]) -> str:

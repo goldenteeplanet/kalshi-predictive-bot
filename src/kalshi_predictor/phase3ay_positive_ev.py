@@ -316,12 +316,8 @@ def _near_miss_rows(
     max_candidates: int,
 ) -> list[dict[str, Any]]:
     band = near_miss_cents / Decimal("100")
-    near_misses = [
-        row
-        for row in rows
-        if (value := _ev_value(row)) <= 0 and value >= -band
-    ]
-    return sorted(near_misses, key=_near_miss_sort_key, reverse=True)[:max(0, max_candidates)]
+    near_misses = [row for row in rows if (value := _ev_value(row)) <= 0 and value >= -band]
+    return sorted(near_misses, key=_near_miss_sort_key, reverse=True)[: max(0, max_candidates)]
 
 
 def _refresh_near_miss_snapshots(
@@ -333,7 +329,7 @@ def _refresh_near_miss_snapshots(
     allow_concurrent_refresh: bool,
     max_candidates: int,
 ) -> dict[str, Any]:
-    tickers = [str(row["ticker"]) for row in near_miss_rows[:max(0, max_candidates)]]
+    tickers = [str(row["ticker"]) for row in near_miss_rows[: max(0, max_candidates)]]
     if not enabled:
         return _refresh_status("DISABLED", tickers=tickers)
     if not tickers:
@@ -706,18 +702,12 @@ def _gap_to_positive_cents(value: Decimal | None) -> str | None:
 
 
 def _parse_symbols(symbols: str) -> set[str]:
-    return {
-        token.strip().upper()
-        for token in symbols.split(",")
-        if token.strip()
-    }
+    return {token.strip().upper() for token in symbols.split(",") if token.strip()}
 
 
 def _active_crypto_watcher_state(reports_dir: Path) -> dict[str, Any]:
     status = _read_json(reports_dir / "phase3bc_r5" / "phase3bc_r5_status.json")
-    watch = _read_json(
-        reports_dir / "phase3bc_r5" / "phase3bc_r5_crypto_freshness_watch.json"
-    )
+    watch = _read_json(reports_dir / "phase3bc_r5" / "phase3bc_r5_crypto_freshness_watch.json")
     process = status.get("process") if isinstance(status.get("process"), dict) else {}
     guard = status.get("guard") if isinstance(status.get("guard"), dict) else {}
     latest = status.get("latest_summary") if isinstance(status.get("latest_summary"), dict) else {}

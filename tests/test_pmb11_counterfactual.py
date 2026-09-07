@@ -16,7 +16,9 @@ def test_pmb11_is_deterministic_and_attributes_every_changed_decision(tmp_path):
     assert first["comparison"]["changed_decision_count"] > 0
     assert first["comparison"]["all_changes_attributed"] is True
     assert {row["category"] for row in first["baseline"]["decisions"]} == {
-        "crypto", "weather", "sports"
+        "crypto",
+        "weather",
+        "sports",
     }
     assert first["database_writes"] == 0
     assert first["execution_enabled"] is False

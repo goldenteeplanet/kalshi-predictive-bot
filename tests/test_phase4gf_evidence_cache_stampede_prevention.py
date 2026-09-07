@@ -41,9 +41,7 @@ def test_empty_partial_and_requester_bound_fail_closed() -> None:
     with pytest.raises(EvidenceCacheStampedeError, match="REQUESTERS_EMPTY"):
         _policy(requesters=[])
     with pytest.raises(EvidenceCacheStampedeError, match="PROPAGATION_INPUT_INVALID"):
-        prevent_evidence_cache_stampede(
-            propagation=None, snapshot=_snapshot(), requester_ids=["a"]
-        )
+        prevent_evidence_cache_stampede(propagation=None, snapshot=_snapshot(), requester_ids=["a"])
     with pytest.raises(EvidenceCacheStampedeError, match="REQUESTER_BOUND_EXCEEDED"):
         _policy(requesters=["a", "b"], max_requesters=1)
 
@@ -133,9 +131,7 @@ def _propagation():
         age_seconds=1,
         configured_timeout_ms=0,
     )
-    timeout_evidence = build_busy_timeout_evidence(
-        budget=budget, observations=[observation]
-    )
+    timeout_evidence = build_busy_timeout_evidence(budget=budget, observations=[observation])
     boundaries = build_query_cancellation_boundaries(
         budget=budget,
         timeout_evidence=timeout_evidence,

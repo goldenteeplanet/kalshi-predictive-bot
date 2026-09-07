@@ -15,8 +15,7 @@ def test_guarded_runtime_writers_share_one_lock() -> None:
     assert "db-writer-monitor --json" in weather
     assert "gh1-websocket-orderbook-drain --apply" in gh1
     assert (
-        "for location in new_york chicago miami austin los_angeles boston washington_dc"
-        in weather
+        "for location in new_york chicago miami austin los_angeles boston washington_dc" in weather
     )
     assert 'ingest-weather --location-key "$location"' in weather
     assert 'build-weather-features --location-key "$location" --limit 200' in weather
@@ -54,9 +53,9 @@ def test_systemd_units_use_guarded_writers_and_paper_only_flags() -> None:
 
 
 def test_weather_and_gh2_timers_keep_restart_safe_writer_separation() -> None:
-    weather_timer = (
-        ROOT / "deploy/systemd/kalshi-nyc-weather-runtime-refresh.timer"
-    ).read_text(encoding="utf-8")
+    weather_timer = (ROOT / "deploy/systemd/kalshi-nyc-weather-runtime-refresh.timer").read_text(
+        encoding="utf-8"
+    )
     weather_service = (
         ROOT / "deploy/systemd/kalshi-nyc-weather-runtime-refresh.service"
     ).read_text(encoding="utf-8")

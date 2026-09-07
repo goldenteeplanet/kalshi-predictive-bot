@@ -101,9 +101,7 @@ def build_phase3bc_crypto_clean_opportunity_router(
         "active_crypto_links": sum(1 for row in rows if row["active_market"]),
         "pure_crypto_markets": sum(1 for row in rows if row["structure_status"] == "PURE_CRYPTO"),
         "active_pure_crypto_markets": sum(
-            1
-            for row in rows
-            if row["active_market"] and row["structure_status"] == "PURE_CRYPTO"
+            1 for row in rows if row["active_market"] and row["structure_status"] == "PURE_CRYPTO"
         ),
         "mixed_or_cross_category_markets": sum(
             1 for row in rows if row["structure_status"] == "MIXED_CATEGORY"
@@ -218,9 +216,7 @@ def _build_row(
     leg_payloads = [_leg_payload(leg) for leg in parsed_legs]
     terms = _terms_for_row(market=market, link=link, legs=parsed_legs)
     market_status = _row_market_status(market=market, snapshot=snapshot)
-    active_market = market_status_bucket(market_status) == "active" and not is_link_deprecated(
-        link
-    )
+    active_market = market_status_bucket(market_status) == "active" and not is_link_deprecated(link)
     structure_status = _structure_status(terms, leg_payloads)
     metrics = payout_metrics_from_ranking(ranking) if ranking is not None else None
     executable_book = _executable_book(snapshot=snapshot, ranking=ranking, settings=settings)
@@ -274,9 +270,7 @@ def _build_row(
         "best_price": ranking.best_price if ranking is not None else None,
         "estimated_edge": ranking.estimated_edge if ranking is not None else None,
         "expected_value": decimal_to_str(metrics.expected_value) if metrics else None,
-        "payout_to_risk_ratio": decimal_to_str(metrics.payout_to_risk_ratio)
-        if metrics
-        else None,
+        "payout_to_risk_ratio": decimal_to_str(metrics.payout_to_risk_ratio) if metrics else None,
         "opportunity_score": ranking.opportunity_score if ranking is not None else None,
         "liquidity": ranking.liquidity if ranking is not None else None,
         "liquidity_score": ranking.liquidity_score if ranking is not None else None,
@@ -382,10 +376,7 @@ def _readiness_status(
     if _decimal(ranking.model_confidence_score) < MIN_EXECUTABLE_CONFIDENCE_SCORE:
         return "WATCH_LOW_CONFIDENCE"
     time_to_close = to_decimal(ranking.time_to_close_minutes)
-    if (
-        time_to_close is not None
-        and time_to_close < settings.opportunity_min_time_to_close_minutes
-    ):
+    if time_to_close is not None and time_to_close < settings.opportunity_min_time_to_close_minutes:
         return "WATCH_TOO_CLOSE_TO_SETTLEMENT"
     if not is_acceptable_best_payout(ranking, metrics):
         return "WATCH_PAYOUT_FILTER_NOT_MET"
@@ -442,9 +433,7 @@ def _blockers_for_status(
     if ranking is None:
         return []
     if status == "WATCH_LOW_EDGE":
-        return [
-            f"Edge {ranking.estimated_edge or 'n/a'} is below {settings.opportunity_min_edge}."
-        ]
+        return [f"Edge {ranking.estimated_edge or 'n/a'} is below {settings.opportunity_min_edge}."]
     if status == "WATCH_LOW_SCORE":
         return [
             "Opportunity score "
@@ -459,10 +448,7 @@ def _blockers_for_status(
     if status == "WATCH_NO_POSITIVE_EXPECTED_VALUE":
         return ["Expected value is not positive at current ask prices."]
     if status == "WATCH_TOO_CLOSE_TO_SETTLEMENT":
-        return [
-            "Time to close is below "
-            f"{settings.opportunity_min_time_to_close_minutes} minutes."
-        ]
+        return [f"Time to close is below {settings.opportunity_min_time_to_close_minutes} minutes."]
     if status == "WATCH_PAYOUT_FILTER_NOT_MET":
         return ["Payout-adjusted filter is not met yet."]
     return []
@@ -689,8 +675,7 @@ def _recommended_next_action(summary: dict[str, Any]) -> str:
         )
     if summary["mixed_or_cross_category_markets"] > 0:
         return (
-            "Filter mixed crypto/sports bundles out of payout views and wait for pure "
-            "crypto rows."
+            "Filter mixed crypto/sports bundles out of payout views and wait for pure crypto rows."
         )
     return "Refresh crypto links, snapshots, forecasts, and rankings."
 
@@ -785,6 +770,7 @@ def _append_rows(lines: list[str], rows: list[dict[str, Any]], *, empty: str) ->
             f"{row['spread'] or ''} | "
             f"{row['strict_turn_on_status']} |"
         )
+
 
 def _append_watch_rows(lines: list[str], rows: list[dict[str, Any]], *, empty: str) -> None:
     if not rows:

@@ -12,9 +12,7 @@ from typing import Any
 
 
 def canonical_hash(value: Any) -> str:
-    encoded = json.dumps(
-        value, sort_keys=True, separators=(",", ":"), default=str
-    ).encode()
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -142,9 +140,7 @@ def prospective_evaluation_values(
     bid_value, ask_value = capture.get("best_yes_bid"), capture.get("best_yes_ask")
     bid = Decimal(str(bid_value)) if bid_value not in (None, "") else None
     ask = Decimal(str(ask_value)) if ask_value not in (None, "") else None
-    midpoint = (
-        (bid + ask) / 2 if bid is not None and ask is not None else market_probability
-    )
+    midpoint = (bid + ask) / 2 if bid is not None and ask is not None else market_probability
     advantage = abs(model_probability - midpoint)
     crossing = (ask - bid) / 2 if bid is not None and ask is not None else Decimal("0")
     gross_edge = advantage - crossing

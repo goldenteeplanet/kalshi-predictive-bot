@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from kalshi_predictor.ui.live_status_collector import collect_live_snapshot, publish_live_snapshot, storage_status
+from kalshi_predictor.ui.live_status_collector import (
+    collect_live_snapshot,
+    publish_live_snapshot,
+    storage_status,
+)
 
 
 def runner(command: list[str], timeout: int) -> str:
@@ -26,6 +30,7 @@ def test_source_failure_blocks_process(tmp_path: Path) -> None:
         if "db-writer-monitor" in command:
             raise TimeoutError
         return runner(command, timeout)
+
     snapshot = collect_live_snapshot(runner=failing, backup_root=tmp_path)
     assert snapshot["active_process"]["state"] == "BLOCKED"
     assert snapshot["writer"]["safe_to_start_write"] is False
@@ -33,7 +38,9 @@ def test_source_failure_blocks_process(tmp_path: Path) -> None:
 
 def test_atomic_publication_and_history(tmp_path: Path) -> None:
     destination = tmp_path / "progress.json"
-    result = publish_live_snapshot(collect_live_snapshot(runner=runner, backup_root=tmp_path), destination)
+    result = publish_live_snapshot(
+        collect_live_snapshot(runner=runner, backup_root=tmp_path), destination
+    )
     assert result["published"] is True
     assert destination.exists()
     assert not destination.with_suffix(".json.tmp").exists()
@@ -58,7 +65,9 @@ def test_writer_pid_and_verified_backup_display_fields(tmp_path: Path) -> None:
 
 def test_storage_pressure_is_visible_and_bounded(monkeypatch, tmp_path: Path) -> None:
     usage = type("Usage", (), {"total": 1000, "used": 850, "free": 150})()
-    monkeypatch.setattr("kalshi_predictor.ui.live_status_collector.shutil.disk_usage", lambda _path: usage)
+    monkeypatch.setattr(
+        "kalshi_predictor.ui.live_status_collector.shutil.disk_usage", lambda _path: usage
+    )
     status, alerts = storage_status({"backup": tmp_path})
     assert status["backup"]["state"] == "WARNING"
     assert status["backup"]["free_percent"] == 15.0
@@ -68,6 +77,7 @@ def test_storage_pressure_is_visible_and_bounded(monkeypatch, tmp_path: Path) ->
 def test_storage_failure_fails_visible_not_silent(monkeypatch, tmp_path: Path) -> None:
     def fail(_path):
         raise OSError("unavailable")
+
     monkeypatch.setattr("kalshi_predictor.ui.live_status_collector.shutil.disk_usage", fail)
     status, alerts = storage_status({"project": tmp_path})
     assert status["project"]["state"] == "UNKNOWN"

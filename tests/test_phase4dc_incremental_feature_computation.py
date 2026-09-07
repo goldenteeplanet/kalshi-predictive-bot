@@ -25,12 +25,14 @@ def fixture():
         {"id": "d", "op": "MULTIPLY", "dependencies": ["c", "b"], "source_value": None},
         {"id": "independent", "op": "MAX", "dependencies": ["b"], "source_value": None},
     ]
-    return signed({
-        "schema": INPUT_SCHEMA,
-        "nodes": nodes,
-        "previous_values": {"a": "2", "b": "3", "c": "5", "d": "15", "independent": "3"},
-        "source_updates": {"a": "4"},
-    })
+    return signed(
+        {
+            "schema": INPUT_SCHEMA,
+            "nodes": nodes,
+            "previous_values": {"a": "2", "b": "3", "c": "5", "d": "15", "independent": "3"},
+            "source_updates": {"a": "4"},
+        }
+    )
 
 
 def test_incremental_matches_full_and_reuses_unaffected_nodes():
@@ -42,11 +44,14 @@ def test_incremental_matches_full_and_reuses_unaffected_nodes():
     assert report["baseline_values_hash"] == report["incremental_values_hash"]
 
 
-@pytest.mark.parametrize("update, expected", [
-    ({"a": "2"}, {"a", "c", "d"}),
-    ({"b": "5"}, {"b", "c", "d", "independent"}),
-    ({"a": "4", "b": "5"}, {"a", "b", "c", "d", "independent"}),
-])
+@pytest.mark.parametrize(
+    "update, expected",
+    [
+        ({"a": "2"}, {"a", "c", "d"}),
+        ({"b": "5"}, {"b", "c", "d", "independent"}),
+        ({"a": "4", "b": "5"}, {"a", "b", "c", "d", "independent"}),
+    ],
+)
 def test_changed_dependency_closure_is_exact(update, expected):
     payload = fixture()
     payload["source_updates"] = update
@@ -55,18 +60,20 @@ def test_changed_dependency_closure_is_exact(update, expected):
 
 
 def test_decimal_operations_and_canonical_rendering():
-    payload = signed({
-        "schema": INPUT_SCHEMA,
-        "nodes": [
-            {"id": "x", "op": "SOURCE", "dependencies": [], "source_value": "10.00"},
-            {"id": "y", "op": "SOURCE", "dependencies": [], "source_value": "4"},
-            {"id": "sub", "op": "SUBTRACT", "dependencies": ["x", "y"], "source_value": None},
-            {"id": "div", "op": "DIVIDE", "dependencies": ["x", "y"], "source_value": None},
-            {"id": "min", "op": "MIN", "dependencies": ["x", "y"], "source_value": None},
-        ],
-        "previous_values": {"x": "10", "y": "4", "sub": "6", "div": "2.5", "min": "4"},
-        "source_updates": {"x": "8.0"},
-    })
+    payload = signed(
+        {
+            "schema": INPUT_SCHEMA,
+            "nodes": [
+                {"id": "x", "op": "SOURCE", "dependencies": [], "source_value": "10.00"},
+                {"id": "y", "op": "SOURCE", "dependencies": [], "source_value": "4"},
+                {"id": "sub", "op": "SUBTRACT", "dependencies": ["x", "y"], "source_value": None},
+                {"id": "div", "op": "DIVIDE", "dependencies": ["x", "y"], "source_value": None},
+                {"id": "min", "op": "MIN", "dependencies": ["x", "y"], "source_value": None},
+            ],
+            "previous_values": {"x": "10", "y": "4", "sub": "6", "div": "2.5", "min": "4"},
+            "source_updates": {"x": "8.0"},
+        }
+    )
     assert build_report(payload)["values"] == {
         "x": "8",
         "y": "4",
@@ -84,12 +91,15 @@ def test_stale_or_tampered_previous_values_fail_closed():
         build_report(payload)
 
 
-@pytest.mark.parametrize("mutation, error", [
-    (lambda p: p["nodes"][2]["dependencies"].append("c"), "CYCLE"),
-    (lambda p: p["nodes"][2]["dependencies"].append("missing"), "MISSING"),
-    (lambda p: p["source_updates"].update({"c": "7"}), "UPDATE_TARGET"),
-    (lambda p: p["nodes"][0].update({"source_value": "NaN"}), "DECIMAL"),
-])
+@pytest.mark.parametrize(
+    "mutation, error",
+    [
+        (lambda p: p["nodes"][2]["dependencies"].append("c"), "CYCLE"),
+        (lambda p: p["nodes"][2]["dependencies"].append("missing"), "MISSING"),
+        (lambda p: p["source_updates"].update({"c": "7"}), "UPDATE_TARGET"),
+        (lambda p: p["nodes"][0].update({"source_value": "NaN"}), "DECIMAL"),
+    ],
+)
 def test_invalid_graphs_fail_closed(mutation, error):
     payload = fixture()
     mutation(payload)
@@ -153,8 +163,7 @@ def test_report_is_non_executable():
 
 def test_source_has_no_connected_or_trading_surface():
     source = (
-        Path(__file__).parents[1]
-        / "scripts/local/phase4dc_incremental_feature_computation.py"
+        Path(__file__).parents[1] / "scripts/local/phase4dc_incremental_feature_computation.py"
     ).read_text()
     for token in (
         "sqlite3",

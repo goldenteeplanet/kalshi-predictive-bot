@@ -121,7 +121,9 @@ def write_phase3bb_r58_weather_selected_window_alignment_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(rows_csv_path, payload["alignment_rows"])
     _write_rows_csv(patch_status_csv_path, payload["patch_status_rows"])
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
@@ -181,7 +183,9 @@ def build_phase3bb_r58_weather_selected_window_alignment(
         output_dir=output_dir,
     )
     metadata["command_arguments"] = {
-        "command": "kalshi-bot phase3bb-r58-weather-selected-window-forecast-feature-alignment-repair",
+        "command": "kalshi-bot phase3bb-r58-weather-selected-window-"
+        "forecast-feature-alignment-repai"
+        "r",
         "argv": command_args or [],
     }
     r57_payload = _read_json(reports_dir / "phase3bb_r57" / "selected_window_weather_pipeline.json")
@@ -205,7 +209,7 @@ def build_phase3bb_r58_weather_selected_window_alignment(
                 "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair "
                 "phase3bb-r57-weather-selected-window-pipeline-speed-repair "
                 "phase3bb-r8-unified-paper-gate forecast; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             per_probe_timeout_seconds,
@@ -223,7 +227,9 @@ def build_phase3bb_r58_weather_selected_window_alignment(
     ]
     results = [runner(probe, target) for probe in probes]
     alignment_payload = _json_from_named_probe(results, "selected_window_alignment")
-    alignment_rows = alignment_payload.get("rows") if isinstance(alignment_payload.get("rows"), list) else []
+    alignment_rows = (
+        alignment_payload.get("rows") if isinstance(alignment_payload.get("rows"), list) else []
+    )
     patch_status = _patch_status()
     summary = _summary(
         selected=selected,
@@ -278,9 +284,18 @@ def build_phase3bb_r58_weather_selected_window_alignment(
 
 
 def _selected_window_from_r57(payload: dict[str, Any]) -> dict[str, Any]:
-    r53 = payload.get("r53_final_payload") or payload.get("r53_after_apply_payload") or payload.get("r53_initial_payload") or {}
+    r53 = (
+        payload.get("r53_final_payload")
+        or payload.get("r53_after_apply_payload")
+        or payload.get("r53_initial_payload")
+        or {}
+    )
     summary = r53.get("summary") if isinstance(r53.get("summary"), dict) else {}
-    rows = payload.get("selected_window_tickers") if isinstance(payload.get("selected_window_tickers"), list) else []
+    rows = (
+        payload.get("selected_window_tickers")
+        if isinstance(payload.get("selected_window_tickers"), list)
+        else []
+    )
     tickers = []
     for row in rows:
         ticker = str(row.get("ticker") or "").strip()
@@ -297,7 +312,11 @@ def _selected_window_from_r57(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _r57_forecast_loop_status(payload: dict[str, Any]) -> dict[str, Any]:
-    rows = payload.get("remote_probe_results") if isinstance(payload.get("remote_probe_results"), list) else []
+    rows = (
+        payload.get("remote_probe_results")
+        if isinstance(payload.get("remote_probe_results"), list)
+        else []
+    )
     probe = next((row for row in rows if row.get("name") == "weather_per_ticker_forecast"), {})
     stdout = str(probe.get("stdout_excerpt") or "")
     forecasted = _extract_count(stdout, "PHASE3BB_R57_FORECASTED_TICKERS")
@@ -322,9 +341,13 @@ def _patch_status() -> dict[str, bool]:
     source = Path(__file__).with_name("phase3bb_r57_weather_selected_window_pipeline.py")
     text = source.read_text(encoding="utf-8") if source.exists() else ""
     return {
-        "r57_passes_selected_tickers_to_pipeline": "selected_tickers=_selected_ticker_values(active_r53)" in text,
-        "r57_forecast_shell_uses_selected_tickers": "selected_tickers = " in text and "PHASE3BB_R57_SELECTED_TICKERS" in text,
-        "r57_no_longer_rediscovers_window_for_forecast": "where (series_ticker = 'KXTEMPNYCH'" not in text,
+        "r57_passes_selected_tickers_to_pipeline": (
+            "selected_tickers=_selected_ticker_values(active_r53)" in text
+        ),
+        "r57_forecast_shell_uses_selected_tickers": "selected_tickers = " in text
+        and "PHASE3BB_R57_SELECTED_TICKERS" in text,
+        "r57_no_longer_rediscovers_window_for_forecast": "where (series_ticker = 'KXTEMPNYCH'"
+        not in text,
     }
 
 
@@ -490,7 +513,8 @@ try:
         ranking = dict(ranking_row) if ranking_row else {}
         market_target = target_from_market(market)
         link_target = link.get("target_time")
-        compare_target = link_target or (market_target.isoformat() if market_target else selected_target_time)
+        compare_target = link_target or (market_target.isoformat() if market_target \
+else selected_target_time)
         feature, feature_distance = nearest(features, compare_target, "target_time")
         source_forecast, source_distance = nearest(source, compare_target, "forecast_time")
         forecast_feature_target = None
@@ -499,16 +523,20 @@ try:
                 forecast_feature_target = json.loads(forecast["feature_json"]).get("target_time")
             except Exception:
                 forecast_feature_target = None
-        feature_aligned = feature is not None and feature_distance is not None and feature_distance <= match_tolerance_hours
-        source_aligned = source_forecast is not None and source_distance is not None and source_distance <= match_tolerance_hours
+        feature_aligned = feature is not None and feature_distance is not None and \
+feature_distance <= match_tolerance_hours
+        source_aligned = source_forecast is not None and source_distance is not None and \
+source_distance <= match_tolerance_hours
         market_selected_aligned = True
         selected_dt = parse_dt(selected_target_time)
         if market_target is not None and selected_dt is not None:
-            market_selected_aligned = abs((market_target - selected_dt).total_seconds()) / 3600 <= match_tolerance_hours
+            market_selected_aligned = abs((market_target - selected_dt).total_seconds()) \
+/ 3600 <= match_tolerance_hours
         link_market_aligned = True
         link_dt = parse_dt(link_target)
         if link_dt is not None and market_target is not None:
-            link_market_aligned = abs((link_dt - market_target).total_seconds()) / 3600 <= match_tolerance_hours
+            link_market_aligned = abs((link_dt - market_target).total_seconds()) \
+/ 3600 <= match_tolerance_hours
         if not market:
             blocker = "MARKET_MISSING"
         elif not market_selected_aligned:
@@ -539,8 +567,10 @@ try:
             "link_target_time": iso(link.get("target_time")),
             "link_detected_at": iso(link.get("detected_at")),
             "snapshot_at": iso(snapshot.get("captured_at")),
-            "source_forecast_time": iso(source_forecast.get("forecast_time") if source_forecast else None),
-            "source_forecast_generated_at": iso(source_forecast.get("forecast_generated_at") if source_forecast else None),
+            "source_forecast_time": iso(source_forecast.get("forecast_time") \
+if source_forecast else None),
+            "source_forecast_generated_at": iso(source_forecast.get("forecast_generated_at") \
+if source_forecast else None),
             "feature_target_time": iso(feature.get("target_time") if feature else None),
             "feature_generated_at": iso(feature.get("generated_at") if feature else None),
             "feature_distance_hours": feature_distance,
@@ -558,7 +588,9 @@ try:
     payload["rows"] = rows
     payload["summary"] = {
         "row_count": len(rows),
-        "feature_aligned_rows": sum(1 for row in rows if row.get("feature_target_time") and row.get("feature_distance_hours") is not None and row["feature_distance_hours"] <= match_tolerance_hours),
+        "feature_aligned_rows": sum(1 for row in rows if row.get("feature_target_time") and \
+row.get("feature_distance_hours") is not None and \
+row["feature_distance_hours"] <= match_tolerance_hours),
         "forecast_rows": sum(1 for row in rows if row.get("forecast_at")),
         "ranking_rows": sum(1 for row in rows if row.get("ranking_at")),
         "positive_ev_aligned_rows": counts.get("POSITIVE_EV_ALIGNED", 0),
@@ -591,7 +623,11 @@ def _summary(
     patch_status: dict[str, bool],
     results: list[RemoteProbeResult],
 ) -> dict[str, Any]:
-    remote_summary = alignment_payload.get("summary") if isinstance(alignment_payload.get("summary"), dict) else {}
+    remote_summary = (
+        alignment_payload.get("summary")
+        if isinstance(alignment_payload.get("summary"), dict)
+        else {}
+    )
     r57_loop = {}
     failed = [result.name for result in results if not result.ok]
     blockers: dict[str, int] = remote_summary.get("blocker_counts") or {}
@@ -653,7 +689,10 @@ def _decision(summary: dict[str, Any]) -> dict[str, Any]:
     elif summary["feature_aligned_rows"] > 0 and summary["forecast_rows"] == 0:
         status = "R57_PATCHED_RERUN_SELECTED_WINDOW_PIPELINE"
         blocker = "FORECAST_MISSING_AFTER_FEATURE_ALIGNMENT"
-        reason = "Selected tickers have aligned feature/source rows, but no weather_v2 forecasts were written."
+        reason = (
+            "Selected tickers have aligned feature/source rows, but no weather_v2 forecasts "
+            "were written."
+        )
         command = (
             "kalshi-bot phase3bb-r57-weather-selected-window-pipeline-speed-repair "
             "--output-dir reports/phase3bb_r57 --reports-dir reports --max-wait-seconds 420 "
@@ -674,12 +713,17 @@ def _decision(summary: dict[str, Any]) -> dict[str, Any]:
         status = "WEATHER_POSITIVE_EV_ALIGNED"
         blocker = "PAPER_GATE_RECHECK"
         reason = "Selected-window rows are aligned and have positive EV; recheck paper gate."
-        command = "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+            "--reports-dir reports"
+        )
         next_step = "Paper-only gate recheck"
     else:
         status = "WEATHER_ALIGNED_EV_NOT_POSITIVE"
         blocker = summary["first_alignment_blocker"]
-        reason = "Selected-window rows are aligned enough to diagnose; no paper-ready EV exists yet."
+        reason = (
+            "Selected-window rows are aligned enough to diagnose; no paper-ready EV exists yet."
+        )
         command = (
             "kalshi-bot phase3bb-r52-weather-ev-fair-value-diagnostic "
             "--output-dir reports/phase3bb_r52 --reports-dir reports"
@@ -768,21 +812,28 @@ def _render_markdown(payload: dict[str, Any]) -> str:
 
 def _render_next_actions(payload: dict[str, Any]) -> str:
     decision = payload["decision"]
-    return "\n".join(
-        [
-            "# Next Actions",
-            "",
-            f"Status: `{decision['status']}`",
-            f"First hard blocker: `{decision['first_hard_blocker']}`",
-            "",
-            "```bash",
-            decision["operator_next_command"],
-            "```",
-            "",
-            "Do not create paper trades or live/demo orders from this phase.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Next Actions",
+                "",
+                f"Status: `{decision['status']}`",
+                f"First hard blocker: `{decision['first_hard_blocker']}`",
+                "",
+                "```bash",
+                decision["operator_next_command"],
+                "```",
+                "",
+                "Do not create paper trades or live/demo orders from this phase.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
-    return "#!/usr/bin/env bash\nset -euo pipefail\n" + payload["decision"]["operator_next_command"] + "\n"
+    return (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + payload["decision"]["operator_next_command"]
+        + "\n"
+    )

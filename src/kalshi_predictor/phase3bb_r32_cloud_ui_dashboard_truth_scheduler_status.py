@@ -197,8 +197,7 @@ def build_phase3bb_r32_cloud_ui_dashboard_truth_scheduler_status(
     )
     metadata["command_arguments"] = {
         "command": (
-            "kalshi-bot "
-            "phase3bb-r32-cloud-ui-dashboard-truth-scheduler-status-verification"
+            "kalshi-bot phase3bb-r32-cloud-ui-dashboard-truth-scheduler-status-verification"
         ),
         "argv": command_args or [],
     }
@@ -421,9 +420,7 @@ def _verification_checks(
         _probe_check(result_by_name, "db_writer_api"),
         _check(
             "ui_db_writer_api_read_only_no_conflict",
-            bool(writer.get("ok"))
-            and bool(writer.get("read_only"))
-            and writer_clear_or_matches_r5,
+            bool(writer.get("ok")) and bool(writer.get("read_only")) and writer_clear_or_matches_r5,
             (
                 f"ok={writer.get('ok')}; read_only={writer.get('read_only')}; "
                 f"status={writer.get('writer_status')}; "
@@ -465,12 +462,8 @@ def _verification_checks(
         ),
         _check(
             "dashboard_workspace_db_fingerprint_matches",
-            bool(guard_fingerprint)
-            and guard_fingerprint in dashboard_fingerprints,
-            (
-                f"workspace_guard={guard_fingerprint}; "
-                f"dashboard={','.join(dashboard_fingerprints)}."
-            ),
+            bool(guard_fingerprint) and guard_fingerprint in dashboard_fingerprints,
+            (f"workspace_guard={guard_fingerprint}; dashboard={','.join(dashboard_fingerprints)}."),
         ),
     ]
 

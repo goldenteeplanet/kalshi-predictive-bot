@@ -36,14 +36,22 @@ def test_prov3_resolves_model_specific_features_without_writes(tmp_path: Path) -
     connection.commit()
     connection.close()
     prov2 = tmp_path / "prov2.json"
-    prov2.write_text(json.dumps({"rows": [
-        {"attribution": {"forecast_id": "forecast:1"}},
-        {"attribution": {"forecast_id": "forecast:2"}},
-    ]}))
+    prov2.write_text(
+        json.dumps(
+            {
+                "rows": [
+                    {"attribution": {"forecast_id": "forecast:1"}},
+                    {"attribution": {"forecast_id": "forecast:2"}},
+                ]
+            }
+        )
+    )
     before = _sha(database)
-    report = json.loads(write_prov3_preview(
-        database_path=database, prov2_report=prov2, output_dir=tmp_path / "out"
-    ).read_text())
+    report = json.loads(
+        write_prov3_preview(
+            database_path=database, prov2_report=prov2, output_dir=tmp_path / "out"
+        ).read_text()
+    )
     assert _sha(database) == before
     assert report["summary"]["feature_relations_resolved"] == 2
     assert report["summary"]["snapshot_relations_resolved"] == 2
@@ -65,12 +73,15 @@ def test_prov3_does_not_infer_missing_ranking_or_observation_ids(tmp_path: Path)
           '{"crypto_feature_id":10}');
         INSERT INTO crypto_features VALUES(10,'2026-07-16 16:01:00','{}');
     """)
-    connection.commit(); connection.close()
+    connection.commit()
+    connection.close()
     prov2 = tmp_path / "prov2.json"
     prov2.write_text(json.dumps({"rows": [{"attribution": {"forecast_id": "forecast:1"}}]}))
-    row = json.loads(write_prov3_preview(
-        database_path=database, prov2_report=prov2, output_dir=tmp_path / "out"
-    ).read_text())["rows"][0]
+    row = json.loads(
+        write_prov3_preview(
+            database_path=database, prov2_report=prov2, output_dir=tmp_path / "out"
+        ).read_text()
+    )["rows"][0]
     assert "RANKING_NOT_PERSISTED" in row["blockers"]
     assert "SOURCE_OBSERVATION_ID_NOT_PERSISTED" in row["blockers"]
     assert "MODEL_VERSION_NOT_PERSISTED" in row["blockers"]

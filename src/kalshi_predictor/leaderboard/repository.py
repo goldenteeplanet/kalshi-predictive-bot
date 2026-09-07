@@ -48,4 +48,3 @@ def latest_leaderboard_rows(session: Session, *, limit: int = 50) -> list[ModelL
 
 def _decimal_string(value: Any) -> str | None:
     return decimal_to_str(value)
-

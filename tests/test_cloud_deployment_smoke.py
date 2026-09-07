@@ -29,9 +29,7 @@ def test_cloud_deployment_smoke_is_read_only_and_checks_runtime_ownership() -> N
 
 def test_gh4_rehearsal_is_local_and_simulated() -> None:
     root = Path(__file__).parents[1]
-    script = (root / "scripts/local/gh4-paper-lifecycle-rehearsal.sh").read_text(
-        encoding="utf-8"
-    )
+    script = (root / "scripts/local/gh4-paper-lifecycle-rehearsal.sh").read_text(encoding="utf-8")
 
     assert "tests/test_phase_gh4.py" in script
     assert "tests/test_paper_strategy.py" in script

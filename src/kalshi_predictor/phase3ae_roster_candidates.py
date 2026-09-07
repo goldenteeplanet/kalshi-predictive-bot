@@ -162,9 +162,7 @@ def build_phase3ae_roster_candidate_diagnostics(
     clean_candidates = [
         row for row in rows if row["upgrade_candidate_status"] == CLEAN_PHASE3AE_CANDIDATE
     ]
-    blockers = [
-        row for row in rows if row["upgrade_candidate_status"] != CLEAN_PHASE3AE_CANDIDATE
-    ]
+    blockers = [row for row in rows if row["upgrade_candidate_status"] != CLEAN_PHASE3AE_CANDIDATE]
     blockers_by_reason = _blockers_by_reason(rows)
     blocked_tickers = {
         str(row["ticker"])
@@ -172,9 +170,7 @@ def build_phase3ae_roster_candidate_diagnostics(
         if NO_VERIFIED_ROSTER_PLAYER_MENTIONED in row["rejection_reasons"]
     }
     mixed_sport_tickers = {
-        str(row["ticker"])
-        for row in rows
-        if MIXED_SPORT_PLAYER_LEGS in row["rejection_reasons"]
+        str(row["ticker"]) for row in rows if MIXED_SPORT_PLAYER_LEGS in row["rejection_reasons"]
     }
     return {
         "generated_at": utc_now().isoformat(),
@@ -374,9 +370,7 @@ def _diagnose_link(
         entity for entity in target_player_prop_entities if _is_non_player_roster_entity(entity)
     ]
     target_player_prop_entities = [
-        entity
-        for entity in target_player_prop_entities
-        if not _is_non_player_roster_entity(entity)
+        entity for entity in target_player_prop_entities if not _is_non_player_roster_entity(entity)
     ]
     cross_sport_entities = [
         {
@@ -1271,8 +1265,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     lines.extend(["", "## Blockers By Reason", ""])
     for row in payload["blockers_by_reason"][:20]:
         lines.append(
-            f"- {row['reason']}: {row['count']} "
-            f"(examples: {', '.join(row['example_tickers'])})"
+            f"- {row['reason']}: {row['count']} (examples: {', '.join(row['example_tickers'])})"
         )
     if not payload["blockers_by_reason"]:
         lines.append("- none")

@@ -75,9 +75,9 @@ def build_offline_provenance_triage(report: Mapping[str, Any]) -> dict[str, Any]
             "rows_examined": len(rows),
             "failed_rows": sum(bool(row.get("failures")) for row in rows),
             "distinct_causes": len(cause_counts),
-            "distinct_affected_tickers": len([
-                ticker for ticker in ticker_counts if ticker != "UNKNOWN"
-            ]),
+            "distinct_affected_tickers": len(
+                [ticker for ticker in ticker_counts if ticker != "UNKNOWN"]
+            ),
         },
         "groups": {
             "by_cause": dict(sorted(cause_counts.items())),

@@ -63,9 +63,7 @@ def normalize_cycle_evidence(raw: dict[str, Any]) -> dict[str, Any]:
         "memory_current_bytes": _integer(
             systemd.get("MemoryCurrent", raw.get("memory_current_bytes"))
         ),
-        "memory_peak_bytes": _integer(
-            systemd.get("MemoryPeak", raw.get("memory_peak_bytes"))
-        ),
+        "memory_peak_bytes": _integer(systemd.get("MemoryPeak", raw.get("memory_peak_bytes"))),
         "memory_events": memory_events,
         "r3_heartbeat_max_age_seconds": _number(raw.get("r3_heartbeat_max_age_seconds")),
         "r5_heartbeat_max_age_seconds": _number(raw.get("r5_heartbeat_max_age_seconds")),
@@ -199,8 +197,7 @@ def run_census(
             else "WAIT_FOR_NEXT_DISTINCT_CYCLE"
         ),
         "next_phase": (
-            "R5-RECOVERY-6B Preview — Scheduler Rollback and Failed-Cycle "
-            "Quarantine Certification"
+            "R5-RECOVERY-6B Preview — Scheduler Rollback and Failed-Cycle Quarantine Certification"
         ),
     }
     report["report_sha256"] = hashlib.sha256(_canonical(report).encode("utf-8")).hexdigest()

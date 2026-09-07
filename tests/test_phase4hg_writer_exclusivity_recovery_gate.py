@@ -42,9 +42,7 @@ def test_zero_multiple_and_unexpected_writers_are_denied() -> None:
 
 
 def test_exact_freshness_boundary_passes_and_older_is_stale() -> None:
-    exact = evaluate_writer_exclusivity_recovery_gate(
-        _scheduler(age=120), _inventory(age=120)
-    )
+    exact = evaluate_writer_exclusivity_recovery_gate(_scheduler(age=120), _inventory(age=120))
     assert exact.status == "PASSED"
     stale = evaluate_writer_exclusivity_recovery_gate(_scheduler(), _inventory(age=121))
     assert stale.status == "STALE"
@@ -52,9 +50,7 @@ def test_exact_freshness_boundary_passes_and_older_is_stale() -> None:
 
 
 def test_incomplete_and_identity_mismatch_fail_closed() -> None:
-    incomplete = evaluate_writer_exclusivity_recovery_gate(
-        _scheduler(), _inventory(complete=False)
-    )
+    incomplete = evaluate_writer_exclusivity_recovery_gate(_scheduler(), _inventory(complete=False))
     assert incomplete.status == "INCOMPLETE"
     mismatch = evaluate_writer_exclusivity_recovery_gate(
         _scheduler(), _inventory(authoritative="other.service")

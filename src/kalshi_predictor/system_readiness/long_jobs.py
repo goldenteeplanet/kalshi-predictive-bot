@@ -22,18 +22,9 @@ POST_REFRESH_COMMANDS = (
     ),
     "kalshi-bot phase3bb-domain-readiness --output-dir reports/phase3bb",
     "kalshi-bot phase3bb-r2-general-candidate-routing --output-dir reports/phase3bb_r2",
-    (
-        "kalshi-bot phase3bb-r2-general-source-intake "
-        "--output-dir reports/phase3bb_r2_sources"
-    ),
-    (
-        "kalshi-bot phase3bb-r2-general-source-evidence "
-        "--output-dir reports/phase3bb_r2_sources"
-    ),
-    (
-        "kalshi-bot phase3bb-r2-general-source-availability "
-        "--output-dir reports/phase3bb_r2_sources"
-    ),
+    ("kalshi-bot phase3bb-r2-general-source-intake --output-dir reports/phase3bb_r2_sources"),
+    ("kalshi-bot phase3bb-r2-general-source-evidence --output-dir reports/phase3bb_r2_sources"),
+    ("kalshi-bot phase3bb-r2-general-source-availability --output-dir reports/phase3bb_r2_sources"),
     "kalshi-bot phase3bb-r3-general-reclassification --output-dir reports/phase3bb_r3",
     "kalshi-bot phase3az-gap-analysis --output-dir reports/phase3az --reports-dir reports",
     (
@@ -81,9 +72,7 @@ def build_long_job_monitor(
     )
     generated_at = utc_now()
     expected_finish_at = (
-        (generated_at.timestamp() + remaining_seconds)
-        if remaining_seconds is not None
-        else None
+        (generated_at.timestamp() + remaining_seconds) if remaining_seconds is not None else None
     )
     hook = _post_refresh_hook_status(output_dir=output_dir, phase_running=phase_running)
     progress_percent = _progress_percent(

@@ -15,8 +15,15 @@ INPUT_SCHEMA = "phase4bu.timestamp-evidence-input.v1"
 SCHEMA = "phase4bu.timestamp-harmonization.v1"
 PROOF_SCHEMA = "phase4bu.timestamp-precision-proof.v1"
 STAGES = (
-    "COLLECTION", "SNAPSHOT", "FORECAST", "RANKING", "POSITION_SIZING",
-    "ADVANCED_RISK", "APPROVAL", "PAPER_ROUTING", "OBSERVABILITY",
+    "COLLECTION",
+    "SNAPSHOT",
+    "FORECAST",
+    "RANKING",
+    "POSITION_SIZING",
+    "ADVANCED_RISK",
+    "APPROVAL",
+    "PAPER_ROUTING",
+    "OBSERVABILITY",
 )
 REQUIRED_FRACTION_DIGITS = 6
 MAX_DURATION_NS = 86_400_000_000_000
@@ -59,8 +66,13 @@ def build(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     if not isinstance(rows, list) or stages != list(STAGES):
         raise ValueError("PHASE4BU_STAGE_COVERAGE_OR_ORDER_INVALID")
     expected = {
-        "stage", "wall_started_at", "wall_ended_at", "monotonic_started_ns",
-        "monotonic_ended_ns", "declared_fraction_digits", "evidence_hash",
+        "stage",
+        "wall_started_at",
+        "wall_ended_at",
+        "monotonic_started_ns",
+        "monotonic_ended_ns",
+        "declared_fraction_digits",
+        "evidence_hash",
     }
     normalized: list[dict[str, Any]] = []
     previous_wall: datetime | None = None
@@ -97,16 +109,18 @@ def build(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
             raise ValueError("PHASE4BU_WALL_MONOTONIC_DURATION_MISMATCH")
         if not isinstance(row["evidence_hash"], str) or len(row["evidence_hash"]) != 64:
             raise ValueError("PHASE4BU_EVIDENCE_HASH_INVALID")
-        normalized.append({
-            "stage": row["stage"],
-            "wall_started_at_utc": _canonical(started),
-            "wall_ended_at_utc": _canonical(ended),
-            "monotonic_started_ns": mono_start,
-            "monotonic_ended_ns": mono_end,
-            "duration_ns": monotonic_duration,
-            "fraction_digits": REQUIRED_FRACTION_DIGITS,
-            "evidence_hash": row["evidence_hash"],
-        })
+        normalized.append(
+            {
+                "stage": row["stage"],
+                "wall_started_at_utc": _canonical(started),
+                "wall_ended_at_utc": _canonical(ended),
+                "monotonic_started_ns": mono_start,
+                "monotonic_ended_ns": mono_end,
+                "duration_ns": monotonic_duration,
+                "fraction_digits": REQUIRED_FRACTION_DIGITS,
+                "evidence_hash": row["evidence_hash"],
+            }
+        )
         previous_wall, previous_monotonic = ended, mono_end
     harmonized: dict[str, Any] = {
         "schema": SCHEMA,

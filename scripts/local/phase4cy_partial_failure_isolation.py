@@ -84,7 +84,8 @@ def build_report(payload: dict[str, Any]) -> dict[str, Any]:
         if compound_key in market_failures:
             reasons.append("MARKET_FAILURE")
         failed_pages = sorted(
-            page for failed_source, failed_market, page in page_failures
+            page
+            for failed_source, failed_market, page in page_failures
             if failed_source == source and failed_market == market
         )
         if failed_pages:

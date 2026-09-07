@@ -180,16 +180,10 @@ def run_phase3ah_r2_backfill(
         "curated_roster_rows_available": len(CURATED_ROSTER_EVIDENCE),
         "curated_roster_rows_applied": len(applied_rows),
         "verified_roster_rows_before": before_verified,
-        "verified_roster_rows_after": verification_payload["summary"][
-            "verified_roster_rows"
-        ],
+        "verified_roster_rows_after": verification_payload["summary"]["verified_roster_rows"],
         "rework_rows_after": verification_payload["summary"]["rework_rows"],
-        "schedule_fetches_run": len(schedule_result["league_results"])
-        if schedule_result
-        else 0,
-        "schedules_ingested": int(
-            schedule_result["summary"].get("games_inserted") or 0
-        )
+        "schedule_fetches_run": len(schedule_result["league_results"]) if schedule_result else 0,
+        "schedules_ingested": int(schedule_result["summary"].get("games_inserted") or 0)
         if schedule_result
         else 0,
         "auto_upgrades_created": 0,
@@ -270,8 +264,7 @@ def write_phase3ah_r2_backfill_report(
         updated_roster_template_path=roster_template_path,
         roster_verification_json_path=roster_output_dir
         / "phase3ah_roster_participant_verification.json",
-        verified_roster_evidence_path=roster_output_dir
-        / "phase3ah_verified_roster_evidence.json",
+        verified_roster_evidence_path=roster_output_dir / "phase3ah_verified_roster_evidence.json",
     )
 
 
@@ -384,12 +377,16 @@ def _applied_row(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _is_verified_row(row: dict[str, Any]) -> bool:
-    return str(row.get("review_status") or "").upper() in {
-        "APPROVED",
-        "READY",
-        "REVIEWED_VERIFIED",
-        "VERIFIED",
-    } and row.get("safe_to_apply") is True
+    return (
+        str(row.get("review_status") or "").upper()
+        in {
+            "APPROVED",
+            "READY",
+            "REVIEWED_VERIFIED",
+            "VERIFIED",
+        }
+        and row.get("safe_to_apply") is True
+    )
 
 
 def _norm(value: object) -> str:
@@ -423,8 +420,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     lines.extend(["", "## Applied Roster Evidence", ""])
     for row in payload["applied_roster_rows"]:
         lines.append(
-            f"- {row['player_name']} -> {row['current_team_key']} "
-            f"({row['roster_source_url']})"
+            f"- {row['player_name']} -> {row['current_team_key']} ({row['roster_source_url']})"
         )
     if not payload["applied_roster_rows"]:
         lines.append("- none")

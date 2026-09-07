@@ -331,9 +331,7 @@ def test_crypto_v2_uses_yes_bid_as_explicit_lower_bound_without_midpoint(tmp_pat
         assert forecast is not None
         assert forecast.yes_probability == Decimal("0.44")
         assert forecast.market_mid_probability is None
-        assert forecast.feature_json["market_price_basis"] == (
-            "EXECUTABLE_YES_BID_LOWER_BOUND"
-        )
+        assert forecast.feature_json["market_price_basis"] == ("EXECUTABLE_YES_BID_LOWER_BOUND")
         assert forecast.feature_json["market_probability_bounds"] == {
             "lower": "0.40",
             "upper": "1",
@@ -444,9 +442,7 @@ def test_crypto_backtest_handles_no_evaluated_trades(tmp_path) -> None:
 
 def test_crypto_backtest_never_uses_post_forecast_snapshot() -> None:
     root = Path(__file__).parents[1]
-    implementation = (root / "src/kalshi_predictor/crypto/backtest.py").read_text(
-        encoding="utf-8"
-    )
+    implementation = (root / "src/kalshi_predictor/crypto/backtest.py").read_text(encoding="utf-8")
 
     assert "MarketSnapshot.captured_at <= forecast.forecasted_at" in implementation
 

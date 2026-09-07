@@ -37,9 +37,9 @@ def build_liquidity_boundary_sweep(
         for spread in spreads:
             for depth in top_five_depths:
                 rows.append(_evaluate(ticker, spread, depth))
-    rows.sort(key=lambda row: (
-        row["ticker"], Decimal(row["spread"]), Decimal(row["top_five_depth"])
-    ))
+    rows.sort(
+        key=lambda row: (row["ticker"], Decimal(row["spread"]), Decimal(row["top_five_depth"]))
+    )
     boundaries = [_ticker_boundaries(ticker, rows, spreads, top_five_depths) for ticker in YES_BIDS]
     canonical = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
     return {
@@ -63,9 +63,7 @@ def build_liquidity_boundary_sweep(
             "rows": len(rows),
             "allocated": sum(row["status"] == "ALLOCATED" for row in rows),
             "edge_blocked": sum(row["blocker"] == "EDGE_NOT_POSITIVE" for row in rows),
-            "liquidity_blocked": sum(
-                row["blocker"] == "INSUFFICIENT_LIQUIDITY" for row in rows
-            ),
+            "liquidity_blocked": sum(row["blocker"] == "INSUFFICIENT_LIQUIDITY" for row in rows),
             "partial_fills": sum(row["fill_state"] == "PARTIAL" for row in rows),
             "full_fills": sum(row["fill_state"] == "FULL" for row in rows),
             "all_attribution_complete": all(row["attribution_complete"] for row in rows),
@@ -85,7 +83,9 @@ def write_liquidity_boundary_sweep(output_dir: Path) -> Path:
 
 
 def _evaluate(
-    ticker: str, spread: Decimal, top_five_depth: Decimal,
+    ticker: str,
+    spread: Decimal,
+    top_five_depth: Decimal,
     forecast: Decimal | None = None,
 ) -> dict[str, Any]:
     selected_forecast = forecast if forecast is not None else BASELINE_FORECASTS[ticker]
@@ -110,9 +110,7 @@ def _evaluate(
             blocker = "INSUFFICIENT_LIQUIDITY"
     status = "ALLOCATED" if blocker is None else "REJECTED"
     filled = quote.filled_size if quote else Decimal("0")
-    fill_state = (
-        "NONE" if filled == 0 else "FULL" if filled >= requested_size else "PARTIAL"
-    )
+    fill_state = "NONE" if filled == 0 else "FULL" if filled >= requested_size else "PARTIAL"
     attribution = SYNTHETIC_ATTRIBUTION[ticker]
     return {
         "ticker": ticker,
@@ -140,9 +138,10 @@ def _evaluate(
             **attribution["orderbook_ref"],
             "scenario": f"spread={spread}|depth={top_five_depth}",
         },
-        "attribution_complete": all(attribution.get(field) for field in (
-            "feature_ref", "observation_ref", "orderbook_ref", "model_version"
-        )),
+        "attribution_complete": all(
+            attribution.get(field)
+            for field in ("feature_ref", "observation_ref", "orderbook_ref", "model_version")
+        ),
     }
 
 
@@ -173,14 +172,16 @@ def _ticker_boundaries(
     minimum_depth_by_spread = {}
     for spread in spreads:
         allocated = [
-            Decimal(row["top_five_depth"]) for row in selected
+            Decimal(row["top_five_depth"])
+            for row in selected
             if Decimal(row["spread"]) == spread and row["status"] == "ALLOCATED"
         ]
         minimum_depth_by_spread[str(spread)] = str(min(allocated)) if allocated else None
     maximum_spread_by_depth = {}
     for depth in depths:
         allocated = [
-            Decimal(row["spread"]) for row in selected
+            Decimal(row["spread"])
+            for row in selected
             if Decimal(row["top_five_depth"]) == depth and row["status"] == "ALLOCATED"
         ]
         maximum_spread_by_depth[str(depth)] = str(max(allocated)) if allocated else None

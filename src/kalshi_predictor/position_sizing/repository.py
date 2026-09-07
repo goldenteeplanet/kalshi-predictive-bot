@@ -56,9 +56,7 @@ def insert_position_sizing_decision(
         executed_contracts=decision.executed_contracts,
         factor_scores_json=encode_json(decision.factor_scores),
         factor_weights_json=encode_json(decision.factor_weights),
-        adjusted_historical_accuracy=(
-            decimal_to_str(decision.adjusted_historical_accuracy) or "0"
-        ),
+        adjusted_historical_accuracy=(decimal_to_str(decision.adjusted_historical_accuracy) or "0"),
         historical_sample_size=decision.historical_sample_size,
         drawdown_utilization=decimal_to_str(decision.drawdown_utilization) or "0",
         caps_json=encode_json(decision.caps),

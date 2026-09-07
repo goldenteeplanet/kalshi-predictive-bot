@@ -353,10 +353,7 @@ def _seed_no_liquidity_opportunity(session_factory) -> None:
 def _seed_multileg_opportunity(session_factory) -> None:
     with session_factory() as session:
         captured_at = utc_now()
-        title = (
-            "yes Mexico,"
-            "yes Bosnia and Herzegovina wins by more than 1.5 goals"
-        )
+        title = "yes Mexico,yes Bosnia and Herzegovina wins by more than 1.5 goals"
         snapshot = insert_market_snapshot(
             session,
             {

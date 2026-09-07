@@ -121,7 +121,9 @@ def test_cushman_unavailable_remains_not_link_or_forecast_safe(tmp_path, monkeyp
     assert cushman["forecast_safe"] is False
 
 
-def test_flightaware_ready_for_review_remains_not_link_or_forecast_safe(tmp_path, monkeypatch) -> None:
+def test_flightaware_ready_for_review_remains_not_link_or_forecast_safe(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     with _session(tmp_path) as session:
         payload = phase3an.build_phase3an_general_sources_status(session)
@@ -319,12 +321,8 @@ def test_economic_news_handoff_reports_current_link_parser_backfill(tmp_path, mo
     assert payload["summary"]["economic_exact_linked_current_without_parsed_leg"] == 1
     assert handoff["counts"]["exact_linked_current_without_parsed_leg"] == 1
     assert handoff["first_blocker"] == "CURRENT_EXACT_LINKS_NEED_PARSER_BACKFILL"
-    assert handoff["link_only_rows"][0]["reason_codes"] == [
-        "CURRENT_EXACT_LINK_WITHOUT_PARSED_LEG"
-    ]
-    assert payload["summary"]["first_hard_blocker"] == (
-        "CURRENT_EXACT_LINKS_NEED_PARSER_BACKFILL"
-    )
+    assert handoff["link_only_rows"][0]["reason_codes"] == ["CURRENT_EXACT_LINK_WITHOUT_PARSED_LEG"]
+    assert payload["summary"]["first_hard_blocker"] == ("CURRENT_EXACT_LINKS_NEED_PARSER_BACKFILL")
     assert payload["summary"]["compatibility_status"] == "PARSER_BACKFILL_REQUIRED"
     assert payload["summary"]["source_freshness"] == "CONTEXT_READY"
     assert payload["summary"]["next_registered_command"] == (
@@ -356,9 +354,7 @@ def test_economic_news_watch_writes_registered_next_actions(
     payload = json.loads(artifacts.json_path.read_text(encoding="utf-8"))
     next_actions = (output_dir / "NEXT_ACTIONS.md").read_text(encoding="utf-8")
 
-    assert payload["summary"]["first_hard_blocker"] == (
-        "CURRENT_EXACT_LINKS_NEED_PARSER_BACKFILL"
-    )
+    assert payload["summary"]["first_hard_blocker"] == ("CURRENT_EXACT_LINKS_NEED_PARSER_BACKFILL")
     assert "phase3an-economic-news-parser-backfill-plan" in next_actions
     assert "Do not force links" in next_actions
     assert (output_dir / "ECONOMIC_NEWS_WATCH.md").exists()
@@ -985,7 +981,10 @@ def test_dashboard_consumes_specific_status_reason_codes(tmp_path, monkeypatch) 
         Path("reports/phase3an/phase3an_dashboard_status.json"),
         {
             "summary": {
-                "crypto_watch": {"status": "RUNNING_CYCLE_OVERDUE", "next_action": "Inspect slow stage"},
+                "crypto_watch": {
+                    "status": "RUNNING_CYCLE_OVERDUE",
+                    "next_action": "Inspect slow stage",
+                },
                 "paper_funnel": {
                     "first_hard_blocker": "NO_POSITIVE_RAW_EV",
                     "top_reason": ["NO_POSITIVE_RAW_EV", 2000],
@@ -1003,7 +1002,11 @@ def test_dashboard_consumes_specific_status_reason_codes(tmp_path, monkeypatch) 
                     "source_evidence_ready_rows": 0,
                 },
                 "phase3bb_r2": {"evidence_ready_rows": 0, "source_blocker": "Resolve source"},
-                "sports": {"placeholder_rows": 2, "partial_provenance_markets": 1, "reason_codes": ["ROUND_PLACEHOLDER"]},
+                "sports": {
+                    "placeholder_rows": 2,
+                    "partial_provenance_markets": 1,
+                    "reason_codes": ["ROUND_PLACEHOLDER"],
+                },
                 "economic_news": {
                     "blocker_reason": "WAITING_FOR_COMPATIBLE_MARKETS",
                     "economic_compatible_parsed_markets": 0,
@@ -1426,9 +1429,7 @@ def _write_general_source_activation_reports(tmp_path) -> None:
                 "accepted_date_stable_evidence_rows": 0,
                 "date_stable_evidence_status": "NOT_FOUND",
                 "source_value_available_for_review": True,
-                "first_hard_blocker": (
-                    "OFFICIAL_FLIGHTAWARE_HISTORICAL_AGGREGATE_UNAVAILABLE"
-                ),
+                "first_hard_blocker": ("OFFICIAL_FLIGHTAWARE_HISTORICAL_AGGREGATE_UNAVAILABLE"),
                 "link_safe_rows": 0,
                 "forecast_safe_rows": 0,
                 "next_action": "External FlightAware historical aggregate access is required.",

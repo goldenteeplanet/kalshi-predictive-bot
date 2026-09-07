@@ -141,7 +141,9 @@ def write_phase3bb_r53_weather_current_window_cadence_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(rows_csv_path, payload["window_rows"], WINDOW_ROW_FIELDS)
     _write_rows_csv(checks_csv_path, payload["cadence_checks"])
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
@@ -207,7 +209,8 @@ def build_phase3bb_r53_weather_current_window_cadence(
         output_dir=output_dir,
     )
     metadata["command_arguments"] = {
-        "command": "kalshi-bot phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair",
+        "command": "kalshi-bot phase3bb-r53-weather-current-window-c"
+        "adence-preview-narrowing-repair",
         "argv": command_args or [],
     }
     r11_context = _read_json(reports_dir / "phase3bb_r11" / "codex_cloud_context.json")
@@ -299,7 +302,9 @@ def _probes(
 ) -> list[RemoteProbe]:
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
         RemoteProbe("db_writer_monitor", writer_cmd, timeout_seconds),
@@ -315,14 +320,15 @@ def _probes(
                 "phase3bb-r51-weather-ranking-path-repair "
                 "phase3bb-r52-weather-ev-fair-value-diagnostic "
                 "phase3bb-r8-unified-paper-gate; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
         ),
         RemoteProbe(
             "r12_preview_json",
-            f"cd {app} && cat reports/phase3az_r12_weather/weather_activation_preview.json 2>/dev/null || true",
+            f"cd {app} && cat reports/phase3az_r12_weather/wea"
+            f"ther_activation_preview.json 2>/dev/null || true",
             timeout_seconds,
         ),
         RemoteProbe(
@@ -480,7 +486,8 @@ try:
         from markets
         where (series_ticker = ? or ticker like ?)
           and (status is null or lower(status) not in ('closed','settled','expired','inactive'))
-        order by close_time desc, expected_expiration_time desc, expiration_time desc, ticker asc
+        order by close_time desc, expected_expiration_time desc, expiration_time desc, \
+ticker asc
         limit ?
         ''',
         (series_ticker, series_ticker + "%", limit),
@@ -492,10 +499,13 @@ try:
             continue
         market["target_time"] = iso(target_time)
         markets.append(market)
-    future_markets = [market for market in markets if parse_dt(market.get("target_time")) and parse_dt(market.get("target_time")) >= now]
-    future_times = sorted({{target_key(market.get("target_time")) for market in future_markets if target_key(market.get("target_time"))}})
+    future_markets = [market for market in markets if \
+parse_dt(market.get("target_time")) and parse_dt(market.get("target_time")) >= now]
+    future_times = sorted({{target_key(market.get("target_time")) for market in \
+future_markets if target_key(market.get("target_time"))}})
     selected_target = future_times[0] if future_times else None
-    selected_markets = [market for market in future_markets if selected_target and target_key(market.get("target_time")) == selected_target]
+    selected_markets = [market for market in future_markets if selected_target and \
+target_key(market.get("target_time")) == selected_target]
     tickers = [str(market.get("ticker")) for market in selected_markets if market.get("ticker")]
 
     links = {{}}
@@ -583,17 +593,23 @@ try:
         forecast = forecasts.get(ticker)
         ranking = rankings.get(ticker)
         row_location = str((link or {{}}).get("location_key") or location_key)
-        feature = nearest_time(features_by_location.get(row_location, []), target_time, "target_time", "generated_at")
-        source = nearest_time(source_by_location.get(row_location, []), target_time, "forecast_time", "forecast_generated_at")
+        feature = nearest_time(features_by_location.get(row_location, []), target_time, \
+"target_time", "generated_at")
+        source = nearest_time(source_by_location.get(row_location, []), target_time, \
+"forecast_time", "forecast_generated_at")
         snapshot_at = snapshot.get("captured_at") if snapshot else None
         forecast_at = forecast.get("forecasted_at") if forecast else None
         ranking_at = ranking.get("ranked_at") if ranking else None
         snapshot_dt = parse_dt(snapshot_at)
         forecast_dt = parse_dt(forecast_at)
         ranking_dt = parse_dt(ranking_at)
-        snapshot_fresh = snapshot_dt is not None and (now - snapshot_dt).total_seconds() / 60 <= snapshot_fresh_minutes
-        source_fresh = source is not None and parse_dt(source.get("forecast_generated_at")) is not None and parse_dt(source.get("forecast_generated_at")) >= fresh_since
-        feature_fresh = feature is not None and parse_dt(feature.get("generated_at")) is not None and parse_dt(feature.get("generated_at")) >= fresh_since
+        snapshot_fresh = snapshot_dt is not None and (now - \
+snapshot_dt).total_seconds() / 60 <= snapshot_fresh_minutes
+        source_fresh = source is not None and \
+parse_dt(source.get("forecast_generated_at")) is not None and \
+parse_dt(source.get("forecast_generated_at")) >= fresh_since
+        feature_fresh = feature is not None and parse_dt(feature.get("generated_at")) \
+is not None and parse_dt(feature.get("generated_at")) >= fresh_since
         has_current_forecast = bool(forecast_dt and snapshot_dt and forecast_dt >= snapshot_dt)
         has_current_ranking = bool(ranking_dt and forecast_dt and ranking_dt >= forecast_dt)
         link_target_matches = bool(link and within_window(link.get("target_time"), target_time))
@@ -647,12 +663,15 @@ try:
             "has_current_ranking": has_current_ranking,
             "latest_ranking_at": ranking_at,
             "estimated_edge": dstr(edge),
-            "opportunity_score": dstr(dec(ranking.get("opportunity_score")) if ranking else None),
+            "opportunity_score": dstr(dec(ranking.get("opportunity_score")) if ranking \
+else None),
             "first_window_blocker": blocker,
         }})
 
-    expired_markets = [market for market in markets if parse_dt(market.get("target_time")) and parse_dt(market.get("target_time")) < now]
-    latest_expired_target = max((parse_dt(market.get("target_time")) for market in expired_markets), default=None)
+    expired_markets = [market for market in markets if \
+parse_dt(market.get("target_time")) and parse_dt(market.get("target_time")) < now]
+    latest_expired_target = max((parse_dt(market.get("target_time")) for market in \
+expired_markets), default=None)
     payload["ok"] = True
     payload["selected_target_time"] = selected_target
     payload["rows"] = rows
@@ -670,18 +689,24 @@ try:
         "selected_target_time": selected_target,
         "selected_minutes_until_target": selected_minutes,
         "selected_window_market_rows": len(rows),
-        "selected_window_linked_rows": sum(1 for row in rows if row["has_link"] and row["link_target_matches_window"]),
+        "selected_window_linked_rows": sum(1 for row in rows if row["has_link"] and \
+row["link_target_matches_window"]),
         "selected_window_missing_link_rows": sum(1 for row in rows if not row["has_link"]),
-        "selected_window_stale_link_rows": sum(1 for row in rows if row["has_link"] and not row["link_target_matches_window"]),
+        "selected_window_stale_link_rows": sum(1 for row in rows if row["has_link"] and \
+not row["link_target_matches_window"]),
         "selected_window_snapshot_rows": sum(1 for row in rows if row["has_snapshot"]),
         "selected_window_fresh_snapshot_rows": sum(1 for row in rows if row["snapshot_fresh"]),
-        "selected_window_source_forecast_rows": sum(1 for row in rows if row["has_source_forecast"]),
+        "selected_window_source_forecast_rows": sum(1 for row in rows if \
+row["has_source_forecast"]),
         "selected_window_feature_rows": sum(1 for row in rows if row["has_weather_feature"]),
         "selected_window_forecast_rows": sum(1 for row in rows if row["has_current_forecast"]),
         "selected_window_ranking_rows": sum(1 for row in rows if row["has_current_ranking"]),
-        "selected_window_positive_ev_rows": sum(1 for row in rows if row["first_window_blocker"] == "POSITIVE_EV_READY_FOR_PAPER_GATE"),
-        "selected_window_non_positive_ev_rows": sum(1 for row in rows if row["first_window_blocker"] == "EV_NOT_POSITIVE"),
-        "selected_window_too_close_to_expiry": selected_minutes is not None and selected_minutes < min_minutes_before_target,
+        "selected_window_positive_ev_rows": sum(1 for row in rows if \
+row["first_window_blocker"] == "POSITIVE_EV_READY_FOR_PAPER_GATE"),
+        "selected_window_non_positive_ev_rows": sum(1 for row in rows if \
+row["first_window_blocker"] == "EV_NOT_POSITIVE"),
+        "selected_window_too_close_to_expiry": selected_minutes is not None and \
+selected_minutes < min_minutes_before_target,
         "first_window_blocker_counts": dict(sorted(blocker_counts.items())),
     }}
 except Exception as exc:
@@ -715,7 +740,9 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         "state_ok": bool(state.get("ok")),
         "state_error": state.get("error"),
         "r12_preview_available": bool(r12_preview),
-        "r12_preview_summary": r12_preview.get("summary") if isinstance(r12_preview.get("summary"), dict) else {},
+        "r12_preview_summary": r12_preview.get("summary")
+        if isinstance(r12_preview.get("summary"), dict)
+        else {},
         "state_summary": summary,
         "audit": audit,
         "window_rows": rows,
@@ -742,17 +769,31 @@ def _summary(parsed: dict[str, Any]) -> dict[str, Any]:
         "selected_minutes_until_target": state.get("selected_minutes_until_target"),
         "selected_window_market_rows": _int_or_zero(state.get("selected_window_market_rows")),
         "selected_window_linked_rows": _int_or_zero(state.get("selected_window_linked_rows")),
-        "selected_window_missing_link_rows": _int_or_zero(state.get("selected_window_missing_link_rows")),
-        "selected_window_stale_link_rows": _int_or_zero(state.get("selected_window_stale_link_rows")),
+        "selected_window_missing_link_rows": _int_or_zero(
+            state.get("selected_window_missing_link_rows")
+        ),
+        "selected_window_stale_link_rows": _int_or_zero(
+            state.get("selected_window_stale_link_rows")
+        ),
         "selected_window_snapshot_rows": _int_or_zero(state.get("selected_window_snapshot_rows")),
-        "selected_window_fresh_snapshot_rows": _int_or_zero(state.get("selected_window_fresh_snapshot_rows")),
-        "selected_window_source_forecast_rows": _int_or_zero(state.get("selected_window_source_forecast_rows")),
+        "selected_window_fresh_snapshot_rows": _int_or_zero(
+            state.get("selected_window_fresh_snapshot_rows")
+        ),
+        "selected_window_source_forecast_rows": _int_or_zero(
+            state.get("selected_window_source_forecast_rows")
+        ),
         "selected_window_feature_rows": _int_or_zero(state.get("selected_window_feature_rows")),
         "selected_window_forecast_rows": _int_or_zero(state.get("selected_window_forecast_rows")),
         "selected_window_ranking_rows": _int_or_zero(state.get("selected_window_ranking_rows")),
-        "selected_window_positive_ev_rows": _int_or_zero(state.get("selected_window_positive_ev_rows")),
-        "selected_window_non_positive_ev_rows": _int_or_zero(state.get("selected_window_non_positive_ev_rows")),
-        "selected_window_too_close_to_expiry": bool(state.get("selected_window_too_close_to_expiry")),
+        "selected_window_positive_ev_rows": _int_or_zero(
+            state.get("selected_window_positive_ev_rows")
+        ),
+        "selected_window_non_positive_ev_rows": _int_or_zero(
+            state.get("selected_window_non_positive_ev_rows")
+        ),
+        "selected_window_too_close_to_expiry": bool(
+            state.get("selected_window_too_close_to_expiry")
+        ),
         "first_window_blocker": _first_blocker(dict(blockers)),
         "first_window_blocker_counts": dict(blockers),
     }
@@ -765,19 +806,38 @@ def _summary(parsed: dict[str, Any]) -> dict[str, Any]:
 
 def _cadence_checks(parsed: dict[str, Any], summary: dict[str, Any]) -> list[dict[str, Any]]:
     return [
-        _check("remote_probes_completed", not parsed.get("failed_probe_names"), f"failed={','.join(parsed.get('failed_probe_names') or []) or 'none'}."),
-        _check("command_registry_ok", bool(summary.get("command_registry_ok")), "Required weather commands are registered on the cloud."),
-        _check("current_window_state_readable", bool(summary.get("state_ok")), f"error={parsed.get('state_error')}."),
-        _check("selected_live_target_found", bool(summary.get("selected_target_time")), "A future weather target window was selected."),
+        _check(
+            "remote_probes_completed",
+            not parsed.get("failed_probe_names"),
+            f"failed={','.join(parsed.get('failed_probe_names') or []) or 'none'}.",
+        ),
+        _check(
+            "command_registry_ok",
+            bool(summary.get("command_registry_ok")),
+            "Required weather commands are registered on the cloud.",
+        ),
+        _check(
+            "current_window_state_readable",
+            bool(summary.get("state_ok")),
+            f"error={parsed.get('state_error')}.",
+        ),
+        _check(
+            "selected_live_target_found",
+            bool(summary.get("selected_target_time")),
+            "A future weather target window was selected.",
+        ),
         _check(
             "selected_window_not_too_close_to_expiry",
-            bool(summary.get("selected_target_time")) and not bool(summary.get("selected_window_too_close_to_expiry")),
+            bool(summary.get("selected_target_time"))
+            and not bool(summary.get("selected_window_too_close_to_expiry")),
             f"minutes_until_target={summary.get('selected_minutes_until_target')}.",
         ),
         _check(
             "preview_narrowing_active",
-            summary.get("selected_window_market_rows", 0) <= max(summary.get("future_series_market_rows", 0), 1),
-            "R53 decision is based on the selected next live weather window, not all expired lookback rows.",
+            summary.get("selected_window_market_rows", 0)
+            <= max(summary.get("future_series_market_rows", 0), 1),
+            "R53 decision is based on the selected next live weather window, not all "
+            "expired lookback rows.",
         ),
     ]
 
@@ -797,14 +857,20 @@ def _decision(summary: dict[str, Any], checks: list[dict[str, Any]]) -> dict[str
     if not summary.get("command_registry_ok"):
         status = "WEATHER_CURRENT_WINDOW_COMMAND_REGISTRY_INCOMPLETE"
         reason = "The cloud is missing one or more registered weather commands."
-        command = "kalshi-bot phase3bb-r12-cloud-bootstrap-verification --output-dir reports/phase3bb_r12 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r12-cloud-bootstrap-verification --output-dir "
+            "reports/phase3bb_r12 --reports-dir reports"
+        )
         next_step = "Phase 3BB-R12 - Cloud Bootstrap Verification"
         blocker = "COMMAND_REGISTRY_MISSING"
         writer_required = False
     elif not summary.get("state_ok"):
         status = "WEATHER_CURRENT_WINDOW_STATE_UNREADABLE"
         reason = "R53 could not inspect the remote weather DB state."
-        command = "kalshi-bot phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair --output-dir reports/phase3bb_r53 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair "
+            "--output-dir reports/phase3bb_r53 --reports-dir reports"
+        )
         next_step = "Phase 3BB-R53 - Repair Weather Current Window Probe"
         blocker = "REMOTE_STATE_UNREADABLE"
         writer_required = False
@@ -813,7 +879,8 @@ def _decision(summary: dict[str, Any], checks: list[dict[str, Any]]) -> dict[str
         reason = "No future weather target window was present in the active KXTEMPNYCH catalog."
         command = (
             "kalshi-bot db-writer-monitor --json\n"
-            "kalshi-bot sync-markets --status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH\n"
+            "kalshi-bot sync-markets --status open --limit 100 --max-pages 3 "
+            "--series-ticker KXTEMPNYCH\n"
             "kalshi-bot market-legs-parse --refresh --limit 1500\n"
             "kalshi-bot phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair "
             "--output-dir reports/phase3bb_r53 --reports-dir reports"
@@ -823,9 +890,12 @@ def _decision(summary: dict[str, Any], checks: list[dict[str, Any]]) -> dict[str
         writer_required = True
     elif summary.get("selected_window_too_close_to_expiry"):
         status = "WEATHER_CURRENT_WINDOW_TOO_CLOSE_TO_EXPIRY"
-        reason = "Do not start forecast/ranking work when the selected target is too close to expiry."
+        reason = (
+            "Do not start forecast/ranking work when the selected target is too close to expiry."
+        )
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports"
         )
         next_step = "Phase 3BB-R47 - Refresh Next Weather Window"
@@ -844,9 +914,13 @@ def _decision(summary: dict[str, Any], checks: list[dict[str, Any]]) -> dict[str
         writer_required = True
     elif stale_links > 0:
         status = "WEATHER_CURRENT_WINDOW_STALE_LINK_REPAIR_NEEDED"
-        reason = "The selected live weather window has link rows whose target time does not match the market text."
+        reason = (
+            "The selected live weather window has link rows whose target time does not match "
+            "the market text."
+        )
         command = (
-            "kalshi-bot phase3az-r12-weather-activation-preview --output-dir reports/phase3az_r12_weather "
+            "kalshi-bot phase3az-r12-weather-activation-preview --output-dir "
+            "reports/phase3az_r12_weather "
             "--limit 2000 --fresh-window-hours 24 --match-tolerance-hours 3"
         )
         next_step = "Phase 3AZ-R12 - Current Weather Relink Preview"
@@ -854,7 +928,9 @@ def _decision(summary: dict[str, Any], checks: list[dict[str, Any]]) -> dict[str
         writer_required = False
     elif snapshot_rows < rows:
         status = "WEATHER_CURRENT_WINDOW_SNAPSHOT_MISSING"
-        reason = "Selected live weather links exist but exact market snapshots/orderbooks are missing."
+        reason = (
+            "Selected live weather links exist but exact market snapshots/orderbooks are missing."
+        )
         command = (
             "kalshi-bot phase3bb-r51-weather-ranking-path-repair "
             "--output-dir reports/phase3bb_r51 --reports-dir reports"
@@ -865,13 +941,19 @@ def _decision(summary: dict[str, Any], checks: list[dict[str, Any]]) -> dict[str
     elif feature_rows < rows:
         status = "WEATHER_CURRENT_WINDOW_FEATURE_REFRESH_NEEDED"
         reason = "Selected live weather rows are linked, but fresh source/features are missing."
-        command = "kalshi-bot phase3bb-r48-weather-feature-refresh-runtime-verification --output-dir reports/phase3bb_r48 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r48-weather-feature-refresh-runtime-verification "
+            "--output-dir reports/phase3bb_r48 --reports-dir reports"
+        )
         next_step = "Phase 3BB-R48 - Weather Feature Refresh Runtime Verification"
         blocker = "FEATURE_MISSING_FOR_TARGET_WINDOW"
         writer_required = True
     elif forecast_rows < rows or ranking_rows < rows:
         status = "WEATHER_CURRENT_WINDOW_RANKING_PATH_NEEDED"
-        reason = "Selected live weather rows have links/source inputs but need forecast/ranking completion."
+        reason = (
+            "Selected live weather rows have links/source inputs but need forecast/ranking "
+            "completion."
+        )
         command = (
             "kalshi-bot phase3bb-r51-weather-ranking-path-repair "
             "--output-dir reports/phase3bb_r51 --reports-dir reports"
@@ -882,14 +964,20 @@ def _decision(summary: dict[str, Any], checks: list[dict[str, Any]]) -> dict[str
     elif positive_rows > 0:
         status = "WEATHER_CURRENT_WINDOW_POSITIVE_EV_REFRESH_PAPER_GATE"
         reason = "Selected live weather rows have positive EV; refresh the unified paper gate."
-        command = "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+            "--reports-dir reports"
+        )
         next_step = "Phase 3BB-R8 - Unified Paper Gate"
         blocker = "PAPER_GATE_REFRESH_NEEDED"
         writer_required = False
     elif failed:
         status = "WEATHER_CURRENT_WINDOW_CADENCE_CHECK_WARNING"
         reason = f"First failing cadence check: {failed[0]['check']}."
-        command = "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir reports/phase3bb_r40 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir "
+            "reports/phase3bb_r40 --reports-dir reports"
+        )
         next_step = "Phase 3BB-R40 - Cloud Scheduler Runtime Monitor"
         blocker = failed[0]["check"].upper()
         writer_required = False
@@ -985,14 +1073,16 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- Missing links in selected window: `{summary['selected_window_missing_link_rows']}`",
             f"- Forecast rows in selected window: `{summary['selected_window_forecast_rows']}`",
             f"- Ranking rows in selected window: `{summary['selected_window_ranking_rows']}`",
-            f"- Positive EV rows in selected window: `{summary['selected_window_positive_ev_rows']}`",
+            f"- Positive EV rows in selected window: `"
+            f"{summary['selected_window_positive_ev_rows']}`",
             f"- Writer safe: `{summary['writer_safe_to_start_write']}`",
             "",
             "## Why",
             "",
             decision["primary_reason"],
             "",
-            "R53 narrows weather work to the next live target window and keeps expired lookback rows as audit context only.",
+            "R53 narrows weather work to the next live target window and keeps expired "
+            "lookback rows as audit context only.",
             "",
             "## Next",
             "",
@@ -1000,7 +1090,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             decision["operator_next_command"],
             "```",
             "",
-            "No paper trades, live/demo orders, service starts/stops, threshold changes, or fake evidence were run.",
+            "No paper trades, live/demo orders, service starts/stops, threshold changes, "
+            "or fake evidence were run.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -1017,7 +1108,8 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         f"Selected target: `{summary.get('selected_target_time')}`",
         f"First blocker: `{decision['first_hard_blocker']}`",
         "",
-        "| Ticker | Target | Min Left | Link | Snapshot | Feature | Forecast | Ranking | Edge | Blocker |",
+        "| Ticker | Target | Min Left | Link | Snapshot | Feature | Forecast | Ranking | "
+        "Edge | Blocker |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for row in rows[:30]:
@@ -1055,33 +1147,42 @@ def _render_markdown(payload: dict[str, Any]) -> str:
 
 def _render_next_actions(payload: dict[str, Any]) -> str:
     decision = payload["decision"]
-    return "\n".join(
-        [
-            "# Next Actions",
-            "",
-            f"Status: `{decision['status']}`",
-            f"First hard blocker: `{decision['first_hard_blocker']}`",
-            f"Selected target: `{decision.get('selected_target_time')}`",
-            f"Blocked by writer: `{decision['blocked_by_writer']}`",
-            "",
-            "```bash",
-            decision["operator_next_command"],
-            "```",
-            "",
-            "Guardrails:",
-            "- Run writer-capable commands only after `db-writer-monitor` is clear.",
-            "- Do not create paper trades unless a downstream paper-ready gate opens.",
-            "- Do not submit/cancel/replace live or demo orders.",
-            "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Next Actions",
+                "",
+                f"Status: `{decision['status']}`",
+                f"First hard blocker: `{decision['first_hard_blocker']}`",
+                f"Selected target: `{decision.get('selected_target_time')}`",
+                f"Blocked by writer: `{decision['blocked_by_writer']}`",
+                "",
+                "```bash",
+                decision["operator_next_command"],
+                "```",
+                "",
+                "Guardrails:",
+                "- Run writer-capable commands only after `db-writer-monitor` is clear.",
+                "- Do not create paper trades unless a downstream paper-ready gate opens.",
+                "- Do not submit/cancel/replace live or demo orders.",
+                "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
-    return "#!/usr/bin/env bash\nset -euo pipefail\n" + payload["decision"]["operator_next_command"] + "\n"
+    return (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + payload["decision"]["operator_next_command"]
+        + "\n"
+    )
 
 
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]], fields: list[str] | None = None) -> None:
+def _write_rows_csv(
+    path: Path, rows: list[dict[str, Any]], fields: list[str] | None = None
+) -> None:
     if fields is None:
         fields = sorted({key for row in rows for key in row})
     with path.open("w", encoding="utf-8", newline="") as handle:
@@ -1092,7 +1193,15 @@ def _write_rows_csv(path: Path, rows: list[dict[str, Any]], fields: list[str] | 
 
 
 def _write_probe_csv(path: Path, results: list[dict[str, Any]]) -> None:
-    fields = ["name", "ok", "exit_code", "duration_seconds", "stdout_tail", "stderr_tail", "command"]
+    fields = [
+        "name",
+        "ok",
+        "exit_code",
+        "duration_seconds",
+        "stdout_tail",
+        "stderr_tail",
+        "command",
+    ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()

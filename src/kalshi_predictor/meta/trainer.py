@@ -48,9 +48,7 @@ def build_meta_training_examples(
         forecasts = _eligible_forecasts(session, settlement)
         if not forecasts:
             continue
-        losses = {
-            forecast.id: _brier_loss(forecast, settlement.result) for forecast in forecasts
-        }
+        losses = {forecast.id: _brier_loss(forecast, settlement.result) for forecast in forecasts}
         best_loss = min(losses.values())
         if len(forecasts) == 1:
             limited += 1

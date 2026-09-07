@@ -3,9 +3,9 @@ from pathlib import Path
 SCRIPT = (
     Path(__file__).parents[1] / "scripts" / "local" / "kalshi-fixed-rate-refresh.sh"
 ).read_text(encoding="utf-8")
-WEATHER_PREP = (
-    Path(__file__).parents[1] / "scripts" / "supported_weather_prepare.py"
-).read_text(encoding="utf-8")
+WEATHER_PREP = (Path(__file__).parents[1] / "scripts" / "supported_weather_prepare.py").read_text(
+    encoding="utf-8"
+)
 WEATHER_SNAPSHOT = (
     Path(__file__).parents[1] / "scripts" / "supported_weather_snapshot_forecast.py"
 ).read_text(encoding="utf-8")
@@ -29,9 +29,9 @@ def test_targeted_capture_is_rate_limited_and_sharded() -> None:
     assert 'targeted_capture_stage="targeted_crypto_capture_major"' in SCRIPT
     assert 'targeted_capture_stage="targeted_crypto_capture_alt"' in SCRIPT
     assert 'run_health_stage "$targeted_capture_stage" 180 timeout 180s' in SCRIPT
-    assert '--coherence-ms 2500 --max-workers 2' in SCRIPT
-    assert '--max-new-events 1 --max-events-attempted 2' in SCRIPT
-    assert '--targeted-capture-max-buckets 25' in SCRIPT
+    assert "--coherence-ms 2500 --max-workers 2" in SCRIPT
+    assert "--max-new-events 1 --max-events-attempted 2" in SCRIPT
+    assert "--targeted-capture-max-buckets 25" in SCRIPT
 
 
 def test_crypto_router_has_an_independent_scheduler_budget() -> None:
@@ -44,7 +44,7 @@ def test_crypto_router_has_an_independent_scheduler_budget() -> None:
 def test_supported_weather_prepare_bounds_feature_rebuilds() -> None:
     assert 'parser.add_argument("--feature-limit", type=int, default=200)' in WEATHER_PREP
     assert '"--limit",' in WEATHER_PREP
-    assert 'str(args.feature_limit)' in WEATHER_PREP
+    assert "str(args.feature_limit)" in WEATHER_PREP
 
 
 def test_supported_weather_snapshot_fetches_outside_db_session_in_bounded_pool() -> None:

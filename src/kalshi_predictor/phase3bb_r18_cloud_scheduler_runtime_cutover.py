@@ -346,9 +346,11 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         r5_pid = pids[0]
     guard_after = guard.get("after") if isinstance(guard, dict) else {}
     guard_after_guard = guard_after.get("guard") if isinstance(guard_after, dict) else {}
-    guard_status = (r5_guard or {}).get("status") or (guard_after_guard or {}).get(
-        "status"
-    ) or guard.get("status")
+    guard_status = (
+        (r5_guard or {}).get("status")
+        or (guard_after_guard or {}).get("status")
+        or guard.get("status")
+    )
     guard_should_stop = bool(
         (r5_guard or {}).get("should_stop")
         or (guard_after_guard or {}).get("should_stop")

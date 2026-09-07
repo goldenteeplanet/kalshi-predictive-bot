@@ -137,8 +137,7 @@ def _count_rows(sports: dict[str, Any]) -> list[dict[str, Any]]:
             "value": sports.get("unresolved_partial_legs", 0),
             "unit": "parsed legs",
             "definition": (
-                "Parsed leg rows whose ticker still only has unresolved "
-                "market-derived provenance."
+                "Parsed leg rows whose ticker still only has unresolved market-derived provenance."
             ),
         },
         {
@@ -177,11 +176,7 @@ def _count_rows(sports: dict[str, Any]) -> list[dict[str, Any]]:
 def _consistency_checks(dashboard: dict[str, Any]) -> list[dict[str, Any]]:
     sports = _sports_reconciliation(dashboard)
     sports_row = next(
-        (
-            row
-            for row in dashboard.get("category_rows", [])
-            if row.get("category") == "sports"
-        ),
+        (row for row in dashboard.get("category_rows", []) if row.get("category") == "sports"),
         {},
     )
     checks = [
@@ -200,8 +195,7 @@ def _consistency_checks(dashboard: dict[str, Any]) -> list[dict[str, Any]]:
         ),
         _check(
             "partial_legs_not_less_than_unresolved_markets",
-            sports.get("unresolved_partial_legs", 0)
-            >= sports.get("unresolved_partial_markets", 0),
+            sports.get("unresolved_partial_legs", 0) >= sports.get("unresolved_partial_markets", 0),
             "A parsed unresolved partial market should have at least one parsed sports leg.",
         ),
         _check(

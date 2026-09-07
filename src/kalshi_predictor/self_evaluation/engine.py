@@ -93,9 +93,7 @@ def run_self_evaluation(
         markdown = render_journal_markdown(payload) if payload else ""
         written_md = _write_text(output_path, markdown) if output_path else None
         written_json = (
-            _write_text(json_output_path, _json_text(payload))
-            if json_output_path
-            else None
+            _write_text(json_output_path, _json_text(payload)) if json_output_path else None
         )
         return SelfEvaluationResult(
             evaluation_run_id=existing.evaluation_run_id,

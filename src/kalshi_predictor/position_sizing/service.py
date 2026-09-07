@@ -421,9 +421,7 @@ def _cached_historical_accuracy(
         return None
     prepared_at = parse_datetime(cache.get("prepared_at"))
     current = (
-        decision_timestamp
-        if decision_timestamp.tzinfo
-        else decision_timestamp.replace(tzinfo=UTC)
+        decision_timestamp if decision_timestamp.tzinfo else decision_timestamp.replace(tzinfo=UTC)
     )
     if prepared_at is None:
         return None

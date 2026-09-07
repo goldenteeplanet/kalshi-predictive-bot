@@ -3,10 +3,10 @@ from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, aliased
-from zoneinfo import ZoneInfo
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.repositories import decode_json, encode_json
@@ -25,15 +25,11 @@ def autopilot_config_payload(settings: Settings) -> dict[str, Any]:
         "AUTOPILOT_MAX_ORDERS_PER_CYCLE": settings.autopilot_max_orders_per_cycle,
         "AUTOPILOT_MAX_DAILY_ORDERS": settings.autopilot_max_daily_orders,
         "AUTOPILOT_MIN_EDGE": decimal_to_str(settings.autopilot_min_edge),
-        "AUTOPILOT_MIN_OPPORTUNITY_SCORE": decimal_to_str(
-            settings.autopilot_min_opportunity_score
-        ),
+        "AUTOPILOT_MIN_OPPORTUNITY_SCORE": decimal_to_str(settings.autopilot_min_opportunity_score),
         "AUTOPILOT_STOP_ON_DRAWDOWN": settings.autopilot_stop_on_drawdown,
         "AUTOPILOT_MAX_DAILY_DRAWDOWN": decimal_to_str(settings.autopilot_max_daily_drawdown),
         "AUTOPILOT_MAX_OPEN_DEMO_ORDERS": settings.autopilot_max_open_demo_orders,
-        "AUTOPILOT_REQUIRE_FRESH_DATA_MINUTES": (
-            settings.autopilot_require_fresh_data_minutes
-        ),
+        "AUTOPILOT_REQUIRE_FRESH_DATA_MINUTES": (settings.autopilot_require_fresh_data_minutes),
         "KALSHI_ENV": settings.kalshi_env,
         "EXECUTION_ENABLED": settings.execution_enabled,
         "EXECUTION_DRY_RUN": settings.execution_dry_run,
@@ -197,9 +193,7 @@ def recent_autopilot_cycles(session: Session, *, limit: int = 10) -> list[Autopi
 def recent_risk_events(session: Session, *, limit: int = 20) -> list[RiskEvent]:
     return list(
         session.scalars(
-            select(RiskEvent)
-            .order_by(desc(RiskEvent.created_at), desc(RiskEvent.id))
-            .limit(limit)
+            select(RiskEvent).order_by(desc(RiskEvent.created_at), desc(RiskEvent.id)).limit(limit)
         )
     )
 
@@ -239,8 +233,10 @@ def current_daily_pnl(
     latest = _latest_pnl_totals(session, before_or_at=current)
     baseline = _latest_pnl_totals(session, strictly_before=start)
     return sum(
-        (latest.get(ticker, Decimal("0")) - baseline.get(ticker, Decimal("0"))
-         for ticker in set(latest) | set(baseline)),
+        (
+            latest.get(ticker, Decimal("0")) - baseline.get(ticker, Decimal("0"))
+            for ticker in set(latest) | set(baseline)
+        ),
         Decimal("0"),
     )
 
@@ -328,10 +324,12 @@ def _latest_pnl_totals(
     ranked = (
         select(
             PaperPnl,
-            func.row_number().over(
+            func.row_number()
+            .over(
                 partition_by=PaperPnl.ticker,
                 order_by=(desc(PaperPnl.calculated_at), desc(PaperPnl.id)),
-            ).label("row_number"),
+            )
+            .label("row_number"),
         )
         .where(*filters)
         .subquery()

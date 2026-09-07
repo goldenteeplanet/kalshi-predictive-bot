@@ -21,19 +21,26 @@ def compare_forecast_rankings(
         new_probability = to_decimal(candidate_by_ticker[ticker].get("yes_probability"))
         probability_change = (
             new_probability - old_probability
-            if old_probability is not None and new_probability is not None else None
+            if old_probability is not None and new_probability is not None
+            else None
         )
-        rows.append({
-            "ticker": ticker,
-            "baseline_probability": str(old_probability) if old_probability is not None else None,
-            "candidate_probability": str(new_probability) if new_probability is not None else None,
-            "probability_change": (
-                str(probability_change) if probability_change is not None else None
-            ),
-            "baseline_rank": baseline_rank[ticker],
-            "candidate_rank": candidate_rank[ticker],
-            "rank_change": baseline_rank[ticker] - candidate_rank[ticker],
-        })
+        rows.append(
+            {
+                "ticker": ticker,
+                "baseline_probability": str(old_probability)
+                if old_probability is not None
+                else None,
+                "candidate_probability": str(new_probability)
+                if new_probability is not None
+                else None,
+                "probability_change": (
+                    str(probability_change) if probability_change is not None else None
+                ),
+                "baseline_rank": baseline_rank[ticker],
+                "candidate_rank": candidate_rank[ticker],
+                "rank_change": baseline_rank[ticker] - candidate_rank[ticker],
+            }
+        )
     return {
         "shared_tickers": len(shared),
         "added_tickers": sorted(set(candidate_by_ticker) - set(baseline_by_ticker)),

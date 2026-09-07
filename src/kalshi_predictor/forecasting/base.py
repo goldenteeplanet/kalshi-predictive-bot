@@ -30,4 +30,3 @@ class BaseForecaster(Protocol):
 
     def forecast(self, forecast_input: ForecastInput) -> ForecastOutput | None:
         """Return a forecast or None when inputs are not usable."""
-

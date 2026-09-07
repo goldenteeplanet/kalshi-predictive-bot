@@ -339,8 +339,7 @@ def _command_queue(
                 },
                 {
                     "command": (
-                        "kalshi-bot phase3ae-fast-market-harvester "
-                        f"--model-name {model_name}"
+                        f"kalshi-bot phase3ae-fast-market-harvester --model-name {model_name}"
                     ),
                     "purpose": (
                         "Confirm fast candidates exist before paper trade creation is considered."

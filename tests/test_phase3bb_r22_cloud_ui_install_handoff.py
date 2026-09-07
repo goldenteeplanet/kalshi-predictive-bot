@@ -33,9 +33,7 @@ def test_phase3bb_r22_writes_approved_ui_handoff_bundle(tmp_path: Path) -> None:
     script = artifacts.operator_handoff_script_path.read_text(encoding="utf-8")
 
     assert payload["phase"] == "3BB-R22-CLOUD-UI-INSTALL-HANDOFF"
-    assert payload["handoff_decision"]["status"] == (
-        "HANDOFF_READY_UI_INSTALL_ENABLE_NO_START"
-    )
+    assert payload["handoff_decision"]["status"] == ("HANDOFF_READY_UI_INSTALL_ENABLE_NO_START")
     assert payload["handoff_decision"]["handoff_ready"] is True
     assert payload["handoff_decision"]["codex_executed_install"] is False
     assert payload["handoff_decision"]["codex_executed_enable"] is False
@@ -68,9 +66,7 @@ def test_phase3bb_r22_blocks_without_operator_approval(tmp_path: Path) -> None:
 
     assert payload["handoff_decision"]["status"] == "BLOCKED_UI_INSTALL_HANDOFF"
     assert payload["handoff_decision"]["handoff_ready"] is False
-    assert payload["handoff_decision"]["first_failed_check"] == (
-        "operator_approved_flag_present"
-    )
+    assert payload["handoff_decision"]["first_failed_check"] == ("operator_approved_flag_present")
 
 
 def test_phase3bb_r22_handoff_script_defaults_to_dry_run(tmp_path: Path) -> None:
@@ -130,8 +126,7 @@ def _write_context(reports_dir: Path) -> None:
         "remote_db_path": "/var/lib/kalshi-bot/kalshi_phase1.db",
         "remote_reports_path": "/opt/kalshi-predictive-bot/reports",
         "ssh_tunnel_command": (
-            "ssh -i '~/.ssh/id_ed25519_do' -L 8080:127.0.0.1:8080 "
-            "'kalshi@203.0.113.10'"
+            "ssh -i '~/.ssh/id_ed25519_do' -L 8080:127.0.0.1:8080 'kalshi@203.0.113.10'"
         ),
     }
     (r20_dir / "cloud_ui_service_plan.json").write_text(

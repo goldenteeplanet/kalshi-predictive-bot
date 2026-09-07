@@ -31,13 +31,15 @@ def export_forecast_ranking_rows_read_only(
 def compare_database_model_versions(
     database_path: Path, *, baseline_model: str, candidate_model: str
 ) -> dict[str, Any]:
-    baseline = export_forecast_ranking_rows_read_only(
-        database_path, model_name=baseline_model
-    )
-    candidate = export_forecast_ranking_rows_read_only(
-        database_path, model_name=candidate_model
-    )
+    baseline = export_forecast_ranking_rows_read_only(database_path, model_name=baseline_model)
+    candidate = export_forecast_ranking_rows_read_only(database_path, model_name=candidate_model)
     result = compare_forecast_rankings(baseline, candidate)
-    result.update({"database_mode": "read_only", "database_writes": 0,
-                   "baseline_model": baseline_model, "candidate_model": candidate_model})
+    result.update(
+        {
+            "database_mode": "read_only",
+            "database_writes": 0,
+            "baseline_model": baseline_model,
+            "candidate_model": candidate_model,
+        }
+    )
     return result

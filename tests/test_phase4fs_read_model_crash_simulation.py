@@ -65,9 +65,7 @@ def test_empty_workspace_and_missing_marker_fail_closed(tmp_path: Path) -> None:
 
 def test_exact_size_boundary_and_overflow(tmp_path: Path) -> None:
     artifact = build_simulated_artifact(sequence=1, data={"value": "x"})
-    encoded_size = len(
-        json.dumps(artifact, sort_keys=True, separators=(",", ":"))
-    ) + 1
+    encoded_size = len(json.dumps(artifact, sort_keys=True, separators=(",", ":"))) + 1
     root = _workspace(tmp_path)
     state = simulate_publication(
         root,

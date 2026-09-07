@@ -8,7 +8,6 @@ from kalshi_predictor.benchmarking.export_custody import (
     write_export_custody_preview,
 )
 
-
 FIXTURES = Path(__file__).parent / "fixtures/pmb34c"
 
 
@@ -25,7 +24,9 @@ def test_pmb34d_certifies_hashes_metadata_redaction_and_import():
     assert report["summary"]["certification_passed"] is True
     assert report["summary"]["artifacts"] == 5
     assert report["summary"]["sensitive_fields_rejected"] == 0
-    assert report["signing_metadata"]["attestation_type"] == "offline-sha256-manifest-attestation-v1"
+    assert (
+        report["signing_metadata"]["attestation_type"] == "offline-sha256-manifest-attestation-v1"
+    )
     assert len(report["chain_digest"]) == 64
     assert report["summary"]["pmb35_deployment_unblocked"] is False
 
@@ -53,7 +54,9 @@ def test_pmb34d_rejects_sensitive_json_and_csv_fields(tmp_path):
     payload[0]["api_key"] = "must-not-pass"
     decisions.write_text(json.dumps(payload), encoding="utf-8")
     result = certify_export_custody(custody)
-    assert any(code.startswith("SENSITIVE_FIELD_REJECTED:decisions:") for code in result["diagnostics"])
+    assert any(
+        code.startswith("SENSITIVE_FIELD_REJECTED:decisions:") for code in result["diagnostics"]
+    )
 
     custody = _copy(tmp_path / "second")
     books = custody.parent / "books.csv"

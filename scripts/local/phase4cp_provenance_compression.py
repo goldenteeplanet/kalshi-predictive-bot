@@ -23,9 +23,7 @@ def _hash(payload: Any) -> str:
 
 
 def _bytes(value: Any) -> int:
-    encoded = json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode()
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     return len(encoded)
 
 

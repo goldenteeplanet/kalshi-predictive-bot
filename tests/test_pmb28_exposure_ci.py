@@ -10,9 +10,7 @@ GOLDEN = ROOT / "tests/golden/pmb27_exposure_guard_bundle_summary.json"
 
 
 def test_pmb28_regenerates_and_passes_exact_golden_gate(tmp_path):
-    path, exit_code = run_offline_exposure_certification_ci_gate(
-        ROOT, tmp_path / "pass"
-    )
+    path, exit_code = run_offline_exposure_certification_ci_gate(ROOT, tmp_path / "pass")
     report = json.loads(path.read_text())
     assert exit_code == 0
     assert report["summary"]["passed"] is True

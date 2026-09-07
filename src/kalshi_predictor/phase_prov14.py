@@ -44,20 +44,27 @@ def build_prov14_certification_report(
     if limit < 1 or limit > 1000:
         raise ValueError("limit must be between 1 and 1000")
     expected = tuple(dict.fromkeys(str(model) for model in expected_models))
-    events = list(session.scalars(
-        select(RuntimeProvenanceEvent)
-        .where(RuntimeProvenanceEvent.id > after_event_id)
-        .order_by(RuntimeProvenanceEvent.id)
-        .limit(limit)
-    ))
+    events = list(
+        session.scalars(
+            select(RuntimeProvenanceEvent)
+            .where(RuntimeProvenanceEvent.id > after_event_id)
+            .order_by(RuntimeProvenanceEvent.id)
+            .limit(limit)
+        )
+    )
     rows = [_certify_event(session, event) for event in events]
     model_counts = Counter(row["model_name"] for row in rows if row["passed"])
     missing_models = [model for model in expected if model_counts[model] == 0]
-    truncated = bool(events and len(events) == limit and session.scalar(
-        select(RuntimeProvenanceEvent.id)
-        .where(RuntimeProvenanceEvent.id > events[-1].id)
-        .limit(1)
-    ) is not None)
+    truncated = bool(
+        events
+        and len(events) == limit
+        and session.scalar(
+            select(RuntimeProvenanceEvent.id)
+            .where(RuntimeProvenanceEvent.id > events[-1].id)
+            .limit(1)
+        )
+        is not None
+    )
     failures = [row for row in rows if not row["passed"]]
     passed = bool(rows) and not failures and not missing_models and not truncated
     return {
@@ -85,8 +92,9 @@ def build_prov14_certification_report(
         },
         "next_action": (
             "Proceed to retention monitoring only after certification_passed=true."
-            if passed else
-            "Preserve execution disablement and repair only the exact failed future-write path."
+            if passed
+            else "Preserve execution disablement and repair only the exact failed "
+            "future-write path."
         ),
     }
 
@@ -100,8 +108,10 @@ def write_prov14_certification_report(
     limit: int = 200,
 ) -> Path:
     payload = build_prov14_certification_report(
-        session, after_event_id=after_event_id,
-        expected_models=expected_models, limit=limit,
+        session,
+        after_event_id=after_event_id,
+        expected_models=expected_models,
+        limit=limit,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / "prov14_guarded_future_attribution_certification.json"

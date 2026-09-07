@@ -63,9 +63,12 @@ def ingest_manual_crypto_json(
         if symbol is None or price_value is None:
             errors.append(f"Skipped record with missing symbol or price: {record}")
             continue
-        observed_at = parse_datetime(
-            record.get("observed_at") or record.get("timestamp") or payload.get("observed_at")
-        ) or utc_now()
+        observed_at = (
+            parse_datetime(
+                record.get("observed_at") or record.get("timestamp") or payload.get("observed_at")
+            )
+            or utc_now()
+        )
         insert_crypto_price(
             session,
             symbol=normalize_symbol(str(symbol)),
@@ -101,4 +104,3 @@ def _extract_manual_records(payload: Mapping[str, Any]) -> list[Mapping[str, Any
     if isinstance(data, Mapping) and "amount" in data:
         return [data]
     return [payload]
-

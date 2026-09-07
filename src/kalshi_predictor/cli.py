@@ -31,14 +31,10 @@ def _candidate_ticker_scope(path: Path | None, *, limit: int) -> list[str] | Non
     raw_tickers = manifest.get("tickers") if isinstance(manifest, dict) else None
     if not isinstance(raw_tickers, list) and isinstance(manifest, dict):
         raw_tickers = [
-            row.get("ticker")
-            for row in manifest.get("candidates") or []
-            if isinstance(row, dict)
+            row.get("ticker") for row in manifest.get("candidates") or [] if isinstance(row, dict)
         ]
     return list(
-        dict.fromkeys(
-            str(ticker).strip() for ticker in (raw_tickers or []) if str(ticker).strip()
-        )
+        dict.fromkeys(str(ticker).strip() for ticker in (raw_tickers or []) if str(ticker).strip())
     )[:limit]
 
 
@@ -70,9 +66,7 @@ def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
         from kalshi_predictor.roadmap.runtime_reports import write_runtime_roadmap_reports
 
         try:
-            freshness_minutes = int(
-                _fast_option_value(args, "--freshness-minutes", "15") or "15"
-            )
+            freshness_minutes = int(_fast_option_value(args, "--freshness-minutes", "15") or "15")
             market_limit = int(_fast_option_value(args, "--market-limit", "500") or "500")
             paper_order_limit = int(
                 _fast_option_value(args, "--paper-order-limit", "1000") or "1000"
@@ -471,7 +465,6 @@ from kalshi_predictor.phase3aj import write_phase3aj_report
 from kalshi_predictor.phase3aj_gap_closure import (
     write_composite_settlement_resolve_report,
     write_gap_closure_doctor_report,
-    write_market_data_refresh_status,
     write_paper_trade_funnel_report,
     write_phase_3aj_report,
     write_source_readiness_report,
@@ -1267,10 +1260,12 @@ def _print_db_writer_monitor(payload: dict[str, object]) -> None:
     console.print(f"Current writer PID: {payload.get('current_writer_pid') or 'none'}")
     console.print(f"Command running: {payload.get('current_writer_command') or 'none'}")
     console.print(f"Elapsed time: {payload.get('current_writer_elapsed') or 'n/a'}")
-    console.print(
-        "Heartbeat status: "
-        f"{payload.get('long_job_heartbeat_display_status') or payload.get('long_job_heartbeat_status') or 'unknown'}"
+    heartbeat_status = (
+        payload.get("long_job_heartbeat_display_status")
+        or payload.get("long_job_heartbeat_status")
+        or "unknown"
     )
+    console.print(f"Heartbeat status: {heartbeat_status}")
     console.print(f"Heartbeat stage: {payload.get('long_job_stage') or 'none'}")
     console.print(f"Heartbeat age: {payload.get('long_job_heartbeat_age') or 'n/a'}")
     console.print(
@@ -9521,7 +9516,10 @@ def phase3bb_r26_cloud_ui_access_control_gate_command(
     auth_mode: Annotated[
         str,
         typer.Option(
-            help="Auth mode to evaluate: none, basic_auth, oauth_proxy, cloudflare_access, tailscale_funnel_auth."
+            help=(
+                "Auth mode to evaluate: none, basic_auth, oauth_proxy, cloudflare_access, "
+                "tailscale_funnel_auth."
+            )
         ),
     ] = "none",
     max_public_route_seconds: Annotated[
@@ -9583,7 +9581,10 @@ def phase3bb_r27_cloud_ui_private_access_auth_draft_command(
     preferred_access: Annotated[
         str,
         typer.Option(
-            help="Preferred private access mode: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."
+            help=(
+                "Preferred private access mode: ssh_tunnel, private_vpn, or "
+                "cloudflare_access_tunnel."
+            )
         ),
     ] = "private_vpn",
     operator_email: Annotated[
@@ -9648,7 +9649,10 @@ def phase3bb_r28_cloud_ui_private_access_operator_review_command(
     selected_access: Annotated[
         str | None,
         typer.Option(
-            help="Optional selected access override: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."
+            help=(
+                "Optional selected access override: ssh_tunnel, private_vpn, or "
+                "cloudflare_access_tunnel."
+            )
         ),
     ] = None,
 ) -> None:
@@ -10888,7 +10892,10 @@ def phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_command(
     reset_failed: Annotated[
         bool,
         typer.Option(
-            help="Clear the failed systemd service marker after installing; does not start the service."
+            help=(
+                "Clear the failed systemd service marker after installing; does not start "
+                "the service."
+            )
         ),
     ] = False,
     per_probe_timeout_seconds: Annotated[
@@ -10896,7 +10903,10 @@ def phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_command(
         typer.Option(help="Timeout for each bounded remote repair probe."),
     ] = 45,
 ) -> None:
-    """Repair scheduler writer-gate handling so mid-run BUSY_WRITER becomes a clean retry skip."""
+    (
+        """Repair scheduler writer-gate handling so mid-run"""
+        """ BUSY_WRITER becomes a clean retry skip."""
+    )
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -11011,7 +11021,10 @@ def phase3bb_r47_weather_current_window_series_discovery_linkability_repair_comm
         typer.Option(help="Timeout for each bounded remote linkability probe."),
     ] = 60,
 ) -> None:
-    """Discover current weather windows and repair the scheduler hook that feeds R12 linkability."""
+    (
+        """Discover current weather windows and repair the """
+        """scheduler hook that feeds R12 linkability."""
+    )
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -11884,7 +11897,10 @@ def phase3bb_r55_weather_ranking_path_retry_command(
         typer.Option(help="Timeout for each bounded remote probe."),
     ] = 60,
 ) -> None:
-    """Wait for R5 writer clear, rerun R53, then run R51 only while the weather window is live."""
+    (
+        """Wait for R5 writer clear, rerun R53, then run R5"""
+        """1 only while the weather window is live."""
+    )
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -11986,7 +12002,10 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
     min_minutes_before_target: Annotated[
         int,
         typer.Option(
-            help="Minimum lead time before weather target expiry before running the selected-window pipeline."
+            help=(
+                "Minimum lead time before weather target expiry before running the "
+                "selected-window pipeline."
+            )
         ),
     ] = 10,
     fresh_window_hours: Annotated[
@@ -12002,7 +12021,9 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
     max_records: Annotated[
         int,
         typer.Option(
-            help="Maximum R12 missing-link rows to apply if the current-window gate says it is safe."
+            help=(
+                "Maximum R12 missing-link rows to apply if the current-window gate says it is safe."
+            )
         ),
     ] = 25,
     limit: Annotated[
@@ -12282,7 +12303,9 @@ def phase3bb_r59_weather_catalog_refresh_r57_retry_command(
         typer.Option(help="Timeout for each bounded remote probe."),
     ] = 60,
 ) -> None:
-    """Wait for writer clear, refresh KXTEMPNYCH catalog, then rerun patched R57 if a future window exists."""
+    """Wait for writer clear, refresh KXTEMPNYCH catalog, then rerun patched R57
+    if a future window exists.
+    """
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -12410,7 +12433,10 @@ def phase3bb_r60_weather_next_window_lead_time_scheduler_repair_command(
     max_minutes_before_target: Annotated[
         int,
         typer.Option(
-            help="Maximum lead time before weather target expiry before waiting for a later scheduler tick."
+            help=(
+                "Maximum lead time before weather target expiry before waiting for a later "
+                "scheduler tick."
+            )
         ),
     ] = 90,
     fresh_window_hours: Annotated[
@@ -15456,7 +15482,8 @@ def synthetic_markets_run_command(
             console.print("Phase 3R synthetic markets: BLOCKED")
             console.print(str(exc))
             console.print(
-                "Next action: create examples/synthetic_markets_candidates.json or rerun without "
+                "Next action: create examples/synthetic_markets_c"
+                "andidates.json or rerun without "
                 "--input-file."
             )
             raise typer.Exit(1) from exc
@@ -15657,7 +15684,8 @@ def rl_shadow_report_command(
         "# Phase 3S Shadow Report\n\n"
         f"- Recommendation: {recommendation.recommended_action}\n"
         f"- Baseline: {recommendation.baseline_action}\n"
-        "- Shadow mode changes no orders, quantities, Phase 3M requests, or Phase 3N decisions.\n",
+        "- Shadow mode changes no orders, quantities, Pha"
+        "se 3M requests, or Phase 3N decisions.\n",
         encoding="utf-8",
     )
     json_output.parent.mkdir(parents=True, exist_ok=True)
@@ -17223,9 +17251,9 @@ def gh1_websocket_orderbook_watch_command(
     persist_every_deltas: Annotated[
         int, typer.Option(help="Stage a checkpoint after this many applied deltas.")
     ] = 25,
-    status_path: Annotated[
-        Path, typer.Option(help="Filesystem heartbeat/status artifact.")
-    ] = Path("reports/phase_gh1/watch/status.json"),
+    status_path: Annotated[Path, typer.Option(help="Filesystem heartbeat/status artifact.")] = Path(
+        "reports/phase_gh1/watch/status.json"
+    ),
     active_market_catalog_path: Annotated[
         Path | None,
         typer.Option(help="Filesystem-only bounded active-market rollover catalog."),
@@ -17949,7 +17977,8 @@ def forecast_command(
         typer.Option(
             "--model",
             help=(
-                "Forecast model: market_implied_v1, weather_v1, weather_v2, crypto_v1, crypto_v2, "
+                "Forecast model: market_implied_v1, weather_v1, w"
+                "eather_v2, crypto_v1, crypto_v2, "
                 "economic_v1, news_v1, mlb_v1, nba_v1, nfl_v1, nhl_v1, sports_v1, "
                 "microstructure_v1, meta_model_v1, meta_ensemble_v1, ensemble_v1, "
                 "ensemble_v2, or all."
@@ -19598,7 +19627,10 @@ def link_crypto_markets_command(
     stop_after_minutes: Annotated[
         int,
         typer.Option(
-            help="Stop cleanly after N minutes and keep committed checkpoint batches. Use 0 for no limit."
+            help=(
+                "Stop cleanly after N minutes and keep committed checkpoint batches. Use 0 "
+                "for no limit."
+            )
         ),
     ] = 0,
     heartbeat_dir: Annotated[
@@ -19967,9 +19999,7 @@ def gh2_single_writer_decision_refresh_command(
 
     settings = get_settings()
     writer_monitor_at_start = db_writer_monitor(settings=settings)
-    if guard_active_writer and not bool(
-        writer_monitor_at_start.get("safe_to_start_write", True)
-    ):
+    if guard_active_writer and not bool(writer_monitor_at_start.get("safe_to_start_write", True)):
         current = writer_monitor_at_start.get("current_writer_command") or "unknown"
         console.print(f"Status: BLOCKED_ACTIVE_WRITER ({current})")
         raise typer.Exit(code=2)
@@ -20552,9 +20582,7 @@ def candidate_funnel_audit_command(
     )
 
     settings = get_settings()
-    engine = make_candidate_funnel_read_only_engine(
-        database_url_from_settings(settings)
-    )
+    engine = make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
     with session_factory() as session:
         artifacts = write_candidate_funnel_audit(
@@ -20716,7 +20744,9 @@ def weather_alpha_validation_command(
     database_url = database_url_from_settings(settings)
     console.print(f"Resolved database URL: {database_url}")
     console.print("Mode: WEATHER SHADOW VALIDATION / SQLITE QUERY ONLY")
-    console.print("Settlement writes are delegated to the existing serialized sync-settlements job.")
+    console.print(
+        "Settlement writes are delegated to the existing serialized sync-settlements job."
+    )
     console.print("Paper/live/demo/autopilot and paper-order creation remain blocked.")
     artifacts = write_weather_alpha_validation(
         database_url=database_url,
@@ -20763,9 +20793,7 @@ def candidate_coverage_audit_command(
     if freshness_minutes < 1 or addition_limit < 1:
         raise typer.BadParameter("freshness-minutes and addition-limit must be positive")
     settings = get_settings()
-    engine = make_candidate_funnel_read_only_engine(
-        database_url_from_settings(settings)
-    )
+    engine = make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
     with session_factory() as session:
         artifacts = write_candidate_coverage_audit(
@@ -20889,9 +20917,7 @@ def catalog_lineage_repair_command(
     if deadline_seconds < 1:
         raise typer.BadParameter("deadline-seconds must be positive")
     if apply and (accepted_plan is None or accepted_plan_sha256 is None):
-        raise typer.BadParameter(
-            "--apply requires --accepted-plan and --accepted-plan-sha256"
-        )
+        raise typer.BadParameter("--apply requires --accepted-plan and --accepted-plan-sha256")
     if not apply and (accepted_plan is not None or accepted_plan_sha256 is not None):
         raise typer.BadParameter("accepted-plan options are apply-only")
     try:
@@ -21214,9 +21240,7 @@ def evidence_expand_crypto_command(
     resume: Annotated[bool, typer.Option(help="Resume matching checkpointed partition.")] = False,
 ) -> None:
     research_factory = get_session_factory(init_db())
-    source_factory = get_session_factory(
-        make_sqlite_read_only_engine(f"sqlite:///{source_db}")
-    )
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
     with research_factory() as research, source_factory() as source:
         payload = expand_verified_crypto_cohort(
             research,
@@ -21342,9 +21366,7 @@ def paired_evidence_status_lineage_command(
     research_factory = get_session_factory(init_db())
     source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
     with research_factory() as research, source_factory() as source:
-        payload = capture_status_lineage(
-            research, source, sample_limit=sample_limit
-        )
+        payload = capture_status_lineage(research, source, sample_limit=sample_limit)
     console.print(json.dumps(payload, indent=2))
     console.print("Source database read-only; closed/settled statuses remain ineligible.")
 
@@ -21389,8 +21411,11 @@ def paired_evidence_handoff_command(
     source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
     with research_factory() as research, source_factory() as source:
         payload = run_latest_handoff(
-            research, source, owner_id=owner_id, batch_limit=batch_limit
-            , artifact_path=artifact_path
+            research,
+            source,
+            owner_id=owner_id,
+            batch_limit=batch_limit,
+            artifact_path=artifact_path,
         )
         payload["funnel"] = handoff_funnel(research)
     console.print(json.dumps(payload, indent=2))

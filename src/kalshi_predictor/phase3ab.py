@@ -285,8 +285,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     if payload["slow_settlement_avoids"]:
         for row in payload["slow_settlement_avoids"][:20]:
             lines.append(
-                f"| {row['ticker']} | {row['category']} | {row['eta_bucket']} | "
-                f"{row['reason']} |"
+                f"| {row['ticker']} | {row['category']} | {row['eta_bucket']} | {row['reason']} |"
             )
     else:
         lines.append("| None |  |  | No slow-settlement candidates found. |")

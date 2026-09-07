@@ -76,14 +76,11 @@ def calculate_payout_metrics(
     payout_if_correct = ONE_DOLLAR - cost_value
     downside_if_wrong = cost_value
     gross_expected_value = (
-        probability * payout_if_correct
-        - (ONE_DOLLAR - probability) * downside_if_wrong
+        probability * payout_if_correct - (ONE_DOLLAR - probability) * downside_if_wrong
     )
     estimated_taker_fee = trading_fee(price=cost_value)
     fee_adjusted_expected_value = (
-        gross_expected_value - estimated_taker_fee
-        if estimated_taker_fee is not None
-        else None
+        gross_expected_value - estimated_taker_fee if estimated_taker_fee is not None else None
     )
     # Executable opportunity truth must include the fee paid to enter. Keep
     # gross EV as a diagnostic field, but never use it for readiness or rank.

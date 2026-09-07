@@ -32,10 +32,8 @@ SOURCE_FAMILIES = {
 NEXT_COMMAND_CANDIDATES = (
     "kalshi-bot phase3bb-r3-source-evidence-activation "
     "--output-dir reports/phase3bb_r3_source_activation --reports-dir reports",
-    "kalshi-bot phase3bb-r2-general-source-evidence "
-    "--output-dir reports/phase3bb_r2_sources",
-    "kalshi-bot phase3bb-r2-general-source-availability "
-    "--output-dir reports/phase3bb_r2_sources",
+    "kalshi-bot phase3bb-r2-general-source-evidence --output-dir reports/phase3bb_r2_sources",
+    "kalshi-bot phase3bb-r2-general-source-availability --output-dir reports/phase3bb_r2_sources",
     "kalshi-bot phase3ax-gap-analysis --output-dir reports/phase3ax --reports-dir reports",
 )
 
@@ -65,9 +63,7 @@ def build_phase3bb_r3_source_evidence_activation(
         reports_dir / "phase3bb_r2_sources" / "phase3bb_r2_general_source_evidence.json"
     )
     availability_report = _read_json(
-        reports_dir
-        / "phase3bb_r2_sources"
-        / "phase3bb_r2_general_source_availability.json"
+        reports_dir / "phase3bb_r2_sources" / "phase3bb_r2_general_source_availability.json"
     )
     readiness_report = _read_json(
         reports_dir / "phase3bb_r2_sources" / "source_readiness_matrix.json"
@@ -76,9 +72,7 @@ def build_phase3bb_r3_source_evidence_activation(
         reports_dir / "phase3bb_r2_sources" / "usda_fvwretail_date_resolution.json"
     )
     flightaware_date_report = _read_json(
-        reports_dir
-        / "phase3bb_r2_sources"
-        / "flightaware_cancellation_date_resolution.json"
+        reports_dir / "phase3bb_r2_sources" / "flightaware_cancellation_date_resolution.json"
     )
     phase3an_status = _read_json(reports_dir / "phase3an" / "general_sources_status.json")
     phase3ax_status = _read_json(reports_dir / "phase3ax" / "source_evidence_gap_status.json")
@@ -125,22 +119,16 @@ def build_phase3bb_r3_source_evidence_activation(
         "fabricated_evidence": False,
         "source_reports_used": {
             "phase3bb_r2_general_source_evidence": str(
-                reports_dir
-                / "phase3bb_r2_sources"
-                / "phase3bb_r2_general_source_evidence.json"
+                reports_dir / "phase3bb_r2_sources" / "phase3bb_r2_general_source_evidence.json"
             ),
             "phase3bb_r2_general_source_availability": str(
-                reports_dir
-                / "phase3bb_r2_sources"
-                / "phase3bb_r2_general_source_availability.json"
+                reports_dir / "phase3bb_r2_sources" / "phase3bb_r2_general_source_availability.json"
             ),
             "source_readiness_matrix": str(
                 reports_dir / "phase3bb_r2_sources" / "source_readiness_matrix.json"
             ),
             "usda_fvwretail_date_resolution": str(
-                reports_dir
-                / "phase3bb_r2_sources"
-                / "usda_fvwretail_date_resolution.json"
+                reports_dir / "phase3bb_r2_sources" / "usda_fvwretail_date_resolution.json"
             ),
             "phase3an_general_sources_status": str(
                 reports_dir / "phase3an" / "general_sources_status.json"
@@ -260,9 +248,7 @@ def _source_activation_decision(
         availability_row.get("availability_status") == "SOURCE_VALUE_AVAILABLE_FOR_REVIEW"
     )
     activation_allowed = (
-        affected_rows > 0
-        and link_safe == affected_rows
-        and forecast_safe == affected_rows
+        affected_rows > 0 and link_safe == affected_rows and forecast_safe == affected_rows
     )
     activation_allowed = activation_allowed and not blocker_codes
     return {
@@ -358,9 +344,7 @@ def _activation_summary(
     phase3ax_status: dict[str, Any],
 ) -> dict[str, Any]:
     evidence_summary = (
-        evidence_report.get("summary")
-        if isinstance(evidence_report.get("summary"), dict)
-        else {}
+        evidence_report.get("summary") if isinstance(evidence_report.get("summary"), dict) else {}
     )
     availability_summary = (
         availability_report.get("summary")
@@ -482,8 +466,7 @@ def _next_codex_task(
         phase = "Phase 3AH-R3 Sports Provenance Repair"
         reason = "General-source gates are reported but blocked by external or review evidence."
         problem = (
-            "Move to the next implementation gap while source evidence waits for exact "
-            "inputs."
+            "Move to the next implementation gap while source evidence waits for exact inputs."
         )
     return {
         "task_phase_name": phase,

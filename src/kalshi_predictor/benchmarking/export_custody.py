@@ -3,18 +3,24 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from kalshi_predictor.benchmarking.runtime_export_import import (
     build_runtime_export_import_preview,
 )
 
-
 SENSITIVE_FIELD_TOKENS = (
-    "api_key", "authorization", "credential", "password", "private_key",
-    "secret", "session_token", "token",
+    "api_key",
+    "authorization",
+    "credential",
+    "password",
+    "private_key",
+    "secret",
+    "session_token",
+    "token",
 )
 ATTESTATION_TYPE = "offline-sha256-manifest-attestation-v1"
 
@@ -36,12 +42,14 @@ def _timestamp(value: Any, label: str, diagnostics: list[str]) -> str | None:
     if parsed.tzinfo is None:
         diagnostics.append(f"TIMESTAMP_NAIVE:{label}")
         return None
-    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return parsed.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _is_sensitive(field: str) -> bool:
     normalized = field.strip().lower().replace("-", "_")
-    return any(token == normalized or normalized.endswith(f"_{token}") for token in SENSITIVE_FIELD_TOKENS)
+    return any(
+        token == normalized or normalized.endswith(f"_{token}") for token in SENSITIVE_FIELD_TOKENS
+    )
 
 
 def _json_sensitive_paths(value: Any, prefix: str = "$") -> list[str]:
@@ -82,7 +90,14 @@ def _attestation_payload(custody: Mapping[str, Any]) -> bytes:
 def certify_export_custody(custody_path: Path) -> dict[str, Any]:
     custody = json.loads(custody_path.read_text(encoding="utf-8"))
     diagnostics: list[str] = []
-    for field in ("attestation_type", "signer_id", "signed_at", "signature_digest", "export_manifest", "artifacts"):
+    for field in (
+        "attestation_type",
+        "signer_id",
+        "signed_at",
+        "signature_digest",
+        "export_manifest",
+        "artifacts",
+    ):
         if custody.get(field) in (None, "", []):
             diagnostics.append(f"CUSTODY_FIELD_MISSING:{field}")
     if custody.get("attestation_type") != ATTESTATION_TYPE:
@@ -113,7 +128,9 @@ def certify_export_custody(custody_path: Path) -> dict[str, Any]:
         actual_hash = _sha256(path)
         if artifact.get("sha256") != actual_hash:
             diagnostics.append(f"ARTIFACT_HASH_MISMATCH:{label}")
-        source_timestamp = _timestamp(artifact.get("source_timestamp"), f"artifact:{label}", diagnostics)
+        source_timestamp = _timestamp(
+            artifact.get("source_timestamp"), f"artifact:{label}", diagnostics
+        )
         try:
             sensitive = _sensitive_paths(path)
         except (csv.Error, json.JSONDecodeError, OSError):
@@ -121,13 +138,15 @@ def certify_export_custody(custody_path: Path) -> dict[str, Any]:
             sensitive = []
         diagnostics.extend(f"SENSITIVE_FIELD_REJECTED:{label}:{item}" for item in sensitive)
         artifact_paths[label] = path
-        certified_artifacts.append({
-            "dataset": label,
-            "path": relative,
-            "sha256": actual_hash,
-            "source_timestamp": source_timestamp,
-            "sensitive_fields": sensitive,
-        })
+        certified_artifacts.append(
+            {
+                "dataset": label,
+                "path": relative,
+                "sha256": actual_hash,
+                "source_timestamp": source_timestamp,
+                "sensitive_fields": sensitive,
+            }
+        )
 
     export_spec = custody.get("export_manifest") or {}
     export_path = (root / str(export_spec.get("path", ""))).resolve()
@@ -141,11 +160,17 @@ def certify_export_custody(custody_path: Path) -> dict[str, Any]:
         diagnostics.append("EXPORT_MANIFEST_HASH_MISMATCH")
 
     chain_rows = sorted(certified_artifacts, key=lambda row: (row["dataset"], row["path"]))
-    chain_digest = hashlib.sha256(json.dumps({
-        "signer_id": custody.get("signer_id"),
-        "signed_at": signed_at,
-        "artifacts": chain_rows,
-    }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    chain_digest = hashlib.sha256(
+        json.dumps(
+            {
+                "signer_id": custody.get("signer_id"),
+                "signed_at": signed_at,
+                "artifacts": chain_rows,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
     return {
         "certified": not diagnostics,
         "diagnostics": diagnostics,
@@ -188,7 +213,9 @@ def build_export_custody_preview(custody_path: Path) -> dict[str, Any]:
         "import_preview": import_preview,
         "summary": {
             "artifacts": len(custody["artifacts"]),
-            "sensitive_fields_rejected": sum(len(row["sensitive_fields"]) for row in custody["artifacts"]),
+            "sensitive_fields_rejected": sum(
+                len(row["sensitive_fields"]) for row in custody["artifacts"]
+            ),
             "import_certified": import_certified,
             "pmb35_deployment_unblocked": False,
             "certification_passed": custody["certified"] and import_certified,

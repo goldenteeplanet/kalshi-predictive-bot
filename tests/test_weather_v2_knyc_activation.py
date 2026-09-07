@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import httpx
@@ -22,7 +22,7 @@ from kalshi_predictor.weather.repository import (
 )
 
 TICKER = "KXTEMPNYCH-26JUL1523-T80.99"
-TARGET = datetime(2026, 7, 16, 3, tzinfo=timezone.utc)
+TARGET = datetime(2026, 7, 16, 3, tzinfo=UTC)
 
 
 def test_flag_off_preserves_baseline_weather_v2_behavior(tmp_path) -> None:
@@ -43,9 +43,7 @@ def test_flag_on_applies_exact_bounded_probability_helpers(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
         snapshot = _seed_exact_runtime_rows(session)
-        forecast = WeatherV2Forecaster(settings=_settings(enabled=True)).forecast(
-            session, snapshot
-        )
+        forecast = WeatherV2Forecaster(settings=_settings(enabled=True)).forecast(session, snapshot)
 
     assert forecast is not None
     assert forecast.yes_probability == Decimal("0.55")
@@ -65,9 +63,7 @@ def test_flag_on_keeps_baseline_when_exact_evidence_is_invalid(tmp_path) -> None
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
         snapshot = _seed_exact_runtime_rows(session, station_id="KLGA")
-        forecast = WeatherV2Forecaster(settings=_settings(enabled=True)).forecast(
-            session, snapshot
-        )
+        forecast = WeatherV2Forecaster(settings=_settings(enabled=True)).forecast(session, snapshot)
 
     assert forecast is not None
     assert forecast.yes_probability == Decimal("0.44005")
@@ -119,9 +115,7 @@ def test_feature_builder_attaches_only_exact_knyc_observation(tmp_path) -> None:
     assert evidence["target_utc_time"] == now.isoformat()
 
 
-def test_enabled_new_york_ingest_deduplicates_station_observations(
-    tmp_path, monkeypatch
-) -> None:
+def test_enabled_new_york_ingest_deduplicates_station_observations(tmp_path, monkeypatch) -> None:
     session_factory = _session_factory(tmp_path)
     now = utc_now()
     payload = {
@@ -197,9 +191,7 @@ def _seed_exact_runtime_rows(session, *, station_id: str = "KNYC"):
             "floor_strike": 80.99,
             "cap_strike": None,
             "close_time": TARGET.isoformat(),
-            "rules_primary": (
-                "The Weather Company reports temperature for coordinates KNYC."
-            ),
+            "rules_primary": ("The Weather Company reports temperature for coordinates KNYC."),
             "yes_bid_dollars": "0.40",
             "yes_ask_dollars": "0.50",
         },

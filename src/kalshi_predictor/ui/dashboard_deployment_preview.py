@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-
 FILES = (
     "src/kalshi_predictor/ui/progress.py",
     "src/kalshi_predictor/ui/live_roadmap_status.py",
@@ -13,7 +12,9 @@ FILES = (
 )
 
 
-def certify_dashboard_deployment_preview(project: Path, unit: Path, harness: Path | None = None) -> dict[str, object]:
+def certify_dashboard_deployment_preview(
+    project: Path, unit: Path, harness: Path | None = None
+) -> dict[str, object]:
     failures: list[str] = []
     unit_text = unit.read_text(encoding="utf-8")
     required = (
@@ -28,7 +29,10 @@ def certify_dashboard_deployment_preview(project: Path, unit: Path, harness: Pat
     for token in required:
         if token not in unit_text:
             failures.append("UNIT_GUARD_MISSING:" + token.split("=", 1)[0])
-    if "Requires=kalshi-r5-watcher.service" in unit_text or "After=network-online.target kalshi-r5-watcher.service" in unit_text:
+    if (
+        "Requires=kalshi-r5-watcher.service" in unit_text
+        or "After=network-online.target kalshi-r5-watcher.service" in unit_text
+    ):
         failures.append("LEGACY_WATCHER_DEPENDENCY_PRESENT")
     hashes: dict[str, str] = {}
     for relative in FILES:
@@ -53,9 +57,13 @@ def certify_dashboard_deployment_preview(project: Path, unit: Path, harness: Pat
         harness_text = harness.read_text(encoding="utf-8")
         harness_hash = hashlib.sha256(harness.read_bytes()).hexdigest()
         for token in (
-            "trap 'fail_and_rollback' ERR", "rollback_now", "exit \"$status\"",
+            "trap 'fail_and_rollback' ERR",
+            "rollback_now",
+            'exit "$status"',
             "curl --fail --silent --max-time 5 http://127.0.0.1:8080/api/system/progress",
-            "post_status=", "[[ \"$post_status\" == 405 ]]", "127.0.0.1:8080",
+            "post_status=",
+            '[[ "$post_status" == 405 ]]',
+            "127.0.0.1:8080",
         ):
             if token not in harness_text:
                 failures.append("DEPLOYMENT_HARNESS_GUARD_MISSING:" + token)
@@ -75,9 +83,13 @@ def certify_dashboard_deployment_preview(project: Path, unit: Path, harness: Pat
             "collector_timer_wanted": True,
         },
         "guardrails": {
-            "local_only": True, "cloud_writes": 0, "database_writes": 0,
-            "deployment_performed": False, "execution_enabled": False,
-            "loopback_only": True, "rollback_required": True,
+            "local_only": True,
+            "cloud_writes": 0,
+            "database_writes": 0,
+            "deployment_performed": False,
+            "execution_enabled": False,
+            "loopback_only": True,
+            "rollback_required": True,
         },
         "deployment_requires_explicit_approval": True,
     }

@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 WORKFLOW = Path(".github/workflows/ui-obs2h-notification-pipeline.yml")
 
 
@@ -16,7 +15,8 @@ def build_workflow_preview(project_root: Path) -> dict[str, Any]:
     checks = {
         "workflow_present": bool(text),
         "runs_ui_obs2h_gate": "scripts/ui_obs2h_notification_pipeline_ci.py" in text,
-        "golden_manifest_supplied": "tests/golden/ui_obs2h_notification_pipeline_golden.json" in text,
+        "golden_manifest_supplied": "tests/golden/ui_obs2h_notification_pipeline_golden.json"
+        in text,
         "fails_on_gate_exit_code": "continue-on-error" not in lowered,
         "artifact_retained_always": "if: always()" in text and "actions/upload-artifact@v4" in text,
         "missing_artifact_fails": "if-no-files-found: error" in text,
@@ -24,7 +24,9 @@ def build_workflow_preview(project_root: Path) -> dict[str, Any]:
         "bounded_runtime": "timeout-minutes: 10" in text,
         "read_only_permissions": "permissions:\n  contents: read" in text,
         "no_deployment": not any(token in lowered for token in ("deploy", "ssh", "tailscale")),
-        "no_real_notifications": not any(token in lowered for token in ("send-mail", "slack", "webhook", "notify-send")),
+        "no_real_notifications": not any(
+            token in lowered for token in ("send-mail", "slack", "webhook", "notify-send")
+        ),
         "no_secrets": "secrets." not in lowered,
     }
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest() if text else None

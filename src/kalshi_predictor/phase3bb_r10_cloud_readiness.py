@@ -370,9 +370,7 @@ def _machine_profile(metadata: dict[str, Any]) -> dict[str, Any]:
     cpu_count = os.cpu_count() or 0
     load_avg = _load_average()
     load_ratio = (
-        round(float(load_avg[0]) / float(cpu_count), 3)
-        if load_avg and cpu_count > 0
-        else None
+        round(float(load_avg[0]) / float(cpu_count), 3) if load_avg and cpu_count > 0 else None
     )
     memory = _memory_profile()
     disk = _disk_profile(Path.cwd())
@@ -485,9 +483,7 @@ def _artifact_freshness(reports_dir: Path, *, now: datetime) -> dict[str, Any]:
         text = _read_text(path) if path.suffix != ".json" else ""
         generated = payload.get("generated_at") or _generated_from_markdown(text)
         parsed = parse_datetime(generated)
-        age_seconds = (
-            int(max(0, (now - parsed).total_seconds())) if parsed is not None else None
-        )
+        age_seconds = int(max(0, (now - parsed).total_seconds())) if parsed is not None else None
         result[key] = {
             "path": str(path),
             "exists": path.exists(),

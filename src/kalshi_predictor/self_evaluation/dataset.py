@@ -40,9 +40,7 @@ class EvaluationDataset:
     @property
     def pending_forecasts(self) -> list[ForecastMemory]:
         return [
-            row
-            for row in self.forecast_rows
-            if not forecast_is_final(row, self.evaluation_as_of)
+            row for row in self.forecast_rows if not forecast_is_final(row, self.evaluation_as_of)
         ]
 
     @property
@@ -62,8 +60,7 @@ class EvaluationDataset:
             for row in self.forecast_events
         )
         refs.extend(
-            _source_ref("trade_memory", row.trade_memory_event_id)
-            for row in self.trade_events
+            _source_ref("trade_memory", row.trade_memory_event_id) for row in self.trade_events
         )
         return refs
 
@@ -186,10 +183,8 @@ def _session_forecast_ids(
             or_(
                 and_(
                     ForecastMemory.forecast_generated_at.is_not(None),
-                    ForecastMemory.forecast_generated_at
-                    >= trading_session.evaluation_window_start,
-                    ForecastMemory.forecast_generated_at
-                    <= trading_session.evaluation_window_end,
+                    ForecastMemory.forecast_generated_at >= trading_session.evaluation_window_start,
+                    ForecastMemory.forecast_generated_at <= trading_session.evaluation_window_end,
                 ),
                 and_(
                     ForecastMemory.event_type == "FORECAST_CREATED",

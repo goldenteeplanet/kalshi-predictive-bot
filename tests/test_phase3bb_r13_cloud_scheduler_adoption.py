@@ -39,9 +39,7 @@ def test_phase3bb_r13_adopts_healthy_existing_r5(tmp_path: Path) -> None:
     assert payload["safety_flags"]["starts_r5_watcher"] is False
     assert payload["safety_flags"]["stops_processes"] is False
     assert artifacts.operator_command_path.exists()
-    assert "Phase 3BB-R14" in artifacts.next_actions_path.read_text(
-        encoding="utf-8"
-    )
+    assert "Phase 3BB-R14" in artifacts.next_actions_path.read_text(encoding="utf-8")
     assert "phase3bb-r13-cloud-scheduler-adoption" in payload["next_operator_command"]
 
 

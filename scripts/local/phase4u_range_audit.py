@@ -94,9 +94,7 @@ def main() -> None:
         "reason_codes": dict(
             sorted(Counter(reason for row in verdicts for reason in row["reason_codes"]).items())
         ),
-        "contract_structures": dict(
-            Counter(row["contract_structure"] for row in verdicts)
-        ),
+        "contract_structures": dict(Counter(row["contract_structure"] for row in verdicts)),
         "candidate_probabilities": sum(
             row["candidate_probability"] is not None for row in verdicts
         ),

@@ -40,9 +40,7 @@ def test_phase3bb_r5_documents_missing_date_stable_flightaware_evidence(tmp_path
     assert summary["link_safe_rows"] == 0
     assert summary["forecast_safe_rows"] == 0
     assert summary["network_fetches_performed"] is False
-    assert rows["canonical_local_record_1"]["rejection_code"] == (
-        "KALSHI_OUTCOME_NOT_OFFICIAL"
-    )
+    assert rows["canonical_local_record_1"]["rejection_code"] == ("KALSHI_OUTCOME_NOT_OFFICIAL")
     assert rows["flightaware_latest_public_recent_snapshot"]["rejection_code"] == (
         "RELATIVE_OR_MUTABLE_PAGE"
     )
@@ -120,9 +118,7 @@ def test_phase3ax_uses_phase3bb_r5_followup_task(tmp_path) -> None:
 
     source_status = _source_evidence_gap_status(reports_dir)
 
-    assert source_status["next_codex_task_phase_name"] == (
-        "Phase 3AH-R3 Sports Provenance Repair"
-    )
+    assert source_status["next_codex_task_phase_name"] == ("Phase 3AH-R3 Sports Provenance Repair")
     assert source_status["flightaware_status"] == "NOT_FOUND"
     assert source_status["first_hard_blocker"] == (
         "OFFICIAL_FLIGHTAWARE_HISTORICAL_AGGREGATE_UNAVAILABLE"

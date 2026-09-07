@@ -142,8 +142,7 @@ def _calibration_metrics(evaluated: list[tuple[Forecast, int]]) -> dict[str, Any
         return {"brier_score": None, "log_loss": None}
     y_true = [actual for _, actual in evaluated]
     y_prob = [
-        float(to_decimal(forecast.yes_probability) or Decimal("0"))
-        for forecast, _ in evaluated
+        float(to_decimal(forecast.yes_probability) or Decimal("0")) for forecast, _ in evaluated
     ]
     return {
         "brier_score": brier_score(y_true, y_prob),
@@ -189,10 +188,7 @@ def _pnl_metrics(trades: list[BacktestTrade]) -> dict[str, Any]:
     total_pnl = sum(((to_decimal(trade.pnl) or Decimal("0")) for trade in trades), Decimal("0"))
     total_edge = sum(((to_decimal(trade.edge) or Decimal("0")) for trade in trades), Decimal("0"))
     exposure = sum(
-        (
-            ((to_decimal(trade.price) or Decimal("0")) * Decimal(trade.quantity))
-            for trade in trades
-        ),
+        (((to_decimal(trade.price) or Decimal("0")) * Decimal(trade.quantity)) for trade in trades),
         Decimal("0"),
     )
     wins = sum(1 for trade in trades if (to_decimal(trade.pnl) or Decimal("0")) > 0)

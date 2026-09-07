@@ -122,10 +122,7 @@ def cached_evidence_dashboard(
 
 def evidence_dashboard(session: Session, *, include_deep: bool = False) -> dict[str, Any]:
     started = time.perf_counter()
-    lanes = {
-        lane: _empty_lane_summary()
-        for lane in (HISTORICAL_REPLAY, SHADOW, GUARDED_PAPER)
-    }
+    lanes = {lane: _empty_lane_summary() for lane in (HISTORICAL_REPLAY, SHADOW, GUARDED_PAPER)}
     lane_rows = session.execute(
         select(
             CanonicalEvaluation.source_lane,
@@ -352,10 +349,12 @@ def evidence_dashboard(session: Session, *, include_deep: bool = False) -> dict[
         warnings.append("PROSPECTIVE_STATUS_LINEAGE_UNAVAILABLE")
     generated_at = datetime.now(UTC).isoformat()
     freshness_times = [
-        value for value in (
+        value
+        for value in (
             health.get("generated_at"),
             status_lineage.get("generated_at"),
-        ) if value
+        )
+        if value
     ]
     latest_source_at = max(freshness_times) if freshness_times else None
     source_age_seconds = None

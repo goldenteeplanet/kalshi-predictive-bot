@@ -15,8 +15,16 @@ from kalshi_predictor.phase3bb_acceleration import (
     _safety_flags,
     _write_manifest,
 )
-from kalshi_predictor.phase3bb_r12_cloud_bootstrap import ProbeRunner, _resolve_target, _result_payload, _run_ssh_probe
-from kalshi_predictor.phase3bb_r44_weather_catalog_hook_runtime_verification import _mark_executable, _target_payload
+from kalshi_predictor.phase3bb_r12_cloud_bootstrap import (
+    ProbeRunner,
+    _resolve_target,
+    _result_payload,
+    _run_ssh_probe,
+)
+from kalshi_predictor.phase3bb_r44_weather_catalog_hook_runtime_verification import (
+    _mark_executable,
+    _target_payload,
+)
 from kalshi_predictor.phase3bb_r51_weather_ranking_path_repair import (
     write_phase3bb_r51_weather_ranking_path_repair_report,
 )
@@ -118,7 +126,9 @@ def write_phase3bb_r55_weather_ranking_path_retry_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(wait_checks_csv_path, payload["writer_wait_checks"])
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(r51_summary_csv_path, [payload.get("r51_summary") or {}])
@@ -217,7 +227,10 @@ def build_phase3bb_r55_weather_ranking_path_retry(
             output_dir=r53_output_dir,
             reports_dir=reports_dir,
             settings=resolved,
-            command_args=["phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair", "--r55-gate"],
+            command_args=[
+                "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair",
+                "--r55-gate",
+            ],
             ssh_target=ssh_target,
             identity_file=identity_file,
             app_path=app_path,
@@ -231,8 +244,12 @@ def build_phase3bb_r55_weather_ranking_path_retry(
             probe_runner=runner,
         )
         r53_payload = _read_json(r53_artifacts.json_path)
-        probe_results.extend(_probe_payloads_to_results(r53_payload.get("remote_probe_results") or []))
-    gate = _r51_gate(r53_payload, writer_wait=writer_wait, min_minutes_before_target=min_minutes_before_target)
+        probe_results.extend(
+            _probe_payloads_to_results(r53_payload.get("remote_probe_results") or [])
+        )
+    gate = _r51_gate(
+        r53_payload, writer_wait=writer_wait, min_minutes_before_target=min_minutes_before_target
+    )
     if gate["allowed"]:
         r51_artifacts = write_phase3bb_r51_weather_ranking_path_repair_report(
             session,
@@ -254,17 +271,22 @@ def build_phase3bb_r55_weather_ranking_path_retry(
             probe_runner=runner,
         )
         r51_payload = _read_json(r51_artifacts.json_path)
-        probe_results.extend(_probe_payloads_to_results(r51_payload.get("remote_probe_results") or []))
-    decision = _decision(writer_wait=writer_wait, gate=gate, r53_payload=r53_payload, r51_payload=r51_payload)
+        probe_results.extend(
+            _probe_payloads_to_results(r51_payload.get("remote_probe_results") or [])
+        )
+    decision = _decision(
+        writer_wait=writer_wait, gate=gate, r53_payload=r53_payload, r51_payload=r51_payload
+    )
     safety = {
         **_safety_flags(),
         "paper_only": True,
         "weather_ranking_path_retry": True,
         "ssh_read_only_commands_executed": writer_wait["read_only_probe_count"]
-        + (len((r53_payload.get("remote_probe_results") or [])) if r53_payload else 0)
-        + (len((r51_payload.get("remote_probe_results") or [])) if r51_payload else 0),
+        + (len(r53_payload.get("remote_probe_results") or []) if r53_payload else 0)
+        + (len(r51_payload.get("remote_probe_results") or []) if r51_payload else 0),
         "ssh_write_capable_commands_executed": len(_r51_repair_probe_names(r51_payload)),
-        "runs_weather_snapshot_capture": "weather_snapshot_capture" in _r51_repair_probe_names(r51_payload),
+        "runs_weather_snapshot_capture": "weather_snapshot_capture"
+        in _r51_repair_probe_names(r51_payload),
         "runs_weather_forecast": "weather_forecast_run" in _r51_repair_probe_names(r51_payload),
         "runs_weather_fast_lane": "weather_fast_lane_run" in _r51_repair_probe_names(r51_payload),
         "runs_missing_link_apply": False,
@@ -364,7 +386,9 @@ def _decision(
     r51_payload: dict[str, Any],
 ) -> dict[str, Any]:
     r53_decision = (r53_payload.get("decision") or {}) if isinstance(r53_payload, dict) else {}
-    r51_decision = (r51_payload.get("ranking_path_decision") or {}) if isinstance(r51_payload, dict) else {}
+    r51_decision = (
+        (r51_payload.get("ranking_path_decision") or {}) if isinstance(r51_payload, dict) else {}
+    )
     r51_status = r51_decision.get("status")
     if not writer_wait.get("cleared"):
         status = "WAITING_FOR_WRITER_CLEAR"
@@ -399,12 +423,18 @@ def _decision(
     elif r51_status:
         status = "R51_COMPLETED_WITH_WEATHER_BLOCKER"
         blocker = r51_decision.get("first_weather_path_blocker") or r51_status
-        reason = r51_decision.get("primary_reason") or "R51 completed but the weather path is still blocked."
+        reason = (
+            r51_decision.get("primary_reason")
+            or "R51 completed but the weather path is still blocked."
+        )
         command = r51_decision.get("operator_next_command") or (
             "kalshi-bot phase3bb-r51-weather-ranking-path-repair "
             "--output-dir reports/phase3bb_r51 --reports-dir reports"
         )
-        next_step = r51_decision.get("next_codex_step") or "Phase 3BB-R51 - Continue weather ranking path repair"
+        next_step = (
+            r51_decision.get("next_codex_step")
+            or "Phase 3BB-R51 - Continue weather ranking path repair"
+        )
     else:
         status = "R51_NOT_RUN_OR_UNREADABLE"
         blocker = "R51_PAYLOAD_MISSING"
@@ -515,7 +545,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             decision["operator_next_command"],
             "```",
             "",
-            "R55 does not stop R5, start services, create paper trades, submit live/demo orders, or lower thresholds.",
+            "R55 does not stop R5, start services, create paper trades, submit live/demo "
+            "orders, or lower thresholds.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -569,25 +600,32 @@ def _render_markdown(payload: dict[str, Any]) -> str:
 
 def _render_next_actions(payload: dict[str, Any]) -> str:
     decision = payload["decision"]
-    return "\n".join(
-        [
-            "# Next Actions",
-            "",
-            f"Status: `{decision['status']}`",
-            f"First hard blocker: `{decision['first_hard_blocker']}`",
-            "",
-            "```bash",
-            decision["operator_next_command"],
-            "```",
-            "",
-            "Guardrails:",
-            "- Do not stop R5 from this phase.",
-            "- Do not create paper trades unless a downstream paper-ready gate opens.",
-            "- Do not submit/cancel/replace live or demo orders.",
-            "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Next Actions",
+                "",
+                f"Status: `{decision['status']}`",
+                f"First hard blocker: `{decision['first_hard_blocker']}`",
+                "",
+                "```bash",
+                decision["operator_next_command"],
+                "```",
+                "",
+                "Guardrails:",
+                "- Do not stop R5 from this phase.",
+                "- Do not create paper trades unless a downstream paper-ready gate opens.",
+                "- Do not submit/cancel/replace live or demo orders.",
+                "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
-    return "#!/usr/bin/env bash\nset -euo pipefail\n" + payload["decision"]["operator_next_command"] + "\n"
+    return (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + payload["decision"]["operator_next_command"]
+        + "\n"
+    )

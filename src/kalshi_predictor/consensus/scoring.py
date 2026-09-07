@@ -205,4 +205,3 @@ def _price(value: Decimal | None) -> str:
     if value is None:
         return "n/a"
     return f"{(value * Decimal('100')).quantize(Decimal('0.1'))} cents"
-

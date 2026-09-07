@@ -131,7 +131,9 @@ def write_phase3bb_r52_weather_ev_fair_value_diagnostic_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(rows_csv_path, payload["weather_ev_rows"], ROW_FIELDS)
     _write_rows_csv(summary_csv_path, [payload["summary"]])
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
@@ -266,7 +268,9 @@ def _probes(
 ) -> list[RemoteProbe]:
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
         RemoteProbe("db_writer_monitor", writer_cmd, timeout_seconds),
@@ -282,7 +286,7 @@ def _probes(
                 "phase3bb-r8-unified-paper-gate "
                 "phase3bb-r51-weather-ranking-path-repair "
                 "phase3bb-r52-weather-ev-fair-value-diagnostic; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -312,7 +316,8 @@ print(json.dumps({
     "opportunity_min_score": str(settings.opportunity_min_score),
     "opportunity_max_spread": str(settings.opportunity_max_spread),
     "opportunity_min_liquidity": str(settings.opportunity_min_liquidity),
-    "opportunity_min_time_to_close_minutes": str(settings.opportunity_min_time_to_close_minutes),
+    "opportunity_min_time_to_close_minutes": \
+str(settings.opportunity_min_time_to_close_minutes),
 }, sort_keys=True))
 """
     return f"cd {app} && set -a && . {env} && set +a && .venv/bin/python -c {shlex.quote(script)}"
@@ -437,11 +442,13 @@ try:
         link["_parsed_target_time"] = target_time
         seen_eligible.add(ticker)
         eligible_links.append(link)
-    future_target_times = sorted({{iso(link["_parsed_target_time"]) for link in eligible_links if link["_parsed_target_time"] >= now}})
+    future_target_times = sorted({{iso(link["_parsed_target_time"]) for link in \
+eligible_links if link["_parsed_target_time"] >= now}})
     selected_target_time = future_target_times[0] if future_target_times else None
     selected_link_rows = [
         link for link in eligible_links
-        if selected_target_time is not None and iso(link["_parsed_target_time"]) == selected_target_time
+        if selected_target_time is not None and iso(link["_parsed_target_time"]) == \
+selected_target_time
     ]
     if not selected_link_rows:
         selected_link_rows = eligible_links
@@ -465,14 +472,16 @@ try:
         placeholders = ",".join("?" for _ in tickers)
         markets = {{str(row["ticker"]): dict(row) for row in conn.execute(
             f'''
-            select ticker, title, status, series_ticker, close_time, expected_expiration_time, expiration_time
+            select ticker, title, status, series_ticker, close_time, \
+expected_expiration_time, expiration_time
             from markets where ticker in ({{placeholders}})
             ''',
             tickers,
         ).fetchall()}}
         forecasts = latest_by_ticker([dict(row) for row in conn.execute(
             f'''
-            select id, ticker, forecasted_at, model_name, yes_probability, market_mid_probability,
+            select id, ticker, forecasted_at, model_name, yes_probability, \
+market_mid_probability,
                    best_yes_bid, best_yes_ask
             from forecasts
             where ticker in ({{placeholders}}) and model_name = 'weather_v2'
@@ -513,10 +522,13 @@ try:
         snapshot = snapshots.get(ticker) or {{}}
         ranking = rankings.get(ticker) or {{}}
         raw_ranking = load_raw(ranking.get("raw_json"))
-        forecast_probability = dec(forecast.get("yes_probability")) or dec(ranking.get("forecast_probability"))
+        forecast_probability = dec(forecast.get("yes_probability")) or \
+dec(ranking.get("forecast_probability"))
         yes_fair = forecast_probability
-        no_fair = Decimal("1") - forecast_probability if forecast_probability is not None else None
-        yes_ask = dec(snapshot.get("best_yes_ask")) or dec(forecast.get("best_yes_ask")) or dec(raw_ranking.get("best_yes_ask"))
+        no_fair = Decimal("1") - forecast_probability if forecast_probability is not \
+None else None
+        yes_ask = dec(snapshot.get("best_yes_ask")) or \
+dec(forecast.get("best_yes_ask")) or dec(raw_ranking.get("best_yes_ask"))
         no_ask = dec(snapshot.get("best_no_ask")) or dec(raw_ranking.get("best_no_ask"))
         yes_bid = dec(snapshot.get("best_yes_bid"))
         no_bid = dec(snapshot.get("best_no_bid"))
@@ -554,10 +566,12 @@ try:
             explanation = "Forecast exists but no executable ask side was visible."
         elif edge is not None and edge <= Decimal("0"):
             blocker = "FAIR_VALUE_BELOW_EXECUTABLE_PRICE"
-            explanation = "The best executable ask is above the model fair probability for both YES/NO sides."
+            explanation = "The best executable ask is above the model fair probability \
+for both YES/NO sides."
         else:
             blocker = "EV_POSITIVE_OR_FILTERED_LATER"
-            explanation = "Raw EV is positive or unresolved; downstream score/liquidity/spread gates should decide."
+            explanation = "Raw EV is positive or unresolved; downstream \
+score/liquidity/spread gates should decide."
         blockers[blocker] += 1
         rows.append({{
             "ticker": ticker,
@@ -568,7 +582,8 @@ try:
             "yes_fair_value": dstr(yes_fair),
             "no_fair_value": dstr(no_fair),
             "market_mid_probability": dstr(midpoint),
-            "forecast_minus_mid": dstr(forecast_probability - midpoint) if forecast_probability is not None and midpoint is not None else None,
+            "forecast_minus_mid": dstr(forecast_probability - midpoint) if \
+forecast_probability is not None and midpoint is not None else None,
             "best_yes_bid": dstr(yes_bid),
             "best_yes_ask": dstr(yes_ask),
             "best_no_bid": dstr(no_bid),
@@ -597,11 +612,16 @@ try:
     payload["summary"] = {{
         "selected_target_time": selected_target_time,
         "linked_weather_rows": len(links),
-        "ranked_weather_rows": sum(1 for row in rows if row["first_ev_blocker"] != "RANKING_MISSING"),
-        "positive_ev_rows": sum(1 for row in rows if dec(row.get("estimated_edge")) is not None and dec(row.get("estimated_edge")) > Decimal("0")),
-        "non_positive_ev_rows": sum(1 for row in rows if dec(row.get("estimated_edge")) is not None and dec(row.get("estimated_edge")) <= Decimal("0")),
-        "live_or_future_rows": sum(1 for row in rows if row["target_window_state"] == "LIVE_OR_FUTURE"),
-        "recently_expired_rows": sum(1 for row in rows if row["target_window_state"] == "RECENTLY_EXPIRED"),
+        "ranked_weather_rows": sum(1 for row in rows if row["first_ev_blocker"] != \
+"RANKING_MISSING"),
+        "positive_ev_rows": sum(1 for row in rows if dec(row.get("estimated_edge")) is \
+not None and dec(row.get("estimated_edge")) > Decimal("0")),
+        "non_positive_ev_rows": sum(1 for row in rows if dec(row.get("estimated_edge")) \
+is not None and dec(row.get("estimated_edge")) <= Decimal("0")),
+        "live_or_future_rows": sum(1 for row in rows if row["target_window_state"] == \
+"LIVE_OR_FUTURE"),
+        "recently_expired_rows": sum(1 for row in rows if row["target_window_state"] == \
+"RECENTLY_EXPIRED"),
         "expired_rows": sum(1 for row in rows if row["target_window_state"] == "EXPIRED"),
         "first_ev_blocker_counts": dict(blockers),
     }}
@@ -644,7 +664,9 @@ def _parse_probe_outputs(
     rows = rows if isinstance(rows, list) else []
     _apply_threshold_gaps(rows, thresholds)
     return {
-        "remote_time_utc": (by_name.get("remote_time_utc").stdout.strip() if by_name.get("remote_time_utc") else ""),
+        "remote_time_utc": (
+            by_name.get("remote_time_utc").stdout.strip() if by_name.get("remote_time_utc") else ""
+        ),
         "writer": _json_from_stdout(by_name.get("db_writer_monitor")),
         "command_registry_ok": bool(
             by_name.get("command_registry")
@@ -653,7 +675,9 @@ def _parse_probe_outputs(
         ),
         "thresholds": thresholds,
         "weather_ev_state_ok": bool(state.get("ok")) if isinstance(state, dict) else False,
-        "weather_ev_state_error": state.get("error") if isinstance(state, dict) else "missing_weather_ev_state",
+        "weather_ev_state_error": state.get("error")
+        if isinstance(state, dict)
+        else "missing_weather_ev_state",
         "weather_ev_rows": rows,
         "weather_ev_state_summary": state.get("summary", {}) if isinstance(state, dict) else {},
     }
@@ -665,8 +689,14 @@ def _apply_threshold_gaps(rows: list[dict[str, Any]], thresholds: dict[str, Any]
     for row in rows:
         edge = _decimal(row.get("estimated_edge"))
         score = _decimal(row.get("opportunity_score"))
-        row["edge_to_min_threshold"] = _format_decimal(min_edge - edge) if min_edge is not None and edge is not None else None
-        row["score_to_threshold"] = _format_decimal(min_score - score) if min_score is not None and score is not None else None
+        row["edge_to_min_threshold"] = (
+            _format_decimal(min_edge - edge) if min_edge is not None and edge is not None else None
+        )
+        row["score_to_threshold"] = (
+            _format_decimal(min_score - score)
+            if min_score is not None and score is not None
+            else None
+        )
 
 
 def _summary(rows: list[dict[str, Any]], *, parsed: dict[str, Any]) -> dict[str, Any]:
@@ -681,8 +711,12 @@ def _summary(rows: list[dict[str, Any]], *, parsed: dict[str, Any]) -> dict[str,
         "ranked_weather_rows": len(ranked_rows),
         "positive_ev_rows": len(positive_values),
         "non_positive_ev_rows": sum(1 for value in positive if value is not None and value <= 0),
-        "live_or_future_rows": sum(1 for row in rows if row.get("target_window_state") == "LIVE_OR_FUTURE"),
-        "recently_expired_rows": sum(1 for row in rows if row.get("target_window_state") == "RECENTLY_EXPIRED"),
+        "live_or_future_rows": sum(
+            1 for row in rows if row.get("target_window_state") == "LIVE_OR_FUTURE"
+        ),
+        "recently_expired_rows": sum(
+            1 for row in rows if row.get("target_window_state") == "RECENTLY_EXPIRED"
+        ),
         "first_ev_blocker": blockers.most_common(1)[0][0] if blockers else "NO_WEATHER_ROWS",
         "first_ev_blocker_counts": dict(blockers),
         "best_ticker": best_row.get("ticker") if best_row else None,
@@ -699,7 +733,10 @@ def _decision(summary: dict[str, Any]) -> dict[str, Any]:
     if not summary.get("command_registry_ok"):
         status = "WEATHER_EV_DIAGNOSTIC_COMMAND_REGISTRY_INCOMPLETE"
         blocker = "COMMAND_REGISTRY_MISSING"
-        command = "kalshi-bot phase3bb-r12-cloud-bootstrap-verification --output-dir reports/phase3bb_r12 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r12-cloud-bootstrap-verification --output-dir "
+            "reports/phase3bb_r12 --reports-dir reports"
+        )
     elif summary["ranked_weather_rows"] <= 0:
         status = "WEATHER_EV_DIAGNOSTIC_RANKING_ROWS_MISSING"
         blocker = "RANKING_MISSING"
@@ -710,18 +747,25 @@ def _decision(summary: dict[str, Any]) -> dict[str, Any]:
     elif summary["positive_ev_rows"] > 0:
         status = "WEATHER_POSITIVE_EV_FOUND_REFRESH_PAPER_GATE"
         blocker = "PAPER_GATE_REFRESH_NEEDED"
-        command = "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+            "--reports-dir reports"
+        )
     elif summary["live_or_future_rows"] <= 0:
         status = "WEATHER_EV_WINDOW_EXPIRED_AFTER_RANKING"
         blocker = "TARGET_WINDOW_EXPIRED"
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports"
         )
     else:
         status = "WEATHER_EV_NOT_POSITIVE_EXPLAINED"
         blocker = summary.get("first_ev_blocker") or "EV_NOT_POSITIVE"
-        command = "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir reports/phase3bb_r40 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir "
+            "reports/phase3bb_r40 --reports-dir reports"
+        )
     summary["status"] = status
     summary["first_hard_blocker"] = blocker
     return {
@@ -782,36 +826,39 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
     lines = _metadata_lines(payload, "# Phase 3BB-R52 Weather EV / Fair-Value Diagnostic")
     lines.extend(
         [
-        f"- Live/demo execution: `{payload['live_or_demo_execution']}`",
-        f"- Order submission/cancel/replace: `{payload['order_submission_cancel_replace']}`",
-        f"- Paper trade creation: `{payload['paper_trade_creation']}`",
-        f"- Thresholds lowered: `{payload['thresholds_lowered']}`",
-        "",
-        "## Result",
-        "",
-        f"- Status: `{decision['status']}`",
-        f"- First hard blocker: `{decision['first_hard_blocker']}`",
-        f"- Linked weather rows inspected: `{summary['linked_weather_rows']}`",
-        f"- Ranked weather rows: `{summary['ranked_weather_rows']}`",
-        f"- Positive-EV rows: `{summary['positive_ev_rows']}`",
-        f"- Non-positive-EV rows: `{summary['non_positive_ev_rows']}`",
-        f"- Live/future rows: `{summary['live_or_future_rows']}`",
-        f"- Best ticker: `{summary.get('best_ticker')}`",
-        f"- Best estimated edge: `{summary.get('best_estimated_edge')}`",
-        f"- Best edge gap to positive: `{summary.get('best_edge_to_positive')}`",
-        "",
-        "## Explanation",
-        "",
-        "R52 compares the weather model's fair value (`YES=p`, `NO=1-p`) against the executable ask prices. "
-        "A row stays blocked when the best executable side costs more than its model fair value.",
-        "",
-        "## Next",
-        "",
-        "```bash",
-        decision["operator_next_command"],
-        "```",
-        "",
-        "No paper trades, live/demo orders, service starts/stops, threshold changes, or fake evidence were run.",
+            f"- Live/demo execution: `{payload['live_or_demo_execution']}`",
+            f"- Order submission/cancel/replace: `{payload['order_submission_cancel_replace']}`",
+            f"- Paper trade creation: `{payload['paper_trade_creation']}`",
+            f"- Thresholds lowered: `{payload['thresholds_lowered']}`",
+            "",
+            "## Result",
+            "",
+            f"- Status: `{decision['status']}`",
+            f"- First hard blocker: `{decision['first_hard_blocker']}`",
+            f"- Linked weather rows inspected: `{summary['linked_weather_rows']}`",
+            f"- Ranked weather rows: `{summary['ranked_weather_rows']}`",
+            f"- Positive-EV rows: `{summary['positive_ev_rows']}`",
+            f"- Non-positive-EV rows: `{summary['non_positive_ev_rows']}`",
+            f"- Live/future rows: `{summary['live_or_future_rows']}`",
+            f"- Best ticker: `{summary.get('best_ticker')}`",
+            f"- Best estimated edge: `{summary.get('best_estimated_edge')}`",
+            f"- Best edge gap to positive: `{summary.get('best_edge_to_positive')}`",
+            "",
+            "## Explanation",
+            "",
+            "R52 compares the weather model's fair value (`YES=p`, `NO=1-p`) against the "
+            "executable ask prices. "
+            "A row stays blocked when the best executable side costs more than its model "
+            "fair value.",
+            "",
+            "## Next",
+            "",
+            "```bash",
+            decision["operator_next_command"],
+            "```",
+            "",
+            "No paper trades, live/demo orders, service starts/stops, threshold changes, "
+            "or fake evidence were run.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -826,7 +873,8 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         f"Status: `{decision['status']}`",
         f"First hard blocker: `{decision['first_hard_blocker']}`",
         "",
-        "| Ticker | Window | p(YES) | YES ask | NO ask | Best side | Price | Edge | Gap to +EV | Blocker |",
+        "| Ticker | Window | p(YES) | YES ask | NO ask | Best side | Price | Edge | Gap "
+        "to +EV | Blocker |",
         "|---|---:|---:|---:|---:|---|---:|---:|---:|---|",
     ]
     for row in rows[:25]:
@@ -864,30 +912,39 @@ def _render_markdown(payload: dict[str, Any]) -> str:
 
 def _render_next_actions(payload: dict[str, Any]) -> str:
     decision = payload["decision"]
-    return "\n".join(
-        [
-            "# Next Actions",
-            "",
-            f"Status: `{decision['status']}`",
-            f"First hard blocker: `{decision['first_hard_blocker']}`",
-            "",
-            "```bash",
-            decision["operator_next_command"],
-            "```",
-            "",
-            "Guardrails:",
-            "- Do not create paper trades unless a downstream paper-ready gate opens.",
-            "- Do not submit/cancel/replace live or demo orders.",
-            "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Next Actions",
+                "",
+                f"Status: `{decision['status']}`",
+                f"First hard blocker: `{decision['first_hard_blocker']}`",
+                "",
+                "```bash",
+                decision["operator_next_command"],
+                "```",
+                "",
+                "Guardrails:",
+                "- Do not create paper trades unless a downstream paper-ready gate opens.",
+                "- Do not submit/cancel/replace live or demo orders.",
+                "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
-    return "#!/usr/bin/env bash\nset -euo pipefail\n" + payload["decision"]["operator_next_command"] + "\n"
+    return (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + payload["decision"]["operator_next_command"]
+        + "\n"
+    )
 
 
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]], fields: list[str] | None = None) -> None:
+def _write_rows_csv(
+    path: Path, rows: list[dict[str, Any]], fields: list[str] | None = None
+) -> None:
     if fields is None:
         fields = sorted({key for row in rows for key in row})
     with path.open("w", encoding="utf-8", newline="") as handle:
@@ -898,7 +955,15 @@ def _write_rows_csv(path: Path, rows: list[dict[str, Any]], fields: list[str] | 
 
 
 def _write_probe_csv(path: Path, results: list[dict[str, Any]]) -> None:
-    fields = ["name", "ok", "exit_code", "duration_seconds", "stdout_tail", "stderr_tail", "command"]
+    fields = [
+        "name",
+        "ok",
+        "exit_code",
+        "duration_seconds",
+        "stdout_tail",
+        "stderr_tail",
+        "command",
+    ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()

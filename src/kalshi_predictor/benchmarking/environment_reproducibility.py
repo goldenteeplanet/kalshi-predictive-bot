@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 SUPPORTED_PYTHON_VERSIONS = ("3.11", "3.12", "3.13")
 HASH_SEEDS = ("0", "1", "8675309")
 
@@ -23,8 +22,10 @@ def build_cross_environment_reproducibility_preview(
         command = [
             sys.executable,
             str(project_root / "scripts/pmb28_certification_ci.py"),
-            "--project-root", str(project_root),
-            "--output-dir", str(output_dir),
+            "--project-root",
+            str(project_root),
+            "--output-dir",
+            str(output_dir),
         ]
         completed = subprocess.run(
             command,
@@ -37,14 +38,16 @@ def build_cross_environment_reproducibility_preview(
         )
         report_path = output_dir / "pmb28_offline_certification_ci_gate.json"
         report = json.loads(report_path.read_text()) if report_path.is_file() else {}
-        runs.append({
-            "python_hash_seed": hash_seed,
-            "exit_code": completed.returncode,
-            "passed": report.get("summary", {}).get("passed") is True,
-            "bundle_digest": report.get("summary", {}).get("regenerated_bundle_digest"),
-            "summary_digest": report.get("summary", {}).get("actual_summary_digest"),
-            "stderr_empty": not completed.stderr.strip(),
-        })
+        runs.append(
+            {
+                "python_hash_seed": hash_seed,
+                "exit_code": completed.returncode,
+                "passed": report.get("summary", {}).get("passed") is True,
+                "bundle_digest": report.get("summary", {}).get("regenerated_bundle_digest"),
+                "summary_digest": report.get("summary", {}).get("actual_summary_digest"),
+                "stderr_empty": not completed.stderr.strip(),
+            }
+        )
     workflow = (project_root / ".github/workflows/pmb28-offline-certification.yml").read_text()
     matrix_declared = all(f'"{version}"' in workflow for version in SUPPORTED_PYTHON_VERSIONS)
     bundle_digests = {row["bundle_digest"] for row in runs}
@@ -75,9 +78,7 @@ def build_cross_environment_reproducibility_preview(
     }
 
 
-def write_cross_environment_reproducibility_preview(
-    project_root: Path, output_dir: Path
-) -> Path:
+def write_cross_environment_reproducibility_preview(project_root: Path, output_dir: Path) -> Path:
     report = build_cross_environment_reproducibility_preview(
         project_root, output_dir / "clean_runs"
     )
@@ -91,13 +92,16 @@ def write_cross_environment_reproducibility_preview(
 
 def _clean_environment(hash_seed: str) -> dict[str, str]:
     allowed = {
-        key: value for key, value in os.environ.items()
+        key: value
+        for key, value in os.environ.items()
         if key in {"PATH", "HOME", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "VIRTUAL_ENV"}
     }
-    allowed.update({
-        "PYTHONHASHSEED": hash_seed,
-        "PYTHONNOUSERSITE": "1",
-        "PYTHONDONTWRITEBYTECODE": "1",
-        "EXECUTION_ENABLED": "false",
-    })
+    allowed.update(
+        {
+            "PYTHONHASHSEED": hash_seed,
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "EXECUTION_ENABLED": "false",
+        }
+    )
     return allowed

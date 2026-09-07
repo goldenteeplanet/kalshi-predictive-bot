@@ -134,9 +134,7 @@ def build_phase3bb_r14_cloud_service_plan(
         "argv": command_args or [],
     }
     r13_context = _read_json(reports_dir / "phase3bb_r13" / "cloud_scheduler_adoption.json")
-    r12_context = _read_json(
-        reports_dir / "phase3bb_r12" / "cloud_bootstrap_verification.json"
-    )
+    r12_context = _read_json(reports_dir / "phase3bb_r12" / "cloud_bootstrap_verification.json")
     r11_context = _read_json(reports_dir / "phase3bb_r11" / "codex_cloud_context.json")
     adoption = r13_context.get("adoption_decision") or {}
     target = _target_from_contexts(r13_context, r11_context)
@@ -285,9 +283,7 @@ def _service_plan(
             "kalshi-bot phase3bb-r13-cloud-scheduler-adoption "
             "--output-dir reports/phase3bb_r13 --reports-dir reports"
         ),
-        "next_codex_step": (
-            "Phase 3BB-R15 - Cloud Service Install Review / No-start Dry Run"
-        ),
+        "next_codex_step": ("Phase 3BB-R15 - Cloud Service Install Review / No-start Dry Run"),
         "active_command": active_command,
         "remote_app_path": target.get("app_path"),
         "remote_env_path": target.get("env_path"),
@@ -431,15 +427,15 @@ def _render_guard_script_draft(payload: dict[str, Any]) -> str:
             f"APP_PATH={_shell_quote(str(plan['remote_app_path']))}",
             f"ENV_PATH={_shell_quote(str(plan['remote_env_path']))}",
             "",
-            "cd \"$APP_PATH\"",
+            'cd "$APP_PATH"',
             "existing_pids=$(pgrep -f 'phase3bc-r5-crypto-freshness-watch' || true)",
-            "if [[ -n \"$existing_pids\" ]]; then",
-            "  echo \"Refusing duplicate R5 start; existing pid(s): $existing_pids\" >&2",
+            'if [[ -n "$existing_pids" ]]; then',
+            '  echo "Refusing duplicate R5 start; existing pid(s): $existing_pids" >&2',
             "  exit 75",
             "fi",
             "",
             "set -a",
-            ". \"$ENV_PATH\"",
+            '. "$ENV_PATH"',
             "set +a",
             "",
             ".venv/bin/kalshi-bot db-writer-monitor --json > /tmp/kalshi-r5-writer-guard.json",

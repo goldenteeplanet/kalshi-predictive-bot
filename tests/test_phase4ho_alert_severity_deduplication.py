@@ -58,30 +58,48 @@ def test_severity_escalation_and_resolution_bypass_deduplication() -> None:
         candidate, [], evaluated_at_epoch_seconds=100
     )
     lower = _record(initial.deduplication_key_hash, emitted=100, severity="WARNING")
-    assert evaluate_alert_severity_and_deduplication(
-        candidate, [lower], evaluated_at_epoch_seconds=101
-    ).disposition == "EMIT"
+    assert (
+        evaluate_alert_severity_and_deduplication(
+            candidate, [lower], evaluated_at_epoch_seconds=101
+        ).disposition
+        == "EMIT"
+    )
     resolved = _record(
         initial.deduplication_key_hash, emitted=100, severity="CRITICAL", resolved=True
     )
-    assert evaluate_alert_severity_and_deduplication(
-        candidate, [resolved], evaluated_at_epoch_seconds=101
-    ).disposition == "EMIT"
+    assert (
+        evaluate_alert_severity_and_deduplication(
+            candidate, [resolved], evaluated_at_epoch_seconds=101
+        ).disposition
+        == "EMIT"
+    )
 
 
 def test_stale_incomplete_unknown_and_future_candidates_fail_closed() -> None:
-    assert evaluate_alert_severity_and_deduplication(
-        _candidate(age=121), [], evaluated_at_epoch_seconds=200
-    ).disposition == "STALE"
-    assert evaluate_alert_severity_and_deduplication(
-        _candidate(complete=False), [], evaluated_at_epoch_seconds=200
-    ).disposition == "INCOMPLETE"
-    assert evaluate_alert_severity_and_deduplication(
-        _candidate(category="UNKNOWN"), [], evaluated_at_epoch_seconds=200
-    ).disposition == "DENY"
-    assert evaluate_alert_severity_and_deduplication(
-        _candidate(observed=201), [], evaluated_at_epoch_seconds=200
-    ).disposition == "DENY"
+    assert (
+        evaluate_alert_severity_and_deduplication(
+            _candidate(age=121), [], evaluated_at_epoch_seconds=200
+        ).disposition
+        == "STALE"
+    )
+    assert (
+        evaluate_alert_severity_and_deduplication(
+            _candidate(complete=False), [], evaluated_at_epoch_seconds=200
+        ).disposition
+        == "INCOMPLETE"
+    )
+    assert (
+        evaluate_alert_severity_and_deduplication(
+            _candidate(category="UNKNOWN"), [], evaluated_at_epoch_seconds=200
+        ).disposition
+        == "DENY"
+    )
+    assert (
+        evaluate_alert_severity_and_deduplication(
+            _candidate(observed=201), [], evaluated_at_epoch_seconds=200
+        ).disposition
+        == "DENY"
+    )
 
 
 def test_history_order_bounds_duplicates_and_future_records_fail_closed() -> None:

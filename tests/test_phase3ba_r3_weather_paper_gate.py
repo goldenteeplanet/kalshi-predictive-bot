@@ -135,18 +135,18 @@ def test_phase3ba_r3_reports_every_failed_gate() -> None:
 def test_phase3ba_r3_accepts_exact_catalog_api_identity_without_promoting_ui_url() -> None:
     identity = {
         "market_ticker": "KXTEMPNYCH-TEST",
-        "api_url": (
-            "https://external-api.kalshi.com/trade-api/v2/markets/"
-            "KXTEMPNYCH-TEST"
-        ),
+        "api_url": ("https://external-api.kalshi.com/trade-api/v2/markets/KXTEMPNYCH-TEST"),
         "kalshi_url_status": "BUILT_FROM_EXACT_CATALOG",
         "kalshi_url_verified": False,
     }
 
-    assert phase3ba_r3._weather_source_identity_ready(
-        identity,
-        ticker="KXTEMPNYCH-TEST",
-    ) is True
+    assert (
+        phase3ba_r3._weather_source_identity_ready(
+            identity,
+            ticker="KXTEMPNYCH-TEST",
+        )
+        is True
+    )
     assert identity["kalshi_url_verified"] is False
 
 

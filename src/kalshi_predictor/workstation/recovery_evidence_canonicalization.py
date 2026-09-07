@@ -140,9 +140,7 @@ def canonicalize_recovery_evidence(
         "4HH": "PASSED",
     }
     incomplete_statuses = {"INCOMPLETE", "DEGRADED"}
-    if observed_age > max_evidence_age_seconds or any(
-        entry.status == "STALE" for entry in entries
-    ):
+    if observed_age > max_evidence_age_seconds or any(entry.status == "STALE" for entry in entries):
         status: BundleStatus = "STALE"
         reasons = ["RECOVERY_EVIDENCE_STALE"]
     elif any(entry.status in incomplete_statuses for entry in entries):

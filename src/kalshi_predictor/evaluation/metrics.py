@@ -5,8 +5,7 @@ from collections.abc import Sequence
 def brier_score(y_true: Sequence[int], y_prob: Sequence[float]) -> float:
     _validate_lengths(y_true, y_prob)
     return sum(
-        (probability - actual) ** 2
-        for actual, probability in zip(y_true, y_prob, strict=True)
+        (probability - actual) ** 2 for actual, probability in zip(y_true, y_prob, strict=True)
     ) / len(y_true)
 
 

@@ -1,8 +1,8 @@
 import json
 
 from kalshi_predictor.benchmarking.shadow_adapter import (
-    ExposureGuardShadowAdapter,
     SYNTHETIC_RANKINGS,
+    ExposureGuardShadowAdapter,
     build_exposure_guard_shadow_adapter_preview,
     write_exposure_guard_shadow_adapter_preview,
 )
@@ -29,7 +29,8 @@ def test_pmb33_applies_buffer_and_scale_only_to_shadow_rows():
     assert report["summary"]["buffer_rejections"] > 0
     assert all(
         row["shadow"]["allocated_capital"] == "9.50"
-        for row in report["rows"] if row["shadow"]["eligible"]
+        for row in report["rows"]
+        if row["shadow"]["eligible"]
     )
 
 

@@ -70,4 +70,3 @@ def _event(
             "liquidity_change_pct": str(feature.get("liquidity_change_pct")),
         },
     }
-

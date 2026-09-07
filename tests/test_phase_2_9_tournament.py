@@ -133,9 +133,7 @@ def test_diagnostics_identify_insufficient_data() -> None:
 
 
 def test_diagnostics_identify_negative_pnl() -> None:
-    diagnostics = generate_model_diagnostics(
-        [_row("model_a", pnl="-1", roi="-0.1", status="OK")]
-    )
+    diagnostics = generate_model_diagnostics([_row("model_a", pnl="-1", roi="-0.1", status="OK")])
 
     assert any("Negative P&L" in item["notes"] for item in diagnostics)
     assert any("Negative simulated ROI" in item["notes"] for item in diagnostics)

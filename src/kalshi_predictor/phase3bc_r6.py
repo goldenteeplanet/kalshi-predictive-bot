@@ -471,9 +471,7 @@ def _phase3bc_r5_watch_command(
         "--refresh-open-markets" if refresh_open_markets else "--skip-open-market-refresh"
     )
     command.append(
-        "--external-crypto-ingest"
-        if external_crypto_ingest
-        else "--skip-external-crypto-ingest"
+        "--external-crypto-ingest" if external_crypto_ingest else "--skip-external-crypto-ingest"
     )
     command.append("--repair-snapshots" if repair_snapshots else "--diagnose-snapshots")
     command.append(
@@ -577,9 +575,7 @@ def _guard_status(
         status = "STOPPED"
 
     should_stop = status == "OVERRUNNING"
-    stale_report = (
-        latest_age_seconds is None or latest_age_seconds > freshness_window_minutes * 60
-    )
+    stale_report = latest_age_seconds is None or latest_age_seconds > freshness_window_minutes * 60
     return {
         "phase": "3BC-R6",
         "status": status,
@@ -614,9 +610,7 @@ def _guard_status(
         "active_pure_crypto_rows": int(summary.get("active_pure_crypto_rows") or 0),
         "missing_or_stale_ranking_rows": int(summary.get("missing_or_stale_ranking_rows") or 0),
         "r8_fields_available": r8_fields_available,
-        "true_ranking_gap_after_repair": _int_or_none(
-            summary.get("true_ranking_gap_after_repair")
-        ),
+        "true_ranking_gap_after_repair": _int_or_none(summary.get("true_ranking_gap_after_repair")),
         "snapshot_stale_rows": _int_or_none(summary.get("snapshot_stale_rows")),
         "forecast_stale_rows": _int_or_none(summary.get("forecast_stale_rows")),
         "positive_ev_rows": _int_or_none(summary.get("positive_ev_rows")),
@@ -873,7 +867,7 @@ def _pid_matches_phase3bc_r5_watch(pid: int) -> bool:
             "-NoProfile",
             "-Command",
             (
-                f"(Get-CimInstance Win32_Process -Filter \"ProcessId = {pid}\" "
+                f'(Get-CimInstance Win32_Process -Filter "ProcessId = {pid}" '
                 "| Select-Object -ExpandProperty CommandLine)"
             ),
         ]
@@ -1119,7 +1113,7 @@ def _render_status_markdown(payload: dict[str, Any]) -> str:
 
 def _render_guard_markdown(payload: dict[str, Any]) -> str:
     action = payload.get("action") or {}
-    after_guard = ((payload.get("after") or {}).get("guard") or {})
+    after_guard = (payload.get("after") or {}).get("guard") or {}
     lines = [
         "# Phase 3BC-R5 Crypto Freshness Guard",
         "",

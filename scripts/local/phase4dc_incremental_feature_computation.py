@@ -62,9 +62,12 @@ def _validate(
         identifier, op, dependencies = node["id"], node["op"], node["dependencies"]
         if not isinstance(identifier, str) or not identifier or identifier in identifiers:
             raise ValueError("PHASE4DC_NODE_ID_INVALID")
-        if op not in OPS or not isinstance(dependencies, list) or any(
-            not isinstance(item, str) or not item for item in dependencies
-        ) or len(set(dependencies)) != len(dependencies):
+        if (
+            op not in OPS
+            or not isinstance(dependencies, list)
+            or any(not isinstance(item, str) or not item for item in dependencies)
+            or len(set(dependencies)) != len(dependencies)
+        ):
             raise ValueError("PHASE4DC_NODE_DEFINITION_INVALID")
         if op == "SOURCE":
             if dependencies:

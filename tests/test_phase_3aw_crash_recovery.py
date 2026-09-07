@@ -186,14 +186,11 @@ def test_phase3aw_dashboard_truth_ignores_conflicting_phase3ar_positive_ev(
     assert payload["summary"]["paper_ready_candidates"] == 0
     assert payload["summary"]["stale_artifacts_ignored"] >= 1
     assert any(
-        row["name"] == "Phase 3AR paper-ready gate"
-        and row["classification"] == "CONFLICTS_WITH_R5"
+        row["name"] == "Phase 3AR paper-ready gate" and row["classification"] == "CONFLICTS_WITH_R5"
         for row in audit["rows"]
     )
     assert panel["status_label"] == "Waiting for Positive EV"
-    assert {item["label"]: item["value"] for item in panel["metrics"]}[
-        "Positive EV"
-    ] == 0
+    assert {item["label"]: item["value"] for item in panel["metrics"]}["Positive EV"] == 0
     assert panel["positive_ev_rows"] == []
 
 
@@ -259,9 +256,7 @@ def test_phase3aw_dashboard_uses_ev_gap_after_classified_freshness_backlog(
         summary["data_freshness_gap_after_refresh"] = "SNAPSHOT_STALE"
         summary["primary_gap_after_refresh"] = EV_NOT_POSITIVE
         summary["snapshot_backlog_status"] = "EXACT_TICKER_NOT_REFRESHED"
-        summary["forecast_backlog_status"] = (
-            "FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH"
-        )
+        summary["forecast_backlog_status"] = "FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH"
         summary["freshness_backlog_blocks_current_positive_ev"] = False
         summary["positive_ev_snapshot_stale_rows"] = 0
         summary["positive_ev_forecast_stale_rows"] = 0
@@ -323,9 +318,7 @@ def test_phase3aw_dashboard_keeps_running_overdue_r5_as_runner_state(
 
     payload = json.loads(artifacts.dashboard_truth_path.read_text(encoding="utf-8"))
     panel = _paper_trade_blocker_status_from_phase3aw(payload)
-    watcher_row = next(
-        row for row in panel["blockers"] if row["area"] == "Watcher freshness"
-    )
+    watcher_row = next(row for row in panel["blockers"] if row["area"] == "Watcher freshness")
 
     assert payload["summary"]["true_current_blocker"] == EV_NOT_POSITIVE
     assert payload["summary"]["r5_runner_state"] == "RUNNING_CYCLE_OVERDUE"

@@ -149,4 +149,3 @@ def _decimal_delta(current: str | None, previous: str | None) -> str:
         return str(float(current) - float(previous))
     except ValueError:
         return "n/a"
-

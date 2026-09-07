@@ -23,8 +23,12 @@ def test_pmb18_covers_each_requested_distribution_shift():
     report = build_distribution_shift_stress_validation()
     names = {row["name"] for row in report["shift_regimes"]}
     assert names == {
-        "control", "forecast_error_shift", "thinner_books", "wider_spreads",
-        "adverse_settlement_mix", "combined_adverse_shift",
+        "control",
+        "forecast_error_shift",
+        "thinner_books",
+        "wider_spreads",
+        "adverse_settlement_mix",
+        "combined_adverse_shift",
     }
     assert report["summary"]["categories"] == ["crypto", "sports", "weather"]
     assert report["summary"]["all_attribution_complete"] is True

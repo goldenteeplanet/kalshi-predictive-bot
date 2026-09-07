@@ -191,9 +191,7 @@ def test_gate_state_attention_precedence(transition_name, classification, expect
 
 
 def test_no_eligible_rows_gate():
-    state, reasons = _module()._gate_state(
-        [], {"ready_count": 0, "input_row_count": 0}
-    )
+    state, reasons = _module()._gate_state([], {"ready_count": 0, "input_row_count": 0})
     assert state == "NO_ELIGIBLE_ROWS"
     assert reasons == ["VALIDATED_COHORT_EMPTY"]
 

@@ -55,4 +55,3 @@ def _explicit_probability(features: dict[str, Any]) -> Decimal | None:
         if probability is not None:
             return probability
     return None
-

@@ -122,7 +122,9 @@ def write_phase3bb_r61_cloud_dashboard_db_writer_api_repair_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(ui_api_probe_csv_path, payload["private_ui_api_probe_results"])
     _write_rows_csv(checks_csv_path, payload["repair_checks"])
@@ -202,9 +204,13 @@ def build_phase3bb_r61_cloud_dashboard_db_writer_api_repair(
         "argv": command_args or [],
     }
     r11 = _read_json(reports_dir / "phase3bb_r11" / "codex_cloud_context.json")
-    r32 = _read_json(reports_dir / "phase3bb_r32" / "cloud_ui_dashboard_truth_scheduler_status.json")
+    r32 = _read_json(
+        reports_dir / "phase3bb_r32" / "cloud_ui_dashboard_truth_scheduler_status.json"
+    )
     r33 = _read_json(reports_dir / "phase3bb_r33" / "cloud_paper_only_operations_readiness.json")
-    r34 = _read_json(reports_dir / "phase3bb_r34" / "cloud_multicategory_refresh_scheduler_review.json")
+    r34 = _read_json(
+        reports_dir / "phase3bb_r34" / "cloud_multicategory_refresh_scheduler_review.json"
+    )
     target = _resolve_target(
         r11,
         ssh_target=ssh_target,
@@ -224,10 +230,14 @@ def build_phase3bb_r61_cloud_dashboard_db_writer_api_repair(
     remote_results = [runner(probe, target) for probe in remote_probes]
     parsed_remote = _parse_remote_state(remote_results, ui_service_name=ui_service_name)
     ui_runner = ui_probe_runner or _run_ui_api_probe
-    ui_results = [
-        ui_runner(UiApiProbe(name, path, ui_timeout_seconds), resolved_base_url)
-        for name, path in PRIVATE_API_PATHS
-    ] if resolved_base_url else []
+    ui_results = (
+        [
+            ui_runner(UiApiProbe(name, path, ui_timeout_seconds), resolved_base_url)
+            for name, path in PRIVATE_API_PATHS
+        ]
+        if resolved_base_url
+        else []
+    )
     ui_payloads = [_ui_probe_payload(row) for row in ui_results]
     checks = _repair_checks(
         parsed_remote=parsed_remote,
@@ -369,11 +379,19 @@ def _parse_remote_state(
     ui_service_name: str,
 ) -> dict[str, Any]:
     by_name = {row.name: row for row in results}
-    systemd = _parse_systemctl_show(by_name.get("ui_systemd_state").stdout if by_name.get("ui_systemd_state") else "")
-    listener_text = by_name.get("ui_local_listener").stdout if by_name.get("ui_local_listener") else ""
+    systemd = _parse_systemctl_show(
+        by_name.get("ui_systemd_state").stdout if by_name.get("ui_systemd_state") else ""
+    )
+    listener_text = (
+        by_name.get("ui_local_listener").stdout if by_name.get("ui_local_listener") else ""
+    )
     loopback = by_name.get("ui_loopback_db_writer_api")
     loopback_status = _http_status_from_text(loopback.stdout if loopback else "")
-    tailscale_text = by_name.get("tailscale_serve_status").stdout if by_name.get("tailscale_serve_status") else ""
+    tailscale_text = (
+        by_name.get("tailscale_serve_status").stdout
+        if by_name.get("tailscale_serve_status")
+        else ""
+    )
     return {
         "ui_service_name": ui_service_name,
         "ui_service_load_state": systemd.get("LoadState"),
@@ -391,10 +409,12 @@ def _parse_remote_state(
         "tailscale_serve_configured": "proxy http://127.0.0.1:8080" in tailscale_text
         or "127.0.0.1:8080" in tailscale_text,
         "tailscale_serve_excerpt": tailscale_text.strip()[:1000],
-        "r60_registered_on_cloud": "R60_REGISTERED" in (
+        "r60_registered_on_cloud": "R60_REGISTERED"
+        in (
             by_name.get("remote_r60_registry").stdout if by_name.get("remote_r60_registry") else ""
         ),
-        "r32_r33_r34_registered_on_cloud": "R32_R33_R34_REGISTERED" in (
+        "r32_r33_r34_registered_on_cloud": "R32_R33_R34_REGISTERED"
+        in (
             by_name.get("remote_r32_r33_r34_registry").stdout
             if by_name.get("remote_r32_r33_r34_registry")
             else ""
@@ -423,7 +443,10 @@ def _repair_checks(
         _check(
             "ui_service_active",
             bool(parsed_remote.get("ui_service_active")),
-            f"ActiveState={parsed_remote.get('ui_service_active_state')}; SubState={parsed_remote.get('ui_service_sub_state')}.",
+            f"ActiveState="
+            f"{parsed_remote.get('ui_service_active_state')}; "
+            f"SubState="
+            f"{parsed_remote.get('ui_service_sub_state')}.",
         ),
         _check(
             "ui_port_listening",
@@ -448,7 +471,8 @@ def _repair_checks(
         _check(
             "private_dashboard_snapshot_api_reachable",
             bool((result_by_name.get("dashboard_snapshot_api") or {}).get("ok")),
-            f"HTTP status={(result_by_name.get('dashboard_snapshot_api') or {}).get('status_code')}.",
+            f"HTTP status="
+            f"{(result_by_name.get('dashboard_snapshot_api') or {}).get('status_code')}.",
         ),
         _check(
             "r32_r33_r34_registered_on_cloud",
@@ -467,7 +491,8 @@ def _repair_checks(
         ),
         _check(
             "latest_r33_ready",
-            r33_decision.get("status") in {"PAPER_ONLY_MONITORING_READY", "PAPER_ONLY_OPERATOR_REVIEW_READY"},
+            r33_decision.get("status")
+            in {"PAPER_ONLY_MONITORING_READY", "PAPER_ONLY_OPERATOR_REVIEW_READY"},
             f"R33 status={r33_decision.get('status')}.",
         ),
         _check(
@@ -494,10 +519,15 @@ def _repair_decision(
         status = "BLOCKED_UI_SERVICE_NOT_INSTALLED"
         reason = "kalshi-ui.service is not loaded on the cloud host."
         next_step = "Phase 3BB-R22 - Operator-Approved Cloud UI Install Handoff"
-        command = "kalshi-bot phase3bb-r22-cloud-ui-install-handoff --output-dir reports/phase3bb_r22 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r22-cloud-ui-install-handoff --output-dir "
+            "reports/phase3bb_r22 --reports-dir reports"
+        )
     elif not parsed_remote.get("ui_service_active") or not parsed_remote.get("ui_port_listening"):
         status = "BLOCKED_UI_BACKEND_INACTIVE"
-        reason = "Tailscale Serve is up, but no localhost UI backend is serving /api/db-writer-monitor."
+        reason = (
+            "Tailscale Serve is up, but no localhost UI backend is serving /api/db-writer-monitor."
+        )
         next_step = "Phase 3BB-R24 - Operator-Approved Cloud UI Start + SSH Tunnel Verification"
         command = (
             "kalshi-bot phase3bb-r24-cloud-ui-start-tunnel-verification "
@@ -505,34 +535,55 @@ def _repair_decision(
         )
     elif not parsed_remote.get("loopback_db_writer_reachable"):
         status = "BLOCKED_LOOPBACK_DB_WRITER_API"
-        reason = "The UI service is running, but localhost /api/db-writer-monitor is not returning HTTP 200."
+        reason = (
+            "The UI service is running, but localhost /api/db-writer-monitor is not "
+            "returning HTTP 200."
+        )
         next_step = "Phase 3BB-R61 - Inspect UI service logs and route errors"
         command = "journalctl -u kalshi-ui.service -n 120 --no-pager"
     elif any(row["check"].startswith("private_") and not row["passed"] for row in checks):
         status = "BLOCKED_PRIVATE_UI_TAILSCALE_REACHABILITY"
         reason = "The cloud loopback API is healthy, but private Tailscale API probes still fail."
         next_step = "Phase 3BB-R30/R31 - Private Access Verification"
-        command = "kalshi-bot phase3bb-r30-cloud-ui-private-access-install-verification --output-dir reports/phase3bb_r30 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r30-cloud-ui-private-access-install-verification "
+            "--output-dir reports/phase3bb_r30 --reports-dir reports"
+        )
     elif r32_decision.get("status") != "VERIFIED_DASHBOARD_TRUTH_AND_SCHEDULER_STATUS":
         status = "READY_TO_RERUN_R32"
         reason = "UI APIs are reachable; refresh dashboard truth before scheduler handoff."
         next_step = "Phase 3BB-R32 - Cloud UI Dashboard Truth And Scheduler Status Verification"
-        command = "kalshi-bot phase3bb-r32-cloud-ui-dashboard-truth-scheduler-status-verification --output-dir reports/phase3bb_r32 --reports-dir reports"
-    elif r33_decision.get("status") not in {"PAPER_ONLY_MONITORING_READY", "PAPER_ONLY_OPERATOR_REVIEW_READY"}:
+        command = (
+            "kalshi-bot phase3bb-r32-cloud-ui-dashboard-truth-scheduler-status-verification "
+            "--output-dir reports/phase3bb_r32 --reports-dir reports"
+        )
+    elif r33_decision.get("status") not in {
+        "PAPER_ONLY_MONITORING_READY",
+        "PAPER_ONLY_OPERATOR_REVIEW_READY",
+    }:
         status = "READY_TO_RERUN_R33"
         reason = "R32 is verified; refresh paper-only operations readiness."
         next_step = "Phase 3BB-R33 - Cloud Paper-Only Operations Readiness Monitor"
-        command = "kalshi-bot phase3bb-r33-cloud-paper-only-operations-readiness --output-dir reports/phase3bb_r33 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r33-cloud-paper-only-operations-readiness --output-dir "
+            "reports/phase3bb_r33 --reports-dir reports"
+        )
     elif r34_decision.get("status") != "READY_FOR_NO_START_SCHEDULER_DRY_RUN":
         status = "READY_TO_RERUN_R34"
         reason = "R33 is ready; refresh the multi-category scheduler review with the R60 job."
         next_step = "Phase 3BB-R34 - Cloud Multi-Category Refresh Scheduler Review"
-        command = "kalshi-bot phase3bb-r34-cloud-multicategory-refresh-scheduler-review --output-dir reports/phase3bb_r34 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r34-cloud-multicategory-refresh-scheduler-review "
+            "--output-dir reports/phase3bb_r34 --reports-dir reports"
+        )
     else:
         status = "READY_FOR_R60_SCHEDULER_NO_START_HANDOFF"
         reason = "UI API, R32, R33, R34, and R60 command registration are all clear."
         next_step = "Phase 3BB-R35 - Cloud Multi-Category Scheduler No-Start Dry Run"
-        command = "kalshi-bot phase3bb-r35-cloud-multicategory-scheduler-no-start-dry-run --output-dir reports/phase3bb_r35 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r35-cloud-multicategory-scheduler-no-start-dry-run "
+            "--output-dir reports/phase3bb_r35 --reports-dir reports"
+        )
     return {
         "status": status,
         "repair_passed": not failed,
@@ -561,7 +612,9 @@ def _resolve_private_base_url(
     r32_url = str(r32.get("private_base_url") or "").strip()
     if r32_url:
         return r32_url.rstrip("/")
-    r31 = _read_json(reports_dir / "phase3bb_r31" / "cloud_ui_private_access_operator_smoke_test.json")
+    r31 = _read_json(
+        reports_dir / "phase3bb_r31" / "cloud_ui_private_access_operator_smoke_test.json"
+    )
     r31_url = str((r31.get("smoke_decision") or {}).get("private_base_url") or "").strip()
     return r31_url.rstrip("/") or "https://kalshi-bot-01.taile570d1.ts.net"
 
@@ -689,7 +742,8 @@ def _render_next_actions(payload: dict[str, Any]) -> str:
             "",
             "## R60 No-Start Scheduler Hook",
             "",
-            "- Once R32/R33/R34 are verified, run `reports/phase3bb_r61/operator_r60_scheduler_no_start_handoff.sh` to generate the no-start scheduler draft.",
+            "- Once R32/R33/R34 are verified, run `reports/phase3bb_r61/operator_r60_sche"
+            "duler_no_start_handoff.sh` to generate the no-start scheduler draft.",
             "- Do not install or start the scheduler from R61.",
             "",
             "## Do Not Run",

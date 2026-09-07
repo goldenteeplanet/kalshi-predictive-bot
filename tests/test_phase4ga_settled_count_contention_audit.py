@@ -79,9 +79,7 @@ def test_result_tampering_and_safety_boundary_fail_closed() -> None:
     result = audit_settled_count_contention([_sample()])
     with pytest.raises(SettledCountContentionAuditError, match="AUDIT_HASH_MISMATCH"):
         validate_contention_audit(replace(result, audit_hash="0" * 64))
-    with pytest.raises(
-        SettledCountContentionAuditError, match="AUDIT_SAFETY_BOUNDARY_INVALID"
-    ):
+    with pytest.raises(SettledCountContentionAuditError, match="AUDIT_SAFETY_BOUNDARY_INVALID"):
         validate_contention_audit(replace(result, execution_authorized=True))
 
 

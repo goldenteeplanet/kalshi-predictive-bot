@@ -345,9 +345,7 @@ def build_phase3af_coverage_diagnostics(
     ]
     status_counts = Counter(str(game.status or "unknown").lower() for game in games)
     league_counts = Counter(game.league for game in games)
-    coverage_ratio = (
-        (forecast_eligible / len(rows)) if rows else None
-    )
+    coverage_ratio = (forecast_eligible / len(rows)) if rows else None
 
     return {
         "generated_at": utc_now().isoformat(),
@@ -470,9 +468,10 @@ def _phase3af_market_row(
     if matches:
         base["top_candidate_game_key"] = matches[0]["game_key"]
         base["top_candidate_confidence"] = matches[0]["confidence"]
-    if len(matches) >= 2 and Decimal(matches[0]["confidence"]) - Decimal(
-        matches[1]["confidence"]
-    ) < AMBIGUITY_MARGIN:
+    if (
+        len(matches) >= 2
+        and Decimal(matches[0]["confidence"]) - Decimal(matches[1]["confidence"]) < AMBIGUITY_MARGIN
+    ):
         return {
             **base,
             "status": "AMBIGUOUS_VERIFIED_MATCH",

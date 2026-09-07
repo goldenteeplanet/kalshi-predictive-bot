@@ -222,9 +222,7 @@ def build_shell_context(
 ) -> dict[str, Any]:
     resolved = settings or get_settings()
     phase_3t_snapshot = snapshot or build_dashboard_snapshot(session, settings=resolved)
-    sources = {
-        row["source_id"]: row for row in phase_3t_snapshot.get("source_statuses", [])
-    }
+    sources = {row["source_id"]: row for row in phase_3t_snapshot.get("source_statuses", [])}
     phase_3w = phase_3t_snapshot["panels"]["system_certification"]
     phase_3v = phase_3t_snapshot["panels"]["live_readiness"]
     database = phase_3t_snapshot["panels"]["system_health"]["database"]
@@ -458,10 +456,7 @@ def _render_audit_markdown(audit: dict[str, Any]) -> str:
         "",
         "## Route Inventory",
         "",
-        (
-            "| Route | Primary user job | Source authority | Action authority | "
-            "Disposition | Risk |"
-        ),
+        ("| Route | Primary user job | Source authority | Action authority | Disposition | Risk |"),
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for row in audit["routes"]:
@@ -482,9 +477,7 @@ def _render_component_catalog(audit: dict[str, Any]) -> str:
         "| --- | --- | --- | --- |",
     ]
     for row in audit["components"]:
-        lines.append(
-            f"| {row['name']} | {row['purpose']} | {row['states']} | {row['authority']} |"
-        )
+        lines.append(f"| {row['name']} | {row['purpose']} | {row['states']} | {row['authority']} |")
     return "\n".join(lines)
 
 

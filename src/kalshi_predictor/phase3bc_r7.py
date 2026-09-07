@@ -145,11 +145,7 @@ def build_phase3bc_r7_payload(
     limit: int = 2000,
 ) -> dict[str, Any]:
     generated_at = utc_now()
-    after_summary = (
-        _coverage_summary(after_diagnostics)
-        if after_diagnostics is not None
-        else None
-    )
+    after_summary = _coverage_summary(after_diagnostics) if after_diagnostics is not None else None
     before_summary = _coverage_summary(before_diagnostics)
     repair_counts = Counter(row["status"] for row in repair_results)
     summary = {
@@ -158,26 +154,20 @@ def build_phase3bc_r7_payload(
         "current_active_window_rows": before_summary["current_active_window_rows"],
         "expired_crypto_window_rows": before_summary["expired_crypto_window_rows"],
         "fresh_ranking_rows_before": before_summary["fresh_ranking_rows"],
-        "missing_or_stale_ranking_rows_before": before_summary[
-            "missing_or_stale_ranking_rows"
-        ],
+        "missing_or_stale_ranking_rows_before": before_summary["missing_or_stale_ranking_rows"],
         "repairable_ranking_rows_before": before_summary["repairable_ranking_rows"],
         "rankings_inserted": repair_counts.get("RANKING_INSERTED", 0),
         "repair_skipped_rows": sum(
             count for status, count in repair_counts.items() if status != "RANKING_INSERTED"
         ),
-        "fresh_ranking_rows_after": after_summary["fresh_ranking_rows"]
-        if after_summary
-        else None,
+        "fresh_ranking_rows_after": after_summary["fresh_ranking_rows"] if after_summary else None,
         "current_active_window_rows_after": after_summary["current_active_window_rows"]
         if after_summary
         else None,
         "expired_crypto_window_rows_after": after_summary["expired_crypto_window_rows"]
         if after_summary
         else None,
-        "missing_or_stale_ranking_rows_after": after_summary[
-            "missing_or_stale_ranking_rows"
-        ]
+        "missing_or_stale_ranking_rows_after": after_summary["missing_or_stale_ranking_rows"]
         if after_summary
         else None,
         "repair_enabled": repair_rankings,
@@ -218,12 +208,8 @@ def build_phase3bc_r7_payload(
         "before_rows": before_diagnostics,
         "after_rows": after_diagnostics or [],
         "examples": {
-            "repairable": [
-                row for row in before_diagnostics if row["repairable"]
-            ][:50],
-            "blocked": [
-                row for row in before_diagnostics if not row["repairable"]
-            ][:50],
+            "repairable": [row for row in before_diagnostics if row["repairable"]][:50],
+            "blocked": [row for row in before_diagnostics if not row["repairable"]][:50],
         },
         "recommended_next_action": _recommended_next_action(summary),
         "next_commands": _next_commands(summary),
@@ -245,9 +231,7 @@ def classify_phase3bc_r7_rows(
         forecast_at = parse_datetime(row.get("latest_forecast_at"))
         ranking_at = parse_datetime(row.get("latest_ranking_at"))
         ticker_close_time = crypto_ticker_close_time_utc(row.get("ticker"))
-        expired_crypto_window = (
-            ticker_close_time is not None and ticker_close_time <= resolved_now
-        )
+        expired_crypto_window = ticker_close_time is not None and ticker_close_time <= resolved_now
         snapshot_age = _age_minutes(snapshot_at, now=resolved_now)
         forecast_age = _age_minutes(forecast_at, now=resolved_now)
         ranking_age = _age_minutes(ranking_at, now=resolved_now)
@@ -456,9 +440,10 @@ def _main_gap(diagnostics: list[dict[str, Any]]) -> str | None:
 
 
 def _recommended_next_action(summary: dict[str, Any]) -> str:
-    if summary.get("main_gap_after") == R5_PRIMARY_EV_NOT_POSITIVE or summary.get(
-        "main_gap_before"
-    ) == R5_PRIMARY_EV_NOT_POSITIVE:
+    if (
+        summary.get("main_gap_after") == R5_PRIMARY_EV_NOT_POSITIVE
+        or summary.get("main_gap_before") == R5_PRIMARY_EV_NOT_POSITIVE
+    ):
         return (
             "R5 post-refresh evidence shows snapshots, forecasts, and ranking coverage "
             "are clear; the current blocker is EV_NOT_POSITIVE. Continue the R5 status "
@@ -486,9 +471,10 @@ def _recommended_next_action(summary: dict[str, Any]) -> str:
 
 
 def _next_commands(summary: dict[str, Any]) -> list[str]:
-    if summary.get("main_gap_after") == R5_PRIMARY_EV_NOT_POSITIVE or summary.get(
-        "main_gap_before"
-    ) == R5_PRIMARY_EV_NOT_POSITIVE:
+    if (
+        summary.get("main_gap_after") == R5_PRIMARY_EV_NOT_POSITIVE
+        or summary.get("main_gap_before") == R5_PRIMARY_EV_NOT_POSITIVE
+    ):
         return ["kalshi-bot phase3bc-r5-status --output-dir reports/phase3bc_r5"]
     commands = [
         (
@@ -499,8 +485,7 @@ def _next_commands(summary: dict[str, Any]) -> list[str]:
     ]
     if summary["missing_or_stale_ranking_rows_after"] == 0:
         commands[0] = (
-            "kalshi-bot phase3bc-r4-crypto-ev-risk-diagnostics "
-            "--output-dir reports/phase3bc_r4"
+            "kalshi-bot phase3bc-r4-crypto-ev-risk-diagnostics --output-dir reports/phase3bc_r4"
         )
     return commands
 

@@ -16,7 +16,6 @@ from kalshi_predictor.benchmarking.oos_policy import (
     _metrics,
 )
 
-
 SHIFT_REGIMES: tuple[dict[str, str], ...] = (
     {
         "name": "control",
@@ -87,7 +86,8 @@ def build_distribution_shift_stress_validation() -> dict[str, Any]:
             ),
         }
     broken = [
-        row["name"] for row in regimes
+        row["name"]
+        for row in regimes
         if not row["comparison"]["capital_and_drawdown_advantage_survived"]
     ]
     canonical = json.dumps(regimes, sort_keys=True, separators=(",", ":")).encode()
@@ -129,9 +129,7 @@ def write_distribution_shift_stress_validation(output_dir: Path) -> Path:
     return path
 
 
-def _run_regime(
-    regime: dict[str, str], zones: dict[tuple[str, str, str], str]
-) -> dict[str, Any]:
+def _run_regime(regime: dict[str, str], zones: dict[tuple[str, str, str], str]) -> dict[str, Any]:
     baseline_rows: list[dict[str, Any]] = []
     robust_rows: list[dict[str, Any]] = []
     forecast_shift = Decimal(regime["forecast_shift"])
@@ -152,17 +150,32 @@ def _run_regime(
         baseline_allocate = scenario["status"] == "ALLOCATED"
         robust_allocate = baseline_allocate and original_zone == "ROBUST_ALLOCATE"
         shifted_id = f"{episode_id}:{regime['name']}"
-        baseline_rows.append(_episode_row(
-            index, shifted_id, category, shifted_settlement, scenario, original_zone,
-            baseline_allocate, None if baseline_allocate else scenario["blocker"],
-        ))
-        robust_rows.append(_episode_row(
-            index, shifted_id, category, shifted_settlement, scenario, original_zone,
-            robust_allocate,
-            None if robust_allocate else (
-                "ROBUST_ZONE_REQUIRED" if baseline_allocate else scenario["blocker"]
-            ),
-        ))
+        baseline_rows.append(
+            _episode_row(
+                index,
+                shifted_id,
+                category,
+                shifted_settlement,
+                scenario,
+                original_zone,
+                baseline_allocate,
+                None if baseline_allocate else scenario["blocker"],
+            )
+        )
+        robust_rows.append(
+            _episode_row(
+                index,
+                shifted_id,
+                category,
+                shifted_settlement,
+                scenario,
+                original_zone,
+                robust_allocate,
+                None
+                if robust_allocate
+                else ("ROBUST_ZONE_REQUIRED" if baseline_allocate else scenario["blocker"]),
+            )
+        )
     baseline = _metrics("baseline", baseline_rows)
     robust = _metrics("frozen_robust_zone", robust_rows)
     capital_advantage = Decimal(robust["capital_usage"]) <= Decimal(baseline["capital_usage"])

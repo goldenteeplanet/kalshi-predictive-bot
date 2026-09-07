@@ -35,9 +35,7 @@ from kalshi_predictor.utils.time import utc_now
 
 
 def existing_rl_run(session: Session, *, idempotency_key: str) -> RlRun | None:
-    return session.scalar(
-        select(RlRun).where(RlRun.idempotency_key == idempotency_key).limit(1)
-    )
+    return session.scalar(select(RlRun).where(RlRun.idempotency_key == idempotency_key).limit(1))
 
 
 def latest_rl_run(session: Session) -> RlRun | None:
@@ -129,9 +127,7 @@ def persist_shadow_decision(
     idempotency_key: str,
 ) -> RlPolicyDecision:
     existing = session.scalar(
-        select(RlPolicyDecision)
-        .where(RlPolicyDecision.idempotency_key == idempotency_key)
-        .limit(1)
+        select(RlPolicyDecision).where(RlPolicyDecision.idempotency_key == idempotency_key).limit(1)
     )
     if existing is not None:
         return existing

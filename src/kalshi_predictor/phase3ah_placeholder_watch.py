@@ -22,8 +22,7 @@ DEFAULT_PHASE3AA_R3_REPORT_PATH = (
     Path("reports/phase3aa_r3") / "phase3aa_r3_residual_settlement_audit.json"
 )
 DEFAULT_PAPER_SETTLEMENT_PATH = (
-    Path("reports/paper_settlement_reconciliation")
-    / "paper_settlement_reconciliation.json"
+    Path("reports/paper_settlement_reconciliation") / "paper_settlement_reconciliation.json"
 )
 SETTLEMENT_HARVEST_COMMAND = (
     "kalshi-bot phase3aa-r2-exact-settlement-harvest --output-dir reports/phase3aa_r2"
@@ -258,9 +257,7 @@ def _settlement_loop(
     exact_written = int(summary.get("exact_settlements_written") or 0)
     eligible_after = int(summary.get("eligible_exact_settlements_after") or 0)
     fetch_errors = int(summary.get("fetch_errors") or 0)
-    cleared = bool(
-        freshness and freshness.get("realization_cleared_by_fresher_reports")
-    )
+    cleared = bool(freshness and freshness.get("realization_cleared_by_fresher_reports"))
     stale_suppressed = cleared and (exact_written > 0 or eligible_after > 0)
     if stale_suppressed:
         status = (
@@ -302,9 +299,7 @@ def _settlement_freshness(
     r3_summary = _summary(phase3aa_r3)
     paper_summary = _summary(paper)
     sources_present = (
-        isinstance(phase3aa, dict)
-        and isinstance(phase3aa_r3, dict)
-        and isinstance(paper, dict)
+        isinstance(phase3aa, dict) and isinstance(phase3aa_r3, dict) and isinstance(paper, dict)
     )
     eligible_after = int(phase3aa_payload.get("eligible_after_realize") or 0)
     r3_cleared = bool(r3_summary.get("residue_cleared"))
@@ -381,8 +376,7 @@ def _recommended_next_action(gate: dict[str, Any], settlement_loop: dict[str, An
         return gate["next_action"]
     if gate["status"] == "HOLD_PLACEHOLDER_UPGRADES":
         return (
-            f"{gate['next_action']} Settlement work remains separate: "
-            f"{SETTLEMENT_HARVEST_COMMAND}."
+            f"{gate['next_action']} Settlement work remains separate: {SETTLEMENT_HARVEST_COMMAND}."
         )
     return gate["next_action"]
 

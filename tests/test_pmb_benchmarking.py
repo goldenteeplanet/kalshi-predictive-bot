@@ -22,17 +22,42 @@ from kalshi_predictor.kalshi.orderbook import OrderbookSequenceGap
 
 
 def _delta_episode(gap: bool = False):
-    return load_synthetic_episode({
-        "episode_id": "ordered", "category": "crypto", "settlements": {"SYN": "yes"},
-        "events": [
-            {"timestamp": "2026-01-01T00:00:02Z", "ticker": "SYN", "kind": "delta",
-             "message": {"seq": 4 if gap else 2, "msg": {"market_ticker": "SYN",
-                 "side": "yes", "price_dollars": "0.40", "delta_fp": "2"}}},
-            {"timestamp": "2026-01-01T00:00:01Z", "ticker": "SYN", "kind": "snapshot",
-             "message": {"seq": 1, "msg": {"market_ticker": "SYN",
-                 "yes_dollars": [["0.40", "5"]], "no_dollars": [["0.58", "5"]]}}},
-        ],
-    })
+    return load_synthetic_episode(
+        {
+            "episode_id": "ordered",
+            "category": "crypto",
+            "settlements": {"SYN": "yes"},
+            "events": [
+                {
+                    "timestamp": "2026-01-01T00:00:02Z",
+                    "ticker": "SYN",
+                    "kind": "delta",
+                    "message": {
+                        "seq": 4 if gap else 2,
+                        "msg": {
+                            "market_ticker": "SYN",
+                            "side": "yes",
+                            "price_dollars": "0.40",
+                            "delta_fp": "2",
+                        },
+                    },
+                },
+                {
+                    "timestamp": "2026-01-01T00:00:01Z",
+                    "ticker": "SYN",
+                    "kind": "snapshot",
+                    "message": {
+                        "seq": 1,
+                        "msg": {
+                            "market_ticker": "SYN",
+                            "yes_dollars": [["0.40", "5"]],
+                            "no_dollars": [["0.58", "5"]],
+                        },
+                    },
+                },
+            ],
+        }
+    )
 
 
 def test_pmb1_replay_is_timestamp_ordered_and_repeatable() -> None:
@@ -52,12 +77,8 @@ def test_pmb1_sequence_gap_is_a_hard_failure() -> None:
 def test_pmb2_baselines_are_deterministic() -> None:
     episode = load_synthetic_episode(synthetic_scenarios()["crypto"])
     assert run_benchmark(episode, PassiveAgent()).metrics["trade_count"] == 0
-    first = run_benchmark(
-        episode, SeededRandomAgent(seed=19, trade_probability=1.0)
-    ).as_dict()
-    second = run_benchmark(
-        episode, SeededRandomAgent(seed=19, trade_probability=1.0)
-    ).as_dict()
+    first = run_benchmark(episode, SeededRandomAgent(seed=19, trade_probability=1.0)).as_dict()
+    second = run_benchmark(episode, SeededRandomAgent(seed=19, trade_probability=1.0)).as_dict()
     assert first == second
     momentum = run_benchmark(episode, MomentumAgent(threshold=Decimal("0.01")))
     assert momentum.metrics["trade_count"] == 2

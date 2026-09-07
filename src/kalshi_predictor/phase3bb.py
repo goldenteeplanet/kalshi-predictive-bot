@@ -372,15 +372,9 @@ def build_phase3bb_general_candidate_routing(
         if len(bucket_examples[bucket]) < limit_per_bucket:
             bucket_examples[bucket].append(_general_route_row(item, bucket))
         if bucket in GENERAL_SIGNAL_BUCKETS:
-            general_signal_diagnostic_rows.append(
-                _general_signal_diagnostic_row(item, bucket)
-            )
+            general_signal_diagnostic_rows.append(_general_signal_diagnostic_row(item, bucket))
 
-    route_rows = [
-        row
-        for bucket in sorted(bucket_examples)
-        for row in bucket_examples[bucket]
-    ]
+    route_rows = [row for bucket in sorted(bucket_examples) for row in bucket_examples[bucket]]
     candidate_buckets = {
         "economic": bucket_counts.get("ECONOMIC_CANDIDATE", 0),
         "news": (
@@ -402,9 +396,7 @@ def build_phase3bb_general_candidate_routing(
             + bucket_counts.get("GENERAL_UNCLASSIFIED", 0)
         ),
     }
-    general_signal_diagnostics = _general_signal_diagnostics_summary(
-        general_signal_diagnostic_rows
-    )
+    general_signal_diagnostics = _general_signal_diagnostics_summary(general_signal_diagnostic_rows)
     return {
         "generated_at": utc_now().isoformat(),
         "phase": "3BB-R2",
@@ -508,19 +500,13 @@ def build_phase3bb_general_source_evidence(
         adapter_counts[adapter] = adapter_counts.get(adapter, 0) + 1
 
     exact_ready_rows = sum(
-        1
-        for row in evidence_rows
-        if row["evidence_status"] == "EXACT_EVIDENCE_READY_FOR_REVIEW"
+        1 for row in evidence_rows if row["evidence_status"] == "EXACT_EVIDENCE_READY_FOR_REVIEW"
     )
     unavailable_rows = sum(
-        1
-        for row in evidence_rows
-        if row["evidence_status"] == "SOURCE_EVIDENCE_UNAVAILABLE"
+        1 for row in evidence_rows if row["evidence_status"] == "SOURCE_EVIDENCE_UNAVAILABLE"
     )
     missing_files = [
-        str(payload["path"])
-        for payload in source_inputs.values()
-        if not payload["file_exists"]
+        str(payload["path"]) for payload in source_inputs.values() if not payload["file_exists"]
     ]
     invalid_files = [
         str(payload["path"])
@@ -695,9 +681,7 @@ def build_phase3bb_general_source_availability(
         if row["availability_status"] == "SOURCE_VALUE_AVAILABLE_FOR_REVIEW"
     )
     pending_rows = sum(
-        1
-        for row in availability_rows
-        if row["availability_status"] == "PENDING_SOURCE_PUBLICATION"
+        1 for row in availability_rows if row["availability_status"] == "PENDING_SOURCE_PUBLICATION"
     )
     incomplete_rows = sum(
         1
@@ -711,13 +695,9 @@ def build_phase3bb_general_source_availability(
             "SOURCE_URL_MISSING",
         }
     )
-    remote_checked_rows = sum(
-        1 for row in availability_rows if row["remote_check"]["requested"]
-    )
+    remote_checked_rows = sum(1 for row in availability_rows if row["remote_check"]["requested"])
     remote_ok_rows = sum(
-        1
-        for row in availability_rows
-        if row["remote_check"]["status"] == "FETCH_OK"
+        1 for row in availability_rows if row["remote_check"]["status"] == "FETCH_OK"
     )
     return {
         "generated_at": utc_now().isoformat(),
@@ -803,9 +783,7 @@ def write_phase3bb_general_source_availability_report(
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "phase3bb_r2_general_source_availability.json"
     markdown_path = output_dir / "phase3bb_r2_general_source_availability.md"
-    availability_rows_path = (
-        output_dir / "phase3bb_r2_general_source_availability_rows.json"
-    )
+    availability_rows_path = output_dir / "phase3bb_r2_general_source_availability_rows.json"
     json_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True, default=str),
         encoding="utf-8",
@@ -859,9 +837,7 @@ def build_phase3bb_general_source_intake(
         _source_intake_taxonomy_review_row(item)
         for item in sorted(grouped.values(), key=lambda market: str(market["ticker"]))
     ]
-    source_evidence_requirements = [
-        _source_evidence_requirement_row(row) for row in taxonomy_rows
-    ]
+    source_evidence_requirements = [_source_evidence_requirement_row(row) for row in taxonomy_rows]
     source_readiness_matrix = _source_readiness_matrix()
     candidate_market_samples = _candidate_market_samples(
         taxonomy_rows,
@@ -878,9 +854,7 @@ def build_phase3bb_general_source_intake(
     ]
     template_rows = _general_source_intake_template_rows(diagnostic_rows)
     source_rows, source_error = _load_general_source_input_rows(input_file)
-    normalized_rows = [
-        _general_source_input_row(row, diagnostic_rows) for row in source_rows
-    ]
+    normalized_rows = [_general_source_input_row(row, diagnostic_rows) for row in source_rows]
     valid_rows = [row for row in normalized_rows if row["status"] == "READY_TO_WRITE"]
     records_by_adapter = _general_source_records_by_adapter(valid_rows)
     files_written: list[str] = []
@@ -1338,8 +1312,7 @@ def write_phase3bb_r3_safe_parser_reparse_report(
     safe_rows = [
         row
         for row in preflight["reclassification_candidates"]
-        if row.get("safe_to_reparse")
-        and (row.get("parser_preview") or {}).get("safe_to_reparse")
+        if row.get("safe_to_reparse") and (row.get("parser_preview") or {}).get("safe_to_reparse")
     ]
     tickers = sorted({str(row["ticker"]) for row in safe_rows})
     payload: dict[str, Any] = {
@@ -1534,9 +1507,7 @@ def build_phase3bb_r3_composite_preview_gate(
 
     category_counts = _r3_composite_category_counts(session)
     rows = _r3_composite_preview_rows(session, sample_limit=sample_limit)
-    verified_rows = [
-        row for row in rows if row["classification"] == "VERIFIED_COMPONENT_EVIDENCE"
-    ]
+    verified_rows = [row for row in rows if row["classification"] == "VERIFIED_COMPONENT_EVIDENCE"]
     mapped_rows = [row for row in rows if row["component_mapping_status"] == "MAPPED"]
     true_rows = [
         row
@@ -1585,9 +1556,7 @@ def build_phase3bb_r3_composite_preview_gate(
             "true_composite_rows": len(true_rows),
             "component_mapped_rows": len(mapped_rows),
             "component_mapped_unverified_rows": sum(
-                1
-                for row in mapped_rows
-                if row["classification"] != "VERIFIED_COMPONENT_EVIDENCE"
+                1 for row in mapped_rows if row["classification"] != "VERIFIED_COMPONENT_EVIDENCE"
             ),
             "verified_component_evidence_rows": len(verified_rows),
             "safe_to_apply_rows": 0,
@@ -1760,9 +1729,7 @@ def write_phase3bb_r3_composite_operator_preflight_report(
         json_path=json_path,
         markdown_path=markdown_path,
         rows_path=rows_path,
-        paper_composite_review_ready_rows=int(
-            summary["paper_composite_review_ready_rows"]
-        ),
+        paper_composite_review_ready_rows=int(summary["paper_composite_review_ready_rows"]),
         blocked_rows=int(summary["blocked_rows"]),
     )
 
@@ -1944,10 +1911,7 @@ def _database_fingerprint(*, redacted_db_url: str, location: str) -> str:
 def _migration_revision(session: Session) -> str | None:
     try:
         exists = session.execute(
-            text(
-                "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name='alembic_version'"
-            )
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version'")
         ).first()
         if exists is None:
             return None
@@ -2565,8 +2529,7 @@ def _source_intake_next_actions(
                 "must stay out of general-source processing."
             ),
             "exact_command": (
-                "kalshi-bot phase3ah-sports-placeholder-watch "
-                "--output-dir reports/phase3ah_sports"
+                "kalshi-bot phase3ah-sports-placeholder-watch --output-dir reports/phase3ah_sports"
             ),
             "expected_output": "sports placeholder and schedule evidence report",
             "success_criteria": (
@@ -2763,8 +2726,7 @@ def _economic_row(session: Session, coverage: dict[str, Any]) -> dict[str, Any]:
         blocker = "Economic evidence exists, but no current market is parsed as economic."
         actionable = False
         next_action = (
-            "Keep market refreshes running; link when compatible CPI/Fed/jobs/GDP "
-            "markets appear."
+            "Keep market refreshes running; link when compatible CPI/Fed/jobs/GDP markets appear."
         )
     elif link_count == 0:
         status = "READY_TO_LINK"
@@ -3506,9 +3468,7 @@ def _general_source_evidence_row(
             if _general_source_evidence_unavailable(matched_evidence):
                 evidence_status = "SOURCE_EVIDENCE_UNAVAILABLE"
                 missing_evidence_fields = [
-                    field
-                    for field in required_fields
-                    if _is_blank(matched_evidence.get(field))
+                    field for field in required_fields if _is_blank(matched_evidence.get(field))
                 ]
                 block_reason = (
                     "An exact source key was audited, but the required observed "
@@ -3517,9 +3477,7 @@ def _general_source_evidence_row(
                 )
             else:
                 missing_evidence_fields = [
-                    field
-                    for field in required_fields
-                    if _is_blank(matched_evidence.get(field))
+                    field for field in required_fields if _is_blank(matched_evidence.get(field))
                 ]
                 if missing_evidence_fields:
                     evidence_status = "EVIDENCE_FIELD_INCOMPLETE"
@@ -3736,8 +3694,7 @@ def _general_source_availability_spec(adapter_key: str) -> dict[str, Any]:
             "target_observation": "July 3, 2026",
             "target_publication": "FlightAware weekly cancellation outcome",
             "watch_target": (
-                "United States total flight cancellations for week ending "
-                "July 3, 2026"
+                "United States total flight cancellations for week ending July 3, 2026"
             ),
             "watch_terms": ["FlightAware", "cancelled", "United States"],
         }
@@ -3746,8 +3703,7 @@ def _general_source_availability_spec(adapter_key: str) -> dict[str, Any]:
             "required_value_field": "capacity_gw",
             "target_observation": "2026",
             "target_publication": (
-                "Cushman & Wakefield first H2 2026 or year-end 2026 "
-                "Americas Data Center Update"
+                "Cushman & Wakefield first H2 2026 or year-end 2026 Americas Data Center Update"
             ),
             "watch_target": "Americas operational data center capacity for 2026",
             "watch_terms": ["Americas Data Center Update", "2026", "operational"],
@@ -3800,9 +3756,7 @@ def _remote_source_check(
             body = response.read(250_000)
             content_type = response.headers.get("content-type")
             text = _decode_response_sample(body)
-            matched = [
-                term for term in watch_terms if term.lower() in text.lower()
-            ]
+            matched = [term for term in watch_terms if term.lower() in text.lower()]
             return {
                 "requested": True,
                 "status": "FETCH_OK",
@@ -3810,9 +3764,7 @@ def _remote_source_check(
                 "http_status": getattr(response, "status", None),
                 "content_type": content_type,
                 "matched_watch_terms": matched,
-                "missing_watch_terms": [
-                    term for term in watch_terms if term not in matched
-                ],
+                "missing_watch_terms": [term for term in watch_terms if term not in matched],
                 "error": None,
             }
     except urllib.error.HTTPError as exc:
@@ -3857,9 +3809,7 @@ def _source_availability_block_reason(status: str, spec: dict[str, Any]) -> str:
     if status == "SOURCE_URL_MISSING":
         return "A valid http(s) source_url is required before source review."
     if status == "SOURCE_RECORD_INCOMPLETE":
-        return (
-            f"The source record exists but {spec['required_value_field']} is blank."
-        )
+        return f"The source record exists but {spec['required_value_field']} is blank."
     if status == "NO_SOURCE_RECORD":
         return "The evidence file exists but contains no source records."
     if status == "SOURCE_FILE_MISSING":
@@ -4074,9 +4024,7 @@ def _source_availability_recommended_next_action(
             "Required source values are present for review. Rerun source evidence, "
             "then manually review exact rows before guarded adapter/linker work."
         )
-    return (
-        "No source availability rows are ready. Keep R2 in report-only watch mode."
-    )
+    return "No source availability rows are ready. Keep R2 in report-only watch mode."
 
 
 def _source_evidence_recommended_next_action(
@@ -4357,13 +4305,7 @@ def _matched_terms(text: str, bucket: str) -> list[str]:
         "SPORTS_OR_CROSS_CATEGORY_LEAKAGE": SPORTS_TERMS,
     }
     terms = terms_by_bucket.get(bucket, ())
-    return sorted(
-        {
-            term.strip()
-            for term in terms
-            if term.strip() and _term_matches(text, term)
-        }
-    )
+    return sorted({term.strip() for term in terms if term.strip() and _term_matches(text, term)})
 
 
 def _family_key(item: dict[str, Any]) -> str:
@@ -4378,9 +4320,7 @@ def _family_key(item: dict[str, Any]) -> str:
 def _top_family_rows(counts: dict[str, int], *, limit: int = 10) -> list[dict[str, Any]]:
     return [
         {"family_key": family, "count": count}
-        for family, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[
-            :limit
-        ]
+        for family, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
     ]
 
 
@@ -4848,16 +4788,12 @@ def _r3_component_evidence_by_ticker(
     component_tickers: list[str],
 ) -> dict[str, dict[str, Any]]:
     evidence = {
-        ticker: _r3_empty_component_evidence(ticker)
-        for ticker in component_tickers
-        if ticker
+        ticker: _r3_empty_component_evidence(ticker) for ticker in component_tickers if ticker
     }
     if not evidence:
         return evidence
     for chunk in _r3_chunks(sorted(evidence), 500):
-        market_tickers = set(
-            session.scalars(select(Market.ticker).where(Market.ticker.in_(chunk)))
-        )
+        market_tickers = set(session.scalars(select(Market.ticker).where(Market.ticker.in_(chunk))))
         settlement_tickers = set(
             session.scalars(select(Settlement.ticker).where(Settlement.ticker.in_(chunk)))
         )
@@ -5066,8 +5002,9 @@ def _r3_component_preflight_summary(
 ) -> dict[str, Any]:
     exact_settlement_rows = sum(1 for row in component_rows if row.get("exact_settlement_found"))
     quote_required_rows = [
-        row for row in component_rows if row.get("verified_component_evidence_found")
-        and not row.get("exact_settlement_found")
+        row
+        for row in component_rows
+        if row.get("verified_component_evidence_found") and not row.get("exact_settlement_found")
     ]
     stale = 0
     missing = 0
@@ -5367,10 +5304,13 @@ def _term_matches(text: str, term: str) -> bool:
     if not needle:
         return False
     if re.search(r"[a-z0-9]", needle):
-        return re.search(
-            rf"(?<![a-z0-9]){re.escape(needle)}(?![a-z0-9])",
-            text,
-        ) is not None
+        return (
+            re.search(
+                rf"(?<![a-z0-9]){re.escape(needle)}(?![a-z0-9])",
+                text,
+            )
+            is not None
+        )
     return needle in text
 
 
@@ -5617,8 +5557,7 @@ def _render_r2_markdown(payload: dict[str, Any]) -> str:
         )
         lines.append(
             (
-                "| {diagnostic} | {adapter} | {family} | `{ticker}` | "
-                "{fields} | {gaps} | {safe} |"
+                "| {diagnostic} | {adapter} | {family} | `{ticker}` | {fields} | {gaps} | {safe} |"
             ).format(
                 diagnostic=str(row["diagnostic_name"]).replace("|", "/"),
                 adapter=str(row["source_adapter_key"]).replace("|", "/"),
@@ -5735,9 +5674,7 @@ def _group_source_review_row(rows: list[dict[str, str]]) -> dict[str, Any]:
     observed_column = _observed_value_column(adapter)
     key = _group_source_key(first)
     values = _unique_nonblank(row.get(observed_column) for row in rows)
-    thresholds = _unique_nonblank(
-        _threshold_label(row) for row in rows
-    )
+    thresholds = _unique_nonblank(_threshold_label(row) for row in rows)
     tickers = _unique_nonblank(row.get("ticker") for row in rows)
     return {
         "group_id": _group_id(key),
@@ -5857,8 +5794,7 @@ def _render_source_intake_markdown(payload: dict[str, Any]) -> str:
         f"- Database fingerprint: `{payload['database_fingerprint']}`",
         f"- Data watermark: `{payload['data_watermark']}`",
         f"- Taxonomy version: `{payload['taxonomy_version']}`",
-        "- Source readiness schema version: "
-        f"`{payload['source_readiness_schema_version']}`",
+        f"- Source readiness schema version: `{payload['source_readiness_schema_version']}`",
         f"- Command arguments: `{metadata['command_arguments']}`",
         f"- Evidence dir: `{payload['evidence_dir']}`",
         f"- Recommended next action: {payload['recommended_next_action']}",
@@ -5970,8 +5906,7 @@ def _render_source_next_actions_markdown(payload: dict[str, Any]) -> str:
         f"- Database fingerprint: `{payload['database_fingerprint']}`",
         f"- Data watermark: `{payload['data_watermark']}`",
         f"- Taxonomy version: `{payload['taxonomy_version']}`",
-        "- Source readiness schema version: "
-        f"`{payload['source_readiness_schema_version']}`",
+        f"- Source readiness schema version: `{payload['source_readiness_schema_version']}`",
         f"- Command arguments: `{metadata['command_arguments']}`",
         "",
         "## Ranked Actions",

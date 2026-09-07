@@ -15,7 +15,6 @@ from kalshi_predictor.benchmarking.interaction_boundary import (
 from kalshi_predictor.benchmarking.liquidity_boundary import _evaluate
 from kalshi_predictor.benchmarking.oos_policy import CATEGORY_TICKER, _episode_row, _metrics
 
-
 BASE_SPREAD = Decimal("0.02")
 BASE_DEPTH = Decimal("25")
 
@@ -32,29 +31,35 @@ def build_stress_aware_allocation_guard_preview() -> dict[str, Any]:
         for forecast_bias in FORECAST_BIAS_GRID:
             for spread_addition in SPREAD_ADDITION_GRID:
                 forecast = BASELINE_FORECASTS[ticker] + forecast_bias
-                scenario = _evaluate(
-                    ticker, BASE_SPREAD + spread_addition, BASE_DEPTH, forecast
-                )
+                scenario = _evaluate(ticker, BASE_SPREAD + spread_addition, BASE_DEPTH, forecast)
                 settlement = _settlement(category, index)
                 baseline_allocate = scenario["status"] == "ALLOCATED"
-                inside_buffer = (
-                    abs(forecast_bias) <= max_bias and spread_addition <= max_spread
-                )
+                inside_buffer = abs(forecast_bias) <= max_bias and spread_addition <= max_spread
                 guarded_allocate = baseline_allocate and inside_buffer
-                episode_id = (
-                    f"pmb23-{category}-{abs(forecast_bias)}-{spread_addition}"
-                )
+                episode_id = f"pmb23-{category}-{abs(forecast_bias)}-{spread_addition}"
                 baseline_row = _episode_row(
-                    index, episode_id, category, settlement, scenario,
-                    "BASELINE_GATE", baseline_allocate,
+                    index,
+                    episode_id,
+                    category,
+                    settlement,
+                    scenario,
+                    "BASELINE_GATE",
+                    baseline_allocate,
                     None if baseline_allocate else scenario["blocker"],
                 )
                 guarded_row = _episode_row(
-                    index, episode_id, category, settlement, scenario,
+                    index,
+                    episode_id,
+                    category,
+                    settlement,
+                    scenario,
                     "CERTIFIED_BUFFER" if inside_buffer else "OUTSIDE_CERTIFIED_BUFFER",
                     guarded_allocate,
-                    None if guarded_allocate else (
-                        "STRESS_BUFFER_EXCEEDED" if baseline_allocate and not inside_buffer
+                    None
+                    if guarded_allocate
+                    else (
+                        "STRESS_BUFFER_EXCEEDED"
+                        if baseline_allocate and not inside_buffer
                         else scenario["blocker"]
                     ),
                 )
@@ -74,7 +79,8 @@ def build_stress_aware_allocation_guard_preview() -> dict[str, Any]:
     rejected_by_guard = sum(row["blocker"] == "STRESS_BUFFER_EXCEEDED" for row in guarded_rows)
     canonical = json.dumps(
         {"baseline": baseline, "guarded": guarded},
-        sort_keys=True, separators=(",", ":"),
+        sort_keys=True,
+        separators=(",", ":"),
     ).encode()
     return {
         "phase": "PMB-23",

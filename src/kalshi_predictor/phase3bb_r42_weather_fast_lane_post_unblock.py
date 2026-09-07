@@ -362,7 +362,8 @@ def _build_remote_probes(
         ),
         RemoteProbe(
             "weather_ranking_activation_json",
-            f"cd {app} && cat reports/phase3ba_r2/weather_ranking_activation.json 2>/dev/null || true",
+            f"cd {app} && cat reports/phase3ba_r2/weather_rank"
+            f"ing_activation.json 2>/dev/null || true",
             timeout_seconds,
         ),
         RemoteProbe(
@@ -480,7 +481,9 @@ def _verification_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
         _check(
             "scheduler_timer_active",
             parsed.get("scheduler_timer_active_state") == "active",
-            f"timer={parsed.get('scheduler_timer_active_state')} next={parsed.get('scheduler_timer_next')}.",
+            f"timer="
+            f"{parsed.get('scheduler_timer_active_state')} nex"
+            f"t={parsed.get('scheduler_timer_next')}.",
         ),
         _check(
             "r5_service_active",
@@ -515,12 +518,18 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         status = "BLOCKED_R41_NOT_UNBLOCKED"
         reason = "R41 has not produced a clean writer-gate unblock yet."
         next_step = "Phase 3BB-R41 - Writer Gate Normalization / Weather Fast-Lane Unblock"
-        command = "kalshi-bot phase3bb-r41-writer-gate-normalization --output-dir reports/phase3bb_r41 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r41-writer-gate-normalization --output-dir "
+            "reports/phase3bb_r41 --reports-dir reports"
+        )
     elif "db_writer_monitor_json_valid" in failed_names:
         status = "BLOCKED_INVALID_DB_WRITER_MONITOR_JSON"
         reason = "db-writer-monitor --json is not strict JSON in the post-unblock probe."
         next_step = "Phase 3BB-R41 - Sync CLI JSON Fix To Cloud"
-        command = "kalshi-bot phase3bb-r41-writer-gate-normalization --output-dir reports/phase3bb_r41 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r41-writer-gate-normalization --output-dir "
+            "reports/phase3bb_r41 --reports-dir reports"
+        )
     elif "writer_safe_to_start_write" in failed_names:
         status = "WAIT_FOR_ACTIVE_WRITER"
         reason = "The writer gate is parseable, but safe_to_start_write is false."
@@ -530,29 +539,50 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         status = "BLOCKED_POST_UNBLOCK_RUNTIME_DEPENDENCY"
         reason = f"First failing check: {failed[0]['check']}."
         next_step = "Phase 3BB-R42 - Resolve Post-Unblock Runtime Dependency"
-        command = "kalshi-bot phase3bb-r42-weather-fast-lane-post-unblock-verification --output-dir reports/phase3bb_r42 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r42-weather-fast-lane-post-unblock-verification "
+            "--output-dir reports/phase3bb_r42 --reports-dir reports"
+        )
     elif skip_count and latest_kind.endswith("_SKIP"):
         status = "BLOCKED_WEATHER_FAST_LANE_STILL_SKIPPING"
         reason = f"Weather fast-lane still skipped after R41; latest skip kind={latest_kind}."
         next_step = "Phase 3BB-R41 - Recheck Writer Gate Normalization"
-        command = "kalshi-bot phase3bb-r41-writer-gate-normalization --output-dir reports/phase3bb_r41 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r41-writer-gate-normalization --output-dir "
+            "reports/phase3bb_r41 --reports-dir reports"
+        )
     elif not run_count and not report_refreshed:
         status = "WAITING_FOR_NEXT_WEATHER_FAST_LANE_CYCLE"
         reason = (
             "The gate is open, but no post-R41 scheduler weather_fast_lane cycle is visible yet."
         )
         next_step = "Phase 3BB-R42 - Rerun After Next Scheduler Tick"
-        command = "kalshi-bot phase3bb-r42-weather-fast-lane-post-unblock-verification --output-dir reports/phase3bb_r42 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r42-weather-fast-lane-post-unblock-verification "
+            "--output-dir reports/phase3bb_r42 --reports-dir reports"
+        )
     elif run_count and not report_refreshed:
         status = "BLOCKED_WEATHER_FAST_LANE_ARTIFACT_NOT_REFRESHED"
-        reason = "A post-R41 weather_fast_lane run is visible, but weather_funnel.json was not refreshed."
+        reason = (
+            "A post-R41 weather_fast_lane run is visible, but weather_funnel.json was not "
+            "refreshed."
+        )
         next_step = "Phase 3BB-R42 - Inspect Weather Fast-Lane Runtime Output"
-        command = "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir reports/phase3bb_r40 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir "
+            "reports/phase3bb_r40 --reports-dir reports"
+        )
     elif paper_ready_rows > 0:
         status = "WEATHER_FAST_LANE_VERIFIED_PAPER_GATE_OPEN"
-        reason = f"Weather fast-lane refreshed after R41 and reports paper_ready_rows={paper_ready_rows}."
+        reason = (
+            f"Weather fast-lane refreshed after R41 and report"
+            f"s paper_ready_rows={paper_ready_rows}."
+        )
         next_step = "Phase 3BB-R43 - Paper-Only Weather Operator Review"
-        command = "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+            "--reports-dir reports"
+        )
     else:
         status = "WEATHER_FAST_LANE_POST_UNBLOCK_VERIFIED"
         reason = (
@@ -560,7 +590,10 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
             f"Current weather blocker: {first_blocker or 'UNKNOWN'}."
         )
         next_step = "Phase 3BB-R43 - Weather Current Catalog Refresh Scheduler Hook"
-        command = "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir reports/phase3bb_r40 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir "
+            "reports/phase3bb_r40 --reports-dir reports"
+        )
     return {
         "status": status,
         "verification_passed": status.startswith("WEATHER_FAST_LANE_POST_UNBLOCK_VERIFIED")
@@ -687,12 +720,14 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- Verification passed: `{decision['verification_passed']}`",
             f"- Reason: {decision['primary_reason']}",
             f"- R41 generated at: `{payload.get('r41_generated_at')}`",
-            f"- db-writer-monitor strict JSON: `{parsed.get('db_writer_monitor_strict_json_valid')}`",
+            f"- db-writer-monitor strict JSON: `"
+            f"{parsed.get('db_writer_monitor_strict_json_valid')}`",
             f"- safe_to_start_write: `{parsed.get('writer_safe_to_start_write')}`",
             f"- Writer status: `{parsed.get('writer_status')}`",
             f"- Weather run count after R41: `{decision['weather_fast_lane_run_count']}`",
             f"- Weather skip count after R41: `{decision['weather_fast_lane_skip_count']}`",
-            f"- Weather funnel refreshed after R41: `{decision['weather_funnel_report_refreshed_after_r41']}`",
+            f"- Weather funnel refreshed after R41: `"
+            f"{decision['weather_funnel_report_refreshed_after_r41']}`",
             "",
             "## Weather Funnel",
             "",
@@ -758,7 +793,9 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in payload["weather_report_freshness"]:
         lines.append(
-            f"| `{row['path']}` | `{row['status']}` | `{row['mtime_epoch']}` | `{row['refreshed_after_r41']}` |"
+            f"| `{row['path']}` | `{row['status']}` | `"
+            f"{row['mtime_epoch']}` | `"
+            f"{row['refreshed_after_r41']}` |"
         )
     return "\n".join(lines) + "\n"
 

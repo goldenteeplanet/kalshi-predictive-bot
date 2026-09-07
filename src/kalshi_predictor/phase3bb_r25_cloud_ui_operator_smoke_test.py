@@ -7,9 +7,10 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -116,7 +117,9 @@ def write_phase3bb_r25_cloud_ui_operator_smoke_test_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_results_csv(results_csv_path, payload["local_ui_smoke_results"])
     _write_checks_csv(checks_csv_path, payload["smoke_checks"])
     operator_command_path.write_text(_render_operator_command(payload), encoding="utf-8")
@@ -181,8 +184,7 @@ def build_phase3bb_r25_cloud_ui_operator_smoke_test(
     result_payloads = [_result_payload(result) for result in results]
     prechecks = _prechecks(r24, local_base_url)
     route_checks = [
-        _route_check(probe, result)
-        for probe, result in zip(probes, results, strict=True)
+        _route_check(probe, result) for probe, result in zip(probes, results, strict=True)
     ]
     checks = prechecks + route_checks
     decision = _decision(checks, r24, result_payloads, local_base_url)
@@ -440,13 +442,7 @@ def _route_check(probe: LocalHttpProbe, result: LocalHttpResult) -> dict[str, An
     forbidden = [needle for needle in probe.must_not_contain if needle in body]
     expected_status = result.status_code in probe.expected_statuses
     kind_ok = _kind_ok(probe.kind, result.content_type, body)
-    passed = bool(
-        result.ok
-        and expected_status
-        and kind_ok
-        and not missing
-        and not forbidden
-    )
+    passed = bool(result.ok and expected_status and kind_ok and not missing and not forbidden)
     detail_parts = [
         f"{probe.method} {probe.path}",
         f"status={result.status_code}",
@@ -483,7 +479,10 @@ def _decision(
             next_step = "Phase 3BB-R25 - Fix Cloud UI Smoke Failure"
     else:
         status = "VERIFIED_CLOUD_UI_OPERATOR_SMOKE_PASS"
-        reason = "The operator UI is reachable through the SSH tunnel and all read-only smoke probes passed."
+        reason = (
+            "The operator UI is reachable through the SSH tunnel and all read-only smoke "
+            "probes passed."
+        )
         next_step = "Phase 3BB-R26 - Cloud UI Access Control And HTTPS Exposure Decision Gate"
     return {
         "status": status,

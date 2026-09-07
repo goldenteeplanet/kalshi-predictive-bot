@@ -143,9 +143,7 @@ def score_news_market_link(item: NewsItem, market: Market) -> tuple[Decimal, str
     confidence = min(score, Decimal("1.00")).quantize(Decimal("0.0001"))
     if not matched:
         return Decimal("0"), "No market-relevant news terms matched.", []
-    reason = (
-        f"{item.category.title()} news matched {len(matched)} term(s) in market text."
-    )
+    reason = f"{item.category.title()} news matched {len(matched)} term(s) in market text."
     return confidence, reason, sorted(matched)
 
 

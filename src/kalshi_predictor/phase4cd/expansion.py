@@ -83,14 +83,11 @@ def expand_verified_crypto_cohort(
         )
     admitted_events = {row.independent_event_id for row in existing_members}
     all_member_ids = set(research.scalars(select(EvidenceExpansionMember.source_forecast_id)))
-    frozen_query = select(Forecast, Market).join(
-        Market, Market.ticker == Forecast.ticker
-    )
+    frozen_query = select(Forecast, Market).join(Market, Market.ticker == Forecast.ticker)
     if all_member_ids:
         frozen_query = frozen_query.where(Forecast.id.not_in(all_member_ids))
     frozen_events = {
-        market.event_ticker or market.ticker
-        for _, market in research.execute(frozen_query)
+        market.event_ticker or market.ticker for _, market in research.execute(frozen_query)
     }
     query = (
         select(Forecast, Market, Settlement)

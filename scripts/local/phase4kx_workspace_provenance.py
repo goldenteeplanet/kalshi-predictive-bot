@@ -8,7 +8,6 @@ import json
 import subprocess
 from pathlib import Path
 
-
 SCHEMA = "phase4kx.workspace-provenance.v1"
 
 

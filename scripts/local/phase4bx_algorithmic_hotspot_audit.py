@@ -53,9 +53,7 @@ def _audit_source(source: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
         raise ValueError("PHASE4BX_SOURCE_SYNTAX_INVALID") from exc
     findings: list[dict[str, Any]] = []
     counts = {category: 0 for category in CATEGORIES}
-    parents = {
-        child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)
-    }
+    parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
     loops = (ast.For, ast.AsyncFor, ast.comprehension)
     for node in ast.walk(tree):
         if isinstance(node, loops):
@@ -83,9 +81,8 @@ def _audit_source(source: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
 
 
 def build_report(inventory: dict[str, Any]) -> dict[str, Any]:
-    if (
-        inventory.get("schema") != INPUT_SCHEMA
-        or inventory.get("artifact_hash") != _hash(inventory)
+    if inventory.get("schema") != INPUT_SCHEMA or inventory.get("artifact_hash") != _hash(
+        inventory
     ):
         raise ValueError("PHASE4BX_INPUT_SCHEMA_OR_HASH_INVALID")
     sources = inventory.get("sources")
@@ -101,9 +98,8 @@ def build_report(inventory: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("PHASE4BX_SOURCE_FIELDS_INVALID")
         if not isinstance(row["name"], str) or not row["name"]:
             raise ValueError("PHASE4BX_SOURCE_NAME_INVALID")
-        if (
-            not isinstance(row["source"], str)
-            or row["source_hash"] != canonical_hash(row["source"])
+        if not isinstance(row["source"], str) or row["source_hash"] != canonical_hash(
+            row["source"]
         ):
             raise ValueError("PHASE4BX_SOURCE_HASH_INVALID")
         findings, counts = _audit_source(row["source"])

@@ -35,8 +35,7 @@ def audit(source_db: Path, research_db: Path, *, now: datetime) -> dict[str, Any
     source = _ro(source_db)
     research = _ro(research_db)
     evaluated = {
-        row[0]
-        for row in research.execute("SELECT capture_id FROM prospective_pair_evaluations")
+        row[0] for row in research.execute("SELECT capture_id FROM prospective_pair_evaluations")
     }
     captures = research.execute(
         """
@@ -94,29 +93,21 @@ def audit(source_db: Path, research_db: Path, *, now: datetime) -> dict[str, Any
                 "market_status": None if market is None else market["status"],
                 "market_result": market_result,
                 "close_time": None if market is None else market["close_time"],
-                "exchange_due_at": None
-                if exchange_due_at is None
-                else exchange_due_at.isoformat(),
+                "exchange_due_at": None if exchange_due_at is None else exchange_due_at.isoformat(),
                 "expected_expiration_time": None
                 if market is None
                 else market["expected_expiration_time"],
                 "expiration_time": None if market is None else market["expiration_time"],
                 "market_settlement_ts": None if market is None else market["settlement_ts"],
                 "last_authorized_refresh": None if market is None else market["last_seen_at"],
-                "canonical_settled_at": None
-                if settlement is None
-                else settlement["settled_at"],
+                "canonical_settled_at": None if settlement is None else settlement["settled_at"],
                 "canonical_result": None if settlement is None else settlement["result"],
-                "canonical_updated_at": None
-                if settlement is None
-                else settlement["updated_at"],
+                "canonical_updated_at": None if settlement is None else settlement["updated_at"],
             }
         )
     reason_counts = Counter(row["reason"] for row in rows)
     status_counts = Counter(
-        str(row["market_status"] or "MISSING")
-        for row in rows
-        if row["reason"].startswith("DUE_")
+        str(row["market_status"] or "MISSING") for row in rows if row["reason"].startswith("DUE_")
     )
     result = {
         "schema": "phase4x.settlement-lag-audit.v1",

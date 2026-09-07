@@ -274,9 +274,7 @@ def _operations_snapshot(r32: dict[str, Any]) -> dict[str, Any]:
         "dashboard_snapshot_id": dashboard.get("dashboard_snapshot_id"),
         "dashboard_generated_at": dashboard.get("generated_at"),
         "dashboard_execution_mode": dashboard.get("effective_execution_mode"),
-        "dashboard_required_watermark_count": _int_value(
-            dashboard.get("required_watermark_count")
-        ),
+        "dashboard_required_watermark_count": _int_value(dashboard.get("required_watermark_count")),
         "dashboard_stale_watermark_count": stale_watermarks,
         "paper_gate_state": (
             "PAPER_READY_REVIEW_REQUIRED" if paper_ready > 0 else "MONITORING_NO_TRADE"

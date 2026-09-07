@@ -106,9 +106,7 @@ def _input_paths(reports_dir: Path) -> dict[str, Path]:
         "phase3aa_r2_rows": reports_dir
         / "phase3aa_r2"
         / "phase3aa_r2_exact_settlement_harvest_rows.json",
-        "phase3aa_r2": reports_dir
-        / "phase3aa_r2"
-        / "phase3aa_r2_exact_settlement_harvest.json",
+        "phase3aa_r2": reports_dir / "phase3aa_r2" / "phase3aa_r2_exact_settlement_harvest.json",
     }
 
 
@@ -163,9 +161,7 @@ def _capture_row(session: Session, r2_row: dict[str, Any]) -> dict[str, Any]:
         "paper_pnl_realization_allowed": False,
         "sibling_resolution_allowed": False,
         "source_result": _empty_to_none(payload.get("result")),
-        "source_settlement_value_dollars": _empty_to_none(
-            payload.get("settlement_value_dollars")
-        ),
+        "source_settlement_value_dollars": _empty_to_none(payload.get("settlement_value_dollars")),
         "source_settlement_value": _empty_to_none(payload.get("settlement_value")),
         "source_yes_settlement_value": _empty_to_none(payload.get("yes_settlement_value")),
         "source_expiration_value": _empty_to_none(payload.get("expiration_value")),
@@ -274,9 +270,7 @@ def _summary(rows: list[dict[str, Any]], r2_rows: list[dict[str, Any]]) -> dict[
             1 for row in rows if row["classification"] == "SOURCE_CLOSED_WITHOUT_OUTCOME"
         ),
         "source_settled_without_usable_outcome_rows": sum(
-            1
-            for row in rows
-            if row["classification"] == "SOURCE_SETTLED_WITHOUT_USABLE_OUTCOME"
+            1 for row in rows if row["classification"] == "SOURCE_SETTLED_WITHOUT_USABLE_OUTCOME"
         ),
         "usable_outcome_candidate_rows": sum(
             1 for row in rows if row["safe_to_write_exact_settlement_from_current_parser"]

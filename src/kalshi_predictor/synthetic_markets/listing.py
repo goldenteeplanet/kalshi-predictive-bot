@@ -49,9 +49,7 @@ def check_local_listing_status(
             historical_coverage_status="UNKNOWN_NO_LOCAL_MARKET_INVENTORY",
             historical_cutoff=None,
             matches=(),
-            warnings=(
-                "No locally ingested market inventory exists; cannot claim not-listed.",
-            ),
+            warnings=("No locally ingested market inventory exists; cannot claim not-listed.",),
         )
 
     markets = list(session.scalars(select(Market).order_by(Market.ticker).limit(market_limit)))

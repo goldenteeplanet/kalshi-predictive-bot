@@ -240,9 +240,10 @@ def _validate_event_fields(payload: dict[str, Any]) -> None:
         raise AlertRateLimitStormControlError("HISTORY_EVENT_FIELD_INVALID")
     if payload["severity"] not in {"INFO", "WARNING", "CRITICAL"}:
         raise AlertRateLimitStormControlError("HISTORY_EVENT_FIELD_INVALID")
-    if not isinstance(payload["alert_result_hash"], str) or not payload[
-        "alert_result_hash"
-    ].strip():
+    if (
+        not isinstance(payload["alert_result_hash"], str)
+        or not payload["alert_result_hash"].strip()
+    ):
         raise AlertRateLimitStormControlError("HISTORY_EVENT_FIELD_INVALID")
     if not isinstance(payload["complete"], bool):
         raise AlertRateLimitStormControlError("HISTORY_EVENT_FIELD_INVALID")

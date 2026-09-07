@@ -141,7 +141,9 @@ def write_phase3bb_r47_weather_current_window_series_discovery_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["linkability_checks"])
     _write_rows_csv(series_csv_path, payload["current_weather_series"])
@@ -214,7 +216,9 @@ def build_phase3bb_r47_weather_current_window_series_discovery(
         output_dir=output_dir,
     )
     metadata["command_arguments"] = {
-        "command": "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair",
+        "command": "kalshi-bot phase3bb-r47-weather-current-window-s"
+        "eries-discovery-linkability-repa"
+        "ir",
         "argv": command_args or [],
     }
     r11_context = _read_json(reports_dir / "phase3bb_r11" / "codex_cloud_context.json")
@@ -255,7 +259,9 @@ def build_phase3bb_r47_weather_current_window_series_discovery(
         patched_runner,
         location_key=recommended.get("location_key") or "new_york",
     )
-    parsed["runner_patch_required"] = bool(patched_runner and patched_runner != (parsed.get("runner_script") or ""))
+    parsed["runner_patch_required"] = bool(
+        patched_runner and patched_runner != (parsed.get("runner_script") or "")
+    )
     checks = _linkability_checks(
         parsed,
         patched_runner=patched_runner,
@@ -324,7 +330,9 @@ def build_phase3bb_r47_weather_current_window_series_discovery(
         "weather_current_window_series_discovery": True,
         "ssh_read_only_commands_executed": len(probes),
         "ssh_mutating_commands_executed": 1 if install_result.get("attempted") else 0,
-        "scheduler_runner_written_to_system": bool(install_result.get("attempted") and install_result.get("ok")),
+        "scheduler_runner_written_to_system": bool(
+            install_result.get("attempted") and install_result.get("ok")
+        ),
         "scheduler_timer_started": False,
         "scheduler_service_started": False,
         "scheduler_service_stopped": False,
@@ -393,16 +401,41 @@ def _build_remote_probes(
     env = shlex.quote(target.env_path)
     service = shlex.quote(scheduler_service_name)
     timer = shlex.quote(scheduler_timer_name)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
-        RemoteProbe("scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_show", f"systemctl show {service} -p Result -p ActiveState -p SubState -p ExecMainStatus --no-pager || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_service_show",
+            f"systemctl show {service} -p Result -p ActiveStat"
+            f"e -p SubState -p ExecMainStatus --no-pager || tr"
+            f"ue",
+            timeout_seconds,
+        ),
         RemoteProbe("db_writer_monitor_raw", writer_cmd, timeout_seconds),
-        RemoteProbe("runner_script", f"cat {shlex.quote(str(_runner_path(target)))} 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("weather_activation_preview_json", f"cd {app} && cat reports/phase3az_r12_weather/weather_activation_preview.json 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("weather_funnel_json", f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true", timeout_seconds),
+        RemoteProbe(
+            "runner_script",
+            f"cat {shlex.quote(str(_runner_path(target)))} 2>/dev/null || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "weather_activation_preview_json",
+            f"cd {app} && cat reports/phase3az_r12_weather/wea"
+            f"ther_activation_preview.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "weather_funnel_json",
+            f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "weather_current_window_snapshot",
             _weather_current_window_snapshot_command(
@@ -419,7 +452,7 @@ def _build_remote_probes(
                 f"cd {app} && for cmd in "
                 "sync-markets market-legs-parse ingest-weather build-weather-features "
                 "phase3az-r12-weather-activation-preview phase3bb-r2-weather-fast-lane; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -475,7 +508,8 @@ def series_key(row):
     return ticker.split("-", 1)[0] if "-" in ticker else ticker
 
 def infer_location(row):
-    text = " ".join(str(row.get(key) or "") for key in ("ticker", "series_ticker", "title", "subtitle"))
+    text = " ".join(str(row.get(key) or "") for key in ("ticker", "series_ticker", \
+"title", "subtitle"))
     lowered = text.lower()
     if "nych" in lowered or "new york" in lowered or "nyc" in lowered:
         return "new_york"
@@ -539,20 +573,25 @@ try:
     markets = [dict(row) for row in conn.execute(market_sql).fetchall()]
     current_market_candidates = []
     for market in markets:
-        target_time = parse_dt(market.get("close_time") or market.get("expected_expiration_time") or market.get("expiration_time") or market.get("settlement_ts"))
+        target_time = parse_dt(market.get("close_time") or \
+market.get("expected_expiration_time") or market.get("expiration_time") or \
+market.get("settlement_ts"))
         if target_time is not None and target_time >= current_since:
             current_market_candidates.append((market, target_time, infer_location(market)))
-    locations = sorted({{location for _, _, location in current_market_candidates if location != "unknown"}})
+    locations = sorted({{location for _, _, location in current_market_candidates if \
+location != "unknown"}})
     tickers = [row["ticker"] for row, _, _ in current_market_candidates]
     links_by_ticker = set()
     if tickers:
         placeholders = ",".join("?" for _ in tickers)
-        for row in conn.execute(f"select distinct ticker from weather_market_links where ticker in ({{placeholders}})", tickers):
+        for row in conn.execute(f"select distinct ticker from weather_market_links \
+where ticker in ({{placeholders}})", tickers):
             links_by_ticker.add(str(row[0]))
     features = []
     if locations:
         placeholders = ",".join("?" for _ in locations)
-        candidate_targets = [target for _, target, location in current_market_candidates if location in locations]
+        candidate_targets = [target for _, target, location in \
+current_market_candidates if location in locations]
         feature_target_min = min(candidate_targets) - timedelta(hours=match_tolerance_hours)
         feature_target_max = max(candidate_targets) + timedelta(hours=match_tolerance_hours)
         feature_args = [
@@ -580,7 +619,8 @@ try:
         loc = str(feature.get("location_key") or "unknown").strip().lower()
         features_by_location[loc].append(feature)
         generated_at = parse_dt(feature.get("generated_at"))
-        if generated_at and (loc not in feature_max_generated or generated_at > feature_max_generated[loc]):
+        if generated_at and (loc not in feature_max_generated or generated_at > \
+feature_max_generated[loc]):
             feature_max_generated[loc] = generated_at
     # Keep diagnostics bounded to the same candidate-time window used by the
     # matcher. Counting the entire location history can scan millions of rows
@@ -597,7 +637,8 @@ try:
         series = series_key(market)
         has_link = str(market.get("ticker")) in links_by_ticker
         matched_feature = feature_match(features_by_location.get(location, []), target_time)
-        feature_generated = parse_dt(matched_feature.get("generated_at")) if matched_feature else None
+        feature_generated = parse_dt(matched_feature.get("generated_at")) if \
+matched_feature else None
         latest_generated = feature_max_generated.get(location)
         latest_feature_age_hours = None
         if latest_generated:
@@ -619,9 +660,13 @@ try:
             "target_time": iso(target_time),
             "has_weather_link": has_link,
             "matched_fresh_feature_id": matched_feature.get("id") if matched_feature else None,
-            "matched_fresh_feature_source": matched_feature.get("source") if matched_feature else None,
-            "matched_fresh_feature_target_time": matched_feature.get("target_time") if matched_feature else None,
-            "matched_fresh_feature_distance_hours": round(abs((parse_dt(matched_feature.get("target_time")) - target_time).total_seconds()) / 3600, 6) if matched_feature else None,
+            "matched_fresh_feature_source": matched_feature.get("source") if \
+matched_feature else None,
+            "matched_fresh_feature_target_time": matched_feature.get("target_time") if \
+matched_feature else None,
+            "matched_fresh_feature_distance_hours": \
+round(abs((parse_dt(matched_feature.get("target_time")) - target_time).total_seconds()) \
+/ 3600, 6) if matched_feature else None,
             "matched_fresh_feature_generated_at": iso(feature_generated),
             "latest_location_feature_generated_at": iso(latest_generated),
             "latest_location_feature_age_hours": latest_feature_age_hours,
@@ -631,8 +676,10 @@ try:
         current_rows.append(row)
         series_stats[series]["current_market_rows"] += 1
         series_stats[series]["missing_link_rows"] += 0 if has_link else 1
-        series_stats[series]["fresh_feature_window_missing_rows"] += 1 if blocker == "FRESH_FEATURE_WINDOW_MISSING" else 0
-        series_stats[series]["ready_for_r12_preview_rows"] += 1 if blocker == "READY_FOR_R12_SAFE_LINK_PREVIEW" else 0
+        series_stats[series]["fresh_feature_window_missing_rows"] += 1 if blocker == \
+"FRESH_FEATURE_WINDOW_MISSING" else 0
+        series_stats[series]["ready_for_r12_preview_rows"] += 1 if blocker == \
+"READY_FOR_R12_SAFE_LINK_PREVIEW" else 0
         series_stats[series]["linked_rows"] += 1 if has_link else 0
         series_samples.setdefault(series, row)
     series_rows = []
@@ -647,9 +694,11 @@ try:
             "fresh_feature_window_missing_rows": stats["fresh_feature_window_missing_rows"],
             "ready_for_r12_preview_rows": stats["ready_for_r12_preview_rows"],
             "sample_ticker": sample.get("ticker"),
-            "max_target_time": max((row["target_time"] for row in current_rows if row["series_ticker"] == series), default=None),
+            "max_target_time": max((row["target_time"] for row in current_rows if \
+row["series_ticker"] == series), default=None),
         }})
-    series_rows.sort(key=lambda row: (-int(row["current_market_rows"]), str(row["series_ticker"])))
+    series_rows.sort(key=lambda row: (-int(row["current_market_rows"]), \
+str(row["series_ticker"])))
     feature_windows = []
     for loc, count in feature_locations.most_common():
         generated = feature_max_generated.get(loc)
@@ -657,7 +706,8 @@ try:
             "location_key": loc,
             "feature_rows_sampled": count,
             "max_generated_at": iso(generated),
-            "max_generated_age_hours": round((now - generated).total_seconds() / 3600, 3) if generated else None,
+            "max_generated_age_hours": round((now - generated).total_seconds() / 3600, \
+3) if generated else None,
         }})
     payload["ok"] = True
     payload["current_weather_series"] = series_rows
@@ -667,8 +717,10 @@ try:
         "active_weather_markets_sampled": len(markets),
         "current_weather_market_rows": len(current_rows),
         "current_series_count": len(series_rows),
-        "missing_current_weather_link_rows": sum(1 for row in current_rows if not row["has_weather_link"]),
-        "ready_for_r12_safe_link_preview_rows": blocker_counts["READY_FOR_R12_SAFE_LINK_PREVIEW"],
+        "missing_current_weather_link_rows": sum(1 for row in current_rows if not \
+row["has_weather_link"]),
+        "ready_for_r12_safe_link_preview_rows": \
+blocker_counts["READY_FOR_R12_SAFE_LINK_PREVIEW"],
         "fresh_feature_window_missing_rows": blocker_counts["FRESH_FEATURE_WINDOW_MISSING"],
         "current_link_exists_rows": blocker_counts["CURRENT_LINK_EXISTS"],
         "location_unknown_rows": blocker_counts["LOCATION_UNKNOWN"],
@@ -701,8 +753,12 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
     return {
         "remote_time_utc": _first_line(_stdout(by_name.get("remote_time_utc"))),
         "scheduler_timer_active_state": _first_line(_stdout(by_name.get("scheduler_timer_active"))),
-        "scheduler_service_active_state": _first_line(_stdout(by_name.get("scheduler_service_active"))),
-        "scheduler_service_show": _parse_systemd_show(_stdout(by_name.get("scheduler_service_show"))),
+        "scheduler_service_active_state": _first_line(
+            _stdout(by_name.get("scheduler_service_active"))
+        ),
+        "scheduler_service_show": _parse_systemd_show(
+            _stdout(by_name.get("scheduler_service_show"))
+        ),
         "writer_status": writer.get("status") or "UNKNOWN",
         "writer_safe_to_start_write": bool(writer.get("safe_to_start_write")) if writer else False,
         "runner_script": runner_script,
@@ -753,7 +809,9 @@ def _repaired_weather_hook_block(*, series_ticker: str, location_key: str) -> st
             (
                 "run_job weather_current_catalog_refresh true bash -lc "
                 "'set -euo pipefail; "
-                f".venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 --series-ticker {series}; "
+                f".venv/bin/kalshi-bot sync-markets --status open "
+                f"--limit 100 --max-pages 3 --series-ticker "
+                f"{series}; "
                 ".venv/bin/kalshi-bot market-legs-parse --refresh --limit 1500; "
                 f".venv/bin/kalshi-bot ingest-weather --location-key {location}; "
                 f".venv/bin/kalshi-bot build-weather-features --location-key {location}; "
@@ -771,7 +829,8 @@ def patch_runner_weather_feature_refresh(runner_script: str, *, repaired_block: 
     pattern = re.compile(
         r"(?ms)^# cadence_minutes=30 category=weather-catalog\n"
         r"run_job weather_current_catalog_refresh .*?"
-        r"(?=\n# cadence_minutes=30 category=weather\nrun_job weather_fast_lane|\n# cadence_minutes=|$)"
+        r"(?=\n# cadence_minutes=30 category=weather\nrun_job weather_fast_lane|"
+        r"\n# cadence_minutes=|$)"
     )
     if pattern.search(runner_script):
         patched = pattern.sub(repaired_block, runner_script, count=1)
@@ -784,7 +843,9 @@ def patch_runner_weather_feature_refresh(runner_script: str, *, repaired_block: 
     return patched if patched.endswith("\n") else patched + "\n"
 
 
-def _runner_has_weather_feature_refresh(runner_script: str, *, location_key: str | None = None) -> bool:
+def _runner_has_weather_feature_refresh(
+    runner_script: str, *, location_key: str | None = None
+) -> bool:
     if "ingest-weather --location-key" not in runner_script:
         return False
     if "build-weather-features --location-key" not in runner_script:
@@ -811,19 +872,66 @@ def _linkability_checks(
         {fragment for fragment in FORBIDDEN_REPAIR_FRAGMENTS if fragment in patched_runner.lower()}
     )
     checks = [
-        _check("remote_probes_completed", not failed_probes, f"failed={','.join(failed_probes) if failed_probes else 'none'}."),
-        _check("command_registry_ok", bool(parsed.get("command_registry_ok")), "Required weather commands are registered on the cloud host."),
-        _check("weather_current_window_snapshot_ok", bool(parsed.get("weather_current_window_snapshot_ok")), f"error={parsed.get('weather_current_window_error')}."),
-        _check("current_weather_series_discovered", bool(parsed.get("current_weather_series")), f"current_rows={current_rows}."),
-        _check("current_weather_missing_links_recorded", missing_links >= 0, f"missing_current_weather_link_rows={missing_links}."),
-        _check("linkability_blocker_is_explicit", current_rows > 0 and (missing_links > 0 or stale_features > 0), f"current_rows={current_rows} missing_links={missing_links} stale_features={stale_features}."),
-        _check("runner_has_weather_catalog_hook", bool(parsed.get("runner_has_weather_catalog_hook")), "weather_current_catalog_refresh exists in the scheduler runner."),
-        _check("runner_has_weather_fast_lane", bool(parsed.get("runner_has_weather_fast_lane")), "weather_fast_lane exists after the catalog hook."),
-        _check("patched_runner_refreshes_features", _runner_has_weather_feature_refresh(patched_runner), "Patched hook refreshes weather source/features before R12 preview."),
-        _check("patched_runner_has_no_forbidden_commands", not forbidden, f"forbidden={','.join(forbidden) if forbidden else 'none'}."),
+        _check(
+            "remote_probes_completed",
+            not failed_probes,
+            f"failed={','.join(failed_probes) if failed_probes else 'none'}.",
+        ),
+        _check(
+            "command_registry_ok",
+            bool(parsed.get("command_registry_ok")),
+            "Required weather commands are registered on the cloud host.",
+        ),
+        _check(
+            "weather_current_window_snapshot_ok",
+            bool(parsed.get("weather_current_window_snapshot_ok")),
+            f"error={parsed.get('weather_current_window_error')}.",
+        ),
+        _check(
+            "current_weather_series_discovered",
+            bool(parsed.get("current_weather_series")),
+            f"current_rows={current_rows}.",
+        ),
+        _check(
+            "current_weather_missing_links_recorded",
+            missing_links >= 0,
+            f"missing_current_weather_link_rows={missing_links}.",
+        ),
+        _check(
+            "linkability_blocker_is_explicit",
+            current_rows > 0 and (missing_links > 0 or stale_features > 0),
+            f"current_rows={current_rows} missing_links="
+            f"{missing_links} stale_features={stale_features}.",
+        ),
+        _check(
+            "runner_has_weather_catalog_hook",
+            bool(parsed.get("runner_has_weather_catalog_hook")),
+            "weather_current_catalog_refresh exists in the scheduler runner.",
+        ),
+        _check(
+            "runner_has_weather_fast_lane",
+            bool(parsed.get("runner_has_weather_fast_lane")),
+            "weather_fast_lane exists after the catalog hook.",
+        ),
+        _check(
+            "patched_runner_refreshes_features",
+            _runner_has_weather_feature_refresh(patched_runner),
+            "Patched hook refreshes weather source/features before R12 preview.",
+        ),
+        _check(
+            "patched_runner_has_no_forbidden_commands",
+            not forbidden,
+            f"forbidden={','.join(forbidden) if forbidden else 'none'}.",
+        ),
     ]
     if apply:
-        checks.append(_check("apply_requires_backup_first", backup_first, "Remote runner writes require --backup-first."))
+        checks.append(
+            _check(
+                "apply_requires_backup_first",
+                backup_first,
+                "Remote runner writes require --backup-first.",
+            )
+        )
         checks.append(
             _check(
                 "scheduler_service_inactive_for_runner_write",
@@ -852,12 +960,16 @@ def _decision(
         reason = f"First failing check: {failed[0]['check']}."
         next_step = "Phase 3BB-R47 - Re-run Weather Current Window Discovery"
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports"
         )
     elif rows_ready > 0:
         status = "WEATHER_LINK_GATE_READY_AFTER_FEATURE_REFRESH"
-        reason = "Current weather windows have fresh feature evidence; run the existing R12 link gate/apply path."
+        reason = (
+            "Current weather windows have fresh feature evidence; run the existing R12 link "
+            "gate/apply path."
+        )
         next_step = "Phase 3AZ-R12 - Weather Missing Link Apply"
         command = (
             "kalshi-bot db-writer-monitor --json\n"
@@ -868,7 +980,10 @@ def _decision(
         )
     elif install_result.get("ok") and verify_after:
         status = "WEATHER_FEATURE_REFRESH_HOOK_INSTALLED"
-        reason = "The scheduler weather hook now refreshes source/features before R12 linkability preview."
+        reason = (
+            "The scheduler weather hook now refreshes source/features before R12 linkability "
+            "preview."
+        )
         next_step = "Phase 3BB-R48 - Weather Feature Refresh Runtime Verification"
         command = (
             "kalshi-bot phase3bb-r48-weather-feature-refresh-runtime-verification "
@@ -876,10 +991,14 @@ def _decision(
         )
     elif patch_required and not apply:
         status = "READY_TO_INSTALL_WEATHER_FEATURE_REFRESH_HOOK"
-        reason = "Current weather windows exist, but fresh feature windows are stale/missing before R12 preview."
+        reason = (
+            "Current weather windows exist, but fresh feature windows are stale/missing "
+            "before R12 preview."
+        )
         next_step = "Phase 3BB-R47 - Apply Weather Feature Refresh Hook"
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports "
             "--apply --backup-first"
         )
@@ -896,7 +1015,8 @@ def _decision(
         reason = "The hook was not installed and no immediate safe link rows are present."
         next_step = "Phase 3BB-R47 - Inspect Linkability Repair"
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports"
         )
     return {
@@ -945,7 +1065,8 @@ import time
 
 runner = pathlib.Path({str(_runner_path(target))!r})
 tmp = runner.with_name(runner.name + ".phase3bb_r47.tmp")
-backup = runner.with_name(runner.name + ".phase3bb_r47_" + time.strftime("%Y%m%d%H%M%S") + ".bak")
+backup = runner.with_name(runner.name + ".phase3bb_r47_" + \
+time.strftime("%Y%m%d%H%M%S") + ".bak")
 tmp.write_text(base64.b64decode({encoded!r}).decode("utf-8"), encoding="utf-8")
 tmp.chmod(0o755)
 if {bool(backup_first)!r} and runner.exists():
@@ -994,7 +1115,9 @@ def _write_rows_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def _render_executive_summary(payload: dict[str, Any]) -> str:
-    lines = _metadata_lines(payload, "# Phase 3BB-R47 Weather Current Window Series Discovery And Linkability Repair")
+    lines = _metadata_lines(
+        payload, "# Phase 3BB-R47 Weather Current Window Series Discovery And Linkability Repair"
+    )
     decision = payload["linkability_decision"]
     parsed = payload["parsed_linkability_state"]
     lines.extend(
@@ -1008,8 +1131,10 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- Recommended location: `{decision['recommended_location_key']}`",
             f"- Current weather rows: `{decision['current_weather_market_rows']}`",
             f"- Missing current weather links: `{decision['missing_current_weather_link_rows']}`",
-            f"- Fresh feature window missing rows: `{decision['fresh_feature_window_missing_rows']}`",
-            f"- Ready for R12 safe-link preview rows: `{decision['ready_for_r12_safe_link_preview_rows']}`",
+            f"- Fresh feature window missing rows: `"
+            f"{decision['fresh_feature_window_missing_rows']}`",
+            f"- Ready for R12 safe-link preview rows: `"
+            f"{decision['ready_for_r12_safe_link_preview_rows']}`",
             f"- Runner feature refresh before: `{decision['runner_repaired_before']}`",
             f"- Runner feature refresh after: `{decision['runner_repaired_after']}`",
             f"- Runner patch required: `{decision['runner_patch_required']}`",
@@ -1057,11 +1182,22 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in payload["linkability_checks"]:
         lines.append(f"| `{row['check']}` | `{row['passed']}` | {row['detail']} |")
-    lines.extend(["", "## Current Weather Series", "", "| Series | Location | Current Rows | Missing Links | Stale Features | Ready Rows | Sample |", "|---|---|---:|---:|---:|---:|---|"])
+    lines.extend(
+        [
+            "",
+            "## Current Weather Series",
+            "",
+            "| Series | Location | Current Rows | Missing Links | Stale Features | Ready "
+            "Rows | Sample |",
+            "|---|---|---:|---:|---:|---:|---|",
+        ]
+    )
     for row in payload["current_weather_series"]:
         lines.append(
-            "| {series_ticker} | {location_key} | {current_market_rows} | {missing_link_rows} | "
-            "{fresh_feature_window_missing_rows} | {ready_for_r12_preview_rows} | {sample_ticker} |".format(**row)
+            "| {series_ticker} | {location_key} | {current_ma"
+            "rket_rows} | {missing_link_rows} | "
+            "{fresh_feature_window_missing_rows} | {ready_for_r12_preview_rows} | "
+            "{sample_ticker} |".format(**row)
         )
     lines.extend(
         [
@@ -1103,7 +1239,8 @@ def _render_next_actions(payload: dict[str, Any]) -> str:
             "- Do not start duplicate R5 watchers.",
             "- Do not create paper trades.",
             "- Do not submit/cancel/replace live or demo orders.",
-            "- Do not run weather forecasts until R12 linkability opens and links are actually written.",
+            "- Do not run weather forecasts until R12 linkability opens and links are "
+            "actually written.",
         ]
     )
     return "\n".join(lines) + "\n"

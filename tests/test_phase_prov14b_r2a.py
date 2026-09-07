@@ -52,17 +52,19 @@ def _evidence(tmp_path: Path):
     }
     rows = []
     for event_id, model in ((101, "crypto_v2"), (102, "weather_v2")):
-        rows.append({
-            "event_id": event_id,
-            "model_name": model,
-            "forecast_id": event_id + 100,
-            "source_observation_ref": {"table": "observations", "id": event_id + 200},
-            "market_snapshot_id": event_id + 300,
-            "feature_source_table": "features",
-            "feature_source_id": event_id + 400,
-            "passed": True,
-            "failures": [],
-        })
+        rows.append(
+            {
+                "event_id": event_id,
+                "model_name": model,
+                "forecast_id": event_id + 100,
+                "source_observation_ref": {"table": "observations", "id": event_id + 200},
+                "market_snapshot_id": event_id + 300,
+                "feature_source_table": "features",
+                "feature_source_id": event_id + 400,
+                "passed": True,
+                "failures": [],
+            }
+        )
     attribution = {
         "phase": "PROV-14",
         "boundary": {"after_event_id": 100},
@@ -105,8 +107,13 @@ def test_valid_bundle_passes_but_never_authorizes_activation(tmp_path: Path) -> 
 def test_bundle_is_deterministic(tmp_path: Path) -> None:
     values = _evidence(tmp_path)
     kwargs = dict(
-        backup=values[0], rollback=values[1], safety=values[2], cycle=values[3],
-        attribution=values[4], rollback_root=values[5], as_of=AS_OF,
+        backup=values[0],
+        rollback=values[1],
+        safety=values[2],
+        cycle=values[3],
+        attribution=values[4],
+        rollback_root=values[5],
+        as_of=AS_OF,
         synthetic_preview=True,
     )
     assert build_certification_bundle(**kwargs) == build_certification_bundle(**deepcopy(kwargs))
@@ -135,11 +142,13 @@ def test_stale_safety_evidence_fails_closed(tmp_path: Path) -> None:
 
 def test_writer_lock_execution_and_service_failures_are_visible(tmp_path: Path) -> None:
     def mutate(values):
-        values[2].update({
-            "safe_to_start_write": False,
-            "locks_clear": False,
-            "execution_enabled": True,
-        })
+        values[2].update(
+            {
+                "safe_to_start_write": False,
+                "locks_clear": False,
+                "execution_enabled": True,
+            }
+        )
         values[2]["services"]["bounded_timer"] = "active"
         values[2]["services"]["legacy_watcher_enabled"] = True
 

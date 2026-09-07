@@ -121,8 +121,7 @@ def test_report_is_synthetic_and_non_executable():
 
 def test_source_has_no_connected_or_trading_surface():
     source = (
-        Path(__file__).parents[1]
-        / "scripts/local/phase4dd_forecast_batch_vectorization_audit.py"
+        Path(__file__).parents[1] / "scripts/local/phase4dd_forecast_batch_vectorization_audit.py"
     ).read_text()
     for token in (
         "sqlite3",

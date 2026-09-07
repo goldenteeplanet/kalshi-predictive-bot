@@ -90,11 +90,14 @@ class LiveReadinessConfig:
             raise ValueError("PHASE_3V_CERTIFICATE_MAX_LIFETIME_HOURS must be positive.")
         if self.evidence_stale_after_days <= 0:
             raise ValueError("PHASE_3V_EVIDENCE_STALE_AFTER_DAYS must be positive.")
-        if min(
-            self.micro_max_contracts_per_order,
-            self.constrained_max_contracts_per_order,
-            self.full_max_contracts_per_order,
-        ) <= 0:
+        if (
+            min(
+                self.micro_max_contracts_per_order,
+                self.constrained_max_contracts_per_order,
+                self.full_max_contracts_per_order,
+            )
+            <= 0
+        ):
             raise ValueError("Phase 3V stage contract caps must be positive.")
 
 

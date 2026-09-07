@@ -30,8 +30,12 @@ def test_pmb34_reports_exact_gaps_without_fabrication():
 
 
 def test_pmb34_is_deterministic_local_and_disabled(tmp_path):
-    first = json.loads(write_runtime_field_compatibility_preview(FIXTURES, tmp_path / "a").read_text())
-    second = json.loads(write_runtime_field_compatibility_preview(FIXTURES, tmp_path / "b").read_text())
+    first = json.loads(
+        write_runtime_field_compatibility_preview(FIXTURES, tmp_path / "a").read_text()
+    )
+    second = json.loads(
+        write_runtime_field_compatibility_preview(FIXTURES, tmp_path / "b").read_text()
+    )
     assert first == second
     assert first["database_writes"] == 0
     assert first["cloud_access"] is False

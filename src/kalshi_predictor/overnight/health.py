@@ -41,14 +41,10 @@ def run_health_checks(
         "ok": ok,
         "checks": [asdict(check) for check in checks],
         "errors": [
-            asdict(check)
-            for check in checks
-            if check.severity == "ERROR" and not check.passed
+            asdict(check) for check in checks if check.severity == "ERROR" and not check.passed
         ],
         "warnings": [
-            asdict(check)
-            for check in checks
-            if check.severity == "WARNING" and not check.passed
+            asdict(check) for check in checks if check.severity == "WARNING" and not check.passed
         ],
     }
 

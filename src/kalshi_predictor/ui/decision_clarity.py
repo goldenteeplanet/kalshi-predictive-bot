@@ -216,9 +216,7 @@ def build_market_structure(
         legs=legs,
     )
     component_market_tickers = [
-        value
-        for value in dict.fromkeys(leg["component_market_ticker"] for leg in legs)
-        if value
+        value for value in dict.fromkeys(leg["component_market_ticker"] for leg in legs) if value
     ]
     return {
         "clean_title": headline,
@@ -270,9 +268,8 @@ def _decision_values(
     spread = to_decimal(_field(ranking, "spread")) or to_decimal(_field(snapshot, "spread"))
     score = to_decimal(_field(ranking, "opportunity_score")) or Decimal("0")
     confidence = to_decimal(_field(ranking, "model_confidence_score")) or Decimal("0")
-    liquidity_raw = (
-        to_decimal(_field(ranking, "liquidity"))
-        or to_decimal(_field(snapshot, "liquidity_dollars"))
+    liquidity_raw = to_decimal(_field(ranking, "liquidity")) or to_decimal(
+        _field(snapshot, "liquidity_dollars")
     )
     liquidity_score = to_decimal(_field(ranking, "liquidity_score")) or Decimal("0")
     freshness = _freshness(snapshot, settings=settings)
@@ -345,8 +342,7 @@ def _block_reasons(
         and values["liquidity_raw"] < settings.opportunity_min_liquidity
     ):
         reasons.append(
-            "Liquidity is below the configured threshold "
-            f"({settings.opportunity_min_liquidity})."
+            f"Liquidity is below the configured threshold ({settings.opportunity_min_liquidity})."
         )
     if values["spread"] is None:
         reasons.append("Spread is missing from the latest quote.")
@@ -740,10 +736,7 @@ def _contract_short_title(legs: list[dict[str, str]]) -> str:
         _clean_text(leg.get("component_side") or leg.get("side")).upper() in {"", "YES"}
         for leg in legs
     )
-    labels = [
-        leg["human_label"] if all_yes_components else leg["contract_line"]
-        for leg in legs
-    ]
+    labels = [leg["human_label"] if all_yes_components else leg["contract_line"] for leg in legs]
     return _join_english(labels)
 
 

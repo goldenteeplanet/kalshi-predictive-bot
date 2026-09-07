@@ -53,9 +53,7 @@ def test_stale_and_timeout_mismatch_are_explicit() -> None:
     )
     assert stale.status == "STALE"
     assert stale.reasons == ("OBSERVATION_STALE",)
-    mismatch = build_busy_timeout_evidence(
-        budget=_budget(), observations=[_observation(timeout=1)]
-    )
+    mismatch = build_busy_timeout_evidence(budget=_budget(), observations=[_observation(timeout=1)])
     assert mismatch.status == "MISMATCH"
     assert mismatch.reasons == ("BUSY_TIMEOUT_MISMATCH",)
 
@@ -96,14 +94,10 @@ def test_denied_budget_fails_closed() -> None:
 
 
 def test_result_tampering_and_safety_boundary_fail_closed() -> None:
-    evidence = build_busy_timeout_evidence(
-        budget=_budget(), observations=[_observation()]
-    )
+    evidence = build_busy_timeout_evidence(budget=_budget(), observations=[_observation()])
     with pytest.raises(SQLiteBusyTimeoutEvidenceError, match="EVIDENCE_HASH_MISMATCH"):
         validate_busy_timeout_evidence(replace(evidence, evidence_hash="0" * 64))
-    with pytest.raises(
-        SQLiteBusyTimeoutEvidenceError, match="EVIDENCE_SAFETY_BOUNDARY_INVALID"
-    ):
+    with pytest.raises(SQLiteBusyTimeoutEvidenceError, match="EVIDENCE_SAFETY_BOUNDARY_INVALID"):
         validate_busy_timeout_evidence(replace(evidence, execution_authorized=True))
 
 

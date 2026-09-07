@@ -17,7 +17,9 @@ def test_preview_has_exact_invocation_and_safety_guards():
 def test_old_watcher_override_fails(tmp_path: Path):
     source = Path("deploy/systemd/kalshi-ui-status-collector.service.ui-obs5fa.preview").read_text()
     bad = tmp_path / "bad.service"
-    bad.write_text(source.replace("--service kalshi-r5-bounded.service", "--service kalshi-r5-watcher.service"))
+    bad.write_text(
+        source.replace("--service kalshi-r5-bounded.service", "--service kalshi-r5-watcher.service")
+    )
     report = certify_invocation_preview(bad)
     assert report["status"] == "FAILED"
     assert any(code.startswith("REQUIRED_ARGUMENT_MISSING") for code in report["failures"])

@@ -44,8 +44,7 @@ def update_health(
                     "status": "NOT_APPLICABLE",
                     "applicability": "NOT_USED_BY_FIXED_RATE_REST_REFRESH",
                     "detail": (
-                        "The active scheduler refreshes Kalshi through bounded REST "
-                        "snapshots."
+                        "The active scheduler refreshes Kalshi through bounded REST snapshots."
                     ),
                 },
                 "coinbase": {"status": "PENDING", "prices_imported": 0, "errors": []},
@@ -94,9 +93,7 @@ def update_health(
         return payload
     if action == "finish":
         stages = payload.get("stages", {})
-        failures = [
-            name for name, row in stages.items() if row.get("status") != "COMPLETE"
-        ]
+        failures = [name for name, row in stages.items() if row.get("status") != "COMPLETE"]
         coinbase_ok = payload.get("sources", {}).get("coinbase", {}).get("status") == "HEALTHY"
         healthy = not failures and coinbase_ok
         scheduler = payload.setdefault("scheduler", {})
@@ -106,9 +103,9 @@ def update_health(
         scheduler["next_run_at"] = (now + timedelta(seconds=cadence_seconds)).isoformat()
         if healthy:
             scheduler["last_successful_completion"] = now.isoformat()
-            payload["consecutive_healthy_cycles"] = int(
-                payload.get("consecutive_healthy_cycles") or 0
-            ) + 1
+            payload["consecutive_healthy_cycles"] = (
+                int(payload.get("consecutive_healthy_cycles") or 0) + 1
+            )
         else:
             payload["consecutive_healthy_cycles"] = 0
         payload["overall_status"] = "HEALTHY" if healthy else "DEGRADED"
@@ -147,11 +144,7 @@ def _noaa_state(
     cycle_started_at: str | None,
 ) -> dict[str, Any]:
     decision = report.get("decision_refresh", {})
-    feature_rows = [
-        row
-        for row in decision.get("weather_features", [])
-        if isinstance(row, dict)
-    ]
+    feature_rows = [row for row in decision.get("weather_features", []) if isinstance(row, dict)]
     features = sum(
         int(row.get("features_inserted") or row.get("fresh_location_count") or 0)
         for row in feature_rows
@@ -161,9 +154,7 @@ def _noaa_state(
     report_generated_at = _parse_datetime(report.get("generated_at"))
     cycle_started = _parse_datetime(cycle_started_at)
     report_is_current = bool(
-        report_generated_at
-        and cycle_started
-        and report_generated_at >= cycle_started
+        report_generated_at and cycle_started and report_generated_at >= cycle_started
     )
     if stage_status == "TIMEOUT":
         status = "UNAVAILABLE_DUE_TO_STAGE_TIMEOUT"
@@ -176,11 +167,7 @@ def _noaa_state(
         reason = "GH2_REPORT_NOT_UPDATED_IN_CURRENT_CYCLE"
     else:
         all_locations_fresh = expected_locations > 0 and features >= expected_locations
-        status = (
-            "HEALTHY"
-            if all_locations_fresh and forecasts > 0
-            else "NO_CURRENT_OUTPUT"
-        )
+        status = "HEALTHY" if all_locations_fresh and forecasts > 0 else "NO_CURRENT_OUTPUT"
         reason = None if status == "HEALTHY" else "NOAA_PRODUCED_NO_CURRENT_OUTPUT"
     return {
         "status": status,

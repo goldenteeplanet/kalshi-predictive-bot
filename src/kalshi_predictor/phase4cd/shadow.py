@@ -193,9 +193,10 @@ def _candidate(
 ) -> ShadowDecision | None:
     if snapshot is None or not market.rules_primary or market.status not in {"open", "active"}:
         return None
-    if _as_utc(now) - _as_utc(forecast.forecasted_at) > max_age or _as_utc(
-        now
-    ) - _as_utc(snapshot.captured_at) > max_age:
+    if (
+        _as_utc(now) - _as_utc(forecast.forecasted_at) > max_age
+        or _as_utc(now) - _as_utc(snapshot.captured_at) > max_age
+    ):
         return None
     try:
         probability = Decimal(forecast.yes_probability)

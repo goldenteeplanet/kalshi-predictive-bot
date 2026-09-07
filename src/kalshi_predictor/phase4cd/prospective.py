@@ -671,8 +671,7 @@ def prospective_status(research: Session) -> dict[str, Any]:
     exact_invalid_reasons = Counter(
         str(details["crypto_skip"]["reason"])
         for details in invalid_details
-        if isinstance(details.get("crypto_skip"), dict)
-        and details["crypto_skip"].get("reason")
+        if isinstance(details.get("crypto_skip"), dict) and details["crypto_skip"].get("reason")
     )
     category_details = [
         json.loads(row.details_json)
@@ -772,8 +771,7 @@ def prospective_status(research: Session) -> dict[str, Any]:
             event_deltas[label] = [
                 sum(
                     (
-                        Decimal(getattr(row, crypto_field))
-                        - Decimal(getattr(row, market_field))
+                        Decimal(getattr(row, crypto_field)) - Decimal(getattr(row, market_field))
                         for row in rows
                     ),
                     ZERO,
@@ -911,8 +909,7 @@ def prospective_status(research: Session) -> dict[str, Any]:
             "contract_structures": dict(
                 sorted(
                     Counter(
-                        str(row.get("contract_structure") or "UNKNOWN")
-                        for row in range_verdicts
+                        str(row.get("contract_structure") or "UNKNOWN") for row in range_verdicts
                     ).items()
                 )
             ),

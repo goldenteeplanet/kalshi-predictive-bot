@@ -126,13 +126,7 @@ def traffic_light_label(
     high_spread = spread_value is not None and spread_value > max_spread
     low_liquidity = liquidity_value < Decimal("25")
     no_confidence = confidence_value < Decimal("20")
-    if (
-        not is_fresh
-        or score_value < Decimal("60")
-        or high_spread
-        or low_liquidity
-        or no_confidence
-    ):
+    if not is_fresh or score_value < Decimal("60") or high_spread or low_liquidity or no_confidence:
         return {"label": "Avoid", "kind": "avoid"}
     if (
         score_value >= Decimal("80")

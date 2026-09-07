@@ -55,4 +55,3 @@ def validate_hint_artifact(
             tickers.append(ticker)
             seen.add(ticker)
     return tickers
-

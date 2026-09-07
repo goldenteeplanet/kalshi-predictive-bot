@@ -90,9 +90,7 @@ def test_sequence_chain_corrupt_and_partial_existing_journal_fail_closed(tmp_pat
             allowed_root=tmp_path,
         )
     journal.write_bytes(journal.read_bytes()[:-1])
-    with pytest.raises(
-        AppendOnlyIncidentWriterError, match="JOURNAL_TRAILING_RECORD_INCOMPLETE"
-    ):
+    with pytest.raises(AppendOnlyIncidentWriterError, match="JOURNAL_TRAILING_RECORD_INCOMPLETE"):
         append_incident_journal_entry(
             journal,
             _entry(sequence=2, previous=_entry().entry_hash),
@@ -102,9 +100,7 @@ def test_sequence_chain_corrupt_and_partial_existing_journal_fail_closed(tmp_pat
 
 def test_existing_record_and_receipt_tampering_fail_closed(tmp_path: Path) -> None:
     journal = tmp_path / "incidents.jsonl"
-    receipt = append_incident_journal_entry(
-        journal, _entry(), allowed_root=tmp_path, dry_run=False
-    )
+    receipt = append_incident_journal_entry(journal, _entry(), allowed_root=tmp_path, dry_run=False)
     journal.write_bytes(journal.read_bytes().replace(b"DETECTED", b"ALTERED_"))
     with pytest.raises(AppendOnlyIncidentWriterError, match="JOURNAL_RECORD_INVALID"):
         append_incident_journal_entry(

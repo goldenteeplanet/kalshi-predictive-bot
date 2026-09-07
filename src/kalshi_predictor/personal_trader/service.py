@@ -259,8 +259,9 @@ def build_personal_trade_brief(
         "watchlist": watchlist,
         "rejection_summary": rejection_summary,
         "no_trade": no_trade,
-        "next_recheck_at": (generated_at + timedelta(seconds=config.max_advisory_lifetime_seconds))
-        .isoformat(),
+        "next_recheck_at": (
+            generated_at + timedelta(seconds=config.max_advisory_lifetime_seconds)
+        ).isoformat(),
         "disclosures": [
             "This is an advisory snapshot, not an order.",
             "Phase 3U cannot create, submit, cancel, replace, or route orders.",

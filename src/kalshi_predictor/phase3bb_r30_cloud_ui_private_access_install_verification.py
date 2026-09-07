@@ -252,13 +252,10 @@ def build_phase3bb_r30_cloud_ui_private_access_install_verification(
         "r29_context_available": bool(r29),
         "r18_preflight": r18,
         "remote_private_access_probe_duration_seconds": duration,
-        "remote_private_access_probe_results": [
-            _result_payload(result) for result in all_results
-        ],
+        "remote_private_access_probe_results": [_result_payload(result) for result in all_results],
         "parsed_private_access_state": tailscale_state,
         "parsed_ui_state": ui_state,
-        "private_access_handoff_decision": r29.get("private_access_handoff_decision")
-        or {},
+        "private_access_handoff_decision": r29.get("private_access_handoff_decision") or {},
         "verification_checks": checks,
         "verification_decision": decision,
         "next_operator_command": decision["operator_next_command"],
@@ -526,9 +523,7 @@ def _is_public_listener_host(host: str, *, tailnet_ipv4: Any) -> bool:
         "100.64.0.0/10"
     ):
         return False
-    if isinstance(address, ipaddress.IPv6Address) and address in ipaddress.ip_network(
-        "fc00::/7"
-    ):
+    if isinstance(address, ipaddress.IPv6Address) and address in ipaddress.ip_network("fc00::/7"):
         return False
     return True
 
@@ -572,9 +567,7 @@ def _parse_private_access_probe_results(
         "serve_configured": _serve_configured(serve_text),
         "serve_targets_localhost_ui": serve_target in serve_text,
         "funnel_enabled": "funnel" in serve_lower and "off" not in serve_lower,
-        "local_backend_http_ok": "HTTP_OK" in _stdout(
-            by_name.get("tailscale_local_backend_probe")
-        ),
+        "local_backend_http_ok": "HTTP_OK" in _stdout(by_name.get("tailscale_local_backend_probe")),
     }
 
 

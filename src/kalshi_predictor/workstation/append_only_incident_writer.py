@@ -124,12 +124,16 @@ def validate_incident_append_receipt(receipt: Any) -> None:
         raise AppendOnlyIncidentWriterError("RECEIPT_TYPE_INVALID")
     if receipt.schema_version != RECEIPT_SCHEMA_VERSION:
         raise AppendOnlyIncidentWriterError("RECEIPT_SCHEMA_INVALID")
-    if receipt.append_only is not True or receipt.local_only is not True or any(
-        (
-            receipt.recovery_authorized,
-            receipt.service_control_authorized,
-            receipt.host_restart_authorized,
-            receipt.execution_authorized,
+    if (
+        receipt.append_only is not True
+        or receipt.local_only is not True
+        or any(
+            (
+                receipt.recovery_authorized,
+                receipt.service_control_authorized,
+                receipt.host_restart_authorized,
+                receipt.execution_authorized,
+            )
         )
     ):
         raise AppendOnlyIncidentWriterError("RECEIPT_SAFETY_BOUNDARY_INVALID")

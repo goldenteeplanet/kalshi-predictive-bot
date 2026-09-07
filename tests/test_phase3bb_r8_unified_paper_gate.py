@@ -4,8 +4,8 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
-from typer.testing import CliRunner
 from sqlalchemy import event
+from typer.testing import CliRunner
 
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
@@ -142,9 +142,7 @@ def test_phase3bb_r8_writes_requested_artifacts(tmp_path) -> None:
     assert artifacts.category_blockers_csv_path.exists()
     assert artifacts.manifest_path.exists()
     assert "KXBTC-R8A" in artifacts.rows_csv_path.read_text(encoding="utf-8")
-    assert "SOURCE_MISSING" in artifacts.category_blockers_csv_path.read_text(
-        encoding="utf-8"
-    )
+    assert "SOURCE_MISSING" in artifacts.category_blockers_csv_path.read_text(encoding="utf-8")
 
 
 def test_phase3bb_r8_cli_help_registered() -> None:
@@ -164,12 +162,14 @@ def test_phase3bb_r8_latest_lookup_materializes_only_one_row_per_ticker(tmp_path
         for ticker in tickers:
             _seed_market(session, ticker=ticker, title=f"{ticker} test market")
             for offset in range(100):
-                session.add(MarketSnapshot(
-                    ticker=ticker,
-                    captured_at=now + timedelta(seconds=offset),
-                    status="open",
-                    raw_market_json="{}",
-                ))
+                session.add(
+                    MarketSnapshot(
+                        ticker=ticker,
+                        captured_at=now + timedelta(seconds=offset),
+                        status="open",
+                        raw_market_json="{}",
+                    )
+                )
         session.flush()
         expected = {
             ticker: session.query(MarketSnapshot.id)
@@ -181,7 +181,10 @@ def test_phase3bb_r8_latest_lookup_materializes_only_one_row_per_ticker(tmp_path
         session.expunge_all()
 
         latest = _latest_by_ticker(
-            session, MarketSnapshot, tickers, MarketSnapshot.captured_at,
+            session,
+            MarketSnapshot,
+            tickers,
+            MarketSnapshot.captured_at,
         )
 
         assert {ticker: row.id for ticker, row in latest.items()} == expected
@@ -192,6 +195,7 @@ def test_phase3bb_r8_evidence_queries_are_constant_for_repeated_exact_keys(tmp_p
     session_factory = _session_factory(tmp_path)
     counts = []
     with session_factory() as session:
+
         def count_queries(_conn, _cursor, _statement, _parameters, _context, _many):
             counts.append(1)
 
@@ -212,16 +216,20 @@ def test_phase3bb_r8_recent_decision_window_is_bounded_and_conservative(tmp_path
     session_factory = _session_factory(tmp_path)
     now = utc_now()
     with session_factory() as session:
-        session.add(MarketSnapshot(
-            ticker="OLD-DECISION", captured_at=now, status="open", raw_market_json="{}"
-        ))
+        session.add(
+            MarketSnapshot(
+                ticker="OLD-DECISION", captured_at=now, status="open", raw_market_json="{}"
+            )
+        )
         for index in range(20):
-            session.add(MarketSnapshot(
-                ticker=f"RECENT-{index}",
-                captured_at=now + timedelta(seconds=index + 1),
-                status="open",
-                raw_market_json="{}",
-            ))
+            session.add(
+                MarketSnapshot(
+                    ticker=f"RECENT-{index}",
+                    captured_at=now + timedelta(seconds=index + 1),
+                    status="open",
+                    raw_market_json="{}",
+                )
+            )
         session.flush()
         latest = _latest_by_ticker(
             session,

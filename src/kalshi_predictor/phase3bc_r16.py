@@ -162,18 +162,12 @@ def build_phase3bc_r16_payload(
         for row in current_rows
     ]
     decision_rows.sort(key=_executable_ev_sort_key, reverse=True)
-    paper_ready_rows = [
-        row for row in decision_rows if row["paper_ready_candidate"]
-    ]
+    paper_ready_rows = [row for row in decision_rows if row["paper_ready_candidate"]]
     positive_ev_rows = [
         row for row in decision_rows if (to_decimal(row.get("expected_value")) or Decimal("0")) > 0
     ]
-    positive_ev_blocked_rows = [
-        row for row in positive_ev_rows if not row["paper_ready_candidate"]
-    ]
-    clean_execution_rows = [
-        row for row in decision_rows if row["execution_quality"] == "CLEAN"
-    ]
+    positive_ev_blocked_rows = [row for row in positive_ev_rows if not row["paper_ready_candidate"]]
+    clean_execution_rows = [row for row in decision_rows if row["execution_quality"] == "CLEAN"]
     risk_ready_rows = [
         row
         for row in decision_rows
@@ -194,9 +188,7 @@ def build_phase3bc_r16_payload(
         "positive_ev_blocked_rows": len(positive_ev_blocked_rows),
         "clean_execution_rows": len(clean_execution_rows),
         "risk_ready_rows": len(risk_ready_rows),
-        "top_primary_blocker": blocker_counts.most_common(1)[0][0]
-        if blocker_counts
-        else None,
+        "top_primary_blocker": blocker_counts.most_common(1)[0][0] if blocker_counts else None,
         "phase3m_phase3n_preflight_attempted": r5_summary.get(
             "phase3m_phase3n_preflight_attempted",
             0,
@@ -217,9 +209,7 @@ def build_phase3bc_r16_payload(
             "forecast_stale_rows",
             r4_payload.get("summary", {}).get("forecast_stale_rows", 0),
         ),
-        "refresh_mode": "R5_REFRESH_RANKING_AND_PREFLIGHT"
-        if run_refresh
-        else "R4_DIAGNOSTIC_ONLY",
+        "refresh_mode": "R5_REFRESH_RANKING_AND_PREFLIGHT" if run_refresh else "R4_DIAGNOSTIC_ONLY",
     }
     return {
         "generated_at": generated_at.isoformat(),
@@ -367,15 +357,13 @@ def _primary_blocker(
         if risk_state in {None, "MISSING", "STALE"}:
             return "RISK_MISSING"
         return "PAPER_READY"
-    if (
-        (to_decimal(row.get("expected_value")) or Decimal("0")) > 0
-        and row.get("book_state") == "NO_EXECUTABLE_BOOK"
-    ):
+    if (to_decimal(row.get("expected_value")) or Decimal("0")) > 0 and row.get(
+        "book_state"
+    ) == "NO_EXECUTABLE_BOOK":
         return "LIQUIDITY_BLOCKED"
-    if (
-        (to_decimal(row.get("expected_value")) or Decimal("0")) > 0
-        and (to_decimal(row.get("liquidity_score")) or Decimal("0")) <= 0
-    ):
+    if (to_decimal(row.get("expected_value")) or Decimal("0")) > 0 and (
+        to_decimal(row.get("liquidity_score")) or Decimal("0")
+    ) <= 0:
         return "LIQUIDITY_BLOCKED"
     categories = list((diagnostic or {}).get("blocker_categories") or [])
     if categories:
@@ -458,10 +446,7 @@ def _next_commands(summary: dict[str, Any]) -> list[str]:
         commands.append(
             "Review reports/phase3bc_r16/phase3bc_r16_crypto_paper_ready_edge_hunt_rows.json"
         )
-    elif (
-        summary["active_pure_crypto_rows"] > 0
-        and summary["current_active_pure_crypto_rows"] == 0
-    ):
+    elif summary["active_pure_crypto_rows"] > 0 and summary["current_active_pure_crypto_rows"] == 0:
         commands.append(
             "kalshi-bot phase3bc-r5-crypto-freshness-watch --output-dir reports/phase3bc_r5"
         )
@@ -570,6 +555,7 @@ def _append_rows(lines: list[str], rows: list[dict[str, Any]], *, empty: str) ->
             f"{row.get('spread') or ''} | "
             f"{row.get('primary_blocker') or ''} |"
         )
+
 
 def _append_blocked_rows(
     lines: list[str],

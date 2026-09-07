@@ -24,15 +24,17 @@ def _payload(module):
     for index, stage in enumerate(module.STAGES, start=1):
         duration_ns = index * 1_000_000
         ended = wall_cursor + timedelta(microseconds=duration_ns // 1000)
-        rows.append({
-            "stage": stage,
-            "wall_started_at": wall_cursor.isoformat(timespec="microseconds"),
-            "wall_ended_at": ended.isoformat(timespec="microseconds"),
-            "monotonic_started_ns": monotonic_cursor,
-            "monotonic_ended_ns": monotonic_cursor + duration_ns,
-            "declared_fraction_digits": 6,
-            "evidence_hash": module.canonical_hash([stage, duration_ns]),
-        })
+        rows.append(
+            {
+                "stage": stage,
+                "wall_started_at": wall_cursor.isoformat(timespec="microseconds"),
+                "wall_ended_at": ended.isoformat(timespec="microseconds"),
+                "monotonic_started_ns": monotonic_cursor,
+                "monotonic_ended_ns": monotonic_cursor + duration_ns,
+                "declared_fraction_digits": 6,
+                "evidence_hash": module.canonical_hash([stage, duration_ns]),
+            }
+        )
         wall_cursor, monotonic_cursor = ended, monotonic_cursor + duration_ns
     payload = {"schema": module.INPUT_SCHEMA, "samples": rows}
     payload["artifact_hash"] = module._hash(payload)

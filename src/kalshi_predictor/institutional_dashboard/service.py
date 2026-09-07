@@ -189,9 +189,7 @@ def build_dashboard_snapshot(
         "generated_at": generated_at.isoformat(),
         "requested_as_of": parse_datetime(as_of).isoformat() if as_of is not None else None,
         "effective_as_of": effective_as_of.isoformat(),
-        "valid_until": (
-            generated_at.timestamp() + config.snapshot_validity_seconds
-        ),
+        "valid_until": (generated_at.timestamp() + config.snapshot_validity_seconds),
         "environment": resolved_settings.kalshi_env,
         "execution_mode": _execution_mode(resolved_settings),
         "dashboard_mode": config.mode.upper(),
@@ -546,9 +544,7 @@ def _snapshot_warnings(
     skew: dict[str, Any],
 ) -> list[str]:
     warnings = [
-        item.warning
-        for item in watermarks
-        if item.warning and (item.required or item.enabled)
+        item.warning for item in watermarks if item.warning and (item.required or item.enabled)
     ]
     if config.mode == MODE_DISABLED:
         warnings.append("Phase 3T is disabled; snapshot is read-only diagnostic output.")

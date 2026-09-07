@@ -28,8 +28,9 @@ def test_pmb20_isolates_all_four_requested_factors():
 def test_pmb20_reports_exact_individual_break_or_grid_survival():
     report = build_factor_isolated_breakpoint_attribution()
     for factor in report["factors"]:
-        assert factor["first_any_break"] is not None or factor[
-            "bounded_grid_preserved_strict_advantage"
-        ] is True
+        assert (
+            factor["first_any_break"] is not None
+            or factor["bounded_grid_preserved_strict_advantage"] is True
+        )
         if factor["first_any_break"] is not None:
             assert factor["first_any_break"]["step"] > 0

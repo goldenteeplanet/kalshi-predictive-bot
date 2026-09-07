@@ -302,9 +302,7 @@ class AdvancedRiskDecision:
     telemetry: dict[str, Any]
 
     def with_reservation(self, reservation_id: int | None) -> AdvancedRiskDecision:
-        return AdvancedRiskDecision(
-            **{**self.__dict__, "reservation_id": reservation_id}
-        )
+        return AdvancedRiskDecision(**{**self.__dict__, "reservation_id": reservation_id})
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -425,9 +423,7 @@ class AdvancedRiskEngine:
         )
         planned_trade_risk = risk_per_contract * Decimal(executed)
         limiting = tuple(
-            name
-            for name, cap in bucketed_caps.items()
-            if cap < request.phase_3m_proposed_contracts
+            name for name, cap in bucketed_caps.items() if cap < request.phase_3m_proposed_contracts
         )
         reasons.extend(self._limiting_reasons(limiting))
         reasons.append(
@@ -893,8 +889,7 @@ class AdvancedRiskEngine:
                         (
                             snap.executable_depth_contracts
                             * self.config.max_depth_participation_fraction
-                        )
-                        .to_integral_value(rounding=ROUND_FLOOR)
+                        ).to_integral_value(rounding=ROUND_FLOOR)
                     )
                 )
         if "recent_volume" in self.config.required_liquidity_sources:
@@ -1051,8 +1046,7 @@ class AdvancedRiskEngine:
         tail_charge = Decimal("0")
         if stats.cvar_loss_per_contract is not None:
             tail_charge = (
-                max(Decimal("0"), stats.cvar_loss_per_contract - avg_loss)
-                * self.config.cvar_weight
+                max(Decimal("0"), stats.cvar_loss_per_contract - avg_loss) * self.config.cvar_weight
             )
         ev = conservative_probability * avg_win
         ev -= (Decimal("1") - conservative_probability) * avg_loss

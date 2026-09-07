@@ -58,24 +58,36 @@ def test_unhealthy_keepalive_and_unverified_decision_are_denied() -> None:
 
 def test_exact_freshness_and_expiry_boundaries_pass() -> None:
     audit, bundle, report = _inputs(age=120, expires=200, decision_evaluated=200)
-    assert evaluate_wsl_reliability_workstream_gate(
-        audit, bundle, report, evaluated_at_epoch_seconds=200
-    ).status == "CERTIFIED"
+    assert (
+        evaluate_wsl_reliability_workstream_gate(
+            audit, bundle, report, evaluated_at_epoch_seconds=200
+        ).status
+        == "CERTIFIED"
+    )
     audit, bundle, report = _inputs(age=121)
-    assert evaluate_wsl_reliability_workstream_gate(
-        audit, bundle, report, evaluated_at_epoch_seconds=200
-    ).status == "STALE"
+    assert (
+        evaluate_wsl_reliability_workstream_gate(
+            audit, bundle, report, evaluated_at_epoch_seconds=200
+        ).status
+        == "STALE"
+    )
     audit, bundle, report = _inputs(expires=199, decision_evaluated=199)
-    assert evaluate_wsl_reliability_workstream_gate(
-        audit, bundle, report, evaluated_at_epoch_seconds=200
-    ).status == "DENIED"
+    assert (
+        evaluate_wsl_reliability_workstream_gate(
+            audit, bundle, report, evaluated_at_epoch_seconds=200
+        ).status
+        == "DENIED"
+    )
 
 
 def test_incomplete_evidence_and_invalid_bounds_fail_closed() -> None:
     audit, bundle, report = _inputs(keepalive_complete=False)
-    assert evaluate_wsl_reliability_workstream_gate(
-        audit, bundle, report, evaluated_at_epoch_seconds=200
-    ).status == "INCOMPLETE"
+    assert (
+        evaluate_wsl_reliability_workstream_gate(
+            audit, bundle, report, evaluated_at_epoch_seconds=200
+        ).status
+        == "INCOMPLETE"
+    )
     with pytest.raises(WslReliabilityWorkstreamGateError, match="GATE_BOUND_INVALID"):
         evaluate_wsl_reliability_workstream_gate(
             audit, bundle, report, evaluated_at_epoch_seconds=True

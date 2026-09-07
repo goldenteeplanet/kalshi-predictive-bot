@@ -2,8 +2,6 @@ import json
 from datetime import timedelta
 from types import SimpleNamespace
 
-from sqlalchemy import select
-
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_market_snapshot, upsert_market
 from kalshi_predictor.forecasting import registry
@@ -21,9 +19,7 @@ def test_prov14a_weather_selector_excludes_closed_and_stale_status_rows(tmp_path
         _seed_weather(session, "WX-CLOSED", now - timedelta(hours=1), "open", "open")
         _seed_weather(session, "WX-STALE-SNAPSHOT", now + timedelta(hours=2), "open", "closed")
         session.commit()
-        rows = latest_snapshots_for_model(
-            session, model_name="weather_v2", limit=10, as_of=now
-        )
+        rows = latest_snapshots_for_model(session, model_name="weather_v2", limit=10, as_of=now)
     assert [row.ticker for row in rows] == ["WX-CURRENT"]
 
 
@@ -63,12 +59,15 @@ def test_prov14a_registry_passes_exact_snapshot_id_to_forecast_writer(monkeypatc
 
 def _seed_weather(session, ticker, close_time, market_status, snapshot_status):
     now = utc_now()
-    upsert_market(session, {
-        "ticker": ticker,
-        "status": market_status,
-        "close_time": close_time.isoformat(),
-        "title": "NYC temperature test",
-    })
+    upsert_market(
+        session,
+        {
+            "ticker": ticker,
+            "status": market_status,
+            "close_time": close_time.isoformat(),
+            "title": "NYC temperature test",
+        },
+    )
     insert_weather_market_link(
         session,
         ticker=ticker,

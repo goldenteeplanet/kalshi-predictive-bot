@@ -1,2 +1,1 @@
 """Forum consensus signal helpers."""
-

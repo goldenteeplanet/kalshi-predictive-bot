@@ -287,8 +287,7 @@ def _build_remote_probes(
         ),
         RemoteProbe(
             "scheduler_timer_unit_file",
-            f"test -f /etc/systemd/system/{timer} && sed -n '1,220p' "
-            f"/etc/systemd/system/{timer}",
+            f"test -f /etc/systemd/system/{timer} && sed -n '1,220p' /etc/systemd/system/{timer}",
             timeout_seconds,
         ),
         RemoteProbe(
@@ -312,9 +311,15 @@ def _build_remote_probes(
             ),
             timeout_seconds,
         ),
-        RemoteProbe("scheduler_timer_enabled", f"systemctl is-enabled {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_timer_enabled", f"systemctl is-enabled {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds
+        ),
         RemoteProbe(
             "r5_status",
             (
@@ -349,7 +354,7 @@ def _build_remote_probes(
             "command_registry",
             (
                 f"cd {app} && for cmd in {registry_loop}; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -405,8 +410,7 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
     timer_active_state = timer_active or timer_systemd.get("ActiveState")
     return {
         "scheduler_service_unit_file_present": bool(
-            by_name.get("scheduler_service_unit_file")
-            and by_name["scheduler_service_unit_file"].ok
+            by_name.get("scheduler_service_unit_file") and by_name["scheduler_service_unit_file"].ok
         ),
         "scheduler_timer_unit_file_present": bool(
             by_name.get("scheduler_timer_unit_file") and by_name["scheduler_timer_unit_file"].ok
@@ -433,12 +437,8 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         "scheduler_service_active_state": service_active_state,
         "scheduler_timer_active_state": timer_active_state,
         "scheduler_service_started": service_active_state in {"active", "activating"}
-        or (
-            service_active_state not in {"", "failed", "inactive"}
-            and bool(service_exec_main_pid)
-        ),
-        "scheduler_timer_started": timer_active_state == "active"
-        or bool(timer_exec_main_pid),
+        or (service_active_state not in {"", "failed", "inactive"} and bool(service_exec_main_pid)),
+        "scheduler_timer_started": timer_active_state == "active" or bool(timer_exec_main_pid),
         "command_registry_ok": bool(
             by_name.get("command_registry") and by_name["command_registry"].ok
         ),
@@ -559,8 +559,7 @@ def _verification_checks(
         ),
         _check(
             "r5_guard_healthy",
-            parsed.get("guard_status") == "RUNNING"
-            and parsed.get("guard_should_stop") is False,
+            parsed.get("guard_status") == "RUNNING" and parsed.get("guard_should_stop") is False,
             (
                 f"guard_status={parsed.get('guard_status')}, "
                 f"guard_should_stop={parsed.get('guard_should_stop')}."
@@ -569,10 +568,7 @@ def _verification_checks(
         _check(
             "writer_not_conflicting",
             bool(parsed.get("writer_matches_r5_or_clear")),
-            (
-                f"writer_pid={parsed.get('writer_pid')}; "
-                f"r5_pid={parsed.get('r5_pid')}."
-            ),
+            (f"writer_pid={parsed.get('writer_pid')}; r5_pid={parsed.get('r5_pid')}."),
         ),
     ]
 
@@ -609,7 +605,9 @@ def _verification_decision(
                 "kalshi-bot phase3bb-r38-cloud-scheduler-timer-start-handoff "
                 "--output-dir reports/phase3bb_r38 --reports-dir reports"
             )
-            next_codex_step = "Phase 3BB-R38 - Operator-Approved Cloud Scheduler Timer Start Handoff"
+            next_codex_step = (
+                "Phase 3BB-R38 - Operator-Approved Cloud Scheduler Timer Start Handoff"
+            )
     return {
         "status": status,
         "verification_passed": not failed,

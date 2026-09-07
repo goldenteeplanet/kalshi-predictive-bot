@@ -157,9 +157,7 @@ def build_phase3bb_r13_cloud_scheduler_adoption(
         "argv": command_args or [],
     }
     r11_context = _read_json(reports_dir / "phase3bb_r11" / "codex_cloud_context.json")
-    r12_context = _read_json(
-        reports_dir / "phase3bb_r12" / "cloud_bootstrap_verification.json"
-    )
+    r12_context = _read_json(reports_dir / "phase3bb_r12" / "cloud_bootstrap_verification.json")
     target = _resolve_target(
         r11_context,
         ssh_target=ssh_target,

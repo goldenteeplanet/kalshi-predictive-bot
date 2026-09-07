@@ -131,9 +131,7 @@ class SystemCertificationService:
             for scenario in SCENARIO_GROUPS
             if scenario["scenario_id"] != "GOLDEN-TRACE"
         }
-        dynamic_no_bypass_evidence = build_dynamic_no_bypass_evidence(
-            executed=run_contract_tests
-        )
+        dynamic_no_bypass_evidence = build_dynamic_no_bypass_evidence(executed=run_contract_tests)
         phases = [self._phase_result_from_registry(phase) for phase in PHASE_REGISTRY]
         local_test_evidence = self._local_test_evidence(
             executed=run_contract_tests,
@@ -159,9 +157,7 @@ class SystemCertificationService:
             for scenario in SCENARIO_GROUPS
         ]
         runtime_observation = observe_runtime(runtime_url=runtime_url)
-        bypass = self.static_bypass_results(
-            dynamic_no_bypass_evidence=dynamic_no_bypass_evidence
-        )
+        bypass = self.static_bypass_results(dynamic_no_bypass_evidence=dynamic_no_bypass_evidence)
         database_results = self._database_check_group(database_profile=database_profile)
         findings = self._findings(
             phases,
@@ -339,9 +335,7 @@ class SystemCertificationService:
         report["phase_3v_handoff"]["evidence_package"] = str(
             out_dir / "system_certification_report.json"
         )
-        report["phase_3v_handoff"]["evidence_sha256"] = sha256_json(
-            report["evidence_manifest"]
-        )
+        report["phase_3v_handoff"]["evidence_sha256"] = sha256_json(report["evidence_manifest"])
         json_path = out_dir / "system_certification_report.json"
         md_path = out_dir / "system_certification_report.md"
         json_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
@@ -481,9 +475,7 @@ class SystemCertificationService:
                 [row["path"] for row in production_write_candidates[:25]],
                 []
                 if dynamic_passed or not production_write_candidates
-                else [
-                    "Static candidates require manual review and dynamic guard evidence."
-                ],
+                else ["Static candidates require manual review and dynamic guard evidence."],
             ),
             _check_result(
                 "BYPASS-LIVE-AUTH",
@@ -548,9 +540,7 @@ class SystemCertificationService:
         else:
             findings.append("Runtime and E2/E3 evidence still required for certification pass.")
         locations = [
-            row["path"]
-            for row in evidence["modules"]
-            if row["available"] or row.get("path_exists")
+            row["path"] for row in evidence["modules"] if row["available"] or row.get("path_exists")
         ]
         checks = [
             _check_result(
@@ -686,11 +676,7 @@ class SystemCertificationService:
         }
 
     def _phase_result(self, phase: dict[str, Any]) -> dict[str, Any]:
-        locations = [
-            location
-            for location in phase["locations"]
-            if (self.root / location).exists()
-        ]
+        locations = [location for location in phase["locations"] if (self.root / location).exists()]
         status = STATUS_INCOMPLETE if locations else STATUS_FAIL
         findings = [] if locations else [f"{phase['phase_id']}: implementation not found"]
         checks = [
@@ -780,10 +766,7 @@ class SystemCertificationService:
         scenario_traces = scenario_traces or {}
         scenario_trace = scenario_traces.get(scenario["scenario_id"])
         executed = bool(
-            (
-                scenario["scenario_id"] == "GOLDEN-TRACE"
-                and golden_trace["status"] == STATUS_PASS
-            )
+            (scenario["scenario_id"] == "GOLDEN-TRACE" and golden_trace["status"] == STATUS_PASS)
             or (scenario_trace and scenario_trace.get("status") == STATUS_PASS)
         )
         artifact = (
@@ -907,8 +890,7 @@ class SystemCertificationService:
                 )
             )
         if any(
-            connection["contract_test"]["status"] == STATUS_NOT_RUN
-            for connection in connections
+            connection["contract_test"]["status"] == STATUS_NOT_RUN for connection in connections
         ):
             findings.append(
                 _finding(
@@ -1040,19 +1022,11 @@ class SystemCertificationService:
         local_test_evidence: dict[str, Any],
         not_run_count: int,
     ) -> dict[str, Any]:
-        passed = sum(
-            1 for row in connections if row["contract_test"]["status"] == STATUS_PASS
-        )
-        passed += sum(
-            1 for row in scenarios if row["test_reference"]["status"] == STATUS_PASS
-        )
+        passed = sum(1 for row in connections if row["contract_test"]["status"] == STATUS_PASS)
+        passed += sum(1 for row in scenarios if row["test_reference"]["status"] == STATUS_PASS)
         passed += int(local_test_evidence.get("passed") or 0)
-        failed = sum(
-            1 for row in connections if row["contract_test"]["status"] == STATUS_FAIL
-        )
-        failed += sum(
-            1 for row in scenarios if row["test_reference"]["status"] == STATUS_FAIL
-        )
+        failed = sum(1 for row in connections if row["contract_test"]["status"] == STATUS_FAIL)
+        failed += sum(1 for row in scenarios if row["test_reference"]["status"] == STATUS_FAIL)
         failed += int(local_test_evidence.get("failed") or 0)
         return {
             "phases": _status_counts(phases),
@@ -1124,8 +1098,7 @@ class SystemCertificationService:
             "",
         ]
         lines.extend(
-            f"- {finding['finding_id']}: {finding['title']}"
-            for finding in report["findings"]
+            f"- {finding['finding_id']}: {finding['title']}" for finding in report["findings"]
         )
         return "\n".join(lines) + "\n"
 

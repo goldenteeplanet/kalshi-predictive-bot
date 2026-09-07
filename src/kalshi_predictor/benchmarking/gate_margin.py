@@ -16,8 +16,11 @@ from kalshi_predictor.benchmarking.portfolio import PortfolioLimits
 EDGE_THRESHOLD = Decimal("0.02")
 PROBABILITY_QUANTUM = Decimal("0.0001")
 EXPOSURE_BLOCKERS = {
-    "CAPITAL_INSUFFICIENT", "GROSS_EXPOSURE_LIMIT", "CATEGORY_EXPOSURE_LIMIT",
-    "CORRELATED_EXPOSURE_LIMIT", "TICKER_EXPOSURE_LIMIT",
+    "CAPITAL_INSUFFICIENT",
+    "GROSS_EXPOSURE_LIMIT",
+    "CATEGORY_EXPOSURE_LIMIT",
+    "CORRELATED_EXPOSURE_LIMIT",
+    "TICKER_EXPOSURE_LIMIT",
 }
 
 
@@ -29,7 +32,9 @@ def build_exact_gate_margin_report(
 ) -> dict[str, Any]:
     selected_forecasts = forecasts or BASELINE_FORECASTS
     run = _run_variant(
-        "gate-margin", selected_forecasts, versions or BASELINE_VERSIONS,
+        "gate-margin",
+        selected_forecasts,
+        versions or BASELINE_VERSIONS,
         limits or PortfolioLimits(),
     )
     rows = [_decision_margin(row) for row in run["decisions"]]

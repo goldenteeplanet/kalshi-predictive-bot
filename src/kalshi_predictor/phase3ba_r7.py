@@ -459,8 +459,7 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- All rows parked: `{summary['all_rows_parked']}`",
             "- Normal single-market remediation allowed rows: "
             f"`{summary['normal_single_market_remediation_allowed_rows']}`",
-            "- Exact component evidence rows: "
-            f"`{summary['exact_component_evidence_rows']}`",
+            f"- Exact component evidence rows: `{summary['exact_component_evidence_rows']}`",
             f"- Coverage status: `{summary['coverage_pollution_status']}`",
             "",
             "## Type Counts",
@@ -506,8 +505,7 @@ def _render_plan_markdown(payload: dict[str, Any]) -> str:
         [
             "## Component Evidence",
             "",
-            "- Exact component evidence rows found: "
-            f"`{summary['exact_component_evidence_rows']}`",
+            f"- Exact component evidence rows found: `{summary['exact_component_evidence_rows']}`",
             "- Current decision: no composite decomposition is allowed until explicit component "
             "evidence exists.",
             "",

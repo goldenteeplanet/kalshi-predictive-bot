@@ -84,8 +84,7 @@ def test_tonight_run_does_not_call_demo_or_live_execution_by_default(tmp_path) -
     assert all(settings.execution_enabled is False for settings in seen_settings)
     assert all(settings.overnight_run_demo is False for settings in seen_settings)
     assert not any(
-        "demo" in step.name.lower() or "live" in step.name.lower()
-        for step in result.steps
+        "demo" in step.name.lower() or "live" in step.name.lower() for step in result.steps
     )
 
 

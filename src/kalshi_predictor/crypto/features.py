@@ -58,12 +58,8 @@ def build_crypto_features(
             "feature_version": "crypto_features_v3_interval_normalized",
             "volatility_unit": "simple_return_per_sqrt_minute",
             "quality_flags": _quality_flags(features),
-            "source_first_observed_at": (
-                prices[0].observed_at.isoformat() if prices else None
-            ),
-            "source_latest_observed_at": (
-                prices[-1].observed_at.isoformat() if prices else None
-            ),
+            "source_first_observed_at": (prices[0].observed_at.isoformat() if prices else None),
+            "source_latest_observed_at": (prices[-1].observed_at.isoformat() if prices else None),
             "source_observation_ref": (
                 {
                     "table": "crypto_prices",
@@ -72,7 +68,8 @@ def build_crypto_features(
                     "source": prices[-1].source,
                     "observed_at": prices[-1].observed_at.isoformat(),
                 }
-                if prices else None
+                if prices
+                else None
             ),
         }
         insert_crypto_features(

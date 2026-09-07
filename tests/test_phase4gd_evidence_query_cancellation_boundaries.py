@@ -40,9 +40,7 @@ def test_valid_boundaries_arm_with_no_retries() -> None:
 def test_empty_and_partial_inputs_fail_closed() -> None:
     budget, evidence = _inputs()
     for values in ((None, evidence), (budget, None), (None, None)):
-        with pytest.raises(
-            EvidenceQueryCancellationBoundaryError, match="BOUNDARY_INPUT_INVALID"
-        ):
+        with pytest.raises(EvidenceQueryCancellationBoundaryError, match="BOUNDARY_INPUT_INVALID"):
             build_query_cancellation_boundaries(
                 budget=values[0],
                 timeout_evidence=values[1],
@@ -71,9 +69,7 @@ def test_exact_duration_and_callback_boundaries_arm() -> None:
         (100, 1, 99, "CALLBACK_BOUND_EXCEEDED"),
     ],
 )
-def test_boundary_breaches_deny(
-    cancel: int, interval: int, callbacks: int, reason: str
-) -> None:
+def test_boundary_breaches_deny(cancel: int, interval: int, callbacks: int, reason: str) -> None:
     budget, evidence = _inputs()
     boundaries = build_query_cancellation_boundaries(
         budget=budget,
@@ -107,9 +103,7 @@ def test_stale_evidence_denies_and_malformed_fields_fail_closed() -> None:
 
 def test_tampering_and_cross_link_failure_fail_closed() -> None:
     budget, evidence = _inputs()
-    with pytest.raises(
-        EvidenceQueryCancellationBoundaryError, match="BOUNDARY_INPUT_INVALID"
-    ):
+    with pytest.raises(EvidenceQueryCancellationBoundaryError, match="BOUNDARY_INPUT_INVALID"):
         build_query_cancellation_boundaries(
             budget=budget,
             timeout_evidence=replace(evidence, evidence_hash="0" * 64),
@@ -137,9 +131,7 @@ def test_result_tampering_and_safety_contract_fail_closed() -> None:
         progress_check_interval_ms=10,
     )
     with pytest.raises(EvidenceQueryCancellationBoundaryError, match="BOUNDARY_HASH_MISMATCH"):
-        validate_query_cancellation_boundaries(
-            replace(boundaries, boundary_hash="0" * 64)
-        )
+        validate_query_cancellation_boundaries(replace(boundaries, boundary_hash="0" * 64))
     with pytest.raises(
         EvidenceQueryCancellationBoundaryError, match="BOUNDARY_RETRY_CONTRACT_INVALID"
     ):

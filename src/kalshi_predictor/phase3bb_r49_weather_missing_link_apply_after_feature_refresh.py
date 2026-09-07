@@ -118,7 +118,9 @@ def write_phase3bb_r49_weather_missing_link_apply_after_feature_refresh_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["post_link_checks"])
     _write_rows_csv(apply_summary_csv_path, [payload["weather_missing_link_apply_summary"]])
@@ -244,7 +246,8 @@ def build_phase3bb_r49_weather_missing_link_apply_after_feature_refresh(
         "parsed_post_link_state": parsed,
         "post_link_checks": checks,
         "weather_missing_link_apply_summary": parsed.get("missing_link_apply_summary") or {},
-        "weather_post_link_report_freshness": parsed.get("weather_post_link_report_freshness") or [],
+        "weather_post_link_report_freshness": parsed.get("weather_post_link_report_freshness")
+        or [],
         "post_link_decision": decision,
         "next_operator_command": decision["operator_next_command"],
         "safety_flags": safety,
@@ -266,14 +269,36 @@ def _build_remote_probes(
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
     report_list = " ".join(shlex.quote(path) for path in WEATHER_POST_LINK_REPORT_PATHS)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
         RemoteProbe("db_writer_monitor_raw", writer_cmd, timeout_seconds),
-        RemoteProbe("r48_json", f"cd {app} && cat reports/phase3bb_r48/weather_feature_refresh_runtime_verification.json 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("weather_missing_link_apply_json", f"cd {app} && cat reports/phase3az_r12_weather/weather_missing_link_apply.json 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("weather_activation_preview_json", f"cd {app} && cat reports/phase3az_r12_weather/weather_activation_preview.json 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("weather_funnel_json", f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true", timeout_seconds),
+        RemoteProbe(
+            "r48_json",
+            f"cd {app} && cat reports/phase3bb_r48/weather_fea"
+            f"ture_refresh_runtime_verification.json 2>/dev/nu"
+            f"ll || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "weather_missing_link_apply_json",
+            f"cd {app} && cat reports/phase3az_r12_weather/wea"
+            f"ther_missing_link_apply.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "weather_activation_preview_json",
+            f"cd {app} && cat reports/phase3az_r12_weather/wea"
+            f"ther_activation_preview.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "weather_funnel_json",
+            f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "weather_current_window_snapshot",
             _weather_current_window_snapshot_command(
@@ -288,8 +313,8 @@ def _build_remote_probes(
             "weather_post_link_report_stats",
             (
                 f"cd {app} && for p in {report_list}; do "
-                "if [ -e \"$p\" ]; then stat -c '%n|%Y|%s' \"$p\"; "
-                "else echo \"$p|MISSING|0\"; fi; done"
+                'if [ -e "$p" ]; then stat -c \'%n|%Y|%s\' "$p"; '
+                'else echo "$p|MISSING|0"; fi; done'
             ),
             timeout_seconds,
         ),
@@ -303,7 +328,7 @@ def _build_remote_probes(
                 "phase3az-r12-weather-missing-link-apply "
                 "phase3bb-r2-weather-fast-lane "
                 "phase3bb-r45-weather-freshness-to-ranking-impact; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -331,11 +356,21 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         funnel_payload = {}
     if not isinstance(snapshot, dict):
         snapshot = {}
-    apply_summary = apply_payload.get("summary") if isinstance(apply_payload.get("summary"), dict) else {}
-    preview_summary = preview_payload.get("summary") if isinstance(preview_payload.get("summary"), dict) else {}
-    funnel_summary = funnel_payload.get("summary") if isinstance(funnel_payload.get("summary"), dict) else {}
+    apply_summary = (
+        apply_payload.get("summary") if isinstance(apply_payload.get("summary"), dict) else {}
+    )
+    preview_summary = (
+        preview_payload.get("summary") if isinstance(preview_payload.get("summary"), dict) else {}
+    )
+    funnel_summary = (
+        funnel_payload.get("summary") if isinstance(funnel_payload.get("summary"), dict) else {}
+    )
     snapshot_summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), dict) else {}
-    r48_decision = r48_payload.get("runtime_decision") if isinstance(r48_payload.get("runtime_decision"), dict) else {}
+    r48_decision = (
+        r48_payload.get("runtime_decision")
+        if isinstance(r48_payload.get("runtime_decision"), dict)
+        else {}
+    )
     return {
         "remote_time_utc": _first_line(_stdout(by_name.get("remote_time_utc"))),
         "writer_status": writer.get("status") or "UNKNOWN",
@@ -348,12 +383,15 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         "missing_link_apply_json_available": bool(apply_payload),
         "missing_link_apply_status": apply_payload.get("status"),
         "missing_link_apply_generated_at": apply_payload.get("generated_at"),
-        "missing_link_apply_backup": apply_payload.get("backup") or apply_payload.get("backup_path"),
+        "missing_link_apply_backup": apply_payload.get("backup")
+        or apply_payload.get("backup_path"),
         "missing_link_apply_summary": {
             "status": apply_payload.get("status"),
             "generated_at": apply_payload.get("generated_at"),
             "backup": apply_payload.get("backup") or apply_payload.get("backup_path"),
-            "preview_rows_safe_to_link": _int_or_none(apply_summary.get("preview_rows_safe_to_link")),
+            "preview_rows_safe_to_link": _int_or_none(
+                apply_summary.get("preview_rows_safe_to_link")
+            ),
             "candidates_reviewed": _int_or_none(apply_summary.get("candidates_reviewed")),
             "would_write_link_rows": _int_or_none(apply_summary.get("would_write_link_rows")),
             "link_rows_written": _int_or_none(apply_summary.get("link_rows_written")),
@@ -361,10 +399,18 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         },
         "weather_activation_preview_json_ok": bool(preview_payload),
         "weather_activation_preview_summary": preview_summary,
-        "weather_activation_rows_safe_to_link": _int_or_none(preview_summary.get("rows_safe_to_link")),
-        "weather_activation_rows_safe_to_relink": _int_or_none(preview_summary.get("rows_safe_to_relink")),
-        "weather_activation_current_linkable_weather_tickers": _int_or_none(preview_summary.get("current_linkable_weather_tickers")),
-        "weather_activation_missing_weather_links": _int_or_none(preview_summary.get("missing_weather_links")),
+        "weather_activation_rows_safe_to_link": _int_or_none(
+            preview_summary.get("rows_safe_to_link")
+        ),
+        "weather_activation_rows_safe_to_relink": _int_or_none(
+            preview_summary.get("rows_safe_to_relink")
+        ),
+        "weather_activation_current_linkable_weather_tickers": _int_or_none(
+            preview_summary.get("current_linkable_weather_tickers")
+        ),
+        "weather_activation_missing_weather_links": _int_or_none(
+            preview_summary.get("missing_weather_links")
+        ),
         "weather_activation_first_blocker": preview_summary.get("first_blocker"),
         "weather_funnel_json_ok": bool(funnel_payload),
         "weather_funnel_status": funnel_payload.get("status"),
@@ -374,14 +420,18 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         "weather_current_window_snapshot_ok": bool(snapshot.get("ok")),
         "weather_current_window_error": snapshot.get("error"),
         "weather_current_window_summary": snapshot_summary,
-        "weather_post_link_report_freshness": _parse_report_stats(_stdout(by_name.get("weather_post_link_report_stats"))),
+        "weather_post_link_report_freshness": _parse_report_stats(
+            _stdout(by_name.get("weather_post_link_report_stats"))
+        ),
         "command_registry_ok": "COMMAND_REGISTRY_OK" in _stdout(by_name.get("command_registry")),
         "failed_probe_names": [result.name for result in results if not result.ok],
     }
 
 
 def _merge_local_r48_fallback(parsed: dict[str, Any], payload: dict[str, Any]) -> None:
-    r48_decision = payload.get("runtime_decision") if isinstance(payload.get("runtime_decision"), dict) else {}
+    r48_decision = (
+        payload.get("runtime_decision") if isinstance(payload.get("runtime_decision"), dict) else {}
+    )
     if not r48_decision:
         return
     parsed["r48_json_available"] = True
@@ -396,11 +446,31 @@ def _post_link_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
     preview_rows_safe_to_link = int(parsed.get("weather_activation_rows_safe_to_link") or 0)
     preview_rows_safe_to_relink = int(parsed.get("weather_activation_rows_safe_to_relink") or 0)
     return [
-        _check("remote_probes_completed", not parsed.get("failed_probe_names"), f"failed={','.join(parsed.get('failed_probe_names') or []) or 'none'}."),
-        _check("command_registry_ok", bool(parsed.get("command_registry_ok")), "R49/R48/R12/R2/R45 commands are registered on the cloud host."),
-        _check("writer_state_captured", parsed.get("writer_status") != "UNKNOWN", f"writer_status={parsed.get('writer_status')} pid={parsed.get('writer_current_pid')}."),
-        _check("r48_runtime_report_available", bool(parsed.get("r48_json_available")), "R48 weather feature runtime verification JSON exists."),
-        _check("r12_apply_report_available", bool(parsed.get("missing_link_apply_json_available")), "R12 missing-link apply JSON exists."),
+        _check(
+            "remote_probes_completed",
+            not parsed.get("failed_probe_names"),
+            f"failed={','.join(parsed.get('failed_probe_names') or []) or 'none'}.",
+        ),
+        _check(
+            "command_registry_ok",
+            bool(parsed.get("command_registry_ok")),
+            "R49/R48/R12/R2/R45 commands are registered on the cloud host.",
+        ),
+        _check(
+            "writer_state_captured",
+            parsed.get("writer_status") != "UNKNOWN",
+            f"writer_status={parsed.get('writer_status')} pid={parsed.get('writer_current_pid')}.",
+        ),
+        _check(
+            "r48_runtime_report_available",
+            bool(parsed.get("r48_json_available")),
+            "R48 weather feature runtime verification JSON exists.",
+        ),
+        _check(
+            "r12_apply_report_available",
+            bool(parsed.get("missing_link_apply_json_available")),
+            "R12 missing-link apply JSON exists.",
+        ),
         _check(
             "r12_apply_status_known",
             parsed.get("missing_link_apply_status") in {"APPLIED", "NO_SAFE_ROWS"},
@@ -408,16 +478,28 @@ def _post_link_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
         ),
         _check(
             "backup_present_when_rows_written",
-            int(apply_summary.get("link_rows_written") or 0) == 0 or bool(apply_summary.get("backup")),
-            f"rows_written={apply_summary.get('link_rows_written')} backup={apply_summary.get('backup')}.",
+            int(apply_summary.get("link_rows_written") or 0) == 0
+            or bool(apply_summary.get("backup")),
+            f"rows_written="
+            f"{apply_summary.get('link_rows_written')} backup="
+            f"{apply_summary.get('backup')}.",
         ),
-        _check("r12_preview_available_after_apply", bool(parsed.get("weather_activation_preview_json_ok")), "R12 activation preview JSON exists after apply."),
+        _check(
+            "r12_preview_available_after_apply",
+            bool(parsed.get("weather_activation_preview_json_ok")),
+            "R12 activation preview JSON exists after apply.",
+        ),
         _check(
             "post_apply_link_gate_closed",
             preview_rows_safe_to_link == 0 and preview_rows_safe_to_relink == 0,
-            f"rows_safe_to_link={preview_rows_safe_to_link} rows_safe_to_relink={preview_rows_safe_to_relink}.",
+            f"rows_safe_to_link={preview_rows_safe_to_link} ro"
+            f"ws_safe_to_relink={preview_rows_safe_to_relink}.",
         ),
-        _check("current_window_snapshot_readable", bool(parsed.get("weather_current_window_snapshot_ok")), f"error={parsed.get('weather_current_window_error')}."),
+        _check(
+            "current_window_snapshot_readable",
+            bool(parsed.get("weather_current_window_snapshot_ok")),
+            f"error={parsed.get('weather_current_window_error')}.",
+        ),
     ]
 
 
@@ -432,11 +514,15 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
 
     writer_safe = bool(parsed.get("writer_safe_to_start_write"))
 
-    if failed and failed[0]["check"] == "post_apply_link_gate_closed" and (
-        preview_rows_safe_to_link > 0 or preview_rows_safe_to_relink > 0
+    if (
+        failed
+        and failed[0]["check"] == "post_apply_link_gate_closed"
+        and (preview_rows_safe_to_link > 0 or preview_rows_safe_to_relink > 0)
     ):
         status = "WEATHER_LINK_GATE_STILL_OPEN"
-        reason = "R12 still reports safe rows after the last apply; rerun only the guarded apply path."
+        reason = (
+            "R12 still reports safe rows after the last apply; rerun only the guarded apply path."
+        )
         next_step = "Phase 3AZ-R12 - Weather Missing Link Apply"
         command = (
             "kalshi-bot db-writer-monitor --json\n"
@@ -460,13 +546,19 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         first_blocker = failed[0]["check"].upper()
     elif rows_written > 0 and not writer_safe:
         status = "WEATHER_MISSING_LINK_APPLY_VERIFIED_WAIT_FOR_WRITER"
-        reason = "The R12 apply wrote rows and closed the link gate; wait for the active writer before weather fast-lane."
+        reason = (
+            "The R12 apply wrote rows and closed the link gate; wait for the active writer "
+            "before weather fast-lane."
+        )
         next_step = "Phase 3BB-R49 - Wait For Writer Gate"
         command = "kalshi-bot db-writer-monitor --json"
         first_blocker = "ACTIVE_WRITER_BEFORE_FAST_LANE"
     elif rows_written > 0:
         status = "WEATHER_MISSING_LINK_APPLY_VERIFIED"
-        reason = "The R12 writer-gated missing-link apply wrote rows with a backup, and the follow-up preview gate is closed."
+        reason = (
+            "The R12 writer-gated missing-link apply wrote rows with a backup, and the "
+            "follow-up preview gate is closed."
+        )
         next_step = "Phase 3BB-R50 - Weather Post-Link Ranking Fast-Lane Recheck"
         command = (
             "kalshi-bot phase3bb-r50-weather-post-link-ranking-fast-lane-recheck "
@@ -477,11 +569,17 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         status = "WEATHER_LINK_GATE_CLOSED_AND_RANKING_PRESENT"
         reason = "Weather links and rankings are present; refresh the unified paper gate."
         next_step = "Phase 3BB-R8 - Unified Paper Gate Across Categories"
-        command = "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+            "--reports-dir reports"
+        )
         first_blocker = "PAPER_GATE_REFRESH_NEEDED"
     else:
         status = "WEATHER_LINK_GATE_CLOSED_NEEDS_FAST_LANE"
-        reason = "The R12 link gate is closed, but weather ranking impact still needs a fast-lane recheck."
+        reason = (
+            "The R12 link gate is closed, but weather ranking impact still needs a fast-lane "
+            "recheck."
+        )
         next_step = "Phase 3BB-R50 - Weather Post-Link Ranking Fast-Lane Recheck"
         command = (
             "kalshi-bot db-writer-monitor --json\n"
@@ -511,7 +609,9 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
 
 
 def _render_executive_summary(payload: dict[str, Any]) -> str:
-    lines = _metadata_lines(payload, "# Phase 3BB-R49 Weather Missing Link Apply After Feature Refresh")
+    lines = _metadata_lines(
+        payload, "# Phase 3BB-R49 Weather Missing Link Apply After Feature Refresh"
+    )
     decision = payload["post_link_decision"]
     parsed = payload["parsed_post_link_state"]
     lines.extend(
@@ -585,10 +685,12 @@ def _render_markdown(payload: dict[str, Any]) -> str:
             "",
             "## Guardrails",
             "",
-            "- Do not rerun missing-link apply unless R12 preview reports rows_safe_to_link greater than 0.",
+            "- Do not rerun missing-link apply unless R12 preview reports "
+            "rows_safe_to_link greater than 0.",
             "- Do not create paper trades unless a downstream paper-ready gate opens.",
             "- Do not run live/demo exchange order commands.",
-            "- Keep the next step writer-gated because weather fast-lane can write ranking artifacts.",
+            "- Keep the next step writer-gated because weather fast-lane can write "
+            "ranking artifacts.",
             "",
             f"Decision: `{decision['status']}`",
             "",

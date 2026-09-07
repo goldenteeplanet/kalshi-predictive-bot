@@ -47,9 +47,7 @@ def test_exact_freshness_boundary_is_ready_and_one_second_over_is_stale() -> Non
 
 
 def test_expensive_detail_requires_request_and_unavailable_is_honest() -> None:
-    requested = _disclosure(
-        [_input("summary", cost="CHEAP"), _input("detail", requested=True)]
-    )
+    requested = _disclosure([_input("summary", cost="CHEAP"), _input("detail", requested=True)])
     assert requested.panels[1].mode == "DETAIL"
     assert requested.panels[1].detail_query_allowed is True
     unavailable = _disclosure(
@@ -74,15 +72,11 @@ def test_malformed_duplicate_lineage_and_tampering_fail_closed() -> None:
 def test_result_tampering_and_safety_boundary_fail_closed() -> None:
     disclosure = _disclosure(_inputs())
     with pytest.raises(DashboardProgressiveDisclosureError, match="DISCLOSURE_HASH_MISMATCH"):
-        validate_dashboard_progressive_disclosure(
-            replace(disclosure, disclosure_hash="0" * 64)
-        )
+        validate_dashboard_progressive_disclosure(replace(disclosure, disclosure_hash="0" * 64))
     with pytest.raises(
         DashboardProgressiveDisclosureError, match="DISCLOSURE_SAFETY_BOUNDARY_INVALID"
     ):
-        validate_dashboard_progressive_disclosure(
-            replace(disclosure, execution_authorized=True)
-        )
+        validate_dashboard_progressive_disclosure(replace(disclosure, execution_authorized=True))
 
 
 def test_disclosure_has_no_query_publication_or_mutation_surface() -> None:

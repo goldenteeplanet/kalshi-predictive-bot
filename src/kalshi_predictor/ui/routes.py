@@ -146,12 +146,12 @@ from kalshi_predictor.system_certification.reports import (
 )
 from kalshi_predictor.system_readiness.long_jobs import build_long_job_monitor
 from kalshi_predictor.tonight.control import tonight_card
+from kalshi_predictor.ui.cohort_progress import load_cohort_progress
 from kalshi_predictor.ui.evidence_viewer import (
     EvidenceRejected,
     get_cached_evidence_catalog,
     load_evidence_artifact,
 )
-from kalshi_predictor.ui.cohort_progress import load_cohort_progress
 from kalshi_predictor.ui.progress import (
     certification_reports_root,
     get_cached_progress_dashboard,
@@ -497,11 +497,7 @@ def create_router(
     default_shell_context = load_shell_status_context(settings=resolved_settings)
     templates.env.globals["default_shell_context"] = default_shell_context
     if session_factory is None:
-        engine = (
-            make_sqlite_read_only_engine()
-            if resolved_settings.ui_read_only
-            else init_db()
-        )
+        engine = make_sqlite_read_only_engine() if resolved_settings.ui_read_only else init_db()
         session_factory = get_session_factory(engine)
 
     def get_session() -> Iterator[Session]:
@@ -564,10 +560,7 @@ def create_router(
         now = time.monotonic()
         cached = portfolio_context_cache.get("value")
         created_at = float(portfolio_context_cache.get("created_at") or 0.0)
-        if (
-            isinstance(cached, dict)
-            and now - created_at <= PORTFOLIO_CONTEXT_CACHE_SECONDS
-        ):
+        if isinstance(cached, dict) and now - created_at <= PORTFOLIO_CONTEXT_CACHE_SECONDS:
             context = dict(cached)
             context["server_cache"] = {
                 "status": "HIT",
@@ -630,7 +623,9 @@ def create_router(
             "freshness_status": "FRESH",
             "completeness_status": "COMPLETE",
             "lifecycle_status": "ACTIVE",
-            "next_command": "kalshi-bot phase3bb-r32-cloud-ui-dashboard-truth-scheduler-status-verification",
+            "next_command": "kalshi-bot phase3bb-r32-cloud-ui-dashboard-truth"
+            "-scheduler-status-verificati"
+            "on",
         }
         return {
             "schema_version": API_SCHEMA_VERSION,
@@ -833,8 +828,7 @@ def create_router(
                     "message": "Live readiness review failed.",
                     "error": str(exc),
                     "next_action": (
-                        "Run kalshi-bot live-readiness-review from the terminal "
-                        "and inspect logs."
+                        "Run kalshi-bot live-readiness-review from the terminal and inspect logs."
                     ),
                 },
             )
@@ -1033,16 +1027,34 @@ def create_router(
         return FileResponse(path, media_type=media_type, filename=path.name)
 
     @router.get("/system/evidence", response_class=HTMLResponse)
-    def evidence_catalog_dashboard(request: Request, service: Annotated[DecisionUiService, Depends(get_service)]) -> HTMLResponse:
-        return templates.TemplateResponse(request, "evidence_catalog.html", {"request":request,"shell_context":shell_context_for(service),"catalog":get_cached_evidence_catalog()})
+    def evidence_catalog_dashboard(
+        request: Request, service: Annotated[DecisionUiService, Depends(get_service)]
+    ) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "evidence_catalog.html",
+            {
+                "request": request,
+                "shell_context": shell_context_for(service),
+                "catalog": get_cached_evidence_catalog(),
+            },
+        )
 
     @router.get("/system/evidence/{artifact_id}", response_class=HTMLResponse)
-    def evidence_artifact_dashboard(artifact_id: str, request: Request, service: Annotated[DecisionUiService, Depends(get_service)]) -> HTMLResponse:
+    def evidence_artifact_dashboard(
+        artifact_id: str,
+        request: Request,
+        service: Annotated[DecisionUiService, Depends(get_service)],
+    ) -> HTMLResponse:
         try:
             artifact = load_evidence_artifact(artifact_id)
         except EvidenceRejected as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return templates.TemplateResponse(request, "evidence_detail.html", {"request":request,"shell_context":shell_context_for(service),"artifact":artifact})
+        return templates.TemplateResponse(
+            request,
+            "evidence_detail.html",
+            {"request": request, "shell_context": shell_context_for(service), "artifact": artifact},
+        )
 
     @router.get("/api/system/evidence")
     def evidence_catalog_api() -> dict[str, Any]:
@@ -1067,11 +1079,15 @@ def create_router(
             event_limit=250,
             execution_enabled=resolved_settings.execution_enabled,
         )
-        drift_alerts = build_provenance_drift_alerts(
-            service.session,
-            ticker_limit=50,
-            stale_after_minutes=resolved_settings.prov12_provenance_stale_after_minutes,
-        ) if resolved_settings.prov12_decision_trace_preview_enabled else None
+        drift_alerts = (
+            build_provenance_drift_alerts(
+                service.session,
+                ticker_limit=50,
+                stale_after_minutes=resolved_settings.prov12_provenance_stale_after_minutes,
+            )
+            if resolved_settings.prov12_decision_trace_preview_enabled
+            else None
+        )
         return templates.TemplateResponse(
             request,
             "provenance_diagnostics.html",
@@ -1144,11 +1160,13 @@ def create_router(
     ) -> dict[str, Any]:
         if not resolved_settings.prov12_decision_trace_preview_enabled:
             raise HTTPException(status_code=404, detail="PROV-12 preview is disabled")
-        return jsonable_encoder(build_provenance_drift_alerts(
-            service.session,
-            ticker_limit=50,
-            stale_after_minutes=resolved_settings.prov12_provenance_stale_after_minutes,
-        ))
+        return jsonable_encoder(
+            build_provenance_drift_alerts(
+                service.session,
+                ticker_limit=50,
+                stale_after_minutes=resolved_settings.prov12_provenance_stale_after_minutes,
+            )
+        )
 
     @router.get("/api/db-writer-monitor")
     def db_writer_monitor_api() -> dict:
@@ -1566,9 +1584,7 @@ def create_router(
         service: Annotated[DecisionUiService, Depends(get_service)],
     ) -> dict:
         forecast = (
-            service.session.get(Forecast, int(forecast_id))
-            if forecast_id.isdigit()
-            else None
+            service.session.get(Forecast, int(forecast_id)) if forecast_id.isdigit() else None
         )
         if forecast is None:
             raise HTTPException(status_code=404, detail="Forecast not found.")

@@ -124,9 +124,7 @@ def test_link_coverage_snapshot_systemd_contract() -> None:
     service = Path("deploy/systemd/kalshi-link-coverage-snapshot.service").read_text(
         encoding="utf-8"
     )
-    timer = Path("deploy/systemd/kalshi-link-coverage-snapshot.timer").read_text(
-        encoding="utf-8"
-    )
+    timer = Path("deploy/systemd/kalshi-link-coverage-snapshot.timer").read_text(encoding="utf-8")
 
     assert "User=kalshi" in service
     assert "--database-read-only" in service

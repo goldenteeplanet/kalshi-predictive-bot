@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -33,11 +34,14 @@ class ExposureGuardShadowAdapter:
         requested = Decimal(str(source["requested_capital"]))
         shadow_capital = (
             requested * self.policy.position_scale
-            if baseline_eligible and inside_buffer else Decimal("0")
+            if baseline_eligible and inside_buffer
+            else Decimal("0")
         )
         blocker = (
-            None if baseline_eligible and inside_buffer
-            else "STRESS_BUFFER_EXCEEDED" if baseline_eligible
+            None
+            if baseline_eligible and inside_buffer
+            else "STRESS_BUFFER_EXCEEDED"
+            if baseline_eligible
             else "BASELINE_RISK_GATE_FAILED"
         )
         return {
@@ -79,17 +83,19 @@ SYNTHETIC_RANKINGS = tuple(
             "model_version": "synthetic-v1",
         },
     }
-    for index, (category, bias, spread, risk) in enumerate((
-        ("crypto", "-0.004", "0.004", True),
-        ("crypto", "-0.010", "0.004", True),
-        ("crypto", "-0.002", "0.002", False),
-        ("weather", "-0.006", "0.008", True),
-        ("weather", "-0.004", "0.010", True),
-        ("weather", "0", "0", False),
-        ("sports", "-0.008", "0.008", True),
-        ("sports", "-0.010", "0.010", True),
-        ("sports", "-0.002", "0.006", True),
-    ))
+    for index, (category, bias, spread, risk) in enumerate(
+        (
+            ("crypto", "-0.004", "0.004", True),
+            ("crypto", "-0.010", "0.004", True),
+            ("crypto", "-0.002", "0.002", False),
+            ("weather", "-0.006", "0.008", True),
+            ("weather", "-0.004", "0.010", True),
+            ("weather", "0", "0", False),
+            ("sports", "-0.008", "0.008", True),
+            ("sports", "-0.010", "0.010", True),
+            ("sports", "-0.002", "0.006", True),
+        )
+    )
 )
 
 
@@ -123,10 +129,17 @@ def build_exposure_guard_shadow_adapter_preview() -> dict[str, Any]:
             ),
             "all_sources_unchanged": all(row["source_unchanged"] for row in rows),
             "all_attribution_complete": all(
-                all(row["attribution"].get(key) for key in (
-                    "forecast_id", "feature_ref", "observation_ref",
-                    "market_snapshot_id", "model_version",
-                )) for row in rows
+                all(
+                    row["attribution"].get(key)
+                    for key in (
+                        "forecast_id",
+                        "feature_ref",
+                        "observation_ref",
+                        "market_snapshot_id",
+                        "model_version",
+                    )
+                )
+                for row in rows
             ),
             "deterministic_digest": hashlib.sha256(canonical).hexdigest(),
         },

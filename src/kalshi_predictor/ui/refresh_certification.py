@@ -40,9 +40,7 @@ def certify_refresh_readiness(project_root: Path) -> dict[str, Any]:
     }
     checks = {
         "all_explicit_states": all(state in texts["adapter"] for state in REQUIRED_STATES),
-        "all_required_sections": all(
-            section in texts["template"] for section in REQUIRED_SECTIONS
-        ),
+        "all_required_sections": all(section in texts["template"] for section in REQUIRED_SECTIONS),
         "read_only_get_routes": (
             '@router.get("/system/refresh-readiness"' in texts["routes"]
             and '@router.get("/api/system/refresh-readiness"' in texts["routes"]

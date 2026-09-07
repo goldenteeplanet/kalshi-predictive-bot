@@ -169,9 +169,7 @@ def sync_settlements(
         remaining_budget = max(0, exact_recovery_limit - len(missing_tickers))
         explicit_by_series = {
             root: sorted(
-                ticker
-                for ticker in set(exact_recovery_tickers)
-                if ticker.startswith(f"{root}-")
+                ticker for ticker in set(exact_recovery_tickers) if ticker.startswith(f"{root}-")
             )
             for root in AUTHORIZED_CRYPTO_SETTLEMENT_SERIES
         }
@@ -202,9 +200,7 @@ def sync_settlements(
                     )
                 )
                 series_candidates = [
-                    ticker
-                    for ticker in queried_candidates
-                    if ticker not in missing_tickers
+                    ticker for ticker in queried_candidates if ticker not in missing_tickers
                 ][:local_capacity]
                 telemetry["series_candidates"][series_root] = len(series_candidates)
                 telemetry["due_local_exact_candidates"] += len(series_candidates)

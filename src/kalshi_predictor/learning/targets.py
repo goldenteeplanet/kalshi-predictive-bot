@@ -152,10 +152,7 @@ def generate_learning_targets(
         phase3ak_gate = None
         if category == "sports":
             phase3ak_gate = multi_leg_learning_eligibility(session, ranking.ticker)
-            if (
-                phase3ak_gate["status"] != "NOT_MULTILEG"
-                and not phase3ak_gate["eligible"]
-            ):
+            if phase3ak_gate["status"] != "NOT_MULTILEG" and not phase3ak_gate["eligible"]:
                 _log_target_rejection(
                     session,
                     ranking=ranking,

@@ -154,11 +154,9 @@ QUOTE_STALE_AFTER_MINUTES = Decimal("15")
 
 
 class CryptoSnapshotClient(Protocol):
-    def get_market(self, ticker: str) -> Mapping[str, Any]:
-        ...
+    def get_market(self, ticker: str) -> Mapping[str, Any]: ...
 
-    def get_orderbook(self, ticker: str) -> Mapping[str, Any]:
-        ...
+    def get_orderbook(self, ticker: str) -> Mapping[str, Any]: ...
 
 
 @dataclass(frozen=True)
@@ -264,9 +262,7 @@ def build_crypto_forecast_coverage(
             "requested_limit": limit,
             "effective_limit": effective_limit,
             "effective_limit_reason": (
-                "exact_ticker_scope"
-                if ticker_scope
-                else "bounded_default_to_keep_report_terminal"
+                "exact_ticker_scope" if ticker_scope else "bounded_default_to_keep_report_terminal"
             ),
             "diagnostic_passes": 1 if diagnostics_reused else 2,
             "reused_initial_diagnostics": diagnostics_reused,
@@ -424,7 +420,9 @@ def build_phase3ar_url_audit(
         _phase3ar_url_audit_row(session, row, settings=resolved)
         for row in phase3aq["positive_ev_rows"]
     ]
-    reason_counts = Counter(row["specific_malformed_reason"] for row in rows if row["specific_malformed_reason"])
+    reason_counts = Counter(
+        row["specific_malformed_reason"] for row in rows if row["specific_malformed_reason"]
+    )
     previous_reason_counts = Counter(
         row["previous_malformed_reason"] for row in rows if row["previous_malformed_reason"]
     )
@@ -475,8 +473,12 @@ def build_phase3ar_url_audit(
             "stale_quote_rows": phase3aq["summary"].get("stale_quote_rows", 0),
             "first_hard_blocker": phase3aq["summary"].get("first_hard_blocker"),
             "exact_catalog_matches": sum(1 for row in rows if row["canonical_catalog_match"]),
-            "current_verified_links": sum(1 for row in rows if row["current_url_status"] == VERIFIED),
-            "current_malformed_urls": sum(1 for row in rows if row["current_url_status"] == MALFORMED_URL),
+            "current_verified_links": sum(
+                1 for row in rows if row["current_url_status"] == VERIFIED
+            ),
+            "current_malformed_urls": sum(
+                1 for row in rows if row["current_url_status"] == MALFORMED_URL
+            ),
             "safe_to_persist": sum(1 for row in rows if row["safe_to_persist"]),
             "manual_review_required": sum(1 for row in rows if row["manual_review_required"]),
             "current_url_status_counts": dict(sorted(status_counts.items())),
@@ -691,10 +693,14 @@ def build_phase3ar_refresh_catalog_for_opportunities(
         candidates.append(
             {
                 **row,
-                "stale_reason": diagnostic_row.get("stale_reason") or row.get("catalog_freshness_reason"),
-                "exact_market_exists_in_active_catalog": bool(row.get("exact_market_exists_in_active_catalog")),
+                "stale_reason": diagnostic_row.get("stale_reason")
+                or row.get("catalog_freshness_reason"),
+                "exact_market_exists_in_active_catalog": bool(
+                    row.get("exact_market_exists_in_active_catalog")
+                ),
                 "exact_market_exists": bool(row.get("exact_market_exists")),
-                "next_action": "Refresh this exact ticker with the Kalshi /markets/{ticker} endpoint.",
+                "next_action": "Refresh this exact ticker with the Kalshi /marke"
+                "ts/{ticker} endpoint.",
             }
         )
         if len(candidates) >= max(0, max_markets):
@@ -754,7 +760,9 @@ def build_phase3ar_refresh_catalog_for_opportunities(
                     )
                     continue
                 before = session.get(Market, ticker)
-                before_last_seen = before.last_seen_at.isoformat() if before and before.last_seen_at else None
+                before_last_seen = (
+                    before.last_seen_at.isoformat() if before and before.last_seen_at else None
+                )
                 refreshed = upsert_market(session, market_json)
                 refreshed_raw = decode_json(refreshed.raw_json)
                 refreshed_url = build_canonical_kalshi_url(market=refreshed, settings=resolved)
@@ -810,7 +818,9 @@ def build_phase3ar_refresh_catalog_for_opportunities(
                 failed_by_ticker=failed_by_ticker,
                 rate_limited=bool(rate_limit.get("rate_limited")),
             ),
-            refresh_error=failed_by_ticker.get(str(row.get("market_ticker") or ""), {}).get("error"),
+            refresh_error=failed_by_ticker.get(str(row.get("market_ticker") or ""), {}).get(
+                "error"
+            ),
         )
         for row in audit.get("rows", [])
         if isinstance(row, dict)
@@ -1326,16 +1336,22 @@ def write_phase3ar_link_repair_report(
     _phase3ar_write_json(url_audit_path, audit)
     url_audit_md.write_text(_render_phase3ar_url_audit_markdown(audit), encoding="utf-8")
     _phase3ar_write_json(catalog_stale_path, catalog_stale)
-    catalog_stale_md.write_text(_render_phase3ar_catalog_stale_markdown(catalog_stale), encoding="utf-8")
+    catalog_stale_md.write_text(
+        _render_phase3ar_catalog_stale_markdown(catalog_stale), encoding="utf-8"
+    )
     _phase3ar_write_json(catalog_refresh_path, catalog_refresh)
-    catalog_refresh_md.write_text(_render_phase3ar_catalog_refresh_markdown(catalog_refresh), encoding="utf-8")
+    catalog_refresh_md.write_text(
+        _render_phase3ar_catalog_refresh_markdown(catalog_refresh), encoding="utf-8"
+    )
     _phase3ar_write_json(dry_run_path, dry_run)
     _phase3ar_write_json(book_path, book)
     _phase3ar_write_json(book_candidates_path, book)
     _phase3ar_write_json(gate_path, gate)
     _phase3ar_write_csv(blocked_csv, gate.get("blocked_positive_ev_rows", []))
     executive_summary.write_text(
-        _render_phase3ar_executive_summary(audit, catalog_stale, catalog_refresh, dry_run, book, gate),
+        _render_phase3ar_executive_summary(
+            audit, catalog_stale, catalog_refresh, dry_run, book, gate
+        ),
         encoding="utf-8",
     )
     next_actions.write_text(
@@ -1646,9 +1662,7 @@ def _summary(
     unknown_rows = [row for row in rows if row["active_universe_status"] == "unknown"]
     active_blocked_rows = [row for row in active_rows if row["status"] != STATUS_READY]
     linked_with_snapshots = sum(1 for row in rows if row["snapshot_id"] is not None)
-    active_linked_with_snapshots = sum(
-        1 for row in active_rows if row["snapshot_id"] is not None
-    )
+    active_linked_with_snapshots = sum(1 for row in active_rows if row["snapshot_id"] is not None)
     forecasts = int(
         session.scalar(
             select(func.count()).select_from(Forecast).where(Forecast.model_name == "crypto_v2")
@@ -1821,7 +1835,12 @@ def _next_action_for_status(status: str, link: CryptoMarketLink) -> str:
         return "Expired crypto window; exclude from current forecasts and paper-ready gates."
     if status == STATUS_CLOSED_MARKET:
         return "Closed market; keep out of new forecasts and sync settlement outcomes."
-    if status in {STATUS_NO_SNAPSHOT, STATUS_FUTURE_FEATURE, STATUS_NO_MIDPOINT, STATUS_STALE_QUOTE}:
+    if status in {
+        STATUS_NO_SNAPSHOT,
+        STATUS_FUTURE_FEATURE,
+        STATUS_NO_MIDPOINT,
+        STATUS_STALE_QUOTE,
+    }:
         return "Run kalshi-bot crypto-forecast-doctor --repair-snapshots, then forecast crypto_v2."
     if status in {STATUS_MISSING_FEATURE, STATUS_STALE_FEATURE, STATUS_INSUFFICIENT_HISTORY}:
         return f"Run ingest/build crypto features for {link.symbol}, then rerun crypto_v2."
@@ -1837,7 +1856,10 @@ def _recommended_next_action(summary: dict[str, Any]) -> str:
     if summary.get("current_positive_ev_rows") == 0 and summary.get("expired_positive_ev_rows"):
         return "No current positive-EV rows; expired crypto windows are diagnostic-only."
     if main == STATUS_EXPIRED_WINDOW_EXCLUDED:
-        return "Collect fresh open crypto windows; expired windows stay excluded from current forecasts."
+        return (
+            "Collect fresh open crypto windows; expired windows stay excluded from current "
+            "forecasts."
+        )
     if main == STATUS_CLOSED_MARKET:
         return (
             "Collect fresh open crypto markets; closed linked markets should stay out of "
@@ -1907,14 +1929,20 @@ def _phase3ar_url_audit_row(
         and ticker
         and market is not None
     )
-    blocker = None if safe_to_persist else _phase3ar_url_blocker(current, proposed, malformed_reason)
+    blocker = (
+        None if safe_to_persist else _phase3ar_url_blocker(current, proposed, malformed_reason)
+    )
     return {
         "opportunity_id": row.get("ranking_id") or f"ticker:{ticker}",
         "ranking_id": row.get("ranking_id"),
         "forecast_id": row.get("forecast_id"),
         "market_ticker": ticker,
-        "event_ticker": getattr(market, "event_ticker", None) if market else row.get("event_ticker"),
-        "series_ticker": getattr(market, "series_ticker", None) if market else row.get("series_ticker"),
+        "event_ticker": getattr(market, "event_ticker", None)
+        if market
+        else row.get("event_ticker"),
+        "series_ticker": getattr(market, "series_ticker", None)
+        if market
+        else row.get("series_ticker"),
         "current_stored_kalshi_url": stored_url,
         "current_stored_slug": stored_slug,
         "current_kalshi_url": stored_url,
@@ -1926,7 +1954,9 @@ def _phase3ar_url_audit_row(
         "why_url_is_malformed": _phase3ar_reason_text(malformed_reason),
         "url_reason": _phase3ar_reason_text(malformed_reason) or current.kalshi_url_reason,
         "canonical_catalog_match": market is not None,
-        "catalog_market_title": getattr(market, "title", None) if market else row.get("market_title"),
+        "catalog_market_title": getattr(market, "title", None)
+        if market
+        else row.get("market_title"),
         "catalog_title": getattr(market, "title", None) if market else row.get("market_title"),
         "catalog_event_title": raw.get("event_title") or raw.get("event_subtitle") or None,
         "catalog_series_title": raw.get("series_title") or raw.get("series_name") or None,
@@ -1968,7 +1998,15 @@ def _phase3ar_url_audit_row(
 
 
 def _phase3ar_raw_url(raw: dict[str, Any]) -> str | None:
-    for key in ("kalshi_url", "official_kalshi_url", "market_url", "trade_url", "web_url", "event_url", "url"):
+    for key in (
+        "kalshi_url",
+        "official_kalshi_url",
+        "market_url",
+        "trade_url",
+        "web_url",
+        "event_url",
+        "url",
+    ):
         if key in raw:
             value = str(raw.get(key) or "").strip()
             return value or None
@@ -1976,7 +2014,15 @@ def _phase3ar_raw_url(raw: dict[str, Any]) -> str | None:
 
 
 def _phase3ar_has_empty_url_field(raw: dict[str, Any]) -> bool:
-    for key in ("kalshi_url", "official_kalshi_url", "market_url", "trade_url", "web_url", "event_url", "url"):
+    for key in (
+        "kalshi_url",
+        "official_kalshi_url",
+        "market_url",
+        "trade_url",
+        "web_url",
+        "event_url",
+        "url",
+    ):
         if key in raw and str(raw.get(key) or "").strip() == "":
             return True
     return False
@@ -2058,7 +2104,11 @@ def _phase3ar_url_blocker(
         return STALE_CATALOG
     if proposed.kalshi_url_status in {SYNTHETIC_ONLY, COMPOSITE_LOCAL_ONLY}:
         return proposed.kalshi_url_status
-    if proposed.kalshi_url_status in {PLACEHOLDER_BLOCKED, PARTIAL_PROVENANCE_BLOCKED, GENERAL_SOURCE_NOT_SAFE}:
+    if proposed.kalshi_url_status in {
+        PLACEHOLDER_BLOCKED,
+        PARTIAL_PROVENANCE_BLOCKED,
+        GENERAL_SOURCE_NOT_SAFE,
+    }:
         return proposed.kalshi_url_status
     if proposed.kalshi_url_status == MISSING_MARKET_TICKER:
         return "URL_MISSING_MARKET_TICKER"
@@ -2112,7 +2162,10 @@ def _phase3ar_url_next_action(
     if any(row["safe_to_persist"] for row in rows):
         return "Run kalshi-bot phase3ar-url-repair --apply --backup-first --max-records 100."
     if any(row["current_url_status"] == VERIFIED for row in rows):
-        return "Run kalshi-bot phase3ar-refresh-books-for-verified-links after db-writer-monitor is clear."
+        return (
+            "Run kalshi-bot phase3ar-refresh-books-for-verified-links after "
+            "db-writer-monitor is clear."
+        )
     if any(row.get("current_url_status") == STALE_CATALOG for row in rows):
         return (
             "Run kalshi-bot phase3ar-refresh-catalog-for-opportunities --dry-run "
@@ -2165,12 +2218,7 @@ def _phase3ar_catalog_stale_row(
     )
     slug_or_title_fields_exist = bool(
         market is not None
-        and (
-            market.title
-            or raw.get("title")
-            or _phase3ar_raw_slug(raw)
-            or raw.get("series_slug")
-        )
+        and (market.title or raw.get("title") or _phase3ar_raw_slug(raw) or raw.get("series_slug"))
     )
     lifecycle = str(getattr(market, "status", "") or "").strip()
     exact_active = bool(market is not None and is_active_market_status(lifecycle))
@@ -2199,8 +2247,12 @@ def _phase3ar_catalog_stale_row(
         "slug_or_title_fields_exist": slug_or_title_fields_exist,
         "stale_reason": reason,
         "catalog_title": getattr(market, "title", None) if market else row.get("catalog_title"),
-        "event_ticker": getattr(market, "event_ticker", None) if market else row.get("event_ticker"),
-        "series_ticker": getattr(market, "series_ticker", None) if market else row.get("series_ticker"),
+        "event_ticker": getattr(market, "event_ticker", None)
+        if market
+        else row.get("event_ticker"),
+        "series_ticker": getattr(market, "series_ticker", None)
+        if market
+        else row.get("series_ticker"),
         "proposed_url": row.get("proposed_url") or row.get("proposed_official_url"),
         "next_action": _phase3ar_catalog_stale_row_next_action(reason),
     }
@@ -2249,7 +2301,9 @@ def _phase3ar_age_seconds(value: Any) -> int | None:
 
 def _phase3ar_catalog_stale_row_next_action(reason: str) -> str:
     if reason in {"CATALOG_LAST_SEEN_TOO_OLD", "ACTIVE_MARKET_REFRESH_NOT_RUN"}:
-        return "Refresh the exact market catalog row with phase3ar-refresh-catalog-for-opportunities."
+        return (
+            "Refresh the exact market catalog row with phase3ar-refresh-catalog-for-opportunities."
+        )
     if reason == "MARKET_CLOSED_OR_SETTLED":
         return "Keep out of paper entry; closed or settled markets cannot be made paper-ready."
     if reason in {"EVENT_METADATA_STALE", "SERIES_METADATA_STALE", "SLUG_OR_TITLE_MISSING"}:
@@ -2265,7 +2319,9 @@ def _phase3ar_catalog_stale_next_action(rows: list[dict[str, Any]]) -> str:
             "Run kalshi-bot phase3ar-refresh-catalog-for-opportunities --dry-run "
             "--output-dir reports/phase3ar --reports-dir reports."
         )
-    return "No active exact catalog rows are refreshable; inspect catalog lineage before URL repair."
+    return (
+        "No active exact catalog rows are refreshable; inspect catalog lineage before URL repair."
+    )
 
 
 def _phase3ar_catalog_handoff_row(
@@ -2287,8 +2343,12 @@ def _phase3ar_catalog_handoff_row(
     lifecycle = str(getattr(market, "status", "") or "").strip()
     event_ticker = getattr(market, "event_ticker", None) if market else row.get("event_ticker")
     series_ticker = getattr(market, "series_ticker", None) if market else row.get("series_ticker")
-    event_slug = str(raw.get("event_slug") or raw.get("event_path") or "").strip().strip("/") or None
-    series_slug = str(raw.get("series_slug") or raw.get("series_path") or "").strip().strip("/") or None
+    event_slug = (
+        str(raw.get("event_slug") or raw.get("event_path") or "").strip().strip("/") or None
+    )
+    series_slug = (
+        str(raw.get("series_slug") or raw.get("series_path") or "").strip().strip("/") or None
+    )
     market_slug = str(raw.get("market_slug") or raw.get("slug") or "").strip().strip("/") or None
     title = getattr(market, "title", None) if market else row.get("market_title")
     exact_catalog_fresh = bool(
@@ -2333,9 +2393,8 @@ def _phase3ar_catalog_handoff_row(
         catalog_reason = "CATALOG_IDENTITY_METADATA_INCOMPLETE"
     return {
         "market_ticker": ticker,
-        "refresh_status": refresh_status or (
-            "EXACT_TICKER_ALREADY_FRESH" if exact_catalog_fresh else "EXACT_TICKER_NOT_REFRESHED"
-        ),
+        "refresh_status": refresh_status
+        or ("EXACT_TICKER_ALREADY_FRESH" if exact_catalog_fresh else "EXACT_TICKER_NOT_REFRESHED"),
         "refresh_error": refresh_error,
         "exact_market_exists": market is not None,
         "exact_market_exists_in_active_catalog": bool(
@@ -2413,7 +2472,10 @@ def _phase3ar_rate_limit_summary(
             "endpoints": [],
             "events": [],
         }
-    rate_limited = bool(payload.get("rate_limited")) or str(payload.get("status") or "") in PHASE3AR_RATE_LIMIT_STATUSES
+    rate_limited = (
+        bool(payload.get("rate_limited"))
+        or str(payload.get("status") or "") in PHASE3AR_RATE_LIMIT_STATUSES
+    )
     payload["rate_limited"] = rate_limited
     payload["data_complete"] = not rate_limited
     payload["data_completeness"] = "partial" if rate_limited else "complete"
@@ -2435,7 +2497,9 @@ def _phase3ar_catalog_handoff_summary(
         and row.get("refresh_status") not in {"REFRESHED", "EXACT_TICKER_ALREADY_FRESH"}
     )
     return {
-        "exact_positive_ev_tickers": len({row.get("market_ticker") for row in rows if row.get("market_ticker")}),
+        "exact_positive_ev_tickers": len(
+            {row.get("market_ticker") for row in rows if row.get("market_ticker")}
+        ),
         "exact_catalog_rows_checked": len(rows),
         "exact_catalog_fresh_rows": sum(1 for row in rows if row.get("exact_catalog_fresh")),
         "exact_catalog_stale_rows": sum(
@@ -2444,7 +2508,9 @@ def _phase3ar_catalog_handoff_summary(
             if row.get("exact_market_exists") and not row.get("exact_catalog_fresh")
         ),
         "exact_catalog_missing_rows": sum(1 for row in rows if not row.get("exact_market_exists")),
-        "url_verified_rows": sum(1 for row in rows if row.get("url_verification_status") == VERIFIED),
+        "url_verified_rows": sum(
+            1 for row in rows if row.get("url_verification_status") == VERIFIED
+        ),
         "book_fresh_rows": sum(1 for row in rows if row.get("book_orderbook_fresh")),
         "book_executable_rows": sum(1 for row in rows if row.get("book_has_executable_midpoint")),
         "exact_ticker_not_refreshed_rows": exact_not_refreshed,
@@ -2480,11 +2546,15 @@ def _phase3ar_catalog_freshness_views(
     elif any(not row.get("book_orderbook_fresh") for row in handoff_rows):
         book_status = "BOOK_STALE_OR_MISSING"
     url_status = "COMPLETE"
-    if audit.get("summary", {}).get("current_verified_links", 0) < audit.get("summary", {}).get("positive_ev_rows", 0):
+    if audit.get("summary", {}).get("current_verified_links", 0) < audit.get("summary", {}).get(
+        "positive_ev_rows", 0
+    ):
         url_status = "URL_VERIFICATION_INCOMPLETE"
     return {
         "market_data_top_strip": {
-            "status": top_strip.get("market_data_state") or top_strip.get("status") or "UNKNOWN_NO_TOP_STRIP_ARTIFACT",
+            "status": top_strip.get("market_data_state")
+            or top_strip.get("status")
+            or "UNKNOWN_NO_TOP_STRIP_ARTIFACT",
             "source": str(reports_dir / "phase_3ak" / "top_strip_status.json"),
             "generated_at": top_strip.get("generated_at"),
         },
@@ -2545,7 +2615,10 @@ def _phase3ar_catalog_refresh_next_action(
             "Wait for the Kalshi backoff window, then rerun the bounded exact refresh command."
         )
     if status == "BLOCKED_BY_ACTIVE_WRITER":
-        return "Stop condition: active DB writer detected. Wait for writer to clear, then rerun dry-run."
+        return (
+            "Stop condition: active DB writer detected. Wait for writer to clear, then rerun "
+            "dry-run."
+        )
     if status == "DRY_RUN" and candidate_count:
         return (
             "Run kalshi-bot phase3ar-refresh-catalog-for-opportunities "
@@ -2553,12 +2626,16 @@ def _phase3ar_catalog_refresh_next_action(
             "--output-dir reports/phase3ar --reports-dir reports."
         )
     if status.startswith("READONLY_REFRESH") and refreshed_count:
-        return "Rerun kalshi-bot phase3ar-url-audit --output-dir reports/phase3ar --reports-dir reports."
+        return (
+            "Rerun kalshi-bot phase3ar-url-audit --output-dir reports/phase3ar --reports-dir "
+            "reports."
+        )
     if status == "NO_REFRESH_CANDIDATES":
         if exact_ticker_not_refreshed_count:
             return (
                 "Stop condition: exact positive-EV catalog rows remain stale or missing, "
-                "but no safe exact refresh candidate was available. Inspect catalog_refresh_plan.json."
+                "but no safe exact refresh candidate was available. Inspect "
+                "catalog_refresh_plan.json."
             )
         return "Stop condition: no exact active stale catalog candidates to refresh."
     return "Review catalog_refresh_plan.json before continuing."
@@ -2575,7 +2652,9 @@ def _phase3ar_db_writer_status(*, settings: Settings) -> dict[str, Any]:
         }
 
 
-def _phase3ar_write_url_backup(output_dir: Path, rows: list[dict[str, Any]], *, run_id: str) -> Path:
+def _phase3ar_write_url_backup(
+    output_dir: Path, rows: list[dict[str, Any]], *, run_id: str
+) -> Path:
     backup_dir = output_dir / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
     path = backup_dir / f"{run_id}_url_repair_backup.json"
@@ -2733,7 +2812,9 @@ def _render_phase3ar_url_audit_markdown(payload: dict[str, Any]) -> str:
         "",
     ]
     for key, value in summary.items():
-        lines.append(f"- {key}: {json.dumps(value, sort_keys=True) if isinstance(value, dict) else value}")
+        lines.append(
+            f"- {key}: {json.dumps(value, sort_keys=True) if isinstance(value, dict) else value}"
+        )
     lines.extend(["", "## Next Action", "", payload["next_action"], ""])
     return "\n".join(lines)
 
@@ -2772,12 +2853,15 @@ def _render_phase3ar_catalog_stale_markdown(payload: dict[str, Any]) -> str:
         "",
     ]
     for key, value in summary.items():
-        lines.append(f"- {key}: {json.dumps(value, sort_keys=True) if isinstance(value, dict) else value}")
+        lines.append(
+            f"- {key}: {json.dumps(value, sort_keys=True) if isinstance(value, dict) else value}"
+        )
     lines.extend(["", "## Stale Rows", ""])
     for row in payload.get("rows", [])[:25]:
         lines.append(
             f"- {row['market_ticker']}: {row['stale_reason']} "
-            f"(last_seen={row.get('catalog_last_seen_at')}, age={row.get('stale_age_seconds')}s)"
+            f"(last_seen={row.get('catalog_last_seen_at')}, ag"
+            f"e={row.get('stale_age_seconds')}s)"
         )
     if not payload.get("rows"):
         lines.append("- none")
@@ -2808,7 +2892,8 @@ def _render_phase3ar_catalog_refresh_markdown(payload: dict[str, Any]) -> str:
         "## Kalshi API Rate Limit",
         "",
         f"- Status: {rate_limit.get('status', 'COMPLETE')}",
-        f"- Endpoint: {rate_limit.get('top_endpoint') or _phase3ar_top_rate_limit_endpoint(rate_limit)}",
+        f"- Endpoint: "
+        f"{rate_limit.get('top_endpoint') or _phase3ar_top_rate_limit_endpoint(rate_limit)}",
         f"- Retry count: {rate_limit.get('retry_count', 0)}",
         f"- Total sleep seconds: {rate_limit.get('total_sleep_seconds', 0)}",
         f"- Rows fetched before limit: {rate_limit.get('rows_fetched_before_limit', 0)}",
@@ -2877,7 +2962,8 @@ def _render_phase3ar_settlement_noise_markdown(payload: dict[str, Any]) -> str:
             "# Phase 3AR Settlement Check Noise Audit",
             "",
             f"- Generated at: {payload['generated_at']}",
-            f"- Generic remaining: {payload['summary']['generic_settlement_check_failed_remaining']}",
+            f"- Generic remaining: "
+            f"{payload['summary']['generic_settlement_check_failed_remaining']}",
             f"- Noise counts: {json.dumps(payload.get('noise_class_counts', {}), sort_keys=True)}",
             "",
         ]
@@ -2897,7 +2983,9 @@ def _render_phase3ar_executive_summary(
     refresh_summary = catalog_refresh["summary"]
     gate_summary = gate["summary"]
     book_summary = book.get("summary", {})
-    malformed_counts = audit_summary.get("specific_malformed_reason_counts") or audit_summary.get("previous_malformed_reason_counts")
+    malformed_counts = audit_summary.get("specific_malformed_reason_counts") or audit_summary.get(
+        "previous_malformed_reason_counts"
+    )
     stale_tickers = [row["market_ticker"] for row in catalog_stale.get("rows", [])]
     lines = [
         "# Phase 3AR Link Repair Report",
@@ -2908,25 +2996,34 @@ def _render_phase3ar_executive_summary(
             "Phase 3AR did not persist URLs from stale catalog rows."
         ),
         f"2. Rows blocked by stale catalog: {stale_summary['stale_catalog_rows']}.",
-        f"3. Exact stale catalog records: {', '.join(stale_tickers[:25]) if stale_tickers else 'none'}.",
+        f"3. Exact stale catalog records: "
+        f"{', '.join(stale_tickers[:25]) if stale_tickers else 'none'}.",
         (
             "4. Can they be refreshed safely? "
             f"{'yes' if refresh_summary['refresh_candidates'] else 'no'}; "
             f"refresh candidates: {refresh_summary['refresh_candidates']}."
         ),
         f"5. URLs repairable after current dry-run: {dry_run['summary']['safe_to_persist']}.",
-        f"6. Book-refresh candidates after URL verification: {book_summary.get('book_refresh_needed_rows', 0)}.",
-        f"7. Next exact command: {_phase3ar_best_next_command(audit, catalog_stale, catalog_refresh, dry_run, book)}.",
+        f"6. Book-refresh candidates after URL verificatio"
+        f"n: "
+        f"{book_summary.get('book_refresh_needed_rows', 0)}.",
+        f"7. Next exact command: "
+        f"{_phase3ar_best_next_command(audit, catalog_stale, catalog_refresh, dry_run, book)}.",
         "8. Paper trades created: no; live/demo exchange writes: no.",
         "",
         f"- Positive-EV rows: {audit_summary['positive_ev_rows']}.",
         f"- Exact catalog matches: {audit_summary['exact_catalog_matches']}.",
-        f"- Current malformed URLs: {audit_summary['current_malformed_urls']}; malformed reason counts: {json.dumps(malformed_counts, sort_keys=True)}.",
+        f"- Current malformed URLs: "
+        f"{audit_summary['current_malformed_urls']}; malfo"
+        f"rmed reason counts: "
+        f"{json.dumps(malformed_counts, sort_keys=True)}.",
         f"- Current verified links: {audit_summary['current_verified_links']}.",
         f"- Paper-ready rows: {gate_summary.get('paper_ready_rows', 0)}.",
-        f"- Primary blocker counts: {json.dumps(gate_summary.get('primary_blocker_counts', {}), sort_keys=True)}.",
+        f"- Primary blocker counts: "
+        f"{json.dumps(gate_summary.get('primary_blocker_counts', {}), sort_keys=True)}.",
         f"- Git commit: {audit.get('git_commit') or 'unknown'}.",
-        f"- Database fingerprint: {json.dumps(audit.get('database_fingerprint', {}), sort_keys=True)}.",
+        f"- Database fingerprint: "
+        f"{json.dumps(audit.get('database_fingerprint', {}), sort_keys=True)}.",
         f"- Command args: {json.dumps(audit.get('command_arguments', {}), sort_keys=True)}.",
         f"- Data watermark: {json.dumps(audit.get('data_watermark', {}), sort_keys=True)}.",
         f"- Safety flags: {json.dumps(audit.get('safety_flags', {}), sort_keys=True)}.",
@@ -2955,9 +3052,11 @@ def _render_phase3ar_next_actions(
                 "2. Stop condition: if the refresh command reports "
                 "BLOCKED_BY_ACTIVE_WRITER, wait for the writer to clear and rerun dry-run."
             ),
-            "3. After catalog refresh, rerun `kalshi-bot phase3ar-url-audit --output-dir reports/phase3ar --reports-dir reports`.",
+            "3. After catalog refresh, rerun `kalshi-bot phase3ar-url-audit --output-dir "
+            "reports/phase3ar --reports-dir reports`.",
             "4. Keep malformed/unverified/synthetic/composite rows diagnostic-only.",
-            "5. Do not force paper trades; let the canonical paper-ready gate advance rows naturally.",
+            "5. Do not force paper trades; let the canonical paper-ready gate advance "
+            "rows naturally.",
             "",
         ]
     )
@@ -2973,19 +3072,43 @@ def _phase3ar_best_next_command(
     refresh_summary = catalog_refresh.get("summary", {})
     rate_limit = catalog_refresh.get("rate_limit", {})
     if isinstance(rate_limit, dict) and rate_limit.get("rate_limited"):
-        return "kalshi-bot phase3ar-refresh-catalog-for-opportunities --apply-readonly-refresh --max-markets 100 --max-duration-seconds 120 --output-dir reports/phase3ar --reports-dir reports"
+        return (
+            "kalshi-bot phase3ar-refresh-catalog-for-opportunities --apply-readonly-refresh "
+            "--max-markets 100 --max-duration-seconds 120 --output-dir reports/phase3ar "
+            "--reports-dir reports"
+        )
     if isinstance(refresh_summary, dict) and refresh_summary.get("exact_ticker_not_refreshed_rows"):
-        return "kalshi-bot phase3ar-refresh-catalog-for-opportunities --apply-readonly-refresh --max-markets 100 --max-duration-seconds 120 --output-dir reports/phase3ar --reports-dir reports"
+        return (
+            "kalshi-bot phase3ar-refresh-catalog-for-opportunities --apply-readonly-refresh "
+            "--max-markets 100 --max-duration-seconds 120 --output-dir reports/phase3ar "
+            "--reports-dir reports"
+        )
     if dry_run["summary"]["safe_to_persist"]:
-        return "kalshi-bot phase3ar-url-repair --apply --backup-first --max-records 100 --output-dir reports/phase3ar --reports-dir reports"
+        return (
+            "kalshi-bot phase3ar-url-repair --apply --backup-first --max-records 100 "
+            "--output-dir reports/phase3ar --reports-dir reports"
+        )
     if catalog_refresh.get("summary", {}).get("refresh_candidates"):
-        return "kalshi-bot phase3ar-refresh-catalog-for-opportunities --apply-readonly-refresh --max-markets 100 --max-duration-seconds 120 --output-dir reports/phase3ar --reports-dir reports"
+        return (
+            "kalshi-bot phase3ar-refresh-catalog-for-opportunities --apply-readonly-refresh "
+            "--max-markets 100 --max-duration-seconds 120 --output-dir reports/phase3ar "
+            "--reports-dir reports"
+        )
     if catalog_stale.get("summary", {}).get("stale_catalog_rows"):
-        return "kalshi-bot phase3ar-catalog-stale-diagnostic --output-dir reports/phase3ar --reports-dir reports"
+        return (
+            "kalshi-bot phase3ar-catalog-stale-diagnostic --output-dir reports/phase3ar "
+            "--reports-dir reports"
+        )
     if book.get("summary", {}).get("book_refresh_needed_rows"):
-        return "kalshi-bot phase3ar-refresh-books-for-verified-links --apply-readonly-refresh --max-markets 100 --max-duration-seconds 120 --output-dir reports/phase3ar"
+        return (
+            "kalshi-bot phase3ar-refresh-books-for-verified-links --apply-readonly-refresh "
+            "--max-markets 100 --max-duration-seconds 120 --output-dir reports/phase3ar"
+        )
     if audit["summary"]["current_verified_links"]:
-        return "kalshi-bot phase3ar-link-repair-report --output-dir reports/phase3ar --reports-dir reports"
+        return (
+            "kalshi-bot phase3ar-link-repair-report --output-dir reports/phase3ar "
+            "--reports-dir reports"
+        )
     return "kalshi-bot phase3ar-url-audit --output-dir reports/phase3ar --reports-dir reports"
 
 

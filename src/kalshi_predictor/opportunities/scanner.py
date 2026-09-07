@@ -80,11 +80,14 @@ def scan_opportunities(
     # Preserve the diagnostic with a scalar count; never materialize out-of-scope rows.
     historical_rows_excluded = 0
     if allowed_tickers is not None:
-        total_tickers = session.scalar(
-            select(func.count(func.distinct(Forecast.ticker))).where(
-                Forecast.model_name == model_name
+        total_tickers = (
+            session.scalar(
+                select(func.count(func.distinct(Forecast.ticker))).where(
+                    Forecast.model_name == model_name
+                )
             )
-        ) or 0
+            or 0
+        )
         historical_rows_excluded = max(0, int(total_tickers) - len(forecasts))
     forecast_tickers = [forecast.ticker for forecast in forecasts]
     snapshots = _latest_snapshots_by_ticker(session, forecast_tickers)
@@ -175,9 +178,7 @@ def scan_opportunities(
             )
 
     top = (
-        opportunities[0]
-        if opportunities
-        else (selected_rankings[0] if selected_rankings else None)
+        opportunities[0] if opportunities else (selected_rankings[0] if selected_rankings else None)
     )
     return OpportunityScanSummary(
         markets_scanned=len(forecasts),
@@ -425,10 +426,7 @@ def _rejection_reason(
         return "wide_spread"
     if liquidity < settings.opportunity_min_liquidity:
         return "low_liquidity"
-    if (
-        time_to_close is not None
-        and time_to_close < settings.opportunity_min_time_to_close_minutes
-    ):
+    if time_to_close is not None and time_to_close < settings.opportunity_min_time_to_close_minutes:
         return "stale_data"
     return "confidence_too_low"
 
@@ -461,10 +459,7 @@ def _first_hard_blocker(
         return "RANKING_FILTERED_BY_LIQUIDITY"
     if spread is not None and spread > settings.opportunity_max_spread:
         return "RANKING_FILTERED_BY_SPREAD"
-    if (
-        time_to_close is not None
-        and time_to_close < settings.opportunity_min_time_to_close_minutes
-    ):
+    if time_to_close is not None and time_to_close < settings.opportunity_min_time_to_close_minutes:
         return "RANKING_FILTERED_BY_TIME_TO_CLOSE"
     return "UNKNOWN_REQUIRES_INVESTIGATION"
 
@@ -481,9 +476,7 @@ def _log_learning_rejection(
     time_to_close: Decimal | None,
     reason: str,
 ) -> None:
-    settlement_eta_hours = (
-        time_to_close / Decimal("60") if time_to_close is not None else None
-    )
+    settlement_eta_hours = time_to_close / Decimal("60") if time_to_close is not None else None
     insert_learning_rejection(
         session,
         {

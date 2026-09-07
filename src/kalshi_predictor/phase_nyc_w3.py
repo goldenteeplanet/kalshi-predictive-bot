@@ -39,7 +39,8 @@ def write_nyc_w3_report(
         raise ValueError("tolerance_minutes must be non-negative")
     owned_kalshi = kalshi_client is None
     active_kalshi = kalshi_client or httpx.Client(
-        base_url=PRODUCTION_PUBLIC_REST_URL, timeout=15.0,
+        base_url=PRODUCTION_PUBLIC_REST_URL,
+        timeout=15.0,
     )
     try:
         if exact_tickers:
@@ -53,7 +54,8 @@ def write_nyc_w3_report(
             response = active_kalshi.get(
                 "/markets",
                 params={
-                    "limit": market_limit, "status": "open",
+                    "limit": market_limit,
+                    "status": "open",
                     "series_ticker": "KXTEMPNYCH",
                 },
             )
@@ -69,18 +71,22 @@ def write_nyc_w3_report(
         ticker = str(market.get("ticker") or "")
         contract = parse_point_temperature_ticker(ticker)
         if contract is None:
-            rows.append({
-                "ticker": ticker, "metadata_passed": False,
-                "metadata_blockers": ["TICKER_PARSE_FAILED"], "alignment_passed": False,
-                "alignment_blocker": "MARKET_METADATA_NOT_VERIFIED",
-            })
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "metadata_passed": False,
+                    "metadata_blockers": ["TICKER_PARSE_FAILED"],
+                    "alignment_passed": False,
+                    "alignment_blocker": "MARKET_METADATA_NOT_VERIFIED",
+                }
+            )
             continue
-        validations.append((
-            market,
-            validate_point_temperature_market(
-                contract, market, series_scope="KXTEMPNYCH"
-            ),
-        ))
+        validations.append(
+            (
+                market,
+                validate_point_temperature_market(contract, market, series_scope="KXTEMPNYCH"),
+            )
+        )
 
     observations_by_date: dict[date, list[Any]] = {}
     fetch_errors: dict[str, str] = {}
@@ -98,13 +104,15 @@ def write_nyc_w3_report(
             dates.update({local_start.date(), local_end.date()})
             observations_by_date[target_date] = []
             for scoped_date in sorted(dates):
-                observations_by_date[target_date].extend(fetch_nws_station_observations(
-                    station_id=contract.station_id,
-                    target_local_date=scoped_date,
-                    timezone=contract.timezone,
-                    user_agent=user_agent,
-                    client=nws_client,
-                ))
+                observations_by_date[target_date].extend(
+                    fetch_nws_station_observations(
+                        station_id=contract.station_id,
+                        target_local_date=scoped_date,
+                        timezone=contract.timezone,
+                        user_agent=user_agent,
+                        client=nws_client,
+                    )
+                )
         except Exception as exc:
             observations_by_date[target_date] = []
             fetch_errors[target_date.isoformat()] = str(exc)
@@ -113,36 +121,39 @@ def write_nyc_w3_report(
         contract = validation.contract
         observations = observations_by_date.get(contract.target_local_time.date(), [])
         alignment = align_point_observation(
-            validation, observations, tolerance_minutes=tolerance_minutes,
+            validation,
+            observations,
+            tolerance_minutes=tolerance_minutes,
         )
-        rows.append({
-            "ticker": contract.ticker,
-            "target_local_time": contract.target_local_time.isoformat(),
-            "target_utc_time": contract.target_utc_time.isoformat(),
-            "station_id": contract.station_id,
-            "settlement_source": contract.settlement_source,
-            "evidence_source": "noaa_nws_observation_non_settlement_evidence",
-            "metadata_passed": validation.passed,
-            "metadata_blockers": list(validation.blockers),
-            "alignment_passed": alignment.passed,
-            "alignment_blocker": alignment.blocker,
-            "observation_count_for_local_date": len(observations),
-            "observation_at": (
-                alignment.observation.observed_at.isoformat() if alignment.observation else None
-            ),
-            "observation_temperature_f": (
-                str(alignment.observation.temperature_f) if alignment.observation else None
-            ),
-            "offset_seconds": alignment.offset_seconds,
-            "market_status": market.get("status"),
-        })
+        rows.append(
+            {
+                "ticker": contract.ticker,
+                "target_local_time": contract.target_local_time.isoformat(),
+                "target_utc_time": contract.target_utc_time.isoformat(),
+                "station_id": contract.station_id,
+                "settlement_source": contract.settlement_source,
+                "evidence_source": "noaa_nws_observation_non_settlement_evidence",
+                "metadata_passed": validation.passed,
+                "metadata_blockers": list(validation.blockers),
+                "alignment_passed": alignment.passed,
+                "alignment_blocker": alignment.blocker,
+                "observation_count_for_local_date": len(observations),
+                "observation_at": (
+                    alignment.observation.observed_at.isoformat() if alignment.observation else None
+                ),
+                "observation_temperature_f": (
+                    str(alignment.observation.temperature_f) if alignment.observation else None
+                ),
+                "offset_seconds": alignment.offset_seconds,
+                "market_status": market.get("status"),
+            }
+        )
 
     metadata_blockers = Counter(
         blocker for row in rows for blocker in row.get("metadata_blockers", [])
     )
     alignment_blockers = Counter(
-        str(row["alignment_blocker"])
-        for row in rows if row.get("alignment_blocker") is not None
+        str(row["alignment_blocker"]) for row in rows if row.get("alignment_blocker") is not None
     )
     offsets = [int(row["offset_seconds"]) for row in rows if row.get("offset_seconds") is not None]
     report = {

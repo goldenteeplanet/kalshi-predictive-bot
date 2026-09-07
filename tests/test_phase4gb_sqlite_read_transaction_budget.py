@@ -76,9 +76,7 @@ def test_result_tampering_and_read_only_contract_fail_closed() -> None:
         validate_sqlite_read_transaction_budget(replace(budget, budget_hash="0" * 64))
     with pytest.raises(SQLiteReadTransactionBudgetError, match="READ_ONLY_CONTRACT_INVALID"):
         validate_sqlite_read_transaction_budget(replace(budget, query_only=False))
-    with pytest.raises(
-        SQLiteReadTransactionBudgetError, match="BUDGET_SAFETY_BOUNDARY_INVALID"
-    ):
+    with pytest.raises(SQLiteReadTransactionBudgetError, match="BUDGET_SAFETY_BOUNDARY_INVALID"):
         validate_sqlite_read_transaction_budget(replace(budget, execution_authorized=True))
 
 
@@ -104,9 +102,7 @@ def _audit(*, age: int = 1, busy_events: int = 0):
     )
 
 
-def _budget(
-    *, age: int = 1, rows: int = 1, duration: int = 100, busy_events: int = 0
-):
+def _budget(*, age: int = 1, rows: int = 1, duration: int = 100, busy_events: int = 0):
     return build_sqlite_read_transaction_budget(
         audit=_audit(age=age, busy_events=busy_events),
         requested_rows=rows,

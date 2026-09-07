@@ -70,9 +70,7 @@ def recommend_policy_action(
             policy_version=CANDIDATE_POLICY_VERSION,
             reason_codes=(reason, "SHADOW_ONLY") if config.mode == MODE_SHADOW else (reason,),
             value={
-                "expected_net_value": str(
-                    opportunity.get("risk_adjusted_expected_value") or "0"
-                )
+                "expected_net_value": str(opportunity.get("risk_adjusted_expected_value") or "0")
             },
             support={"status": "SUPPORTED", "ood": False},
             valid_until=now + timedelta(minutes=5),

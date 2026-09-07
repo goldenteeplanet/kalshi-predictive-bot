@@ -134,7 +134,9 @@ def write_phase3bb_r51_weather_ranking_path_repair_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["ranking_path_checks"])
     _write_rows_csv(path_rows_csv_path, payload["weather_ranking_path_rows"])
@@ -255,7 +257,8 @@ def build_phase3bb_r51_weather_ranking_path_repair(
         "weather_ranking_path_repair": True,
         "ssh_read_only_commands_executed": len(initial_results) + len(final_results),
         "ssh_write_capable_commands_executed": len(repair_results),
-        "runs_weather_snapshot_capture": "weather_snapshot_capture" in parsed.get("repair_probe_names", []),
+        "runs_weather_snapshot_capture": "weather_snapshot_capture"
+        in parsed.get("repair_probe_names", []),
         "runs_weather_forecast": "weather_forecast_run" in parsed.get("repair_probe_names", []),
         "runs_weather_fast_lane": "weather_fast_lane_run" in parsed.get("repair_probe_names", []),
         "runs_missing_link_apply": False,
@@ -281,7 +284,8 @@ def build_phase3bb_r51_weather_ranking_path_repair(
         "ranking_path_decision": decision,
         "weather_ranking_path_rows": parsed.get("post_rows") or parsed.get("pre_rows") or [],
         "forecast_skip_reasons": _skip_reason_rows(parsed),
-        "weather_ranking_path_report_freshness": parsed.get("weather_ranking_path_report_freshness") or [],
+        "weather_ranking_path_report_freshness": parsed.get("weather_ranking_path_report_freshness")
+        or [],
         "next_operator_command": decision["operator_next_command"],
         "safety_flags": safety,
         "live_or_demo_execution": False,
@@ -301,7 +305,9 @@ def _initial_probes(
 ) -> list[RemoteProbe]:
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
         RemoteProbe("db_writer_monitor_pre", writer_cmd, timeout_seconds),
@@ -312,7 +318,7 @@ def _initial_probes(
                 "snapshot forecast phase3bb-r2-weather-fast-lane "
                 "phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
                 "phase3bb-r49-weather-missing-link-apply-after-feature-refresh; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -339,8 +345,7 @@ def _repair_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) -> lis
         RemoteProbe(
             "weather_snapshot_capture",
             (
-                prefix
-                + f"timeout {timeout_value} .venv/bin/kalshi-bot snapshot "
+                prefix + f"timeout {timeout_value} .venv/bin/kalshi-bot snapshot "
                 "--status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH"
             ),
             timeout_value + 10,
@@ -348,8 +353,8 @@ def _repair_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) -> lis
         RemoteProbe(
             "weather_forecast_run",
             (
-                prefix
-                + f"timeout {timeout_value} .venv/bin/kalshi-bot forecast --model weather_v2 --limit 500"
+                prefix + f"timeout {timeout_value} .venv/bin/kalshi-bot for"
+                f"ecast --model weather_v2 --limit 500"
             ),
             timeout_value + 10,
         ),
@@ -375,7 +380,9 @@ def _final_probes(
 ) -> list[RemoteProbe]:
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     report_list = " ".join(shlex.quote(path) for path in WEATHER_RANKING_PATH_REPORT_PATHS)
     return [
         RemoteProbe("db_writer_monitor_post", writer_cmd, timeout_seconds),
@@ -389,14 +396,23 @@ def _final_probes(
             ),
             timeout_seconds,
         ),
-        RemoteProbe("weather_funnel_json", f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("weather_ranking_activation_json", f"cd {app} && cat reports/phase3ba_r2/weather_ranking_activation.json 2>/dev/null || true", timeout_seconds),
+        RemoteProbe(
+            "weather_funnel_json",
+            f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "weather_ranking_activation_json",
+            f"cd {app} && cat reports/phase3ba_r2/weather_rank"
+            f"ing_activation.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "weather_ranking_path_report_stats",
             (
                 f"cd {app} && for p in {report_list}; do "
-                "if [ -e \"$p\" ]; then stat -c '%n|%Y|%s' \"$p\"; "
-                "else echo \"$p|MISSING|0\"; fi; done"
+                'if [ -e "$p" ]; then stat -c \'%n|%Y|%s\' "$p"; '
+                'else echo "$p|MISSING|0"; fi; done'
             ),
             timeout_seconds,
         ),
@@ -520,11 +536,13 @@ try:
             continue
         link["_parsed_target_time"] = target_time
         eligible_links.append(link)
-    future_target_times = sorted({{iso(link["_parsed_target_time"]) for link in eligible_links if link["_parsed_target_time"] >= now}})
+    future_target_times = sorted({{iso(link["_parsed_target_time"]) for link in \
+eligible_links if link["_parsed_target_time"] >= now}})
     selected_target_time = future_target_times[0] if future_target_times else None
     selected_links = [
         link for link in eligible_links
-        if selected_target_time is not None and iso(link["_parsed_target_time"]) == selected_target_time
+        if selected_target_time is not None and iso(link["_parsed_target_time"]) == \
+selected_target_time
     ]
     if not selected_links:
         selected_links = eligible_links
@@ -608,7 +626,8 @@ try:
             locations,
         ).fetchall():
             row_dict = dict(row)
-            features_by_location.setdefault(str(row_dict.get("location_key")), []).append(row_dict)
+            features_by_location.setdefault(str(row_dict.get("location_key")), \
+[]).append(row_dict)
         for row in conn.execute(
             f'''
             select id, location_key, source, forecast_generated_at, forecast_time,
@@ -621,7 +640,8 @@ try:
             locations,
         ).fetchall():
             row_dict = dict(row)
-            source_by_location.setdefault(str(row_dict.get("location_key")), []).append(row_dict)
+            source_by_location.setdefault(str(row_dict.get("location_key")), \
+[]).append(row_dict)
 
     rows = []
     blocker_counts = Counter()
@@ -635,19 +655,27 @@ try:
         ranking = rankings.get(ticker)
         skip = skips.get(ticker)
         location = str(link.get("location_key") or "unknown")
-        feature = nearest_time(features_by_location.get(location, []), link.get("target_time"), "target_time", "generated_at")
-        source = nearest_time(source_by_location.get(location, []), link.get("target_time"), "forecast_time", "forecast_generated_at")
+        feature = nearest_time(features_by_location.get(location, []), \
+link.get("target_time"), "target_time", "generated_at")
+        source = nearest_time(source_by_location.get(location, []), \
+link.get("target_time"), "forecast_time", "forecast_generated_at")
         snapshot_at = snapshot.get("captured_at") if snapshot else None
         forecast_at = forecast.get("forecasted_at") if forecast else None
         ranking_at = ranking.get("ranked_at") if ranking else None
         snapshot_fresh = snapshot_at is not None and (age_minutes(snapshot_at) or 999999) <= 15
-        source_fresh = source is not None and parse_dt(source.get("forecast_generated_at")) is not None and parse_dt(source.get("forecast_generated_at")) >= fresh_since
-        feature_fresh = feature is not None and parse_dt(feature.get("generated_at")) is not None and parse_dt(feature.get("generated_at")) >= fresh_since
-        has_current_forecast = bool(forecast_at and snapshot_at and parse_dt(forecast_at) >= parse_dt(snapshot_at))
-        has_current_ranking = bool(ranking_at and forecast_at and parse_dt(ranking_at) >= parse_dt(forecast_at))
+        source_fresh = source is not None and \
+parse_dt(source.get("forecast_generated_at")) is not None and \
+parse_dt(source.get("forecast_generated_at")) >= fresh_since
+        feature_fresh = feature is not None and parse_dt(feature.get("generated_at")) \
+is not None and parse_dt(feature.get("generated_at")) >= fresh_since
+        has_current_forecast = bool(forecast_at and snapshot_at and \
+parse_dt(forecast_at) >= parse_dt(snapshot_at))
+        has_current_ranking = bool(ranking_at and forecast_at and parse_dt(ranking_at) \
+>= parse_dt(forecast_at))
         status = str((market or {{}}).get("status") or "").lower()
         target_expired = bool(target_time and target_time < now)
-        target_minutes_until = None if target_time is None else round((target_time - now).total_seconds() / 60, 3)
+        target_minutes_until = None if target_time is None else round((target_time - \
+now).total_seconds() / 60, 3)
         if target_expired:
             blocker = "EXPIRED_TARGET_WINDOW"
         elif market is None:
@@ -708,7 +736,8 @@ try:
         "selected_target_time": selected_target_time,
         "current_weather_links": len(rows),
         "target_expired_rows": blocker_counts["EXPIRED_TARGET_WINDOW"],
-        "live_or_future_rows": sum(1 for row in rows if row["target_window_state"] == "LIVE_OR_FUTURE"),
+        "live_or_future_rows": sum(1 for row in rows if row["target_window_state"] == \
+"LIVE_OR_FUTURE"),
         "snapshot_rows": sum(1 for row in rows if row["has_snapshot"]),
         "fresh_snapshot_rows": sum(1 for row in rows if row["snapshot_fresh"]),
         "source_forecast_rows": sum(1 for row in rows if row["has_source_forecast"]),
@@ -739,14 +768,18 @@ def _parse_initial_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, 
     return {
         "remote_time_utc": _first_line(_stdout(by_name.get("remote_time_utc"))),
         "writer_pre_status": writer.get("status") or "UNKNOWN",
-        "writer_pre_safe_to_start_write": bool(writer.get("safe_to_start_write")) if writer else False,
+        "writer_pre_safe_to_start_write": bool(writer.get("safe_to_start_write"))
+        if writer
+        else False,
         "writer_pre_current_pid": writer.get("current_writer_pid"),
         "command_registry_ok": "COMMAND_REGISTRY_OK" in _stdout(by_name.get("command_registry")),
         "pre_state_ok": bool(state.get("ok")),
         "pre_state_error": state.get("error"),
         "pre_summary": state_summary,
         "pre_rows": state.get("rows") if isinstance(state.get("rows"), list) else [],
-        "pre_skip_reason_counts": state.get("skip_reason_counts") if isinstance(state.get("skip_reason_counts"), dict) else {},
+        "pre_skip_reason_counts": state.get("skip_reason_counts")
+        if isinstance(state.get("skip_reason_counts"), dict)
+        else {},
         "failed_initial_probe_names": [result.name for result in results if not result.ok],
     }
 
@@ -766,7 +799,10 @@ def _should_run_repair(parsed: dict[str, Any], *, run_repair: bool) -> dict[str,
     if current_rows <= 0:
         return {"run": False, "reason": "No current weather link rows were found."}
     if live_rows <= 0:
-        return {"run": False, "reason": "All current-lookback weather link rows are expired target windows."}
+        return {
+            "run": False,
+            "reason": "All current-lookback weather link rows are expired target windows.",
+        }
     return {"run": True, "reason": "Writer clear and live weather rows exist."}
 
 
@@ -798,35 +834,63 @@ def _parse_final_probe_outputs(
         **initial,
         "repair_should_run": bool(repair_policy.get("run")),
         "repair_skip_reason": repair_policy.get("reason"),
-        "repair_probe_names": [name for name, result in repair_results.items() if result is not None],
-        "snapshot_capture_ok": bool(repair_results["weather_snapshot_capture"] and repair_results["weather_snapshot_capture"].ok),
+        "repair_probe_names": [
+            name for name, result in repair_results.items() if result is not None
+        ],
+        "snapshot_capture_ok": bool(
+            repair_results["weather_snapshot_capture"]
+            and repair_results["weather_snapshot_capture"].ok
+        ),
         "snapshot_capture_stdout_tail": _tail(_stdout(repair_results["weather_snapshot_capture"])),
-        "snapshot_capture_stderr_tail": _tail(repair_results["weather_snapshot_capture"].stderr if repair_results["weather_snapshot_capture"] else ""),
-        "forecast_run_ok": bool(repair_results["weather_forecast_run"] and repair_results["weather_forecast_run"].ok),
+        "snapshot_capture_stderr_tail": _tail(
+            repair_results["weather_snapshot_capture"].stderr
+            if repair_results["weather_snapshot_capture"]
+            else ""
+        ),
+        "forecast_run_ok": bool(
+            repair_results["weather_forecast_run"] and repair_results["weather_forecast_run"].ok
+        ),
         "forecast_run_stdout_tail": _tail(_stdout(repair_results["weather_forecast_run"])),
-        "forecast_run_stderr_tail": _tail(repair_results["weather_forecast_run"].stderr if repair_results["weather_forecast_run"] else ""),
-        "fast_lane_run_ok": bool(repair_results["weather_fast_lane_run"] and repair_results["weather_fast_lane_run"].ok),
+        "forecast_run_stderr_tail": _tail(
+            repair_results["weather_forecast_run"].stderr
+            if repair_results["weather_forecast_run"]
+            else ""
+        ),
+        "fast_lane_run_ok": bool(
+            repair_results["weather_fast_lane_run"] and repair_results["weather_fast_lane_run"].ok
+        ),
         "fast_lane_run_stdout_tail": _tail(_stdout(repair_results["weather_fast_lane_run"])),
-        "fast_lane_run_stderr_tail": _tail(repair_results["weather_fast_lane_run"].stderr if repair_results["weather_fast_lane_run"] else ""),
+        "fast_lane_run_stderr_tail": _tail(
+            repair_results["weather_fast_lane_run"].stderr
+            if repair_results["weather_fast_lane_run"]
+            else ""
+        ),
         "writer_post_status": writer_post.get("status") or "UNKNOWN",
-        "writer_post_safe_to_start_write": bool(writer_post.get("safe_to_start_write")) if writer_post else False,
+        "writer_post_safe_to_start_write": bool(writer_post.get("safe_to_start_write"))
+        if writer_post
+        else False,
         "writer_post_current_pid": writer_post.get("current_writer_pid"),
         "post_state_ok": bool(post_state.get("ok")),
         "post_state_error": post_state.get("error"),
         "post_summary": post_summary,
         "post_rows": post_state.get("rows") if isinstance(post_state.get("rows"), list) else [],
-        "post_skip_reason_counts": post_state.get("skip_reason_counts") if isinstance(post_state.get("skip_reason_counts"), dict) else {},
+        "post_skip_reason_counts": post_state.get("skip_reason_counts")
+        if isinstance(post_state.get("skip_reason_counts"), dict)
+        else {},
         "weather_funnel_json_ok": bool(funnel),
         "weather_funnel_status": funnel.get("status"),
         "weather_funnel_summary": funnel_summary,
         "weather_ranking_activation_json_ok": bool(ranking),
         "weather_ranking_activation_status": ranking.get("status"),
         "weather_ranking_activation_summary": ranking_summary,
-        "weather_ranking_path_report_freshness": _parse_report_stats(_stdout(by_name.get("weather_ranking_path_report_stats"))),
+        "weather_ranking_path_report_freshness": _parse_report_stats(
+            _stdout(by_name.get("weather_ranking_path_report_stats"))
+        ),
         "failed_final_probe_names": [
             result.name
             for result in results
-            if result.name not in {"weather_snapshot_capture", "weather_forecast_run", "weather_fast_lane_run"}
+            if result.name
+            not in {"weather_snapshot_capture", "weather_forecast_run", "weather_fast_lane_run"}
             and not result.ok
         ],
         "failed_repair_probe_names": [
@@ -837,10 +901,26 @@ def _parse_final_probe_outputs(
 
 def _ranking_path_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
     return [
-        _check("initial_remote_probes_completed", not parsed.get("failed_initial_probe_names"), f"failed={','.join(parsed.get('failed_initial_probe_names') or []) or 'none'}."),
-        _check("command_registry_ok", bool(parsed.get("command_registry_ok")), "Required registered cloud commands are available."),
-        _check("pre_path_state_readable", bool(parsed.get("pre_state_ok")), f"error={parsed.get('pre_state_error')}."),
-        _check("repair_policy_recorded", parsed.get("repair_skip_reason") is not None, str(parsed.get("repair_skip_reason"))),
+        _check(
+            "initial_remote_probes_completed",
+            not parsed.get("failed_initial_probe_names"),
+            f"failed={','.join(parsed.get('failed_initial_probe_names') or []) or 'none'}.",
+        ),
+        _check(
+            "command_registry_ok",
+            bool(parsed.get("command_registry_ok")),
+            "Required registered cloud commands are available.",
+        ),
+        _check(
+            "pre_path_state_readable",
+            bool(parsed.get("pre_state_ok")),
+            f"error={parsed.get('pre_state_error')}.",
+        ),
+        _check(
+            "repair_policy_recorded",
+            parsed.get("repair_skip_reason") is not None,
+            str(parsed.get("repair_skip_reason")),
+        ),
         _check(
             "repair_succeeded_or_cleanly_skipped",
             (not parsed.get("repair_should_run") and not parsed.get("repair_probe_names"))
@@ -849,10 +929,19 @@ def _ranking_path_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
                 and bool(parsed.get("forecast_run_ok"))
                 and bool(parsed.get("fast_lane_run_ok"))
             ),
-            f"repair={parsed.get('repair_probe_names')} failed={parsed.get('failed_repair_probe_names')}.",
+            f"repair={parsed.get('repair_probe_names')} failed"
+            f"={parsed.get('failed_repair_probe_names')}.",
         ),
-        _check("final_remote_probes_completed", not parsed.get("failed_final_probe_names"), f"failed={','.join(parsed.get('failed_final_probe_names') or []) or 'none'}."),
-        _check("post_path_state_readable", bool(parsed.get("post_state_ok")), f"error={parsed.get('post_state_error')}."),
+        _check(
+            "final_remote_probes_completed",
+            not parsed.get("failed_final_probe_names"),
+            f"failed={','.join(parsed.get('failed_final_probe_names') or []) or 'none'}.",
+        ),
+        _check(
+            "post_path_state_readable",
+            bool(parsed.get("post_state_ok")),
+            f"error={parsed.get('post_state_error')}.",
+        ),
     ]
 
 
@@ -860,21 +949,28 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
     failed = [row for row in checks if not row["passed"]]
     pre = parsed.get("pre_summary") or {}
     post = parsed.get("post_summary") or {}
-    current_rows = _int_or_zero(post.get("current_weather_links") or pre.get("current_weather_links"))
+    current_rows = _int_or_zero(
+        post.get("current_weather_links") or pre.get("current_weather_links")
+    )
     live_rows = _int_or_zero(post.get("live_or_future_rows") or pre.get("live_or_future_rows"))
     expired_rows = _int_or_zero(post.get("target_expired_rows") or pre.get("target_expired_rows"))
     forecast_rows = _int_or_zero(post.get("forecast_rows") or pre.get("forecast_rows"))
     ranking_rows = _int_or_zero(post.get("ranking_rows") or pre.get("ranking_rows"))
     snapshot_rows = _int_or_zero(post.get("snapshot_rows") or pre.get("snapshot_rows"))
-    fresh_feature_rows = _int_or_zero(post.get("fresh_weather_feature_rows") or pre.get("fresh_weather_feature_rows"))
-    blocker_counts = post.get("first_path_blocker_counts") or pre.get("first_path_blocker_counts") or {}
+    fresh_feature_rows = _int_or_zero(
+        post.get("fresh_weather_feature_rows") or pre.get("fresh_weather_feature_rows")
+    )
+    blocker_counts = (
+        post.get("first_path_blocker_counts") or pre.get("first_path_blocker_counts") or {}
+    )
     first_blocker = _first_blocker(blocker_counts)
     if current_rows == 0:
         status = "WEATHER_RANKING_PATH_NO_CURRENT_LINK_ROWS"
         reason = "No current-lookback weather link rows are available for weather_v2."
         next_step = "Phase 3BB-R47 - Weather Current Window Series Discovery And Linkability Repair"
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports"
         )
         first_blocker = "NO_CURRENT_WEATHER_LINKS"
@@ -883,7 +979,8 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         reason = "The linked weather rows are now expired target windows; do not forecast them."
         next_step = "Phase 3BB-R47 - Weather Current Window Series Discovery And Linkability Repair"
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports"
         )
         first_blocker = "EXPIRED_TARGET_WINDOW"
@@ -906,28 +1003,41 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         status = "WEATHER_RANKING_PATH_REPAIRED"
         reason = "Weather rows now have current weather_v2 rankings."
         next_step = "Phase 3BB-R8 - Unified Paper Gate Across Categories"
-        command = "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+            "--reports-dir reports"
+        )
         first_blocker = "PAPER_GATE_REFRESH_NEEDED"
     elif forecast_rows > 0:
         status = "WEATHER_FORECAST_CREATED_RANKING_STILL_MISSING"
         reason = "Weather forecasts exist after repair, but opportunity rankings are still missing."
         next_step = "Phase 3BB-R2 - Weather Fast-Lane Paper Funnel"
-        command = "kalshi-bot phase3bb-r2-weather-fast-lane --output-dir reports/phase3bb_r2 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r2-weather-fast-lane --output-dir reports/phase3bb_r2 "
+            "--reports-dir reports"
+        )
         first_blocker = first_blocker or "RANKING_MISSING"
     elif snapshot_rows <= 0:
         status = "WEATHER_RANKING_PATH_SNAPSHOT_MISSING"
         reason = "Weather links exist but no exact snapshots/orderbooks exist for those tickers."
         next_step = "Phase 3BB-R47 - Weather Current Window Series Discovery And Linkability Repair"
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports"
         )
         first_blocker = first_blocker or "SNAPSHOT_MISSING"
     elif fresh_feature_rows <= 0:
         status = "WEATHER_RANKING_PATH_FEATURE_MISSING"
-        reason = "Weather links have market snapshots but no fresh feature row for the linked target window."
+        reason = (
+            "Weather links have market snapshots but no fresh feature row for the linked "
+            "target window."
+        )
         next_step = "Phase 3BB-R48 - Weather Feature Refresh Runtime Verification"
-        command = "kalshi-bot phase3bb-r48-weather-feature-refresh-runtime-verification --output-dir reports/phase3bb_r48 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r48-weather-feature-refresh-runtime-verification "
+            "--output-dir reports/phase3bb_r48 --reports-dir reports"
+        )
         first_blocker = first_blocker or "FEATURE_MISSING_FOR_TARGET_WINDOW"
     else:
         status = "WEATHER_RANKING_PATH_FORECAST_STILL_MISSING"
@@ -1017,7 +1127,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             "- Paper trade creation: `False`",
             "- Live/demo order submission/cancel/replace: `False`",
             "- Missing-link apply run by this phase: `False`",
-            "- Forecast/snapshot/fast-lane run only when writer gate is clear and rows are still live.",
+            "- Forecast/snapshot/fast-lane run only when writer gate is clear and rows "
+            "are still live.",
             "",
             "## Next",
             "",
@@ -1063,11 +1174,27 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         )
     )
     lines.extend(["", "## Repair Output", ""])
-    lines.extend(["### Snapshot Capture", "```text", str(parsed.get("snapshot_capture_stdout_tail") or ""), "```"])
-    lines.extend(["### Forecast", "```text", str(parsed.get("forecast_run_stdout_tail") or ""), "```"])
-    lines.extend(["### Fast Lane", "```text", str(parsed.get("fast_lane_run_stdout_tail") or ""), "```"])
+    lines.extend(
+        [
+            "### Snapshot Capture",
+            "```text",
+            str(parsed.get("snapshot_capture_stdout_tail") or ""),
+            "```",
+        ]
+    )
+    lines.extend(
+        ["### Forecast", "```text", str(parsed.get("forecast_run_stdout_tail") or ""), "```"]
+    )
+    lines.extend(
+        ["### Fast Lane", "```text", str(parsed.get("fast_lane_run_stdout_tail") or ""), "```"]
+    )
     lines.extend(["", "## Report Freshness", ""])
-    lines.extend(_table(payload["weather_ranking_path_report_freshness"], ["path", "status", "mtime_epoch", "size_bytes"]))
+    lines.extend(
+        _table(
+            payload["weather_ranking_path_report_freshness"],
+            ["path", "status", "mtime_epoch", "size_bytes"],
+        )
+    )
     return "\n".join(lines)
 
 

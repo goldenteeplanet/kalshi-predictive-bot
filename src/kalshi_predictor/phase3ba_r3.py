@@ -517,9 +517,7 @@ def _weather_paper_gate_row(
         "weather_source_forecast_id": getattr(source_forecast, "id", None),
     }
     row["failed_gates"] = _weather_paper_blockers(row)
-    row["first_blocker"] = (
-        row["failed_gates"][0] if row["failed_gates"] else "PAPER_READY"
-    )
+    row["first_blocker"] = row["failed_gates"][0] if row["failed_gates"] else "PAPER_READY"
     row["paper_ready"] = row["first_blocker"] == "PAPER_READY"
     row["entered_paper_gate"] = bool(
         row["current_window_eligible"]
@@ -993,9 +991,7 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             if not row["verified_kalshi_url"]
             and row.get("kalshi_url_status") == BUILT_FROM_EXACT_CATALOG
         ),
-        "source_identity_ready_rows": sum(
-            1 for row in rows if row["source_identity_ready"]
-        ),
+        "source_identity_ready_rows": sum(1 for row in rows if row["source_identity_ready"]),
         "fresh_snapshot_rows": sum(1 for row in rows if row["snapshot_fresh"]),
         "weather_source_rows": sum(
             1

@@ -34,23 +34,23 @@ def build_prov13_repair_preview(
 ) -> dict[str, Any]:
     if limit < 1 or limit > 1000:
         raise ValueError("limit must be between 1 and 1000")
-    events = list(session.scalars(
-        select(RuntimeProvenanceEvent)
-        .where(
-            (RuntimeProvenanceEvent.source_observation_ref_json.is_(None))
-            | (RuntimeProvenanceEvent.market_snapshot_id.is_(None))
+    events = list(
+        session.scalars(
+            select(RuntimeProvenanceEvent)
+            .where(
+                (RuntimeProvenanceEvent.source_observation_ref_json.is_(None))
+                | (RuntimeProvenanceEvent.market_snapshot_id.is_(None))
+            )
+            .order_by(desc(RuntimeProvenanceEvent.id))
+            .limit(limit)
         )
-        .order_by(desc(RuntimeProvenanceEvent.id))
-        .limit(limit)
-    ))
+    )
     rows = []
     statuses: Counter[str] = Counter()
     for event in events:
         observation_missing = not _json_dict(event.source_observation_ref_json)
         snapshot_missing = event.market_snapshot_id is None
-        observation = (
-            _exact_observation_preview(session, event) if observation_missing else None
-        )
+        observation = _exact_observation_preview(session, event) if observation_missing else None
         snapshot = _exact_snapshot_preview(session, event) if snapshot_missing else None
         blockers = []
         if observation_missing and observation is None:
@@ -59,21 +59,23 @@ def build_prov13_repair_preview(
             blockers.append("EXACT_SNAPSHOT_NOT_UNIQUE_OR_MISSING")
         status = "SAFE_EXACT_PREVIEW" if not blockers else "BLOCKED"
         statuses[status] += 1
-        rows.append({
-            "event_id": event.id,
-            "event_key": event.event_key,
-            "stage": event.stage,
-            "ticker": event.ticker,
-            "model_name": event.model_name,
-            "forecast_id": event.forecast_id,
-            "ranking_id": event.ranking_id,
-            "observation_missing": observation_missing,
-            "snapshot_missing": snapshot_missing,
-            "proposed_source_observation_ref": observation,
-            "proposed_market_snapshot_id": snapshot,
-            "status": status,
-            "blockers": blockers,
-        })
+        rows.append(
+            {
+                "event_id": event.id,
+                "event_key": event.event_key,
+                "stage": event.stage,
+                "ticker": event.ticker,
+                "model_name": event.model_name,
+                "forecast_id": event.forecast_id,
+                "ranking_id": event.ranking_id,
+                "observation_missing": observation_missing,
+                "snapshot_missing": snapshot_missing,
+                "proposed_source_observation_ref": observation,
+                "proposed_market_snapshot_id": snapshot,
+                "status": status,
+                "blockers": blockers,
+            }
+        )
     return {
         "phase": "PROV-13",
         "generated_at": utc_now().isoformat(),
@@ -147,26 +149,36 @@ def _exact_observation_preview(
             return None
         row = matches[0]
         return {
-            "table": "crypto_prices", "id": row.id, "symbol": row.symbol,
-            "source": row.source, "observed_at": row.observed_at.isoformat(),
+            "table": "crypto_prices",
+            "id": row.id,
+            "symbol": row.symbol,
+            "source": row.source,
+            "observed_at": row.observed_at.isoformat(),
         }
     generated_at = parse_datetime(raw.get("forecast_generated_at"))
     target_time = parse_datetime(raw.get("target_time"))
     if generated_at is None or target_time is None:
         return None
-    matches = list(session.scalars(
-        select(WeatherForecast).where(
-            WeatherForecast.location_key == feature.location_key,
-            WeatherForecast.forecast_generated_at == generated_at,
-            WeatherForecast.forecast_time == target_time,
-        ).order_by(WeatherForecast.id).limit(2)
-    ))
+    matches = list(
+        session.scalars(
+            select(WeatherForecast)
+            .where(
+                WeatherForecast.location_key == feature.location_key,
+                WeatherForecast.forecast_generated_at == generated_at,
+                WeatherForecast.forecast_time == target_time,
+            )
+            .order_by(WeatherForecast.id)
+            .limit(2)
+        )
+    )
     if len(matches) != 1:
         return None
     row = matches[0]
     return {
-        "table": "weather_forecasts", "id": row.id,
-        "location_key": row.location_key, "source": row.source,
+        "table": "weather_forecasts",
+        "id": row.id,
+        "location_key": row.location_key,
+        "source": row.source,
         "forecast_generated_at": row.forecast_generated_at.isoformat(),
         "forecast_time": row.forecast_time.isoformat(),
     }
@@ -176,12 +188,14 @@ def _exact_snapshot_preview(
     session: Session,
     event: RuntimeProvenanceEvent,
 ) -> int | None:
-    peer_ids = set(session.scalars(
-        select(RuntimeProvenanceEvent.market_snapshot_id).where(
-            RuntimeProvenanceEvent.forecast_id == event.forecast_id,
-            RuntimeProvenanceEvent.market_snapshot_id.is_not(None),
+    peer_ids = set(
+        session.scalars(
+            select(RuntimeProvenanceEvent.market_snapshot_id).where(
+                RuntimeProvenanceEvent.forecast_id == event.forecast_id,
+                RuntimeProvenanceEvent.market_snapshot_id.is_not(None),
+            )
         )
-    ))
+    )
     if len(peer_ids) == 1:
         snapshot_id = next(iter(peer_ids))
         if session.get(MarketSnapshot, snapshot_id) is not None:
@@ -189,12 +203,17 @@ def _exact_snapshot_preview(
     forecast = session.get(Forecast, event.forecast_id)
     if forecast is None:
         return None
-    matches = list(session.scalars(
-        select(MarketSnapshot).where(
-            MarketSnapshot.ticker == forecast.ticker,
-            MarketSnapshot.captured_at == forecast.forecasted_at,
-        ).order_by(MarketSnapshot.id).limit(2)
-    ))
+    matches = list(
+        session.scalars(
+            select(MarketSnapshot)
+            .where(
+                MarketSnapshot.ticker == forecast.ticker,
+                MarketSnapshot.captured_at == forecast.forecasted_at,
+            )
+            .order_by(MarketSnapshot.id)
+            .limit(2)
+        )
+    )
     return int(matches[0].id) if len(matches) == 1 else None
 
 

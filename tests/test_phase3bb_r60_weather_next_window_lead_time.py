@@ -69,7 +69,10 @@ def test_phase3bb_r60_runs_r59_when_window_inside_lead_time_band(tmp_path: Path)
     assert "weather_catalog_refresh_parse" in names
     assert "weather_per_ticker_forecast" in names
     assert payload["safety_flags"]["creates_paper_trades"] is False
-    assert "phase3bb-r60-weather-next-window-lead-time-scheduler-repair" in artifacts.scheduler_hook_path.read_text(encoding="utf-8")
+    assert (
+        "phase3bb-r60-weather-next-window-lead-time-scheduler-repair"
+        in artifacts.scheduler_hook_path.read_text(encoding="utf-8")
+    )
 
 
 def test_phase3bb_r60_skips_when_selected_window_too_close(tmp_path: Path) -> None:
@@ -234,7 +237,9 @@ def _r53_state(
                 "link_target_matches_window": True,
                 "has_snapshot": has_forecast or has_ranking,
                 "snapshot_fresh": has_forecast or has_ranking,
-                "latest_snapshot_at": "2026-07-14T04:05:00+00:00" if has_forecast or has_ranking else None,
+                "latest_snapshot_at": "2026-07-14T04:05:00+00:00"
+                if has_forecast or has_ranking
+                else None,
                 "has_source_forecast": True,
                 "source_forecast_fresh": True,
                 "source_forecast_at": "2026-07-14T04:04:00+00:00",

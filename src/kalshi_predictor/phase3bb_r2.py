@@ -264,7 +264,8 @@ def weather_candidates_from_reports(
                 "weather_snapshot_fresh": bool(row.get("snapshot_fresh")),
                 "weather_forecast": bool(row.get("has_current_forecast")),
                 "weather_ranking": bool(row.get("has_current_ranking")),
-                "positive_ev": str(first_blocker) not in {
+                "positive_ev": str(first_blocker)
+                not in {
                     "SOURCE_MISSING",
                     "SNAPSHOT_STALE",
                     "FORECAST_MISSING",
@@ -315,7 +316,8 @@ def weather_candidates_from_reports(
                 "weather_snapshot_fresh": bool(row.get("has_snapshot")),
                 "weather_forecast": bool(row.get("has_current_forecast")),
                 "weather_ranking": bool(row.get("has_current_ranking")),
-                "positive_ev": row.get("first_hard_blocker") not in {
+                "positive_ev": row.get("first_hard_blocker")
+                not in {
                     "SNAPSHOT_MISSING",
                     "FORECAST_MISSING",
                     "RANKING_MISSING",

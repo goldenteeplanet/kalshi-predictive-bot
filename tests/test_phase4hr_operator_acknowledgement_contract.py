@@ -69,25 +69,34 @@ def test_decline_and_diagnostics_are_distinct_non_authorizing_outcomes() -> None
 def test_exact_expiry_and_ttl_boundaries_pass_then_expire() -> None:
     admission = _admission()
     exact = _record(admission, issued=100, acknowledged=200, expires=3_700)
-    assert evaluate_operator_acknowledgement(
-        admission,
-        exact,
-        expected_incident_id_hash=INCIDENT_HASH,
-        evaluated_at_epoch_seconds=3_700,
-    ).status == "ACCEPTED"
-    assert evaluate_operator_acknowledgement(
-        admission,
-        exact,
-        expected_incident_id_hash=INCIDENT_HASH,
-        evaluated_at_epoch_seconds=3_701,
-    ).status == "STALE"
+    assert (
+        evaluate_operator_acknowledgement(
+            admission,
+            exact,
+            expected_incident_id_hash=INCIDENT_HASH,
+            evaluated_at_epoch_seconds=3_700,
+        ).status
+        == "ACCEPTED"
+    )
+    assert (
+        evaluate_operator_acknowledgement(
+            admission,
+            exact,
+            expected_incident_id_hash=INCIDENT_HASH,
+            evaluated_at_epoch_seconds=3_701,
+        ).status
+        == "STALE"
+    )
     excessive = _record(admission, issued=100, acknowledged=200, expires=3_701)
-    assert evaluate_operator_acknowledgement(
-        admission,
-        excessive,
-        expected_incident_id_hash=INCIDENT_HASH,
-        evaluated_at_epoch_seconds=200,
-    ).status == "DENIED"
+    assert (
+        evaluate_operator_acknowledgement(
+            admission,
+            excessive,
+            expected_incident_id_hash=INCIDENT_HASH,
+            evaluated_at_epoch_seconds=200,
+        ).status
+        == "DENIED"
+    )
 
 
 def test_incomplete_binding_before_issue_and_future_fail_closed() -> None:
@@ -198,9 +207,7 @@ def _admission():
         complete=True,
         source_identity_hash="b" * 64,
     )
-    alert = evaluate_alert_severity_and_deduplication(
-        candidate, [], evaluated_at_epoch_seconds=100
-    )
+    alert = evaluate_alert_severity_and_deduplication(candidate, [], evaluated_at_epoch_seconds=100)
     retry = evaluate_alert_retry_backoff(alert, [], evaluated_at_epoch_seconds=100)
     return evaluate_alert_rate_limit_and_storm_control(
         retry, "WARNING", [], evaluated_at_epoch_seconds=100

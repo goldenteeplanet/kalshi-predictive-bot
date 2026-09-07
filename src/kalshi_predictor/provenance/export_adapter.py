@@ -56,10 +56,13 @@ def normalize_runtime_provenance_export(
     schema = SUPPORTED_SCHEMAS.get(str(declared)) if declared is not None else None
     diagnostics: list[dict[str, Any]] = []
     if declared is not None and schema is None:
-        diagnostics.append(_diagnostic(
-            "UNSUPPORTED_SCHEMA_VERSION", None,
-            f"unsupported schema version: {declared}",
-        ))
+        diagnostics.append(
+            _diagnostic(
+                "UNSUPPORTED_SCHEMA_VERSION",
+                None,
+                f"unsupported schema version: {declared}",
+            )
+        )
     detected = [_detect_row_schema(row) for row in rows]
     known = sorted({value for value in detected if value is not None})
     if schema is None and declared is None:
@@ -67,26 +70,29 @@ def normalize_runtime_provenance_export(
             schema = known[0]
         elif len(known) > 1:
             schema = "mixed"
-            diagnostics.append(_diagnostic(
-                "MIXED_ROW_SCHEMAS", None, f"mixed row schemas: {','.join(known)}"
-            ))
+            diagnostics.append(
+                _diagnostic("MIXED_ROW_SCHEMAS", None, f"mixed row schemas: {','.join(known)}")
+            )
         else:
-            diagnostics.append(_diagnostic(
-                "SCHEMA_UNDETECTABLE", None, "no supported row schema detected"
-            ))
+            diagnostics.append(
+                _diagnostic("SCHEMA_UNDETECTABLE", None, "no supported row schema detected")
+            )
     normalized_rows = []
     for index, row in enumerate(rows):
         row_schema = detected[index]
         if row_schema is None:
-            diagnostics.append(_diagnostic(
-                "MALFORMED_ROW", index, "row is not a recognized attribution object"
-            ))
+            diagnostics.append(
+                _diagnostic("MALFORMED_ROW", index, "row is not a recognized attribution object")
+            )
             continue
         if schema not in (None, "mixed") and row_schema != schema:
-            diagnostics.append(_diagnostic(
-                "ROW_SCHEMA_MISMATCH", index,
-                f"declared {schema}, detected {row_schema}",
-            ))
+            diagnostics.append(
+                _diagnostic(
+                    "ROW_SCHEMA_MISMATCH",
+                    index,
+                    f"declared {schema}, detected {row_schema}",
+                )
+            )
             continue
         try:
             normalized_rows.append(_adapt_row(row, index))
@@ -126,8 +132,12 @@ def compare_runtime_export_to_golden(
     report["schema_compatibility"] = {
         key: compatibility[key]
         for key in (
-            "source_schema", "normalized_schema", "source_row_count",
-            "normalized_row_count", "compatible", "diagnostics",
+            "source_schema",
+            "normalized_schema",
+            "source_row_count",
+            "normalized_row_count",
+            "compatible",
+            "diagnostics",
         )
     }
     if not compatibility["compatible"]:
@@ -197,14 +207,27 @@ def _detect_row_schema(value: Any) -> str | None:
         return None
     if isinstance(value.get("attribution"), Mapping):
         return SCHEMA_PROV2_ENVELOPE_V1
-    if all(key in value for key in (
-        "event_key", "model_name", "model_version", "event_at",
-        "source_observation_ref", "market_snapshot_ref",
-    )):
+    if all(
+        key in value
+        for key in (
+            "event_key",
+            "model_name",
+            "model_version",
+            "event_at",
+            "source_observation_ref",
+            "market_snapshot_ref",
+        )
+    ):
         return SCHEMA_NORMALIZED_V3
-    if any(key in value for key in (
-        "event_key", "raw_json", "source_observation_ref_json", "market_snapshot_id",
-    )):
+    if any(
+        key in value
+        for key in (
+            "event_key",
+            "raw_json",
+            "source_observation_ref_json",
+            "market_snapshot_id",
+        )
+    ):
         return SCHEMA_RUNTIME_EVENT_V2
     return None
 
@@ -218,16 +241,24 @@ def _adapt_prov2_envelope(
 ) -> dict[str, Any]:
     observation_id = attribution.get("observation_id")
     snapshot_id = attribution.get("orderbook_snapshot_id")
-    observation = None if _missing(observation_id) else {
-        "table": "runtime_observations",
-        "id": _reference_id(observation_id),
-        "observed_at": attribution.get("observation_timestamp"),
-    }
-    snapshot = None if _missing(snapshot_id) else {
-        "table": "market_snapshots",
-        "id": _reference_id(snapshot_id),
-        "captured_at": attribution.get("orderbook_timestamp"),
-    }
+    observation = (
+        None
+        if _missing(observation_id)
+        else {
+            "table": "runtime_observations",
+            "id": _reference_id(observation_id),
+            "observed_at": attribution.get("observation_timestamp"),
+        }
+    )
+    snapshot = (
+        None
+        if _missing(snapshot_id)
+        else {
+            "table": "market_snapshots",
+            "id": _reference_id(snapshot_id),
+            "captured_at": attribution.get("orderbook_timestamp"),
+        }
+    )
     return {
         "event_key": str(row.get("digest") or f"prov2-row-{index}"),
         "ticker": str(attribution.get("ticker") or ""),

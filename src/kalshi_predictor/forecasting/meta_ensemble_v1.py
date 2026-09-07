@@ -27,9 +27,7 @@ class MetaEnsembleV1Forecaster:
         weights, reason = meta_ensemble_weights(
             probabilities=probabilities,
             trust_scores=selection.trust_scores,
-            disagreement=to_decimal(
-                _feature_value(selection.feature, "model_disagreement_score")
-            )
+            disagreement=to_decimal(_feature_value(selection.feature, "model_disagreement_score"))
             or Decimal("0"),
         )
         if not weights:

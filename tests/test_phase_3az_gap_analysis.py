@@ -48,9 +48,7 @@ def test_phase3az_suppresses_stale_unusable_outcome_gap_when_r3_cleared(
         {"summary": {"residue_cleared": True, "residual_rows": 0}},
     )
     _write_json(
-        reports_dir
-        / "paper_settlement_reconciliation"
-        / "paper_settlement_reconciliation.json",
+        reports_dir / "paper_settlement_reconciliation" / "paper_settlement_reconciliation.json",
         {"summary": {"eligible_to_settle_now": 0}},
     )
 
@@ -419,8 +417,7 @@ def test_phase3az_routes_phase3bb_r2_diagnostics_to_source_evidence(
     )
     assert general_gap["phase"] == "3BB-R2"
     assert general_gap["command"] == (
-        "kalshi-bot phase3bb-r2-general-source-intake "
-        "--output-dir reports/phase3bb_r2_sources"
+        "kalshi-bot phase3bb-r2-general-source-intake --output-dir reports/phase3bb_r2_sources"
     )
     assert "source-evidence" in general_gap["next_action"]
     assert payload["implementation_queue"][0]["phase"] == "3BB-R2"
@@ -665,9 +662,7 @@ def _write_reports(reports_dir: Path) -> None:
         },
     )
     _write_json(
-        reports_dir
-        / "paper_settlement_reconciliation"
-        / "paper_settlement_reconciliation.json",
+        reports_dir / "paper_settlement_reconciliation" / "paper_settlement_reconciliation.json",
         {"summary": {"sibling_different_contract_leg": 1}},
     )
     _write_json(
@@ -715,9 +710,7 @@ def _write_clean_reports(reports_dir: Path) -> None:
         {"summary": {"residue_cleared": True, "residual_rows": 0}},
     )
     _write_json(
-        reports_dir
-        / "paper_settlement_reconciliation"
-        / "paper_settlement_reconciliation.json",
+        reports_dir / "paper_settlement_reconciliation" / "paper_settlement_reconciliation.json",
         {"summary": {"eligible_to_settle_now": 0}},
     )
     _write_json(

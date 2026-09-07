@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Mapping
+from typing import Any
 
 from kalshi_predictor.utils.decimals import to_decimal
 from kalshi_predictor.utils.time import parse_datetime
@@ -19,9 +20,13 @@ class ObservationShadowResult:
 
 
 def evaluate_knyc_observation(
-    *, baseline_probability: Decimal, raw_strike: Decimal,
-    target_time: Any, evidence: Mapping[str, Any] | None,
-    max_adjustment: Decimal, enabled: bool,
+    *,
+    baseline_probability: Decimal,
+    raw_strike: Decimal,
+    target_time: Any,
+    evidence: Mapping[str, Any] | None,
+    max_adjustment: Decimal,
+    enabled: bool,
 ) -> ObservationShadowResult:
     provenance = {
         "evidence_source": "NOAA_KNYC",
@@ -39,7 +44,9 @@ def evaluate_knyc_observation(
         )
     observation = to_decimal(evidence.get("observation_temperature_f"))
     signal = max(Decimal("-1"), min(Decimal("1"), (observation - raw_strike) / Decimal("20")))
-    shadow = max(Decimal("0.01"), min(Decimal("0.99"), baseline_probability + signal * max_adjustment))
+    shadow = max(
+        Decimal("0.01"), min(Decimal("0.99"), baseline_probability + signal * max_adjustment)
+    )
     return ObservationShadowResult(
         shadow if enabled else baseline_probability, shadow, enabled, True, None, provenance
     )

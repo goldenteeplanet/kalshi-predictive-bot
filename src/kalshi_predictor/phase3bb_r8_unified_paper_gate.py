@@ -405,9 +405,7 @@ def _batched_evidence(
     weather_locations = {
         ctx.get("location_key") for ctx in contexts if ctx["category"] == "weather"
     }
-    economic_keys = {
-        ctx.get("event_key") for ctx in contexts if ctx["category"] == "economic"
-    }
+    economic_keys = {ctx.get("event_key") for ctx in contexts if ctx["category"] == "economic"}
     crypto_symbols.discard(None)
     weather_locations.discard(None)
     economic_keys.discard(None)
@@ -430,40 +428,86 @@ def _batched_evidence(
         for ctx in contexts
         if ctx["category"] == "sports" and ctx.get("league") and ctx.get("game_key")
     }
-    sports_games = {
-        (row.league, row.game_key): row
-        for row in session.scalars(
-            select(SportsGame).where(
-                SportsGame.league.in_({key[0] for key in sports_keys}),
-                SportsGame.game_key.in_({key[1] for key in sports_keys}),
+    sports_games = (
+        {
+            (row.league, row.game_key): row
+            for row in session.scalars(
+                select(SportsGame).where(
+                    SportsGame.league.in_({key[0] for key in sports_keys}),
+                    SportsGame.game_key.in_({key[1] for key in sports_keys}),
+                )
+            )
+        }
+        if sports_keys
+        else {}
+    )
+
+    crypto_feature_keys = (
+        set(
+            session.scalars(
+                select(CryptoFeature.symbol)
+                .distinct()
+                .where(CryptoFeature.symbol.in_(crypto_symbols))
             )
         )
-    } if sports_keys else {}
-
-    crypto_feature_keys = set(session.scalars(
-        select(CryptoFeature.symbol).distinct().where(CryptoFeature.symbol.in_(crypto_symbols))
-    )) if crypto_symbols else set()
-    weather_feature_keys = set(session.scalars(
-        select(WeatherFeature.location_key).distinct().where(
-            WeatherFeature.location_key.in_(weather_locations)
+        if crypto_symbols
+        else set()
+    )
+    weather_feature_keys = (
+        set(
+            session.scalars(
+                select(WeatherFeature.location_key)
+                .distinct()
+                .where(WeatherFeature.location_key.in_(weather_locations))
+            )
         )
-    )) if weather_locations else set()
-    economic_feature_keys = set(session.scalars(
-        select(EconomicFeature.event_key).distinct().where(
-            EconomicFeature.event_key.in_(economic_keys)
+        if weather_locations
+        else set()
+    )
+    economic_feature_keys = (
+        set(
+            session.scalars(
+                select(EconomicFeature.event_key)
+                .distinct()
+                .where(EconomicFeature.event_key.in_(economic_keys))
+            )
         )
-    )) if economic_keys else set()
+        if economic_keys
+        else set()
+    )
     sports_tickers = {ctx["ticker"] for ctx in contexts if ctx["category"] == "sports"}
-    sports_feature_tickers = set(session.scalars(
-        select(SportsFeature.ticker).distinct().where(SportsFeature.ticker.in_(sports_tickers))
-    )) if sports_tickers else set()
-    sports_signal_tickers = set(session.scalars(
-        select(SportsSignal.ticker).distinct().where(SportsSignal.ticker.in_(sports_tickers))
-    )) if sports_tickers else set()
+    sports_feature_tickers = (
+        set(
+            session.scalars(
+                select(SportsFeature.ticker)
+                .distinct()
+                .where(SportsFeature.ticker.in_(sports_tickers))
+            )
+        )
+        if sports_tickers
+        else set()
+    )
+    sports_signal_tickers = (
+        set(
+            session.scalars(
+                select(SportsSignal.ticker)
+                .distinct()
+                .where(SportsSignal.ticker.in_(sports_tickers))
+            )
+        )
+        if sports_tickers
+        else set()
+    )
     news_tickers = {ctx["ticker"] for ctx in contexts if ctx["category"] == "news"}
-    news_feature_tickers = set(session.scalars(
-        select(NewsFeature.ticker).distinct().where(NewsFeature.ticker.in_(news_tickers))
-    )) if news_tickers else set()
+    news_feature_tickers = (
+        set(
+            session.scalars(
+                select(NewsFeature.ticker).distinct().where(NewsFeature.ticker.in_(news_tickers))
+            )
+        )
+        if news_tickers
+        else set()
+    )
 
     for ctx in contexts:
         ticker = ctx["ticker"]
@@ -551,8 +595,7 @@ def _news_contexts(session: Session, *, now: datetime, limit: int) -> list[dict[
                 "ticker": link.ticker,
                 "verified_kalshi_link": True,
                 "link_detail": (
-                    f"news_item_id={link.news_item_id}; "
-                    f"confidence={link.link_confidence}"
+                    f"news_item_id={link.news_item_id}; confidence={link.link_confidence}"
                 ),
                 "news_item_id": link.news_item_id,
                 "news_source_url": item.source_url,
@@ -1009,14 +1052,14 @@ def _latest_by_ticker(
     if not tickers:
         return {}
     statement = select(
-            model.id.label("row_id"),
-            func.row_number()
-            .over(
-                partition_by=model.ticker,
-                order_by=(desc(timestamp_col), desc(model.id)),
-            )
-            .label("row_number"),
-        ).where(model.ticker.in_(tickers))
+        model.id.label("row_id"),
+        func.row_number()
+        .over(
+            partition_by=model.ticker,
+            order_by=(desc(timestamp_col), desc(model.id)),
+        )
+        .label("row_number"),
+    ).where(model.ticker.in_(tickers))
     if recent_row_limit is not None:
         recent_ids = (
             select(model.id.label("row_id"))
@@ -1027,9 +1070,7 @@ def _latest_by_ticker(
         statement = statement.where(model.id.in_(select(recent_ids.c.row_id)))
     ranked = statement.subquery()
     rows = session.scalars(
-        select(model)
-        .join(ranked, model.id == ranked.c.row_id)
-        .where(ranked.c.row_number == 1)
+        select(model).join(ranked, model.id == ranked.c.row_id).where(ranked.c.row_number == 1)
     )
     return {row.ticker: row for row in rows}
 

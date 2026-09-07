@@ -104,8 +104,7 @@ def verify_cache_provenance_integrity(
     ):
         raise EvidenceCacheProvenanceIntegrityError("SOURCE_IDENTITY_MISMATCH")
     if any(
-        record.descriptor.source_watermark != memory_bounds.source_watermark
-        for record in validated
+        record.descriptor.source_watermark != memory_bounds.source_watermark for record in validated
     ):
         raise EvidenceCacheProvenanceIntegrityError("SOURCE_WATERMARK_MISMATCH")
     entries_hash = _hash([asdict(record.descriptor) for record in validated])

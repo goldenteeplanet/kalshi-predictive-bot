@@ -112,9 +112,7 @@ def test_liquidity_window_selects_in_window_and_falls_back():
     assert select_candidates_for_liquidity_window([far, near], policy, now=now) == [near]
     assert select_candidates_for_liquidity_window([far], policy, now=now) == [far]
     assert (
-        select_candidates_for_liquidity_window(
-            [far], policy, now=now, fallback_when_empty=False
-        )
+        select_candidates_for_liquidity_window([far], policy, now=now, fallback_when_empty=False)
         == []
     )
 
@@ -127,8 +125,8 @@ def test_capture_candidates_require_fresh_point_in_time_forecast():
     class _Rows:
         def all(self):
             return [
-                    ("FRESH-T", now - timedelta(minutes=10)),
-                    ("STALE-T", now - timedelta(minutes=31)),
+                ("FRESH-T", now - timedelta(minutes=10)),
+                ("STALE-T", now - timedelta(minutes=31)),
             ]
 
     class _Session:
@@ -180,9 +178,7 @@ def test_targeted_forecast_refresh_uses_interior_snapshot(monkeypatch):
     monkeypatch.setattr(
         collector,
         "insert_market_snapshot",
-        lambda _session, market, _book, _time: SimpleNamespace(
-            id=4, ticker=market["ticker"]
-        ),
+        lambda _session, market, _book, _time: SimpleNamespace(id=4, ticker=market["ticker"]),
     )
     monkeypatch.setattr(
         collector,
@@ -242,9 +238,7 @@ def test_targeted_forecast_forces_immediate_capture(monkeypatch):
     monkeypatch.setattr(
         collector,
         "insert_market_snapshot",
-        lambda _session, market, _book, _time: SimpleNamespace(
-            id=4, ticker=market["ticker"]
-        ),
+        lambda _session, market, _book, _time: SimpleNamespace(id=4, ticker=market["ticker"]),
     )
     monkeypatch.setattr(collector, "link_crypto_markets", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
@@ -290,9 +284,7 @@ def test_targeted_forecast_defers_before_forecast_when_capture_budget_is_exhaust
     )
     assert result["events_forecasted"] == 0
     assert result["capture_buckets_admitted"] == 0
-    assert result["rows"][0]["reasons"] == [
-        "CAPTURE_REQUEST_BUDGET_EXCEEDED_BEFORE_FORECAST"
-    ]
+    assert result["rows"][0]["reasons"] == ["CAPTURE_REQUEST_BUDGET_EXCEEDED_BEFORE_FORECAST"]
 
 
 def test_coherent_capture_rejects_fanout_larger_than_request_budget():

@@ -606,10 +606,7 @@ def _latest_pnl_by_ticker(
         .subquery()
     )
     pnl = aliased(PaperPnl, ranked)
-    return {
-        row.ticker: row
-        for row in session.scalars(select(pnl).where(ranked.c.row_number == 1))
-    }
+    return {row.ticker: row for row in session.scalars(select(pnl).where(ranked.c.row_number == 1))}
 
 
 def _bid_ask_for_side(snapshot: MarketSnapshot, side: str) -> tuple[Decimal | None, Decimal | None]:

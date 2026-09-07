@@ -23,8 +23,7 @@ def build(research_db: Path, *, now: datetime) -> dict[str, object]:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA query_only=1")
     evaluated = {
-        row[0]
-        for row in connection.execute("SELECT capture_id FROM prospective_pair_evaluations")
+        row[0] for row in connection.execute("SELECT capture_id FROM prospective_pair_evaluations")
     }
     grouped: dict[str, list[sqlite3.Row]] = defaultdict(list)
     for row in connection.execute(

@@ -9,6 +9,7 @@ from kalshi_predictor.backtesting.engine import run_backtest
 from kalshi_predictor.backtesting.metrics import calculate_backtest_metrics
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.schema import Forecast, Market, MarketSnapshot
+from kalshi_predictor.opportunities.market_identity import annotated_opportunity_row
 from kalshi_predictor.sports.repository import (
     feature_row,
     latest_sports_features,
@@ -16,7 +17,6 @@ from kalshi_predictor.sports.repository import (
     sports_dashboard_summary,
     sports_market_links,
 )
-from kalshi_predictor.opportunities.market_identity import annotated_opportunity_row
 from kalshi_predictor.ui.market_display import summarize_market_title
 from kalshi_predictor.utils.decimals import decimal_to_str, to_decimal
 from kalshi_predictor.utils.time import utc_now
@@ -232,14 +232,13 @@ def _render_sports_report(
             "",
             "## Top Sports Opportunities",
             "",
-            "| Ticker | Kalshi URL | League | Signal | Probability | Market | Edge | Recommendation |",
+            "| Ticker | Kalshi URL | League | Signal | Probability | Market | Edge | "
+            "Recommendation |",
             "|---|---|---|---|---:|---:|---:|---|",
         ]
     )
     if not opportunities:
-        lines.append(
-            "| _No sports-driven opportunities yet_ |  |  |  |  |  |  | Build features. |"
-        )
+        lines.append("| _No sports-driven opportunities yet_ |  |  |  |  |  |  | Build features. |")
     for row in opportunities:
         link = row["kalshi_url"] if row.get("kalshi_url_verified") else row["kalshi_url_status"]
         lines.append(
@@ -286,7 +285,9 @@ def _render_sports_opportunities(
         "|---|---|---|---|---|---:|---:|---:|---|---|",
     ]
     if not rows:
-        lines.append("| _No sports rows_ |  |  |  |  |  |  |  | Need links/features/forecasts. |  |")
+        lines.append(
+            "| _No sports rows_ |  |  |  |  |  |  |  | Need links/features/forecasts. |  |"
+        )
     for row in rows:
         link = row["kalshi_url"] if row.get("kalshi_url_verified") else row["kalshi_url_status"]
         lines.append(

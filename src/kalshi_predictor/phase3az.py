@@ -135,12 +135,8 @@ def _load_reports(reports_dir: Path) -> dict[str, dict[str, Any]]:
         "phase3ay": reports_dir / "phase3ay" / "phase3ay_health_refresh.json",
         "phase3ay_status": reports_dir / "phase3ay" / "phase3ay_status.json",
         "phase3aa": reports_dir / "phase3aa" / "phase3aa_outcome_realizer.json",
-        "phase3aa_r2": reports_dir
-        / "phase3aa_r2"
-        / "phase3aa_r2_exact_settlement_harvest.json",
-        "phase3aa_r3": reports_dir
-        / "phase3aa_r3"
-        / "phase3aa_r3_residual_settlement_audit.json",
+        "phase3aa_r2": reports_dir / "phase3aa_r2" / "phase3aa_r2_exact_settlement_harvest.json",
+        "phase3aa_r3": reports_dir / "phase3aa_r3" / "phase3aa_r3_residual_settlement_audit.json",
         "phase3aa_r5": reports_dir
         / "phase3aa_r5"
         / "phase3aa_r5_closed_market_outcome_capture.json",
@@ -148,13 +144,9 @@ def _load_reports(reports_dir: Path) -> dict[str, dict[str, Any]]:
         / "paper_settlement_reconciliation"
         / "paper_settlement_reconciliation.json",
         "market_coverage": reports_dir / "market_coverage" / "market_coverage_doctor.json",
-        "phase3z_r2": reports_dir
-        / "phase3z_r2"
-        / "phase3z_r2_sports_provenance_repair.json",
+        "phase3z_r2": reports_dir / "phase3z_r2" / "phase3z_r2_sports_provenance_repair.json",
         "phase3bb": reports_dir / "phase3bb" / "phase3bb_domain_readiness.json",
-        "phase3bb_r2": reports_dir
-        / "phase3bb_r2"
-        / "phase3bb_r2_general_candidate_routing.json",
+        "phase3bb_r2": reports_dir / "phase3bb_r2" / "phase3bb_r2_general_candidate_routing.json",
         "phase3bb_r2_source_intake": reports_dir
         / "phase3bb_r2_sources"
         / "general_source_intake.json",
@@ -410,8 +402,7 @@ def _gap_rows(reports: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
                 "Sports links still include partial provenance that cannot safely upgrade.",
                 _sports_partial_evidence(partial, phase3z_r2=phase3z_r2),
                 (
-                    "Continue Phase 3AH evidence gathering; Phase 3Z-R2 found no safe "
-                    "repair rows."
+                    "Continue Phase 3AH evidence gathering; Phase 3Z-R2 found no safe repair rows."
                     if diagnosed
                     else "Use Phase 3AH/3AE only after team + time + market-type evidence is clean."
                 ),
@@ -572,18 +563,10 @@ def _coverage_category_rows(coverage: dict[str, Any]) -> list[dict[str, Any]]:
     dashboard = coverage.get("dashboard") if isinstance(coverage.get("dashboard"), dict) else {}
     dashboard_rows = dashboard.get("category_rows")
     if isinstance(dashboard_rows, list) and dashboard_rows:
-        return [
-            _normalize_category_row(row)
-            for row in dashboard_rows
-            if isinstance(row, dict)
-        ]
+        return [_normalize_category_row(row) for row in dashboard_rows if isinstance(row, dict)]
     coverage_rows = coverage.get("coverage_rows")
     if isinstance(coverage_rows, list):
-        return [
-            _normalize_category_row(row)
-            for row in coverage_rows
-            if isinstance(row, dict)
-        ]
+        return [_normalize_category_row(row) for row in coverage_rows if isinstance(row, dict)]
     return []
 
 
@@ -602,9 +585,13 @@ def _normalize_category_row(row: dict[str, Any]) -> dict[str, Any]:
         "status": str(row.get("status") or row.get("health") or row.get("status_label") or ""),
         "parsed_markets": _int_value(row.get("parsed_markets")),
         "parsed_legs": _int_value(row.get("parsed_legs")),
-        "linkable_markets": _int_value(row.get("linkable_markets") or row.get("coverage_denominator")),
+        "linkable_markets": _int_value(
+            row.get("linkable_markets") or row.get("coverage_denominator")
+        ),
         "linked_markets": _int_value(row.get("linked_markets") or row.get("usable_markets")),
-        "derived_markets": _int_value(row.get("derived_markets") or row.get("derived_usable_markets")),
+        "derived_markets": _int_value(
+            row.get("derived_markets") or row.get("derived_usable_markets")
+        ),
         "verified_markets": _int_value(row.get("verified_schedule_markets")),
         "partial_markets": _int_value(row.get("partial_markets")),
         "partial_link_rows": _int_value(row.get("partial_link_rows")),
@@ -631,9 +618,7 @@ def _r11_candidate(
     unsupported = int(row.get("unsupported_multileg_markets") or 0)
     derived = int(row.get("derived_markets") or 0)
     placeholders = (
-        int(placeholder_summary.get("still_placeholder_rows") or 0)
-        if category == "sports"
-        else 0
+        int(placeholder_summary.get("still_placeholder_rows") or 0) if category == "sports" else 0
     )
     blockers = _r11_blockers(
         category=category,
@@ -840,7 +825,8 @@ def _r11_recommended_sprint(selected: dict[str, Any] | None) -> list[dict[str, A
                 1,
                 "weather_source_refresh",
                 f"kalshi-bot ingest-weather --location-key {location_key}",
-                f"Refresh weather observations/forecasts for the dominant linked {location_key} lane.",
+                f"Refresh weather observations/forecasts for the d"
+                f"ominant linked {location_key} lane.",
             ),
             _r11_sprint_step(
                 2,
@@ -863,7 +849,10 @@ def _r11_recommended_sprint(selected: dict[str, Any] | None) -> list[dict[str, A
             _r11_sprint_step(
                 5,
                 "weather_ranking_report",
-                "kalshi-bot market-rankings --limit 100 --output reports/weather_market_rankings.md",
+                (
+                    "kalshi-bot market-rankings --limit 100 --output "
+                    "reports/weather_market_rankings.md"
+                ),
                 "Rank current opportunities after weather forecasts are present.",
             ),
             _r11_sprint_step(
@@ -880,7 +869,10 @@ def _r11_recommended_sprint(selected: dict[str, Any] | None) -> list[dict[str, A
         _r11_sprint_step(
             1,
             "keep_report_only",
-            "kalshi-bot phase3az-r11-non-crypto-category-activation --output-dir reports/phase3az_r11 --reports-dir reports",
+            (
+                "kalshi-bot phase3az-r11-non-crypto-category-activation --output-dir "
+                "reports/phase3az_r11 --reports-dir reports"
+            ),
             "No category is ready for a source-to-paper sprint yet; rerun after fresh evidence.",
         )
     ]
@@ -927,7 +919,9 @@ def _r11_summary(
     gap_analysis: dict[str, Any],
     dominant_weather_location: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    gap_summary = gap_analysis.get("summary") if isinstance(gap_analysis.get("summary"), dict) else {}
+    gap_summary = (
+        gap_analysis.get("summary") if isinstance(gap_analysis.get("summary"), dict) else {}
+    )
     return {
         "candidate_count": len(candidates),
         "selected_category": selected.get("category") if selected else None,
@@ -956,7 +950,11 @@ def _r11_summary(
 
 
 def _render_r11_markdown(payload: dict[str, Any]) -> str:
-    selected = payload.get("selected_category") if isinstance(payload.get("selected_category"), dict) else {}
+    selected = (
+        payload.get("selected_category")
+        if isinstance(payload.get("selected_category"), dict)
+        else {}
+    )
     lines = [
         "# Phase 3AZ-R11 Non-Crypto Category Activation Sprint",
         "",
@@ -991,7 +989,10 @@ def _render_r11_markdown(payload: dict[str, Any]) -> str:
     for row in payload.get("category_candidates") or []:
         blockers = ", ".join(row.get("blockers") or []) or "none"
         lines.append(
-            "| {category} | {state} | {score} | {parsed} | {linked}/{linkable} | {coverage} | {blockers} |".format(
+            (
+                "| {category} | {state} | {score} | {parsed} | {linked}/{linkable} | "
+                "{coverage} | {blockers} |"
+            ).format(
                 category=row.get("category"),
                 state=row.get("activation_state"),
                 score=row.get("score"),
@@ -1153,8 +1154,7 @@ def _phase3bb_general_command(
         return "kalshi-bot phase3bb-r3-general-reclassification --output-dir reports/phase3bb_r3"
     if source_evidence_ready:
         return (
-            "kalshi-bot phase3bb-r2-general-source-intake "
-            "--output-dir reports/phase3bb_r2_sources"
+            "kalshi-bot phase3bb-r2-general-source-intake --output-dir reports/phase3bb_r2_sources"
         )
     return "kalshi-bot phase3bb-r2-general-candidate-routing --output-dir reports/phase3bb_r2"
 
@@ -1163,8 +1163,7 @@ def _general_domain_evidence(row: dict[str, Any]) -> str:
     counts = row.get("counts") if isinstance(row.get("counts"), dict) else {}
     taxonomy = row.get("taxonomy_counts") if isinstance(row.get("taxonomy_counts"), dict) else {}
     taxonomy_bits = [
-        f"{key}={value}"
-        for key, value in sorted(taxonomy.items(), key=lambda item: str(item[0]))
+        f"{key}={value}" for key, value in sorted(taxonomy.items(), key=lambda item: str(item[0]))
     ]
     return (
         f"general parsed_markets={counts.get('parsed_markets', 0)}, "
@@ -1378,11 +1377,7 @@ def _summary_payload(reports: dict[str, dict[str, Any]], key: str) -> dict[str, 
 def _unhealthy_coverage_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     healthy = {"HEALTHY", "NO_COMPATIBLE_ACTIVE_MARKETS"}
     rows = payload.get("coverage_rows") or []
-    return [
-        row
-        for row in rows
-        if isinstance(row, dict) and row.get("health") not in healthy
-    ]
+    return [row for row in rows if isinstance(row, dict) and row.get("health") not in healthy]
 
 
 def _load_json(path: Path) -> dict[str, Any]:

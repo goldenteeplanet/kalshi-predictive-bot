@@ -48,9 +48,7 @@ def get_latest_features_for_ticker(
     statement = select(Feature).where(Feature.ticker.in_(tickers))
     if feature_set_name is not None:
         statement = statement.where(Feature.feature_set_name == feature_set_name)
-    return session.scalar(
-        statement.order_by(desc(Feature.generated_at), desc(Feature.id)).limit(1)
-    )
+    return session.scalar(statement.order_by(desc(Feature.generated_at), desc(Feature.id)).limit(1))
 
 
 def get_features_for_backtest_window(
@@ -117,4 +115,3 @@ def feature_payload(record: Feature | None) -> dict[str, Any]:
 
 def snapshot_external_payload(snapshot: FeatureSnapshot | None) -> dict[str, Any]:
     return decode_json(snapshot.external_features_json if snapshot is not None else None)
-

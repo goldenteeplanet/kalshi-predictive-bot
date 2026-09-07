@@ -149,9 +149,13 @@ def write_phase3bb_r60_weather_next_window_lead_time_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(lead_time_checks_csv_path, payload["lead_time_checks"])
-    _write_rows_csv(r53_pre_summary_csv_path, [payload.get("r53_pre_payload", {}).get("summary") or {}])
+    _write_rows_csv(
+        r53_pre_summary_csv_path, [payload.get("r53_pre_payload", {}).get("summary") or {}]
+    )
     _write_rows_csv(r59_summary_csv_path, [payload.get("r59_payload", {}).get("decision") or {}])
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     scheduler_hook_path.write_text(payload["scheduler_hook_block"], encoding="utf-8")
@@ -281,7 +285,10 @@ def build_phase3bb_r60_weather_next_window_lead_time(
             r53_output_dir=r53_output_dir,
             r57_output_dir=r57_output_dir,
             settings=resolved,
-            command_args=["phase3bb-r59-weather-catalog-refresh-r57-retry", "--r60-lead-time-trigger"],
+            command_args=[
+                "phase3bb-r59-weather-catalog-refresh-r57-retry",
+                "--r60-lead-time-trigger",
+            ],
             ssh_target=ssh_target,
             identity_file=identity_file,
             app_path=app_path,
@@ -307,9 +314,13 @@ def build_phase3bb_r60_weather_next_window_lead_time(
             probe_runner=runner,
         )
         r59_payload = _read_json(r59_artifacts.json_path)
-        probe_results.extend(_probe_payloads_to_results(r59_payload.get("remote_probe_results") or []))
+        probe_results.extend(
+            _probe_payloads_to_results(r59_payload.get("remote_probe_results") or [])
+        )
 
-    decision = _decision(lead_gate=lead_gate, r53_pre_payload=r53_pre_payload, r59_payload=r59_payload)
+    decision = _decision(
+        lead_gate=lead_gate, r53_pre_payload=r53_pre_payload, r59_payload=r59_payload
+    )
     scheduler_hook = _scheduler_hook_block(
         min_minutes_before_target=min_minutes_before_target,
         max_minutes_before_target=max_minutes_before_target,
@@ -320,7 +331,9 @@ def build_phase3bb_r60_weather_next_window_lead_time(
         per_probe_timeout_seconds=per_probe_timeout_seconds,
         series_ticker=series_ticker,
     )
-    r59_safety = r59_payload.get("safety_flags") if isinstance(r59_payload.get("safety_flags"), dict) else {}
+    r59_safety = (
+        r59_payload.get("safety_flags") if isinstance(r59_payload.get("safety_flags"), dict) else {}
+    )
     safety = {
         **_safety_flags(),
         "paper_only": True,
@@ -328,7 +341,9 @@ def build_phase3bb_r60_weather_next_window_lead_time(
         "weather_next_window_lead_time_scheduler_repair": True,
         "ssh_read_only_commands_executed": len(r53_pre_payload.get("remote_probe_results") or [])
         + _int_or_zero(r59_safety.get("ssh_read_only_commands_executed")),
-        "ssh_write_capable_commands_executed": _int_or_zero(r59_safety.get("ssh_write_capable_commands_executed")),
+        "ssh_write_capable_commands_executed": _int_or_zero(
+            r59_safety.get("ssh_write_capable_commands_executed")
+        ),
         "runs_catalog_refresh": bool(r59_safety.get("runs_catalog_refresh")),
         "runs_market_legs_parse": bool(r59_safety.get("runs_market_legs_parse")),
         "runs_r53_after_refresh": bool(r59_safety.get("runs_r53_after_refresh")),
@@ -394,7 +409,9 @@ def _lead_time_gate(
     if status == "WEATHER_CURRENT_WINDOW_STATE_UNREADABLE":
         return _gate(False, "REMOTE_STATE_UNREADABLE", target, minutes, status)
     if not target:
-        return _gate(True, "NO_SELECTED_WINDOW_REFRESH_CATALOG_FOR_DISCOVERY", target, minutes, status)
+        return _gate(
+            True, "NO_SELECTED_WINDOW_REFRESH_CATALOG_FOR_DISCOVERY", target, minutes, status
+        )
     if minutes is None:
         return _gate(False, "SELECTED_TARGET_MINUTES_UNKNOWN", target, minutes, status)
     if minutes < min_minutes_before_target:
@@ -426,12 +443,19 @@ def _decision(
     r53_pre_payload: dict[str, Any],
     r59_payload: dict[str, Any],
 ) -> dict[str, Any]:
-    r53_decision = r53_pre_payload.get("decision") if isinstance(r53_pre_payload.get("decision"), dict) else {}
-    r59_decision = r59_payload.get("decision") if isinstance(r59_payload.get("decision"), dict) else {}
+    r53_decision = (
+        r53_pre_payload.get("decision") if isinstance(r53_pre_payload.get("decision"), dict) else {}
+    )
+    r59_decision = (
+        r59_payload.get("decision") if isinstance(r59_payload.get("decision"), dict) else {}
+    )
     if not lead_gate.get("allowed"):
         reason = str(lead_gate.get("reason") or "LEAD_TIME_GATE_CLOSED")
         if reason == "COMMAND_REGISTRY_MISSING":
-            command = "kalshi-bot phase3bb-r12-cloud-bootstrap-verification --output-dir reports/phase3bb_r12 --reports-dir reports"
+            command = (
+                "kalshi-bot phase3bb-r12-cloud-bootstrap-verification --output-dir "
+                "reports/phase3bb_r12 --reports-dir reports"
+            )
             next_step = "Phase 3BB-R12 - Cloud Bootstrap Verification"
         else:
             command = (
@@ -442,7 +466,8 @@ def _decision(
         return {
             "status": "LEAD_TIME_GATE_CLOSED",
             "first_hard_blocker": reason,
-            "primary_reason": f"R60 skipped refresh/R57 because the lead-time gate is closed: {reason}.",
+            "primary_reason": f"R60 skipped refresh/R57 because the lead-time ga"
+            f"te is closed: {reason}.",
             "r53_status": r53_decision.get("status"),
             "selected_target_time": lead_gate.get("selected_target_time"),
             "selected_minutes_until_target": lead_gate.get("selected_minutes_until_target"),
@@ -473,14 +498,16 @@ def _decision(
     return {
         "status": status,
         "first_hard_blocker": r59_decision.get("first_hard_blocker") or "R59_COMPLETED",
-        "primary_reason": r59_decision.get("primary_reason") or "R59 completed from the R60 lead-time trigger.",
+        "primary_reason": r59_decision.get("primary_reason")
+        or "R59 completed from the R60 lead-time trigger.",
         "r53_status": r53_decision.get("status"),
         "selected_target_time": lead_gate.get("selected_target_time"),
         "selected_minutes_until_target": lead_gate.get("selected_minutes_until_target"),
         "r59_status": r59_decision.get("status"),
         "r59_ran": True,
         "operator_next_command": r59_decision.get("operator_next_command")
-        or "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports",
+        or "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+        "--reports-dir reports",
         "next_codex_step": r59_decision.get("next_codex_step") or "Follow R59 next action",
         "paper_trades_allowed": False,
         "live_demo_orders_allowed": False,
@@ -523,7 +550,8 @@ def _scheduler_hook_block(
             "# cadence_minutes=10 category=weather-lead-time",
             (
                 "run_job weather_next_window_lead_time true "
-                ".venv/bin/kalshi-bot phase3bb-r60-weather-next-window-lead-time-scheduler-repair "
+                ".venv/bin/kalshi-bot phase3bb-r60-weather-next-w"
+                "indow-lead-time-scheduler-repair "
                 "--output-dir reports/phase3bb_r60 --reports-dir reports "
                 f"--series-ticker {series_ticker} "
                 f"--max-wait-seconds {int(max_wait_seconds)} "
@@ -579,7 +607,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
         str(decision["operator_next_command"]),
         "```",
         "",
-        "R60 does not install scheduler files, stop/start R5, create paper trades, submit live/demo orders, or lower thresholds.",
+        "R60 does not install scheduler files, stop/start R5, create paper trades, "
+        "submit live/demo orders, or lower thresholds.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -598,7 +627,9 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         f"- Reason: `{lead_gate.get('reason')}`",
         f"- Selected target: `{lead_gate.get('selected_target_time')}`",
         f"- Minutes until target: `{lead_gate.get('selected_minutes_until_target')}`",
-        f"- Pre-R53 status: `{r53_summary.get('selected_target_time')}` / `{decision.get('r53_status')}`",
+        f"- Pre-R53 status: `"
+        f"{r53_summary.get('selected_target_time')}` / `"
+        f"{decision.get('r53_status')}`",
         "",
         "## R59 Result",
         "",
@@ -631,19 +662,24 @@ def _render_operator_command(payload: dict[str, Any]) -> str:
 
 def _render_next_actions(payload: dict[str, Any]) -> str:
     decision = payload["decision"]
-    return "\n".join(
-        [
-            "# Next Actions",
-            "",
-            f"Status: `{decision['status']}`",
-            f"First hard blocker: `{decision['first_hard_blocker']}`",
-            "",
-            "```bash",
-            str(decision["operator_next_command"]),
-            "```",
-            "",
-            "Scheduler hook draft is available at `scheduler_hook_block.sh`; review/install through the scheduler handoff flow, not by ad hoc service edits.",
-            "",
-            "Do not create paper trades or live/demo orders from this phase.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Next Actions",
+                "",
+                f"Status: `{decision['status']}`",
+                f"First hard blocker: `{decision['first_hard_blocker']}`",
+                "",
+                "```bash",
+                str(decision["operator_next_command"]),
+                "```",
+                "",
+                "Scheduler hook draft is available at `scheduler_hook_block.sh`; "
+                "review/install through the scheduler handoff flow, not by ad hoc "
+                "service edits.",
+                "",
+                "Do not create paper trades or live/demo orders from this phase.",
+            ]
+        )
+        + "\n"
+    )

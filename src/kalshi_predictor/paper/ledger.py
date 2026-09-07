@@ -313,9 +313,7 @@ def get_latest_forecast_per_ticker(
     ranked = statement.subquery()
     forecast = aliased(Forecast, ranked)
     return list(
-        session.scalars(
-            select(forecast).where(ranked.c.row_number == 1).order_by(forecast.ticker)
-        )
+        session.scalars(select(forecast).where(ranked.c.row_number == 1).order_by(forecast.ticker))
     )
 
 
@@ -332,9 +330,7 @@ def get_existing_order_for_forecast(session: Session, forecast_id: int) -> Paper
     for item in session.new:
         if isinstance(item, PaperOrder) and item.forecast_id == forecast_id:
             return item
-    return session.scalar(
-        select(PaperOrder).where(PaperOrder.forecast_id == forecast_id).limit(1)
-    )
+    return session.scalar(select(PaperOrder).where(PaperOrder.forecast_id == forecast_id).limit(1))
 
 
 def get_paper_summary(session: Session) -> PaperSummary:

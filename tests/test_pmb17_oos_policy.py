@@ -32,5 +32,7 @@ def test_pmb17_covers_weather_crypto_sports_with_complete_attribution():
     assert report["summary"]["categories"] == ["crypto", "sports", "weather"]
     assert report["summary"]["all_attribution_complete"] is True
     assert {row["category"] for row in report["baseline"]["rows"]} == {
-        "crypto", "weather", "sports"
+        "crypto",
+        "weather",
+        "sports",
     }

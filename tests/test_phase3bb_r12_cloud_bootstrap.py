@@ -179,9 +179,7 @@ def _fake_runner(
                 "guard": {"status": "STOPPED"},
             }
         ),
-        "phase3ba_status": json.dumps(
-            {"summary": {"safe": True}, "next_operator_command": "WAIT"}
-        ),
+        "phase3ba_status": json.dumps({"summary": {"safe": True}, "next_operator_command": "WAIT"}),
         "command_registry": "COMMAND_REGISTRY_OK\n",
     }
 

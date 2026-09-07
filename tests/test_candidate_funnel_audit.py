@@ -73,9 +73,7 @@ def test_candidate_funnel_does_not_invent_missing_evidence() -> None:
     payload = build_candidate_funnel_audit(
         gh2_payload={"weather_gate": {"weather_rows": []}},
         crypto_r5_payload={
-            "blocked_active_pure_examples": [
-                {"ticker": "CRYPTO", "blocked_reason": "UNKNOWN"}
-            ]
+            "blocked_active_pure_examples": [{"ticker": "CRYPTO", "blocked_reason": "UNKNOWN"}]
         },
         ranking_evidence={},
     )
@@ -111,9 +109,7 @@ def test_candidate_funnel_engine_enforces_query_only(tmp_path) -> None:
         connection.execute("CREATE TABLE evidence (value TEXT NOT NULL)")
         connection.execute("INSERT INTO evidence VALUES ('accepted')")
 
-    engine = make_candidate_funnel_read_only_engine(
-        f"sqlite:///{database_path.as_posix()}"
-    )
+    engine = make_candidate_funnel_read_only_engine(f"sqlite:///{database_path.as_posix()}")
     with engine.connect() as connection:
         assert connection.execute(text("SELECT value FROM evidence")).scalar_one() == "accepted"
         assert connection.execute(text("PRAGMA query_only")).scalar_one() == 1

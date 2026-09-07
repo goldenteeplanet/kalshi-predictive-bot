@@ -87,9 +87,7 @@ def test_expired_and_nondeterministic_features_are_ineligible():
     payload["instances"][2]["valid_until"] = "2026-08-25T23:59:59.999000Z"
     payload["instances"][1]["deterministic"] = False
     _rehash(module, payload)
-    by_id = {
-        row["instance_id"]: row for row in module.build_report(payload)["decisions"]
-    }
+    by_id = {row["instance_id"]: row for row in module.build_report(payload)["decisions"]}
     assert by_id["i-3"]["reasons"] == ["FEATURE_EXPIRED"]
     assert by_id["i-2"]["reasons"] == ["NONDETERMINISTIC_COMPUTATION"]
 

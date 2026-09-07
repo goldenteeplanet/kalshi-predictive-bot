@@ -29,11 +29,9 @@ CLOSED_STATUSES = {"closed", "settled", "expired", "resolved", "finalized"}
 
 
 class SnapshotClient(Protocol):
-    def get_market(self, ticker: str) -> Mapping[str, Any]:
-        ...
+    def get_market(self, ticker: str) -> Mapping[str, Any]: ...
 
-    def get_orderbook(self, ticker: str) -> Mapping[str, Any]:
-        ...
+    def get_orderbook(self, ticker: str) -> Mapping[str, Any]: ...
 
 
 @dataclass(frozen=True)
@@ -521,10 +519,8 @@ def _recommended_next_action(result: SnapshotCoverageRepairResult) -> str:
         )
     if top_reason == REASON_NO_LIQUIDITY:
         return (
-            "Markets have price data but no usable liquidity; keep them out of learning "
-            "decisions."
+            "Markets have price data but no usable liquidity; keep them out of learning decisions."
         )
     return (
-        "Re-run snapshot collection, then re-run "
-        "`kalshi-bot snapshot-coverage-repair --limit 500`."
+        "Re-run snapshot collection, then re-run `kalshi-bot snapshot-coverage-repair --limit 500`."
     )

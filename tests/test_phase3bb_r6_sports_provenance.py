@@ -72,9 +72,7 @@ def test_phase3bb_r6_writes_requested_artifacts(tmp_path) -> None:
     assert artifacts.unsafe_rows_csv_path.exists()
     assert artifacts.manifest_path.exists()
     assert "DB fingerprint" in artifacts.executive_summary_path.read_text(encoding="utf-8")
-    assert "PARTIAL_LEGACY_IDENTIFIER" in artifacts.unsafe_rows_csv_path.read_text(
-        encoding="utf-8"
-    )
+    assert "PARTIAL_LEGACY_IDENTIFIER" in artifacts.unsafe_rows_csv_path.read_text(encoding="utf-8")
     assert "db_writes_performed" in artifacts.candidates_csv_path.read_text(encoding="utf-8")
 
 

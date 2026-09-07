@@ -252,9 +252,7 @@ def insert_weather_features(
         target_time=target_time,
         temperature_f=decimal_to_str(features.get("temperature_f")),
         precipitation_probability=decimal_to_str(features.get("precipitation_probability")),
-        expected_precipitation_inches=decimal_to_str(
-            features.get("expected_precipitation_inches")
-        ),
+        expected_precipitation_inches=decimal_to_str(features.get("expected_precipitation_inches")),
         wind_speed_mph=decimal_to_str(features.get("wind_speed_mph")),
         wind_gust_mph=decimal_to_str(features.get("wind_gust_mph")),
         heat_index_f=decimal_to_str(features.get("heat_index_f")),

@@ -7,7 +7,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -687,9 +687,7 @@ def _crypto_pipeline_truth(
         "best_current_expected_value_cents": dashboard_summary.get(
             "best_current_expected_value_cents"
         ),
-        "best_ev_gap_to_positive_cents": dashboard_summary.get(
-            "best_ev_gap_to_positive_cents"
-        ),
+        "best_ev_gap_to_positive_cents": dashboard_summary.get("best_ev_gap_to_positive_cents"),
         "best_ev_candidate_ticker": dashboard_summary.get("best_ev_candidate_ticker"),
         "db_query_status": db_counts["query_status"],
         "expired_or_historical_rows_excluded": True,
@@ -716,9 +714,7 @@ def _source_evidence_gap_status(reports_dir: Path) -> dict[str, Any]:
             if isinstance(flightaware_evidence.get("summary"), dict)
             else {}
         )
-        general_summary = (
-            status.get("summary") if isinstance(status.get("summary"), dict) else {}
-        )
+        general_summary = status.get("summary") if isinstance(status.get("summary"), dict) else {}
         next_task = (
             flightaware_evidence.get("next_codex_task")
             if isinstance(flightaware_evidence.get("next_codex_task"), dict)
@@ -744,15 +740,11 @@ def _source_evidence_gap_status(reports_dir: Path) -> dict[str, Any]:
                 general_summary.get("official_free_source_rows")
             ),
             "date_stable_rows": accepted_rows,
-            "date_stable_missing_rows": _int_value(
-                general_summary.get("date_stable_missing_rows")
-            )
+            "date_stable_missing_rows": _int_value(general_summary.get("date_stable_missing_rows"))
             or (affected_rows if accepted_rows == 0 else 0),
             "review_gated_rows": review_gated_rows,
             "blocked_rows": _int_value(general_summary.get("blocked_rows")),
-            "proprietary_blocked_rows": _int_value(
-                general_summary.get("proprietary_blocked_rows")
-            ),
+            "proprietary_blocked_rows": _int_value(general_summary.get("proprietary_blocked_rows")),
             "wrong_date_rows": _int_value(general_summary.get("wrong_date_rows")),
             "link_safe_rows": _int_value(summary.get("link_safe_rows")),
             "forecast_safe_rows": _int_value(summary.get("forecast_safe_rows")),
@@ -821,9 +813,7 @@ def _source_evidence_gap_status(reports_dir: Path) -> dict[str, Any]:
             "evidence_ready_rows": _int_value(summary.get("evidence_ready_rows")),
             "link_safe_rows": _int_value(summary.get("link_safe_rows")),
             "forecast_safe_rows": _int_value(summary.get("forecast_safe_rows")),
-            "source_date_mismatch_blockers": bool(
-                summary.get("source_date_mismatch_blockers")
-            ),
+            "source_date_mismatch_blockers": bool(summary.get("source_date_mismatch_blockers")),
             "proprietary_review_blockers": bool(summary.get("proprietary_review_blockers")),
             "activation_readiness": summary.get("activation_readiness") or "NOT_READY",
             "first_hard_blocker": summary.get("first_hard_blocker") or "UNKNOWN",
@@ -832,8 +822,7 @@ def _source_evidence_gap_status(reports_dir: Path) -> dict[str, Any]:
             "next_codex_task_reason": next_task.get("reason"),
             "next_codex_task_problem": next_task.get("problem_statement"),
             "next_action": (
-                "Use Phase 3BB-R3 source activation report for exact source-gate "
-                "follow-up."
+                "Use Phase 3BB-R3 source activation report for exact source-gate follow-up."
             ),
         }
     text = " ".join(
@@ -874,11 +863,7 @@ def _source_evidence_gap_status(reports_dir: Path) -> dict[str, Any]:
 def _sports_gap_status(session: Session, *, reports_dir: Path) -> dict[str, Any]:
     r6_report = _read_json(reports_dir / "phase3ax" / "phase3ax_gap_analysis.json")
     if r6_report:
-        summary = (
-            r6_report.get("summary")
-            if isinstance(r6_report.get("summary"), dict)
-            else {}
-        )
+        summary = r6_report.get("summary") if isinstance(r6_report.get("summary"), dict) else {}
         first_blocker = (
             r6_report.get("first_blocker")
             if isinstance(r6_report.get("first_blocker"), dict)
@@ -909,11 +894,7 @@ def _sports_gap_status(session: Session, *, reports_dir: Path) -> dict[str, Any]
         }
     r3_report = _read_json(reports_dir / "phase3ah_r3" / "sports_provenance_repair.json")
     if r3_report:
-        summary = (
-            r3_report.get("summary")
-            if isinstance(r3_report.get("summary"), dict)
-            else {}
-        )
+        summary = r3_report.get("summary") if isinstance(r3_report.get("summary"), dict) else {}
         next_task = (
             r3_report.get("next_codex_task")
             if isinstance(r3_report.get("next_codex_task"), dict)
@@ -929,9 +910,7 @@ def _sports_gap_status(session: Session, *, reports_dir: Path) -> dict[str, Any]
             "sports_features": _safe_count(session, select(func.count(SportsFeature.id))),
             "schedule_roster_evidence_state": "PHASE3AH_R3_VERIFIED_DIAGNOSTIC",
             "implementation_needed": bool(summary.get("implementation_needed")),
-            "phase3ah_r3_completed": bool(
-                summary.get("sports_r3_completed_without_safe_rows")
-            ),
+            "phase3ah_r3_completed": bool(summary.get("sports_r3_completed_without_safe_rows")),
             "first_hard_blocker": summary.get("first_hard_blocker") or "UNKNOWN",
             "phase3ae_gate_status": summary.get("phase3ae_gate_status"),
             "next_codex_task_phase_name": next_task.get("task_phase_name"),
@@ -965,8 +944,7 @@ def _economic_news_gap_status(reports_dir: Path) -> dict[str, Any]:
     report = _read_json(reports_dir / "phase3an" / "economic_news_watch.json")
     summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
     first_hard_blocker = str(
-        summary.get("first_hard_blocker")
-        or _economic_news_first_hard_blocker_from_report(report)
+        summary.get("first_hard_blocker") or _economic_news_first_hard_blocker_from_report(report)
     )
     status = _economic_news_status_from_blocker(first_hard_blocker)
     return {
@@ -1101,9 +1079,7 @@ def _guarded_refresh_job_status(reports_dir: Path) -> dict[str, Any]:
         "dashboard_truth_refreshed": bool(summary.get("dashboard_truth_refreshed")),
         "gap_analysis_refreshed": bool(summary.get("gap_analysis_refreshed")),
         "operator_next_action": report.get("operator_next_action"),
-        "next_codex_task_phase_name": (report.get("next_codex_task") or {}).get(
-            "task_phase_name"
-        ),
+        "next_codex_task_phase_name": (report.get("next_codex_task") or {}).get("task_phase_name"),
     }
 
 
@@ -1203,8 +1179,7 @@ def _select_next_codex_task(
             "operator next actions unreliable."
         )
         problem = (
-            "Make NEXT_ACTIONS and dashboard operator guidance reference only "
-            "registered commands."
+            "Make NEXT_ACTIONS and dashboard operator guidance reference only registered commands."
         )
     elif _source_task_completed_by_sports_r3(source_status, sports_status):
         phase = str(
@@ -1219,12 +1194,11 @@ def _select_next_codex_task(
             sports_status.get("next_codex_task_problem")
             or "Advance to the next source gap without repeating completed sports repair work."
         )
-    elif guarded_refresh_status and guarded_refresh_status.get(
-        "complete"
-    ) and _source_evidence_r5_has_exact_evidence(
-        source_status
-    ) and _sports_r6_has_terminal_no_safe_rows(
-        sports_status
+    elif (
+        guarded_refresh_status
+        and guarded_refresh_status.get("complete")
+        and _source_evidence_r5_has_exact_evidence(source_status)
+        and _sports_r6_has_terminal_no_safe_rows(sports_status)
     ):
         phase = "Phase 3AX-R10 Evidence Change Stop Gate"
         reason = (
@@ -1236,9 +1210,11 @@ def _select_next_codex_task(
             "Stop routing Codex back into completed repair phases until new market, "
             "source, schedule, roster, or EV evidence changes the gate."
         )
-    elif guarded_refresh_status and guarded_refresh_status.get(
-        "complete"
-    ) and _source_evidence_r5_has_exact_evidence(source_status):
+    elif (
+        guarded_refresh_status
+        and guarded_refresh_status.get("complete")
+        and _source_evidence_r5_has_exact_evidence(source_status)
+    ):
         phase = "Phase 3AX-R6 Sports Provenance Repair"
         reason = (
             "R5 source evidence activation is now exactly classified: no general "
@@ -1250,9 +1226,11 @@ def _select_next_codex_task(
             "round, and roster evidence is exact, while keeping unsafe rows "
             "diagnostic-only."
         )
-    elif guarded_refresh_status and guarded_refresh_status.get(
-        "complete"
-    ) and _economic_news_r7_has_exact_evidence(economic_news_status):
+    elif (
+        guarded_refresh_status
+        and guarded_refresh_status.get("complete")
+        and _economic_news_r7_has_exact_evidence(economic_news_status)
+    ):
         phase = "Phase 3AX-R5 General Source Evidence Activation"
         reason = (
             "R7 now reports an exact economic/news compatibility blocker with "
@@ -1361,8 +1339,7 @@ def _next_operator_commands(
     after = "kalshi-bot phase3bc-r5-status --output-dir reports/phase3bc_r5"
     if "phase3bc-r5-status" not in registered_commands:
         after = (
-            "kalshi-bot phase3ax-gap-analysis --output-dir reports/phase3ax "
-            "--reports-dir reports"
+            "kalshi-bot phase3ax-gap-analysis --output-dir reports/phase3ax --reports-dir reports"
         )
     return {
         "run_now": run_now,
@@ -1656,7 +1633,9 @@ def _crypto_db_counts(session: Session) -> dict[str, Any]:
         link_count = _safe_count(
             session,
             select(func.count(func.distinct(CryptoMarketLink.ticker))).where(
-                CryptoMarketLink.ticker.in_(select(Market.ticker).where(_current_crypto_filter(now)))
+                CryptoMarketLink.ticker.in_(
+                    select(Market.ticker).where(_current_crypto_filter(now))
+                )
             ),
         )
         paper_orders = _safe_count(session, select(func.count(PaperOrder.id)))
@@ -2190,9 +2169,9 @@ def _artifact_generated_at(payload: dict[str, Any]) -> Any:
 
 def _mtime_datetime(path: Path) -> Any:
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
     except OSError:
         return None
 

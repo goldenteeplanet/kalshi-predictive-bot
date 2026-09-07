@@ -248,8 +248,7 @@ def _settlement_rule(merged: Mapping[str, Any], payload: Mapping[str, Any]) -> S
     rule_hash = settlement.get("rule_hash") or checksum_payload(rule_payload)
     return SettlementRule(
         settlement_rule_id=_text(
-            settlement.get("settlement_rule_id")
-            or stable_phase_3r_id("settlement-rule", rule_hash)
+            settlement.get("settlement_rule_id") or stable_phase_3r_id("settlement-rule", rule_hash)
         ),
         settlement_rule_version=int(settlement.get("settlement_rule_version") or 1),
         primary_source_id=rule_payload["primary_source_id"],

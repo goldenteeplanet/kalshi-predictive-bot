@@ -110,8 +110,7 @@ def _evaluate_event(event: Mapping[str, Any], limits: Mapping[str, float]) -> di
     elif observation_at is None or event_at is None:
         failures.append("OBSERVATION_TIMESTAMP_INVALID")
     elif observation_age is not None and (
-        observation_age < 0
-        or observation_age > limits["maximum_observation_age_seconds"]
+        observation_age < 0 or observation_age > limits["maximum_observation_age_seconds"]
     ):
         failures.append("OBSERVATION_STALE")
     if not _valid_reference(snapshot):
@@ -153,9 +152,7 @@ def _thresholds(overrides: Mapping[str, float] | None) -> dict[str, float]:
 
 def _valid_reference(value: Any) -> bool:
     return (
-        isinstance(value, Mapping)
-        and bool(value.get("table"))
-        and _positive_int(value.get("id"))
+        isinstance(value, Mapping) and bool(value.get("table")) and _positive_int(value.get("id"))
     )
 
 

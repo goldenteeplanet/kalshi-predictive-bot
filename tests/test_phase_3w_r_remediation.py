@@ -84,8 +84,7 @@ def test_phase_3w_r_audit_mode_is_incomplete_not_false_fail(tmp_path) -> None:
     assert report["live_authorization_status"] == "NOT_AUTHORIZED"
     assert report["live_trading_authorized"] is False
     assert all(
-        row["contract_test"]["status"] == STATUS_NOT_RUN
-        for row in report["connection_results"]
+        row["contract_test"]["status"] == STATUS_NOT_RUN for row in report["connection_results"]
     )
 
 

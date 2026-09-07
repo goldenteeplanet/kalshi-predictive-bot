@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-import re
 from typing import Any
 from urllib.parse import quote, urlparse
 
@@ -194,7 +194,9 @@ def verify_market_identity(
         or _field(exact_market, "subtitle")
     )
     category = classify_market_category(title, series_ticker)
-    source_lineage = _source_lineage(ranking=ranking, market_raw=market_raw, ranking_raw=ranking_raw)
+    source_lineage = _source_lineage(
+        ranking=ranking, market_raw=market_raw, ranking_raw=ranking_raw
+    )
     common = {
         "market_ticker": market_ticker,
         "event_ticker": event_ticker or None,
@@ -202,7 +204,9 @@ def verify_market_identity(
         "market_title": title or market_ticker,
         "event_title": event_title or None,
         "category": category,
-        "market_lifecycle_status": _clean_text(_field(exact_market, "status") if exact_market else None)
+        "market_lifecycle_status": _clean_text(
+            _field(exact_market, "status") if exact_market else None
+        )
         or _clean_text(_field(ranking, "status")),
         "catalog_last_seen_at": _iso(_field(exact_market, "last_seen_at")),
         "source_lineage": source_lineage,
@@ -339,10 +343,14 @@ def build_canonical_kalshi_url(
     """Build or verify the canonical Kalshi market URL from exact catalog identity."""
     now = generated_at or utc_now()
     resolved = settings or get_settings()
-    raw = dict(catalog_raw if catalog_raw is not None else decode_json(market.raw_json if market else None))
+    raw = dict(
+        catalog_raw if catalog_raw is not None else decode_json(market.raw_json if market else None)
+    )
     ticker = _clean_text(market_ticker or _field(market, "ticker") or raw.get("ticker"))
     event = _clean_text(event_ticker or _field(market, "event_ticker") or raw.get("event_ticker"))
-    series = _clean_text(series_ticker or _field(market, "series_ticker") or raw.get("series_ticker"))
+    series = _clean_text(
+        series_ticker or _field(market, "series_ticker") or raw.get("series_ticker")
+    )
     title = _clean_text(market_title or _field(market, "title") or raw.get("title"))
     event_name = _clean_text(
         event_title
@@ -369,10 +377,17 @@ def build_canonical_kalshi_url(
             generated_at=now,
             trace=trace,
         )
-    if _blocked_internal_ticker(ticker) or _truthy(raw.get("synthetic_only") or raw.get("synthetic_market")):
+    if _blocked_internal_ticker(ticker) or _truthy(
+        raw.get("synthetic_only") or raw.get("synthetic_market")
+    ):
         return _url_build_result(
-            status=SYNTHETIC_ONLY if not ticker.upper().startswith("KXMVECROSSCATEGORY-") else COMPOSITE_LOCAL_ONLY,
-            reason="Synthetic, composite, internal, or local identifiers cannot be promoted to Kalshi URLs.",
+            status=SYNTHETIC_ONLY
+            if not ticker.upper().startswith("KXMVECROSSCATEGORY-")
+            else COMPOSITE_LOCAL_ONLY,
+            reason=(
+                "Synthetic, composite, internal, or local identifiers cannot be promoted to "
+                "Kalshi URLs."
+            ),
             generated_at=now,
             trace=trace,
         )
@@ -403,7 +418,10 @@ def build_canonical_kalshi_url(
                 reason="Stored Kalshi URL matches the exact catalog market or event ticker.",
                 generated_at=now,
                 kalshi_url=stored_url,
-                event_slug=_slug_value(raw, "event_slug", "market_slug", "slug", "event_path", "market_path") or None,
+                event_slug=_slug_value(
+                    raw, "event_slug", "market_slug", "slug", "event_path", "market_path"
+                )
+                or None,
                 series_slug=_slug_value(raw, "series_slug", "series_path") or None,
                 trace=trace,
             )
@@ -559,9 +577,10 @@ def _legacy_canonical_kalshi_url(market: Market | None) -> str | None:
     )
     if not event_slug:
         return None
-    series_slug = _slug_value(raw, "series_slug", "series_path") or _clean_text(
-        market.series_ticker or raw.get("series_ticker")
-    ).lower()
+    series_slug = (
+        _slug_value(raw, "series_slug", "series_path")
+        or _clean_text(market.series_ticker or raw.get("series_ticker")).lower()
+    )
     if not series_slug:
         return None
     return (
@@ -675,7 +694,11 @@ def _catalog_mismatch(*, ranking: MarketRanking | None, market: Market) -> str |
             "Ranking event ticker does not match the exact catalog market event ticker; "
             "sibling or related ticker substitution is blocked."
         )
-    if ranking.series_ticker and market.series_ticker and ranking.series_ticker != market.series_ticker:
+    if (
+        ranking.series_ticker
+        and market.series_ticker
+        and ranking.series_ticker != market.series_ticker
+    ):
         return (
             "Ranking series ticker does not match the exact catalog market series ticker; "
             "sibling or related ticker substitution is blocked."
@@ -697,7 +720,9 @@ def _evidence_blocker(
 ) -> tuple[str, str] | None:
     raws = (market_raw, ranking_raw)
     if any(_truthy(raw.get("general_source_candidate")) for raw in raws):
-        if not any(_truthy(raw.get("source_evidence_ready") or raw.get("link_safe")) for raw in raws):
+        if not any(
+            _truthy(raw.get("source_evidence_ready") or raw.get("link_safe")) for raw in raws
+        ):
             return (
                 GENERAL_SOURCE_NOT_SAFE,
                 "General-source candidate lacks source-readiness evidence for link safety.",
@@ -784,8 +809,10 @@ def _is_kalshi_market_url(value: str | None) -> bool:
         return False
     parsed = urlparse(value)
     host = parsed.netloc.lower()
-    return parsed.scheme == "https" and host in {"kalshi.com", "www.kalshi.com"} and (
-        parsed.path.startswith("/markets/")
+    return (
+        parsed.scheme == "https"
+        and host in {"kalshi.com", "www.kalshi.com"}
+        and (parsed.path.startswith("/markets/"))
     )
 
 
@@ -861,7 +888,12 @@ def _truthy(value: Any) -> bool:
 def _badge_kind(status: str) -> str:
     if status == VERIFIED:
         return "good"
-    if status in {BUILT_FROM_EXACT_CATALOG, VERIFIED_BUT_CLOSED, VERIFIED_BUT_SETTLED, VERIFIED_BUT_PAUSED}:
+    if status in {
+        BUILT_FROM_EXACT_CATALOG,
+        VERIFIED_BUT_CLOSED,
+        VERIFIED_BUT_SETTLED,
+        VERIFIED_BUT_PAUSED,
+    }:
         return "caution"
     if status in {UNVERIFIED, MALFORMED_URL, API_NOT_FOUND, STALE_CATALOG}:
         return "warn"

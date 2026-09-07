@@ -82,4 +82,3 @@ def _event(
             "spread_change": str(feature.get("spread_change")),
         },
     }
-

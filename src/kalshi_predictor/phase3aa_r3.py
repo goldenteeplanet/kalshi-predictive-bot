@@ -111,9 +111,7 @@ def _audit_row(session: Session, row: dict[str, Any]) -> dict[str, Any]:
         "classification_explanation": _classification_explanation(classification),
         "exact_settlement_found": settlement is not None,
         "settlement_result": settlement.result if settlement is not None else None,
-        "yes_settlement_value": settlement.yes_settlement_value
-        if settlement is not None
-        else None,
+        "yes_settlement_value": settlement.yes_settlement_value if settlement is not None else None,
         "source_outcome_supported_by_current_realizer": _source_supported_by_realizer(settlement),
         "has_paper_position": position is not None,
         "position_contracts": _position_contracts(position),
@@ -280,9 +278,7 @@ def _summary(rows: list[dict[str, Any]], reconciliation: dict[str, Any]) -> dict
         "missing_position_rows": counts.get("MISSING_PAPER_POSITION", 0),
         "zero_contract_position_rows": counts.get("ZERO_CONTRACT_POSITION", 0),
         "unsupported_source_outcome_rows": counts.get("SOURCE_OUTCOME_UNSUPPORTED", 0),
-        "duplicate_ticker_rows": sum(
-            1 for row in rows if row["duplicate_filled_order_for_ticker"]
-        ),
+        "duplicate_ticker_rows": sum(1 for row in rows if row["duplicate_filled_order_for_ticker"]),
         "safe_to_run_phase3aa_realize": ready > 0,
         "residue_cleared": len(rows) == 0,
     }
@@ -302,9 +298,7 @@ def _classification_explanation(classification: str) -> str:
             "Exact ticker settlement has a supported scalar yes_settlement_value and a "
             "paper position exists."
         ),
-        "BINARY_READY_FOR_REALIZER": (
-            "Exact ticker binary settlement and a paper position exist."
-        ),
+        "BINARY_READY_FOR_REALIZER": ("Exact ticker binary settlement and a paper position exist."),
         "ALREADY_REALIZED_JOIN_MISS": (
             "A matching settled P&L row already exists; reconciliation should not keep "
             "counting this as eligible."
@@ -313,9 +307,7 @@ def _classification_explanation(classification: str) -> str:
             "The filled paper order has exact settlement evidence but no paper position "
             "for the P&L engine to realize."
         ),
-        "ZERO_CONTRACT_POSITION": (
-            "The paper position exists but has no YES or NO contracts."
-        ),
+        "ZERO_CONTRACT_POSITION": ("The paper position exists but has no YES or NO contracts."),
         "SOURCE_OUTCOME_UNSUPPORTED": (
             "The exact settlement source cannot be mapped to a binary or scalar payout."
         ),

@@ -2,23 +2,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from kalshi_predictor.benchmarking.runtime_compatibility import (
     normalize_runtime_export_for_shadow,
 )
 from kalshi_predictor.benchmarking.shadow_adapter import ExposureGuardShadowAdapter
 
-
 SUPPORTED_CATEGORIES = ("crypto", "weather", "sports")
-REQUIRED_FORECAST_FIELDS = (
-    "ticker", "category", "forecast_id", "model_version", "probability"
-)
-REQUIRED_BOOK_FIELDS = (
-    "ticker", "category", "market_snapshot_id", "executable_spread"
-)
+REQUIRED_FORECAST_FIELDS = ("ticker", "category", "forecast_id", "model_version", "probability")
+REQUIRED_BOOK_FIELDS = ("ticker", "category", "market_snapshot_id", "executable_spread")
 
 
 def _missing(prefix: str, row: Mapping[str, Any], fields: tuple[str, ...]) -> list[str]:
@@ -69,18 +65,28 @@ def map_exact_shadow_context(fixture: Mapping[str, Any]) -> dict[str, Any]:
     ):
         diagnostics.append("BOOK_REFERENCE_NOT_DISTINCT")
 
-    candidate_probability = _decimal(
-        "CANDIDATE_FORECAST_PROBABILITY", candidate.get("probability"), diagnostics
-    ) if candidate.get("probability") not in (None, "") else None
-    reference_probability = _decimal(
-        "REFERENCE_FORECAST_PROBABILITY", reference.get("probability"), diagnostics
-    ) if reference.get("probability") not in (None, "") else None
-    current_spread = _decimal(
-        "CURRENT_EXECUTABLE_SPREAD", current_book.get("executable_spread"), diagnostics
-    ) if current_book.get("executable_spread") not in (None, "") else None
-    reference_spread = _decimal(
-        "REFERENCE_EXECUTABLE_SPREAD", reference_book.get("executable_spread"), diagnostics
-    ) if reference_book.get("executable_spread") not in (None, "") else None
+    candidate_probability = (
+        _decimal("CANDIDATE_FORECAST_PROBABILITY", candidate.get("probability"), diagnostics)
+        if candidate.get("probability") not in (None, "")
+        else None
+    )
+    reference_probability = (
+        _decimal("REFERENCE_FORECAST_PROBABILITY", reference.get("probability"), diagnostics)
+        if reference.get("probability") not in (None, "")
+        else None
+    )
+    current_spread = (
+        _decimal("CURRENT_EXECUTABLE_SPREAD", current_book.get("executable_spread"), diagnostics)
+        if current_book.get("executable_spread") not in (None, "")
+        else None
+    )
+    reference_spread = (
+        _decimal(
+            "REFERENCE_EXECUTABLE_SPREAD", reference_book.get("executable_spread"), diagnostics
+        )
+        if reference_book.get("executable_spread") not in (None, "")
+        else None
+    )
 
     for name, value in (
         ("CANDIDATE_FORECAST_PROBABILITY", candidate_probability),
@@ -98,7 +104,10 @@ def map_exact_shadow_context(fixture: Mapping[str, Any]) -> dict[str, Any]:
     context = None
     provenance = None
     if not diagnostics and None not in (
-        candidate_probability, reference_probability, current_spread, reference_spread
+        candidate_probability,
+        reference_probability,
+        current_spread,
+        reference_spread,
     ):
         forecast_bias = candidate_probability - reference_probability
         spread_addition = current_spread - reference_spread
@@ -142,16 +151,20 @@ def build_exact_shadow_field_mapping_preview(fixtures_path: Path) -> dict[str, A
         )
         compatible = mapping["mapped"] and compatibility["compatible"]
         diagnostics = mapping["diagnostics"] + compatibility["diagnostics"]
-        rows.append({
-            "fixture_id": fixture["fixture_id"],
-            "category": fixture.get("candidate_forecast", {}).get("category"),
-            "mapped": mapping["mapped"],
-            "compatible": compatible,
-            "diagnostics": diagnostics,
-            "shadow_context": mapping["shadow_context"],
-            "mapping_provenance": mapping["mapping_provenance"],
-            "shadow_preview": adapter.preview(compatibility["normalized"]) if compatible else None,
-        })
+        rows.append(
+            {
+                "fixture_id": fixture["fixture_id"],
+                "category": fixture.get("candidate_forecast", {}).get("category"),
+                "mapped": mapping["mapped"],
+                "compatible": compatible,
+                "diagnostics": diagnostics,
+                "shadow_context": mapping["shadow_context"],
+                "mapping_provenance": mapping["mapping_provenance"],
+                "shadow_preview": adapter.preview(compatibility["normalized"])
+                if compatible
+                else None,
+            }
+        )
     diagnostic_counts: dict[str, int] = {}
     for row in rows:
         for diagnostic in row["diagnostics"]:
@@ -172,8 +185,11 @@ def build_exact_shadow_field_mapping_preview(fixtures_path: Path) -> dict[str, A
         "runtime_policy_changed": False,
         "default_or_fabricated_values_allowed": False,
         "source_mapping": {
-            "forecast_bias": "candidate forecast probability minus independent reference forecast probability",
-            "spread_addition": "current executable spread minus distinct reference executable spread",
+            "forecast_bias": (
+                "candidate forecast probability minus independent reference forecast probability"
+            ),
+            "spread_addition": "current executable spread minus distinct referen"
+            "ce executable spread",
         },
         "rows": rows,
         "diagnostic_counts": dict(sorted(diagnostic_counts.items())),
@@ -183,7 +199,8 @@ def build_exact_shadow_field_mapping_preview(fixtures_path: Path) -> dict[str, A
             "compatible": sum(row["compatible"] for row in rows),
             "rejected": sum(not row["compatible"] for row in rows),
             "required_categories_pass": required_categories_pass,
-            "pmb35_deployment_unblocked": required_categories_pass and all(row["compatible"] for row in rows),
+            "pmb35_deployment_unblocked": required_categories_pass
+            and all(row["compatible"] for row in rows),
             "deterministic_digest": hashlib.sha256(canonical).hexdigest(),
         },
     }

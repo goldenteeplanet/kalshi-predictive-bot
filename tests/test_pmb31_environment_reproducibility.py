@@ -20,9 +20,7 @@ def test_pmb31_clean_environment_runs_are_reproducible(tmp_path):
 
 
 def test_pmb31_ci_matrix_covers_supported_python_versions(tmp_path):
-    report = json.loads(
-        write_cross_environment_reproducibility_preview(ROOT, tmp_path).read_text()
-    )
+    report = json.loads(write_cross_environment_reproducibility_preview(ROOT, tmp_path).read_text())
     assert report["supported_python_versions"] == list(SUPPORTED_PYTHON_VERSIONS)
     assert report["summary"]["ci_matrix_covers_supported_versions"] is True
     assert report["database_writes"] == 0

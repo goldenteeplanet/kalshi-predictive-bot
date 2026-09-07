@@ -264,8 +264,7 @@ def insert_sports_odds(
         league=normalized_league,
         game_key=game_key_from_payload(payload, league=normalized_league),
         sportsbook=_str_or_none(payload.get("sportsbook") or payload.get("book")) or "manual",
-        observed_at=_parse_sports_datetime(payload, "observed_at", "as_of", "date")
-        or utc_now(),
+        observed_at=_parse_sports_datetime(payload, "observed_at", "as_of", "date") or utc_now(),
         home_moneyline=decimal_to_str(payload.get("home_moneyline")),
         away_moneyline=decimal_to_str(payload.get("away_moneyline")),
         spread=decimal_to_str(payload.get("spread")),
@@ -516,9 +515,7 @@ def latest_sports_features(
     if league and normalize_league(league) != "ALL":
         statement = statement.where(SportsFeature.league == normalize_league(league))
     rows = list(
-        session.scalars(
-            statement.order_by(desc(SportsFeature.created_at), desc(SportsFeature.id))
-        )
+        session.scalars(statement.order_by(desc(SportsFeature.created_at), desc(SportsFeature.id)))
     )
     seen: set[tuple[str, str | None]] = set()
     latest: list[SportsFeature] = []

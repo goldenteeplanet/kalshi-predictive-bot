@@ -78,11 +78,7 @@ def calculate_signal_performance(session: Session, signal: Signal) -> SignalPerf
         brier_values.append((probability - outcome) ** 2)
         log_loss_values.append(_log_loss(probability, outcome))
 
-    win_rate = (
-        Decimal(wins) / Decimal(settled_trade_count)
-        if settled_trade_count > 0
-        else None
-    )
+    win_rate = Decimal(wins) / Decimal(settled_trade_count) if settled_trade_count > 0 else None
     roi = total_pnl / total_exposure if total_exposure > 0 else None
     brier = _average(brier_values)
     log_loss = _average(log_loss_values)
@@ -242,10 +238,7 @@ def _normalized_result(value: Any) -> str | None:
 def _log_loss(probability: Decimal, outcome: Decimal) -> Decimal:
     clipped = min(max(float(probability), 0.001), 0.999)
     resolved_outcome = float(outcome)
-    loss = -(
-        resolved_outcome * math.log(clipped)
-        + (1 - resolved_outcome) * math.log(1 - clipped)
-    )
+    loss = -(resolved_outcome * math.log(clipped) + (1 - resolved_outcome) * math.log(1 - clipped))
     return Decimal(str(loss))
 
 

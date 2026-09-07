@@ -40,4 +40,3 @@ def _clamp(value: Decimal, limit: Decimal) -> Decimal:
     if value < -limit:
         return -limit
     return value.quantize(Decimal("0.0001"))
-

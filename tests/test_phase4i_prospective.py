@@ -110,9 +110,7 @@ def _crypto_feature_json(feature_id: int) -> dict[str, object]:
     return {
         "component_feature_ids": {"BTC": feature_id},
         "title": "BTC above",
-        "structured_terms": {
-            "components": [{"symbol": "BTC", "comparator": "ABOVE"}]
-        },
+        "structured_terms": {"components": [{"symbol": "BTC", "comparator": "ABOVE"}]},
         "direction_detected": "ABOVE",
         "momentum_score": "0.125",
         "adjustment": "0.01",
@@ -306,9 +304,7 @@ def test_research_skip_recorder_is_exact_and_non_writing() -> None:
 
 def test_comparator_lineage_records_neutrality_and_bound_clipping() -> None:
     payload = _crypto_feature_json(1)
-    payload["structured_terms"] = {
-        "components": [{"symbol": "BTC", "comparator": "UNKNOWN"}]
-    }
+    payload["structured_terms"] = {"components": [{"symbol": "BTC", "comparator": "UNKNOWN"}]}
     payload["direction_detected"] = "UNKNOWN"
     payload["momentum_score"] = "0.0000"
     payload["adjustment"] = "0.04"

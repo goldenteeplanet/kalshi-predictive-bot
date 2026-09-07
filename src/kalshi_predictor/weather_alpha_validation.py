@@ -95,18 +95,45 @@ def write_weather_alpha_validation(
     _write_text(output_dir / "TEST_RESULTS.md", "# Test Results\n\nPending final verification.\n")
     _write_text(output_dir / "NEXT_GOAL.md", next_goal(performance))
     _write_text(output_dir / "NEXT_CODEX_PROMPT.md", next_prompt(performance))
-    return WeatherValidationArtifacts(output_dir, output_dir / "SETTLEMENT_GAP_AUDIT.md", output_dir / "PAPER_READINESS.md", output_dir / "NEXT_CODEX_PROMPT.md")
+    return WeatherValidationArtifacts(
+        output_dir,
+        output_dir / "SETTLEMENT_GAP_AUDIT.md",
+        output_dir / "PAPER_READINESS.md",
+        output_dir / "NEXT_CODEX_PROMPT.md",
+    )
 
 
 def classify_weather_forecasts(session: Session) -> list[dict[str, Any]]:
-    forecasts = list(session.scalars(select(Forecast).where(Forecast.model_name.in_(WEATHER_MODELS)).order_by(Forecast.forecasted_at, Forecast.id)))
+    forecasts = list(
+        session.scalars(
+            select(Forecast)
+            .where(Forecast.model_name.in_(WEATHER_MODELS))
+            .order_by(Forecast.forecasted_at, Forecast.id)
+        )
+    )
     seen_windows: set[tuple[str, str, datetime]] = set()
     rows: list[dict[str, Any]] = []
     for forecast in forecasts:
         market = session.get(Market, forecast.ticker)
         settlement = session.get(Settlement, forecast.ticker)
-        link = session.scalar(select(WeatherMarketLink).where(WeatherMarketLink.ticker == forecast.ticker, WeatherMarketLink.detected_at <= forecast.forecasted_at).order_by(WeatherMarketLink.detected_at.desc(), WeatherMarketLink.id.desc()).limit(1))
-        snapshot = session.scalar(select(MarketSnapshot).where(MarketSnapshot.ticker == forecast.ticker, MarketSnapshot.captured_at <= forecast.forecasted_at).order_by(MarketSnapshot.captured_at.desc(), MarketSnapshot.id.desc()).limit(1))
+        link = session.scalar(
+            select(WeatherMarketLink)
+            .where(
+                WeatherMarketLink.ticker == forecast.ticker,
+                WeatherMarketLink.detected_at <= forecast.forecasted_at,
+            )
+            .order_by(WeatherMarketLink.detected_at.desc(), WeatherMarketLink.id.desc())
+            .limit(1)
+        )
+        snapshot = session.scalar(
+            select(MarketSnapshot)
+            .where(
+                MarketSnapshot.ticker == forecast.ticker,
+                MarketSnapshot.captured_at <= forecast.forecasted_at,
+            )
+            .order_by(MarketSnapshot.captured_at.desc(), MarketSnapshot.id.desc())
+            .limit(1)
+        )
         feature, source_timestamp = _feature_lineage(session, forecast, link)
         key = (forecast.ticker, forecast.model_name, forecast.forecasted_at)
         classification = classify_lineage(
@@ -122,42 +149,55 @@ def classify_weather_forecasts(session: Session) -> list[dict[str, Any]]:
         snapshot_at = parse_datetime(snapshot.captured_at if snapshot else None)
         forecast_at = parse_datetime(forecast.forecasted_at)
         lineage_ok = timestamps_in_order(source_at, feature_at, snapshot_at, forecast_at)
-        rows.append({
-            "forecast_id": forecast.id,
-            "ticker": forecast.ticker,
-            "model": forecast.model_name,
-            "forecasted_at": forecast.forecasted_at.isoformat(),
-            "market_status": market.status if market else None,
-            "market_result": market.result if market else None,
-            "market_close_time": market.close_time.isoformat() if market and market.close_time else None,
-            "settlement_result": settlement.result if settlement else None,
-            "settled_at": settlement.settled_at.isoformat() if settlement and settlement.settled_at else None,
-            "classification": classification,
-            "authoritative_repair_candidate": classification == MARKET_RESULT_MISSING_ROW,
-            "location_key": link.location_key if link else None,
-            "contract_type": link.weather_metric if link else None,
-            "target_operator": link.target_operator if link else None,
-            "target_time": link.target_time.isoformat() if link and link.target_time else None,
-            "weather_link_id": link.id if link else None,
-            "weather_feature_id": feature.id if feature else None,
-            "source_timestamp": source_at.isoformat() if source_at else None,
-            "feature_timestamp": feature_at.isoformat() if feature_at else None,
-            "snapshot_id": snapshot.id if snapshot else None,
-            "snapshot_timestamp": snapshot_at.isoformat() if snapshot_at else None,
-            "lineage_timestamps_valid": lineage_ok,
-            "lineage_blocker": lineage_blocker(source_at, feature_at, snapshot_at, forecast_at),
-            "yes_probability": forecast.yes_probability,
-            "market_midpoint": forecast.market_mid_probability,
-            "yes_bid": snapshot.best_yes_bid if snapshot else forecast.best_yes_bid,
-            "yes_ask": snapshot.best_yes_ask if snapshot else forecast.best_yes_ask,
-            "no_bid": snapshot.best_no_bid if snapshot else None,
-            "no_ask": snapshot.best_no_ask if snapshot else None,
-            "spread": snapshot.spread if snapshot else None,
-        })
+        rows.append(
+            {
+                "forecast_id": forecast.id,
+                "ticker": forecast.ticker,
+                "model": forecast.model_name,
+                "forecasted_at": forecast.forecasted_at.isoformat(),
+                "market_status": market.status if market else None,
+                "market_result": market.result if market else None,
+                "market_close_time": market.close_time.isoformat()
+                if market and market.close_time
+                else None,
+                "settlement_result": settlement.result if settlement else None,
+                "settled_at": settlement.settled_at.isoformat()
+                if settlement and settlement.settled_at
+                else None,
+                "classification": classification,
+                "authoritative_repair_candidate": classification == MARKET_RESULT_MISSING_ROW,
+                "location_key": link.location_key if link else None,
+                "contract_type": link.weather_metric if link else None,
+                "target_operator": link.target_operator if link else None,
+                "target_time": link.target_time.isoformat() if link and link.target_time else None,
+                "weather_link_id": link.id if link else None,
+                "weather_feature_id": feature.id if feature else None,
+                "source_timestamp": source_at.isoformat() if source_at else None,
+                "feature_timestamp": feature_at.isoformat() if feature_at else None,
+                "snapshot_id": snapshot.id if snapshot else None,
+                "snapshot_timestamp": snapshot_at.isoformat() if snapshot_at else None,
+                "lineage_timestamps_valid": lineage_ok,
+                "lineage_blocker": lineage_blocker(source_at, feature_at, snapshot_at, forecast_at),
+                "yes_probability": forecast.yes_probability,
+                "market_midpoint": forecast.market_mid_probability,
+                "yes_bid": snapshot.best_yes_bid if snapshot else forecast.best_yes_bid,
+                "yes_ask": snapshot.best_yes_ask if snapshot else forecast.best_yes_ask,
+                "no_bid": snapshot.best_no_bid if snapshot else None,
+                "no_ask": snapshot.best_no_ask if snapshot else None,
+                "spread": snapshot.spread if snapshot else None,
+            }
+        )
     return rows
 
 
-def classify_lineage(*, duplicate: bool, has_market: bool, has_link: bool, settlement_result: str | None, market_result: str | None) -> str:
+def classify_lineage(
+    *,
+    duplicate: bool,
+    has_market: bool,
+    has_link: bool,
+    settlement_result: str | None,
+    market_result: str | None,
+) -> str:
     if duplicate:
         return DUPLICATE_WINDOW
     if not has_market or not has_link:
@@ -175,14 +215,24 @@ def classify_lineage(*, duplicate: bool, has_market: bool, has_link: bool, settl
     return UNRESOLVED
 
 
-def timestamps_in_order(source: datetime | None, feature: datetime | None, snapshot: datetime | None, forecast: datetime | None) -> bool:
+def timestamps_in_order(
+    source: datetime | None,
+    feature: datetime | None,
+    snapshot: datetime | None,
+    forecast: datetime | None,
+) -> bool:
     if None in (source, feature, snapshot, forecast):
         return False
     assert source and feature and snapshot and forecast
     return source <= feature <= snapshot <= forecast
 
 
-def lineage_blocker(source: datetime | None, feature: datetime | None, snapshot: datetime | None, forecast: datetime | None) -> str | None:
+def lineage_blocker(
+    source: datetime | None,
+    feature: datetime | None,
+    snapshot: datetime | None,
+    forecast: datetime | None,
+) -> str | None:
     if source is None:
         return "SOURCE_TIMESTAMP_MISSING"
     if feature is None:
@@ -218,30 +268,44 @@ def build_weather_shadow_ledger(gap_rows: list[dict[str, Any]]) -> list[dict[str
             pnl = (Decimal("1") if won else Decimal("0")) - price - fee
         forecast_at = parse_datetime(row["forecasted_at"])
         target_at = parse_datetime(row["target_time"])
-        horizon_hours = (target_at - forecast_at).total_seconds() / 3600 if target_at and forecast_at else None
+        horizon_hours = (
+            (target_at - forecast_at).total_seconds() / 3600 if target_at and forecast_at else None
+        )
         feature_at = parse_datetime(row["feature_timestamp"])
-        feature_age = (forecast_at - feature_at).total_seconds() / 3600 if forecast_at and feature_at else None
-        ledger.append({
-            **row,
-            "strategy_version": "weather_shadow_v1",
-            "outcome": outcome,
-            "side": side,
-            "executable_price": str(price) if price is not None else None,
-            "fee": str(fee) if fee is not None else None,
-            "executable_edge": str(edge) if edge is not None else None,
-            "one_contract_pnl_after_fee": str(pnl) if pnl is not None else None,
-            "model_brier": str(brier_score(probability, outcome)),
-            "market_brier": str(brier_score(midpoint, outcome)) if midpoint is not None else None,
-            "model_log_loss": str(log_loss(probability, outcome)),
-            "market_log_loss": str(log_loss(midpoint, outcome)) if midpoint is not None else None,
-            "horizon_hours": horizon_hours,
-            "horizon_bucket": horizon_bucket(horizon_hours),
-            "feature_age_hours": feature_age,
-        })
+        feature_age = (
+            (forecast_at - feature_at).total_seconds() / 3600
+            if forecast_at and feature_at
+            else None
+        )
+        ledger.append(
+            {
+                **row,
+                "strategy_version": "weather_shadow_v1",
+                "outcome": outcome,
+                "side": side,
+                "executable_price": str(price) if price is not None else None,
+                "fee": str(fee) if fee is not None else None,
+                "executable_edge": str(edge) if edge is not None else None,
+                "one_contract_pnl_after_fee": str(pnl) if pnl is not None else None,
+                "model_brier": str(brier_score(probability, outcome)),
+                "market_brier": str(brier_score(midpoint, outcome))
+                if midpoint is not None
+                else None,
+                "model_log_loss": str(log_loss(probability, outcome)),
+                "market_log_loss": str(log_loss(midpoint, outcome))
+                if midpoint is not None
+                else None,
+                "horizon_hours": horizon_hours,
+                "horizon_bucket": horizon_bucket(horizon_hours),
+                "feature_age_hours": feature_age,
+            }
+        )
     return ledger
 
 
-def executable_decision(probability: Decimal, row: dict[str, Any]) -> tuple[str | None, Decimal | None, Decimal | None]:
+def executable_decision(
+    probability: Decimal, row: dict[str, Any]
+) -> tuple[str | None, Decimal | None, Decimal | None]:
     yes_ask = _decimal(row.get("yes_ask"))
     no_ask = _decimal(row.get("no_ask"))
     if no_ask is None:
@@ -298,14 +362,37 @@ def calibration_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         probability = float(row["yes_probability"])
         low = min(9, int(probability * 10)) * 10
         buckets[f"{low:02d}-{low + 10:02d}%"].append(row)
-    return [{"probability_bucket": key, "count": len(group), "mean_forecast": sum(float(r["yes_probability"]) for r in group) / len(group), "observed_yes_rate": sum(r["outcome"] for r in group) / len(group), "model_brier": _mean(group, "model_brier")} for key, group in sorted(buckets.items())]
+    return [
+        {
+            "probability_bucket": key,
+            "count": len(group),
+            "mean_forecast": sum(float(r["yes_probability"]) for r in group) / len(group),
+            "observed_yes_rate": sum(r["outcome"] for r in group) / len(group),
+            "model_brier": _mean(group, "model_brier"),
+        }
+        for key, group in sorted(buckets.items())
+    ]
 
 
 def grouped_performance(rows: list[dict[str, Any]], field: str) -> list[dict[str, Any]]:
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         groups[str(row.get(field) or "UNKNOWN")].append(row)
-    return [{field: key, "count": len(group), "model_brier": _mean(group, "model_brier"), "market_brier": _mean(group, "market_brier"), "net_pnl_after_fee": str(sum((_decimal(r["one_contract_pnl_after_fee"]) or Decimal("0") for r in group), Decimal("0")))} for key, group in sorted(groups.items())]
+    return [
+        {
+            field: key,
+            "count": len(group),
+            "model_brier": _mean(group, "model_brier"),
+            "market_brier": _mean(group, "market_brier"),
+            "net_pnl_after_fee": str(
+                sum(
+                    (_decimal(r["one_contract_pnl_after_fee"]) or Decimal("0") for r in group),
+                    Decimal("0"),
+                )
+            ),
+        }
+        for key, group in sorted(groups.items())
+    ]
 
 
 def collect_runtime_health(session: Session) -> dict[str, Any]:
@@ -384,18 +471,45 @@ def pipeline_health(
 
 
 def paper_readiness(performance: dict[str, Any], safety: dict[str, Any]) -> dict[str, Any]:
-    evidence = performance["settled_observations"] >= 100 and performance["no_lookahead_violations"] == 0
-    return {"settled_sample_gate": evidence, "market_relative_calibration_gate": performance["outperforms_market"], "post_cost_pnl_gate": performance["positive_post_cost"], "guarded_counts_unchanged": safety["guarded_counts_unchanged"], "fresh_current_executable_candidate_verified": False, "phase3m_phase3n_soak_gh4_lifecycle_gates": False, "paper_order_creation_enabled": False, "phase8_ready": False}
+    evidence = (
+        performance["settled_observations"] >= 100 and performance["no_lookahead_violations"] == 0
+    )
+    return {
+        "settled_sample_gate": evidence,
+        "market_relative_calibration_gate": performance["outperforms_market"],
+        "post_cost_pnl_gate": performance["positive_post_cost"],
+        "guarded_counts_unchanged": safety["guarded_counts_unchanged"],
+        "fresh_current_executable_candidate_verified": False,
+        "phase3m_phase3n_soak_gh4_lifecycle_gates": False,
+        "paper_order_creation_enabled": False,
+        "phase8_ready": False,
+    }
 
 
-def _feature_lineage(session: Session, forecast: Forecast, link: WeatherMarketLink | None) -> tuple[WeatherFeature | None, Any]:
+def _feature_lineage(
+    session: Session, forecast: Forecast, link: WeatherMarketLink | None
+) -> tuple[WeatherFeature | None, Any]:
     payload = decode_json(forecast.feature_json)
     feature_id = payload.get("weather_feature_id") or payload.get("feature_snapshot_id")
-    feature = session.get(WeatherFeature, int(feature_id)) if str(feature_id or "").isdigit() else None
+    feature = (
+        session.get(WeatherFeature, int(feature_id)) if str(feature_id or "").isdigit() else None
+    )
     if feature is None and link is not None:
-        feature = session.scalar(select(WeatherFeature).where(WeatherFeature.location_key == link.location_key, WeatherFeature.generated_at <= forecast.forecasted_at).order_by(WeatherFeature.generated_at.desc(), WeatherFeature.id.desc()).limit(1))
+        feature = session.scalar(
+            select(WeatherFeature)
+            .where(
+                WeatherFeature.location_key == link.location_key,
+                WeatherFeature.generated_at <= forecast.forecasted_at,
+            )
+            .order_by(WeatherFeature.generated_at.desc(), WeatherFeature.id.desc())
+            .limit(1)
+        )
     raw = decode_json(feature.raw_json) if feature else {}
-    source_timestamp = raw.get("forecast_generated_at") or raw.get("source_timestamp") or (feature.generated_at if feature else None)
+    source_timestamp = (
+        raw.get("forecast_generated_at")
+        or raw.get("source_timestamp")
+        or (feature.generated_at if feature else None)
+    )
     return feature, source_timestamp
 
 
@@ -413,24 +527,57 @@ def horizon_bucket(hours: float | None) -> str:
 
 def gap_markdown(rows: list[dict[str, Any]]) -> str:
     counts = Counter(row["classification"] for row in rows)
-    lines = ["# Weather Settlement Gap Audit", "", f"- Forecast rows classified: `{len(rows)}`", f"- Unique tickers: `{len({r['ticker'] for r in rows})}`", f"- Authoritative repair candidates: `{counts[MARKET_RESULT_MISSING_ROW]}`", ""]
-    lines.extend(f"- {name}: `{counts[name]}`" for name in (VALID_EXACT_SETTLEMENT, MARKET_RESULT_MISSING_ROW, UNRESOLVED, IDENTITY_MISMATCH, INVALID_RESULT, DUPLICATE_WINDOW))
-    lines.extend(["", "No settlement is inferred from price. Zero authoritative market results means there is nothing safe to reconcile locally; the existing serialized `sync-settlements` job remains the only settlement writer."])
+    lines = [
+        "# Weather Settlement Gap Audit",
+        "",
+        f"- Forecast rows classified: `{len(rows)}`",
+        f"- Unique tickers: `{len({r['ticker'] for r in rows})}`",
+        f"- Authoritative repair candidates: `{counts[MARKET_RESULT_MISSING_ROW]}`",
+        "",
+    ]
+    lines.extend(
+        f"- {name}: `{counts[name]}`"
+        for name in (
+            VALID_EXACT_SETTLEMENT,
+            MARKET_RESULT_MISSING_ROW,
+            UNRESOLVED,
+            IDENTITY_MISMATCH,
+            INVALID_RESULT,
+            DUPLICATE_WINDOW,
+        )
+    )
+    lines.extend(
+        [
+            "",
+            "No settlement is inferred from price. Zero authoritative market results means there is nothing safe to reconcile locally; the existing serialized `sync-settlements` job remains the only settlement writer.",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
 def walk_forward_markdown(rows: list[dict[str, Any]], summary: dict[str, Any]) -> str:
     dates = Counter(str(row["forecasted_at"])[:10] for row in rows)
-    return "# Weather Walk-Forward Results\n\n" + "\n".join(f"- {key}: `{value}`" for key, value in summary.items()) + "\n\n## Settled observations by forecast date\n\n" + ("\n".join(f"- {date}: `{count}`" for date, count in sorted(dates.items())) or "No valid settled observations yet.") + "\n"
+    return (
+        "# Weather Walk-Forward Results\n\n"
+        + "\n".join(f"- {key}: `{value}`" for key, value in summary.items())
+        + "\n\n## Settled observations by forecast date\n\n"
+        + (
+            "\n".join(f"- {date}: `{count}`" for date, count in sorted(dates.items()))
+            or "No valid settled observations yet."
+        )
+        + "\n"
+    )
 
 
 def health_markdown(health: dict[str, Any]) -> str:
-    return "# Weather Pipeline Health\n\n" + "\n".join(f"- {key}: `{value}`" for key, value in health.items()) + "\n"
+    return (
+        "# Weather Pipeline Health\n\n"
+        + "\n".join(f"- {key}: `{value}`" for key, value in health.items())
+        + "\n"
+    )
 
 
-def collection_plan_markdown(
-    performance: dict[str, Any], health: dict[str, Any]
-) -> str:
+def collection_plan_markdown(performance: dict[str, Any], health: dict[str, Any]) -> str:
     missing = max(0, 100 - performance["settled_observations"])
     snapshots = int(health.get("current_verified_family_snapshots") or 0)
     blocker = (
@@ -438,11 +585,15 @@ def collection_plan_markdown(
         if snapshots == 0
         else "VERIFIED_FAMILY_FEATURE_ALIGNMENT_OR_FRESHNESS"
     )
-    return f"""# Weather Shadow Collection Plan\n\n- Additional settled observations required: `{missing}`\n- Current verified-family snapshots: `{snapshots}`\n- Latest forecast skip reasons: `{health.get('recent_forecast_skip_reasons', {})}`\n- Latest skip families: `{health.get('recent_forecast_skip_families', {})}`\n- Current primary blocker: `{blocker}`\n- Writer: existing shared `flock`-serialized weather refresh and `sync-settlements` commands only\n- Analytics: `kalshi-bot weather-alpha-validation` (query-only)\n- Cadence: catalog/source/features every 15 minutes only while verified KXTEMPNYCH markets exist; authoritative settlement sync after natural resolution; validation after sync\n- Promotion: prohibited until 100+ valid rows, zero lookahead, better market-relative calibration, positive post-cost P&L, acceptable drawdown, and all Phase 8 gates\n- Unsupported hurricane contracts: excluded from weather_v2; never remap them to a city or temperature feature\n- Performance repair: use the indexed current-weather snapshot selector; do not restore the full-history grouped query\n- Rollback: stop the weather shadow timer and revert the verified-family selector commit; no threshold, paper-order, or exchange state is changed\n\nUse `scripts/weather-alpha-shadow-cycle.sh` for the fail-closed collection sequence.\n"""
+    return f"""# Weather Shadow Collection Plan\n\n- Additional settled observations required: `{missing}`\n- Current verified-family snapshots: `{snapshots}`\n- Latest forecast skip reasons: `{health.get("recent_forecast_skip_reasons", {})}`\n- Latest skip families: `{health.get("recent_forecast_skip_families", {})}`\n- Current primary blocker: `{blocker}`\n- Writer: existing shared `flock`-serialized weather refresh and `sync-settlements` commands only\n- Analytics: `kalshi-bot weather-alpha-validation` (query-only)\n- Cadence: catalog/source/features every 15 minutes only while verified KXTEMPNYCH markets exist; authoritative settlement sync after natural resolution; validation after sync\n- Promotion: prohibited until 100+ valid rows, zero lookahead, better market-relative calibration, positive post-cost P&L, acceptable drawdown, and all Phase 8 gates\n- Unsupported hurricane contracts: excluded from weather_v2; never remap them to a city or temperature feature\n- Performance repair: use the indexed current-weather snapshot selector; do not restore the full-history grouped query\n- Rollback: stop the weather shadow timer and revert the verified-family selector commit; no threshold, paper-order, or exchange state is changed\n\nUse `scripts/weather-alpha-shadow-cycle.sh` for the fail-closed collection sequence.\n"""
 
 
 def readiness_markdown(readiness: dict[str, Any]) -> str:
-    return "# Paper Readiness\n\n" + "\n".join(f"- {key}: `{value}`" for key, value in readiness.items()) + "\n\nPhase 8 remains blocked. Prior approval cannot bypass objective gates.\n"
+    return (
+        "# Paper Readiness\n\n"
+        + "\n".join(f"- {key}: `{value}`" for key, value in readiness.items())
+        + "\n\nPhase 8 remains blocked. Prior approval cannot bypass objective gates.\n"
+    )
 
 
 def safety_markdown(safety: dict[str, Any]) -> str:
@@ -469,7 +620,13 @@ def _less(left: float | None, right: float | None) -> bool:
 
 def _outcome(value: str | None) -> int | None:
     normalized = (value or "").strip().lower()
-    return 1 if normalized in {"yes", "y", "1", "true"} else 0 if normalized in {"no", "n", "0", "false"} else None
+    return (
+        1
+        if normalized in {"yes", "y", "1", "true"}
+        else 0
+        if normalized in {"no", "n", "0", "false"}
+        else None
+    )
 
 
 def _decimal(value: Any) -> Decimal | None:

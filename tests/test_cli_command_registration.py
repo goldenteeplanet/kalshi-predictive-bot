@@ -20,8 +20,12 @@ def test_root_cli_commands_are_registered_once() -> None:
                 and decorator.func.value.id == "app"
                 and decorator.func.attr == "command"
             ):
-                name = decorator.args[0] if decorator.args else next(
-                    (item.value for item in decorator.keywords if item.arg == "name"), None
+                name = (
+                    decorator.args[0]
+                    if decorator.args
+                    else next(
+                        (item.value for item in decorator.keywords if item.arg == "name"), None
+                    )
                 )
                 if isinstance(name, ast.Constant) and isinstance(name.value, str):
                     names.append(name.value)

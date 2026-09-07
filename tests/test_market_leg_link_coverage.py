@@ -430,12 +430,8 @@ def test_link_coverage_excludes_unsupported_sports_multileg_from_actionable_gap(
     assert coverage["bottleneck"]["status"] == "UNLINKED"
     unlinked_example_tickers = {row["ticker"] for row in coverage["unlinked_examples"]}
     assert "KXMVESPORTSMULTIGAMEEXTENDED-UNSUPPORTED" not in unlinked_example_tickers
-    assert "KXMVESPORTSMULTIGAMEEXTENDED-CRYPTO-COMPOSITE" not in (
-        unlinked_example_tickers
-    )
-    assert "KXBTC-ACTIONABLE" in {
-        row["ticker"] for row in coverage["unlinked_examples"]
-    }
+    assert "KXMVESPORTSMULTIGAMEEXTENDED-CRYPTO-COMPOSITE" not in (unlinked_example_tickers)
+    assert "KXBTC-ACTIONABLE" in {row["ticker"] for row in coverage["unlinked_examples"]}
     assert any(
         card["label"] == "Unsupported Composites" and card["value"] == 2
         for card in coverage["summary_cards"]

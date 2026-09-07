@@ -174,4 +174,3 @@ def test_evaluator_has_no_io_service_restart_or_execution_surface() -> None:
     }
 
     assert forbidden.isdisjoint(evaluate_recovery_cancellation_command.__code__.co_names)
-

@@ -58,4 +58,3 @@ def _decimal_string(value: float | int | Decimal | None) -> str | None:
     if value is None:
         return None
     return decimal_to_str(value)
-

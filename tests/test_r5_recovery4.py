@@ -73,9 +73,7 @@ def test_output_mismatch_fails_closed() -> None:
 
 
 def test_execution_enablement_has_highest_failure_priority() -> None:
-    result = assess_cycle(
-        cycle("a", execution_enabled=True, oom_events=1, timed_out=True), LIMITS
-    )
+    result = assess_cycle(cycle("a", execution_enabled=True, oom_events=1, timed_out=True), LIMITS)
     assert result["failures"][:3] == ["execution_enabled", "oom", "timeout"]
 
 

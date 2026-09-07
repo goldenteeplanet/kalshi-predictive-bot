@@ -96,9 +96,7 @@ def test_stale_threshold_is_inclusive_and_timezone_safe() -> None:
     result, reasons, _ = module._classify(_capture(), _settlement(), None, stale=True)
     assert result == "SOURCE_ARTIFACT_STALE"
     assert reasons == ["MAXIMUM_AGE_THRESHOLD_REACHED"]
-    assert module._utc("2026-08-25T13:00:00-05:00") == datetime(
-        2026, 8, 25, 18, tzinfo=UTC
-    )
+    assert module._utc("2026-08-25T13:00:00-05:00") == datetime(2026, 8, 25, 18, tzinfo=UTC)
 
 
 def _fixture_files(tmp_path: Path):
@@ -112,9 +110,7 @@ def _fixture_files(tmp_path: Path):
           raw_json TEXT,updated_at TEXT)
         """
     )
-    source.execute(
-        "INSERT INTO settlements VALUES(?,?,?,?,?,?)", tuple(_settlement().values())
-    )
+    source.execute("INSERT INTO settlements VALUES(?,?,?,?,?,?)", tuple(_settlement().values()))
     source.commit()
     source.close()
     research = sqlite3.connect(research_db)
@@ -144,14 +140,30 @@ def _fixture_files(tmp_path: Path):
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,
         (
-            capture["capture_id"], "run-1", capture["ticker"], capture["event_ticker"],
-            "KXTEST", capture["snapshot_id"], capture["snapshot_timestamp"],
-            capture["snapshot_hash"], capture["feature_ids_json"],
-            capture["feature_hashes_json"], capture["source_observations_json"],
-            capture["market_probability"], capture["crypto_probability"],
-            capture["model_versions_json"], capture["best_yes_bid"],
-            capture["best_yes_ask"], "0.02", "100", "2026-08-25T19:00:00+00:00",
-            capture["bundle_hash"], "{}", "2026-08-25T18:01:00+00:00", None, None,
+            capture["capture_id"],
+            "run-1",
+            capture["ticker"],
+            capture["event_ticker"],
+            "KXTEST",
+            capture["snapshot_id"],
+            capture["snapshot_timestamp"],
+            capture["snapshot_hash"],
+            capture["feature_ids_json"],
+            capture["feature_hashes_json"],
+            capture["source_observations_json"],
+            capture["market_probability"],
+            capture["crypto_probability"],
+            capture["model_versions_json"],
+            capture["best_yes_bid"],
+            capture["best_yes_ask"],
+            "0.02",
+            "100",
+            "2026-08-25T19:00:00+00:00",
+            capture["bundle_hash"],
+            "{}",
+            "2026-08-25T18:01:00+00:00",
+            None,
+            None,
         ),
     )
     research.commit()
@@ -160,10 +172,14 @@ def _fixture_files(tmp_path: Path):
     hint = {
         "schema": HINT_SCHEMA,
         "generated_at": "2026-08-25T19:00:00+00:00",
-        "hints": [{
-            "ticker": "KXTEST-1", "due_at": "2026-08-25T19:00:00+00:00",
-            "source_capture_id_hash": "c" * 64, "bundle_set_hash": "d" * 64,
-        }],
+        "hints": [
+            {
+                "ticker": "KXTEST-1",
+                "due_at": "2026-08-25T19:00:00+00:00",
+                "source_capture_id_hash": "c" * 64,
+                "bundle_set_hash": "d" * 64,
+            }
+        ],
     }
     hint["artifact_hash"] = hint_hash(hint)
     hint_path.write_text(json.dumps(hint), encoding="utf-8")
@@ -233,8 +249,12 @@ def test_stale_gate_boundary_and_tampered_manifest(tmp_path: Path) -> None:
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="MANIFEST_HASH_MISMATCH"):
         module.audit(
-            source_db, research_db, hint_path, history,
-            now=now, maximum_age_seconds=60,
+            source_db,
+            research_db,
+            hint_path,
+            history,
+            now=now,
+            maximum_age_seconds=60,
         )
 
 

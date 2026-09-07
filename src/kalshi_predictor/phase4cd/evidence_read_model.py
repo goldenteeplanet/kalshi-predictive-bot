@@ -149,9 +149,7 @@ def validate_read_model(
     if not payload["source_watermark"]:
         raise EvidenceReadModelError("READ_MODEL_WATERMARK_MISSING")
     unhashed = {
-        key: value
-        for key, value in payload.items()
-        if key not in {"payload_hash", "manifest_hash"}
+        key: value for key, value in payload.items() if key not in {"payload_hash", "manifest_hash"}
     }
     if payload["payload_hash"] != _hash(unhashed):
         raise EvidenceReadModelError("READ_MODEL_PAYLOAD_HASH_MISMATCH")

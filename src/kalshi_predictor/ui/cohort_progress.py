@@ -11,12 +11,8 @@ DEFAULT_RESULT_PATH = Path("reports/crypto_event_vectors/multiclass_interval_sco
 DEFAULT_STATE_PATH = Path("reports/crypto_event_vectors/cohort_gate_state.json")
 DEFAULT_WINDOW_PATH = Path("reports/crypto_event_vectors/liquidity_window_diagnosis.json")
 DEFAULT_COLLECTOR_PATH = Path("reports/crypto_event_vectors/status.json")
-DEFAULT_ALIGNMENT_PATH = Path(
-    "reports/crypto_event_vectors/forecast_polytope_alignment.json"
-)
-DEFAULT_TELEMETRY_PATH = Path(
-    "reports/crypto_event_vectors/targeted_forecast_telemetry.json"
-)
+DEFAULT_ALIGNMENT_PATH = Path("reports/crypto_event_vectors/forecast_polytope_alignment.json")
+DEFAULT_TELEMETRY_PATH = Path("reports/crypto_event_vectors/targeted_forecast_telemetry.json")
 
 
 def load_cohort_progress(
@@ -78,9 +74,7 @@ def _comparison_summary(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "available": bool(payload),
         "decision": payload.get("decision", "NOT_YET_RUN"),
-        "shadow_activation_permitted": bool(
-            payload.get("shadow_activation_permitted", False)
-        ),
+        "shadow_activation_permitted": bool(payload.get("shadow_activation_permitted", False)),
         "gates": payload.get("interval_frozen_gate_comparison", {}),
     }
 
@@ -92,11 +86,7 @@ def _targeted_forecast_telemetry(
     rows = refresh.get("rows", []) if isinstance(refresh, dict) else []
     rows = [row for row in rows if isinstance(row, dict)]
     targeted_events = {str(row.get("event_ticker")) for row in rows}
-    audits = [
-        row
-        for row in alignment.get("alignment_audit_rows", [])
-        if isinstance(row, dict)
-    ]
+    audits = [row for row in alignment.get("alignment_audit_rows", []) if isinstance(row, dict)]
     latest: dict[str, dict[str, Any]] = {}
     for row in audits:
         latest.setdefault(str(row.get("event_ticker")), row)
@@ -119,9 +109,7 @@ def _targeted_forecast_telemetry(
         )
         item["attempted"] += 1
         item["forecasted"] += row.get("status") == "FORECASTED"
-        item["midpoint_probe_failures"] += int(
-            row.get("midpoint_probe_failures", 0)
-        )
+        item["midpoint_probe_failures"] += int(row.get("midpoint_probe_failures", 0))
         item["one_sided_bound_uses"] += int(row.get("one_sided_bound_uses", 0))
         audit = latest.get(str(row.get("event_ticker")))
         if audit:
@@ -172,19 +160,13 @@ def _targeted_forecast_telemetry(
     return {
         "available": bool(refresh),
         "policy": (
-            refresh.get("policy", "UNAVAILABLE")
-            if isinstance(refresh, dict)
-            else "UNAVAILABLE"
+            refresh.get("policy", "UNAVAILABLE") if isinstance(refresh, dict) else "UNAVAILABLE"
         ),
         "attempted": attempted,
         "forecasted": forecasted,
         "success_rate": forecasted / attempted if attempted else None,
-        "midpoint_probe_failures": sum(
-            int(row.get("midpoint_probe_failures", 0)) for row in rows
-        ),
-        "one_sided_bound_uses": sum(
-            int(row.get("one_sided_bound_uses", 0)) for row in rows
-        ),
+        "midpoint_probe_failures": sum(int(row.get("midpoint_probe_failures", 0)) for row in rows),
+        "one_sided_bound_uses": sum(int(row.get("one_sided_bound_uses", 0)) for row in rows),
         "mean_forecast_capture_lag_seconds": (
             sum(all_latencies) / len(all_latencies) if all_latencies else None
         ),
@@ -211,19 +193,11 @@ def _rolling_telemetry(payload: dict[str, Any]) -> dict[str, Any]:
             "success_interval": forecast,
             "midpoint_probe_failures": int(row.get("midpoint_probe_failures", 0)),
             "one_sided_bound_uses": int(row.get("one_sided_bound_uses", 0)),
-            "immediate_captures_attempted": int(
-                row.get("immediate_captures_attempted", 0)
-            ),
-            "immediate_captures_within_budget": int(
-                row.get("immediate_captures_within_budget", 0)
-            ),
+            "immediate_captures_attempted": int(row.get("immediate_captures_attempted", 0)),
+            "immediate_captures_within_budget": int(row.get("immediate_captures_within_budget", 0)),
             "latency_sample_size": int(row.get("latency_sample_size", 0)),
-            "mean_forecast_capture_lag_seconds": row.get(
-                "mean_forecast_capture_lag_seconds"
-            ),
-            "maximum_forecast_capture_lag_seconds": row.get(
-                "maximum_forecast_capture_lag_seconds"
-            ),
+            "mean_forecast_capture_lag_seconds": row.get("mean_forecast_capture_lag_seconds"),
+            "maximum_forecast_capture_lag_seconds": row.get("maximum_forecast_capture_lag_seconds"),
             "targeted_alignment_rate": targeted.get("rate"),
             "targeted_alignment_interval": targeted,
             "historical_alignment_rate": historical.get("rate"),
@@ -250,11 +224,7 @@ def _rolling_telemetry(payload: dict[str, Any]) -> dict[str, Any]:
         "available": True,
         "policy": payload.get("policy", "ROLLING_EVENT_LEVEL_TELEMETRY"),
         **{key: value for key, value in overall.items() if key != "family"},
-        "families": [
-            adapt(row)
-            for row in summary.get("families", [])
-            if isinstance(row, dict)
-        ],
+        "families": [adapt(row) for row in summary.get("families", []) if isinstance(row, dict)],
         "history_observations": len(payload.get("observations", [])),
         "generated_at": payload.get("generated_at"),
     }

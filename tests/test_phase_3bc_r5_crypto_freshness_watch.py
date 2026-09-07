@@ -680,10 +680,7 @@ def test_phase3bc_r5_snapshot_refresh_allows_unrelated_ranking_gaps(monkeypatch)
         "KXDOGE-POSITIVE-EV",
     ]
     assert observed["limit"] == 2
-    assert (
-        result["trigger"]
-        == "R23_EXACT_SNAPSHOT_REFRESH_FOR_ACTIONABLE_CRYPTO_CANDIDATES"
-    )
+    assert result["trigger"] == "R23_EXACT_SNAPSHOT_REFRESH_FOR_ACTIONABLE_CRYPTO_CANDIDATES"
     assert result["ranking_gaps_did_not_block_refresh"] is True
     assert result["positive_ev_priority"] is True
     assert result["book_visible_priority"] is True
@@ -1021,9 +1018,7 @@ def test_phase3bc_r5_payload_exposes_r8_gap_reconciliation_fields() -> None:
             "attempted": 3,
             "repaired": 2,
             "selected_tickers": ["KXBTC-ACTIONABLE"],
-            "candidate_filter": (
-                "ACTIVE_OPEN_PURE_CRYPTO_EV_NEAR_MISS_OR_STALE_MAINTENANCE"
-            ),
+            "candidate_filter": ("ACTIVE_OPEN_PURE_CRYPTO_EV_NEAR_MISS_OR_STALE_MAINTENANCE"),
             "active_open_candidates": 1,
             "book_visible_candidates": 1,
             "no_book_recheck_candidates": 1,
@@ -1115,9 +1110,7 @@ def test_phase3bc_r5_classifies_bounded_freshness_backlog_without_hiding_ev_gap(
     assert summary["data_freshness_gap_after_refresh"] == "SNAPSHOT_STALE"
     assert summary["primary_gap_after_refresh"] == "EV_NOT_POSITIVE"
     assert summary["snapshot_backlog_status"] == "EXACT_TICKER_NOT_REFRESHED"
-    assert summary["forecast_backlog_status"] == (
-        "FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH"
-    )
+    assert summary["forecast_backlog_status"] == ("FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH")
     assert summary["data_freshness_complete"] is False
     assert summary["freshness_backlog_blocks_current_positive_ev"] is False
     assert summary["exact_snapshot_refresh_unselected_tickers"] == ["KXBTC-3"]
@@ -1254,12 +1247,12 @@ def test_phase3bc_r5_payload_detects_liquidity_emergence_from_previous_report() 
     assert payload["liquidity_emergence_examples"][0]["transition_label"] == (
         "Liquidity appeared; Clean execution appeared"
     )
-    assert {
-        row["ticker"] for row in payload["positive_ev_liquidity_emergence_examples"]
-    } == {"KXBTC-POS"}
-    assert {
-        row["ticker"] for row in payload["near_miss_clean_book_emergence_examples"]
-    } == {"KXETH-NEAR"}
+    assert {row["ticker"] for row in payload["positive_ev_liquidity_emergence_examples"]} == {
+        "KXBTC-POS"
+    }
+    assert {row["ticker"] for row in payload["near_miss_clean_book_emergence_examples"]} == {
+        "KXETH-NEAR"
+    }
 
 
 def test_phase3bc_r5_cli_smoke_no_external_fetches(tmp_path) -> None:
@@ -1511,9 +1504,7 @@ def test_crypto_freshness_watch_status_auto_refreshes_when_runner_is_active(
                             "RISK_MISSING",
                         ],
                         "spread": "0.0200",
-                        "what_would_make_paper_ready": [
-                            "Visible ask liquidity must appear."
-                        ],
+                        "what_would_make_paper_ready": ["Visible ask liquidity must appear."],
                     }
                 ],
             }
@@ -1559,14 +1550,9 @@ def test_crypto_freshness_watch_status_auto_refreshes_when_runner_is_active(
     assert status["book_probe"]["expected_value_label"] == "1.7 cents"
     assert status["book_probe"]["liquidity_label"] == "None"
     assert status["book_probe"]["spread_label"] == "2.0 cents"
-    assert status["book_probe"]["blockers_label"] == (
-        "Low edge, No liquidity, Risk missing"
-    )
+    assert status["book_probe"]["blockers_label"] == ("Low edge, No liquidity, Risk missing")
     assert "Visible ask liquidity" in status["book_probe"]["needed_label"]
-    assert (
-        "does not create exchange liquidity"
-        in status["book_probe"]["safety_label"]
-    )
+    assert "does not create exchange liquidity" in status["book_probe"]["safety_label"]
 
 
 def test_crypto_freshness_watch_status_uses_freshness_window_when_running(
@@ -1843,9 +1829,7 @@ def test_phase3bc_r5_status_marks_unattended_overrun(tmp_path, monkeypatch) -> N
     assert "phase3bc-r5-unattended-guard --stop-overrun" in payload["recommended_next_action"]
 
 
-def test_phase3bc_r5_status_respects_freshness_window_for_slow_cycle(
-    tmp_path, monkeypatch
-) -> None:
+def test_phase3bc_r5_status_respects_freshness_window_for_slow_cycle(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(phase3bc_r6, "_pid_matches_phase3bc_r5_watch", lambda pid: pid == 5151)
     output_dir = Path("reports/phase3bc_r5")
@@ -2413,6 +2397,8 @@ def _row(
         "latest_forecast_at": latest_forecast_at or latest_ranking_at,
         "latest_ranking_at": latest_ranking_at,
     }
+
+
 def test_phase3bc_r5_snapshot_refresh_prioritizes_missing_before_stale_maintenance() -> None:
     tickers, _selection = phase3bc_r5._snapshot_refresh_selection(
         {

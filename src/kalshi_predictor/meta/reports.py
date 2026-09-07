@@ -192,9 +192,7 @@ def render_meta_report(context: dict[str, Any]) -> str:
         ]
     )
     for diagnostic in context["diagnostics"]:
-        lines.append(
-            f"- [{diagnostic['severity']}] {diagnostic['title']}: {diagnostic['message']}"
-        )
+        lines.append(f"- [{diagnostic['severity']}] {diagnostic['title']}: {diagnostic['message']}")
     lines.extend(
         [
             "",
@@ -225,7 +223,10 @@ def render_meta_opportunities_report(rows: list[dict[str, Any]]) -> str:
         "",
         f"- Generated at: {utc_now().isoformat()}",
         "",
-        "| Ticker | Kalshi URL | Selected model | Trust | Probability | Market price | Edge | Score | Reason |",
+        (
+            "| Ticker | Kalshi URL | Selected model | Trust | Probability | Market price | "
+            "Edge | Score | Reason |"
+        ),
         "|---|---|---|---:|---:|---:|---:|---:|---|",
     ]
     for row in rows:

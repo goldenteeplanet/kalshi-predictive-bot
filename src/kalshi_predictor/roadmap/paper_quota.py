@@ -71,9 +71,7 @@ def select_paper_candidates_by_category(
         category: [] for category in CATEGORY_NAMES
     }
     rejected: list[Mapping[str, Any]] = []
-    per_category = {
-        category: _empty_category_counts() for category in (*CATEGORY_NAMES, "unknown")
-    }
+    per_category = {category: _empty_category_counts() for category in (*CATEGORY_NAMES, "unknown")}
     reason_counts = {reason: 0 for reason in REJECTION_REASONS}
 
     for ordinal, candidate in indexed:
@@ -172,9 +170,7 @@ def _ineligible_reason(candidate: PaperQuotaCandidate, category: str) -> str | N
     return None
 
 
-def _freeze_candidate(
-    candidate: PaperQuotaCandidate, *, category: str
-) -> PaperQuotaCandidate:
+def _freeze_candidate(candidate: PaperQuotaCandidate, *, category: str) -> PaperQuotaCandidate:
     return PaperQuotaCandidate(
         candidate_id=candidate.candidate_id,
         ticker=candidate.ticker,

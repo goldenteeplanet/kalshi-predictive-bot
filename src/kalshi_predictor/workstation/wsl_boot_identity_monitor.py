@@ -73,7 +73,11 @@ def monitor_wsl_boot_identity(
     max_observations: int = 128,
     max_evidence_age_seconds: int = 120,
 ) -> WslBootIdentityMonitorResult:
-    if isinstance(max_observations, bool) or not isinstance(max_observations, int) or max_observations <= 0:
+    if (
+        isinstance(max_observations, bool)
+        or not isinstance(max_observations, int)
+        or max_observations <= 0
+    ):
         raise WslBootIdentityMonitorError("MONITOR_BOUND_INVALID")
     if (
         isinstance(max_evidence_age_seconds, bool)

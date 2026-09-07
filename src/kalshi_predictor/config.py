@@ -1317,9 +1317,7 @@ class Settings(BaseSettings):
         self.phase_3w_mode = mode_3w
         mode_3x = self.phase_3x_mode.strip().lower()
         if mode_3x not in {"audit_only", "preview", "staging", "production"}:
-            raise ValueError(
-                "PHASE_3X_MODE must be audit_only, preview, staging, or production."
-            )
+            raise ValueError("PHASE_3X_MODE must be audit_only, preview, staging, or production.")
         if mode_3x == "production" and not self.phase_3w_system_certification_enabled:
             raise ValueError("Phase 3X production mode requires Phase 3W enabled evidence.")
         self.phase_3x_mode = mode_3x
@@ -1334,9 +1332,7 @@ class Settings(BaseSettings):
 
         mode = self.dynamic_position_sizing_mode.strip().lower()
         if mode not in {"disabled", "shadow", "live"}:
-            raise ValueError(
-                "DYNAMIC_POSITION_SIZING_MODE must be disabled, shadow, or live."
-            )
+            raise ValueError("DYNAMIC_POSITION_SIZING_MODE must be disabled, shadow, or live.")
         self.dynamic_position_sizing_mode = mode
 
         weights = (
@@ -1616,8 +1612,7 @@ class Settings(BaseSettings):
             "cap_to_one",
         }:
             raise ValueError(
-                "ADVANCED_RISK_MISSING_OPTIONAL_LIQUIDITY_DATA_ACTION must be block "
-                "or cap_to_one."
+                "ADVANCED_RISK_MISSING_OPTIONAL_LIQUIDITY_DATA_ACTION must be block or cap_to_one."
             )
 
 

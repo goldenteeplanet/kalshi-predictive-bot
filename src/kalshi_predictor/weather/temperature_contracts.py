@@ -14,8 +14,18 @@ from kalshi_predictor.utils.decimals import to_decimal
 from kalshi_predictor.utils.time import parse_datetime
 
 _MONTHS = {
-    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
-    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+    "JAN": 1,
+    "FEB": 2,
+    "MAR": 3,
+    "APR": 4,
+    "MAY": 5,
+    "JUN": 6,
+    "JUL": 7,
+    "AUG": 8,
+    "SEP": 9,
+    "OCT": 10,
+    "NOV": 11,
+    "DEC": 12,
 }
 _NYC_PATTERN = re.compile(
     r"^(?P<series>KXTEMPNYCH)-(?P<year>\d{2})(?P<month>[A-Z]{3})"
@@ -64,7 +74,10 @@ def parse_point_temperature_ticker(ticker: str) -> PointTemperatureContract | No
         return None
     try:
         local_time = datetime(
-            2000 + int(match.group("year")), month, int(match.group("day")), hour,
+            2000 + int(match.group("year")),
+            month,
+            int(match.group("day")),
+            hour,
             tzinfo=ZoneInfo("America/New_York"),
         )
         strike = Decimal(match.group("strike"))

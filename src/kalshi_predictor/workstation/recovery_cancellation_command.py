@@ -195,12 +195,16 @@ def evaluate_recovery_cancellation_command(
 def validate_recovery_cancellation_result(result: Any) -> None:
     if not isinstance(result, RecoveryCancellationResult):
         raise RecoveryCancellationCommandError("RESULT_TYPE_INVALID")
-    if result.read_only is not True or result.authority_active_after is not False or any(
-        (
-            result.recovery_authorized,
-            result.service_control_authorized,
-            result.host_restart_authorized,
-            result.execution_authorized,
+    if (
+        result.read_only is not True
+        or result.authority_active_after is not False
+        or any(
+            (
+                result.recovery_authorized,
+                result.service_control_authorized,
+                result.host_restart_authorized,
+                result.execution_authorized,
+            )
         )
     ):
         raise RecoveryCancellationCommandError("RESULT_SAFETY_BOUNDARY_INVALID")

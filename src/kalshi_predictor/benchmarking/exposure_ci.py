@@ -23,7 +23,6 @@ from kalshi_predictor.benchmarking.stress_guard import (
     write_stress_aware_allocation_guard_preview,
 )
 
-
 DEFAULT_GOLDEN = Path("tests/golden/pmb27_exposure_guard_bundle_summary.json")
 
 
@@ -39,9 +38,7 @@ def run_offline_exposure_certification_ci_gate(
     write_drawdown_aware_guard_refinement(root / "reports/phase_pmb24")
     write_oos_exposure_guard_validation(root / "reports/phase_pmb25")
     write_multi_seed_exposure_stability_census(root / "reports/phase_pmb26")
-    bundle_path = write_exposure_guard_certification_bundle(
-        root, root / "reports/phase_pmb27"
-    )
+    bundle_path = write_exposure_guard_certification_bundle(root, root / "reports/phase_pmb27")
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
     selected_golden = golden_path or (project_root / DEFAULT_GOLDEN)
     expected = json.loads(selected_golden.read_text(encoding="utf-8"))
@@ -50,10 +47,7 @@ def run_offline_exposure_certification_ci_gate(
     artifact_hashes_match = actual.get("artifact_hashes") == expected.get("artifact_hashes")
     bundle_digest_match = actual.get("bundle_digest") == expected.get("bundle_digest")
     certification_passed = bundle["certification"]["passed"] is True
-    passed = (
-        golden_match and artifact_hashes_match and bundle_digest_match
-        and certification_passed
-    )
+    passed = golden_match and artifact_hashes_match and bundle_digest_match and certification_passed
     canonical = json.dumps(actual, sort_keys=True, separators=(",", ":")).encode()
     report: dict[str, Any] = {
         "phase": "PMB-28",

@@ -4,10 +4,21 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-PHASE_STATES = {"RUNNING", "WAITING", "BLOCKED", "PASSED", "FAILED", "PASSED_LOCAL_PREVIEW", "PASSED_CLOSED", "QUEUED"}
+PHASE_STATES = {
+    "RUNNING",
+    "WAITING",
+    "BLOCKED",
+    "PASSED",
+    "FAILED",
+    "PASSED_LOCAL_PREVIEW",
+    "PASSED_CLOSED",
+    "QUEUED",
+}
 
 
-def build_live_roadmap_status(payload: Mapping[str, Any], *, reference_time: datetime) -> dict[str, Any]:
+def build_live_roadmap_status(
+    payload: Mapping[str, Any], *, reference_time: datetime
+) -> dict[str, Any]:
     raw_phases = payload.get("phase_roadmap", [])
     phases = []
     diagnostics: list[str] = []
@@ -18,26 +29,35 @@ def build_live_roadmap_status(payload: Mapping[str, Any], *, reference_time: dat
         if state not in PHASE_STATES:
             diagnostics.append(f"PHASE_STATE_INVALID:{item.get('number')}")
             state = "BLOCKED"
-        phases.append({
-            "number": int(item.get("number") or 0),
-            "phase": str(item.get("phase") or "UNREPORTED"),
-            "status": state,
-            "evidence": str(item.get("evidence") or "No evidence reported"),
-        })
+        phases.append(
+            {
+                "number": int(item.get("number") or 0),
+                "phase": str(item.get("phase") or "UNREPORTED"),
+                "status": state,
+                "evidence": str(item.get("evidence") or "No evidence reported"),
+            }
+        )
     if len(phases) != 20:
         diagnostics.append("PHASE_ROADMAP_INCOMPLETE")
 
     scheduler = dict(payload.get("scheduler") or {})
     heartbeat = dict(scheduler.get("heartbeat") or {})
     heartbeat_at = _time(heartbeat.get("at"))
-    heartbeat_age = None if heartbeat_at is None else max(0, int((reference_time - heartbeat_at).total_seconds()))
+    heartbeat_age = (
+        None
+        if heartbeat_at is None
+        else max(0, int((reference_time - heartbeat_at).total_seconds()))
+    )
     heartbeat_interval = int(heartbeat.get("interval_seconds") or 15)
     heartbeat_stale = heartbeat_age is None or heartbeat_age > max(30, heartbeat_interval * 2)
     if scheduler.get("state") == "RUNNING" and heartbeat_stale:
         diagnostics.append("BOUNDED_CYCLE_HEARTBEAT_STALE")
     if scheduler.get("last_result") == "failed":
         diagnostics.append("BOUNDED_CYCLE_FAILED")
-    legacy_disabled = scheduler.get("legacy_watcher_enabled") is False and scheduler.get("legacy_watcher_active") is False
+    legacy_disabled = (
+        scheduler.get("legacy_watcher_enabled") is False
+        and scheduler.get("legacy_watcher_active") is False
+    )
     if not legacy_disabled:
         diagnostics.append("LEGACY_WATCHER_NOT_DISABLED")
 
@@ -81,7 +101,12 @@ def build_live_roadmap_status(payload: Mapping[str, Any], *, reference_time: dat
         "prov14b": dict(payload.get("prov14b") or {"state": "QUEUED"}),
         "diagnostics": sorted(set(diagnostics)),
         "alerts": [
-            {"severity": "CRITICAL" if code in {"EXECUTION_ENABLED_CRITICAL", "BOUNDED_CYCLE_FAILED"} else "WARNING", "code": code}
+            {
+                "severity": "CRITICAL"
+                if code in {"EXECUTION_ENABLED_CRITICAL", "BOUNDED_CYCLE_FAILED"}
+                else "WARNING",
+                "code": code,
+            }
             for code in sorted(set(diagnostics))
         ],
     }

@@ -486,9 +486,9 @@ def test_phase3ae_roster_diagnostics_suppresses_country_entity_player_prop_leak(
             "verified_entity_type": "TEAM_OR_COMPETITION_ENTITY",
         }
     ]
-    assert {
-        item["player_name"] for item in payload["top_missing_roster_players"]
-    }.isdisjoint({"Congo DR"})
+    assert {item["player_name"] for item in payload["top_missing_roster_players"]}.isdisjoint(
+        {"Congo DR"}
+    )
 
 
 def test_phase3ae_roster_diagnostics_writer_outputs_all_artifacts(tmp_path) -> None:

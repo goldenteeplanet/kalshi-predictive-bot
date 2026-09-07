@@ -1,2 +1,1 @@
 """Strategy/model comparison helpers."""
-

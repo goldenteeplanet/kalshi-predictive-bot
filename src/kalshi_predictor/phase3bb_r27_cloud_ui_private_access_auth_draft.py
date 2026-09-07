@@ -78,7 +78,9 @@ def write_phase3bb_r27_cloud_ui_private_access_auth_draft_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_csv(
         options_csv_path,
         payload["private_access_options"],
@@ -254,7 +256,8 @@ def _draft_checks(
         _check(
             "preferred_access_supported",
             preferred_access in SUPPORTED_PRIVATE_ACCESS_MODES,
-            f"preferred_access={preferred_access}; supported={', '.join(sorted(SUPPORTED_PRIVATE_ACCESS_MODES))}.",
+            f"preferred_access={preferred_access}; supported="
+            f"{', '.join(sorted(SUPPORTED_PRIVATE_ACCESS_MODES))}.",
         ),
     ]
 
@@ -284,7 +287,8 @@ def _private_access_options(
             "risk": "LOW_TO_MEDIUM",
             "auth_boundary": "Private network membership plus device identity",
             "public_exposure": "NONE",
-            "operator_work": "Review a no-install draft, then approve a separate install phase if wanted.",
+            "operator_work": "Review a no-install draft, then approve a separa"
+            "te install phase if wanted.",
             "notes": "Best always-on ergonomic path while avoiding public web exposure.",
         },
         {
@@ -294,7 +298,10 @@ def _private_access_options(
             "auth_boundary": "Identity-aware proxy policy",
             "public_exposure": "PROXIED",
             "operator_work": "Requires account/domain/policy review before any install.",
-            "notes": "Could avoid inbound firewall exposure, but still adds external auth/provider dependency.",
+            "notes": (
+                "Could avoid inbound firewall exposure, but still adds external "
+                "auth/provider dependency."
+            ),
         },
         {
             "option": "PUBLIC_HTTPS_BASIC_AUTH",
@@ -302,7 +309,10 @@ def _private_access_options(
             "risk": "MEDIUM_TO_HIGH",
             "auth_boundary": "Nginx TLS plus IP allowlist plus basic auth",
             "public_exposure": "PUBLIC_443",
-            "operator_work": "Requires domain, cert, IP allowlist, auth secret handling, and route performance fixes.",
+            "operator_work": (
+                "Requires domain, cert, IP allowlist, auth secret handling, and route "
+                "performance fixes."
+            ),
             "notes": f"R26 public HTTPS is blocked; slow_route_count={slow_count}.",
         },
         {
@@ -312,7 +322,9 @@ def _private_access_options(
             "auth_boundary": "NONE",
             "public_exposure": "PUBLIC",
             "operator_work": "Do not run.",
-            "notes": "Rejected because the UI exposes operational state and has no built-in login wall.",
+            "notes": (
+                "Rejected because the UI exposes operational state and has no built-in login wall."
+            ),
         },
     ]
 
@@ -362,7 +374,9 @@ def _decision(
         "r26_status": r26_decision.get("status"),
         "r25_status": r25_decision.get("status"),
         "r24_status": r24_decision.get("status"),
-        "r5_pid": r26_decision.get("r5_pid") or r25_decision.get("r5_pid") or r24_decision.get("r5_pid"),
+        "r5_pid": r26_decision.get("r5_pid")
+        or r25_decision.get("r5_pid")
+        or r24_decision.get("r5_pid"),
         "operator_next_command": operator_command,
         "next_codex_step": next_step,
     }
@@ -451,9 +465,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         lines.append(f"- `{marker}` `{row['check']}` - {row['detail']}")
     lines.extend(["", "## Private Access Options", ""])
     for row in payload["private_access_options"]:
-        lines.append(
-            f"- `{row['option']}`: `{row['status']}` / `{row['risk']}` - {row['notes']}"
-        )
+        lines.append(f"- `{row['option']}`: `{row['status']}` / `{row['risk']}` - {row['notes']}")
     return "\n".join(lines) + "\n"
 
 
@@ -521,11 +533,17 @@ def _render_no_install_draft(payload: dict[str, Any]) -> str:
             f"echo '[phase3bb-r27] selected option: {selected['option']}'",
             "echo '[phase3bb-r27] no remote commands are executed by this draft'",
             "echo '[phase3bb-r27] no firewall/nginx/service changes are made'",
-            "echo '[phase3bb-r27] current approved access remains: SSH tunnel to http://127.0.0.1:8081'",
+            (
+                "echo '[phase3bb-r27] current approved access remains: SSH tunnel to "
+                "http://127.0.0.1:8081'"
+            ),
             "",
             "# Reference only. Do not execute install commands from this draft.",
             "# Current tunnel pattern:",
-            "echo \"ssh -o ExitOnForwardFailure=yes -i ~/.ssh/id_ed25519_do -L 8081:127.0.0.1:8080 kalshi@159.65.35.72\"",
+            (
+                'echo "ssh -o ExitOnForwardFailure=yes -i ~/.ssh/id_ed25519_do -L '
+                '8081:127.0.0.1:8080 kalshi@159.65.35.72"'
+            ),
             "",
         ]
     )
@@ -533,7 +551,15 @@ def _render_no_install_draft(payload: dict[str, Any]) -> str:
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
     command = payload["private_access_decision"]["operator_next_command"]
-    return "\n".join(["#!/usr/bin/env bash", "set -euo pipefail", "", f"printf '%s\\n' {_shell_quote(command)}", ""])
+    return "\n".join(
+        [
+            "#!/usr/bin/env bash",
+            "set -euo pipefail",
+            "",
+            f"printf '%s\\n' {_shell_quote(command)}",
+            "",
+        ]
+    )
 
 
 def _render_next_actions(payload: dict[str, Any]) -> str:

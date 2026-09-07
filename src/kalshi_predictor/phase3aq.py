@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 import csv
 import hashlib
+import json
 from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
@@ -14,9 +14,10 @@ from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.schema import Forecast, LearningRejectionLog, PaperOrder
+from kalshi_predictor.learning.diagnostics import build_learning_diagnostics
 from kalshi_predictor.opportunities.market_identity import (
-    API_NOT_FOUND,
     AMBIGUOUS_MARKET_IDENTITY,
+    API_NOT_FOUND,
     BUILT_FROM_EXACT_CATALOG,
     COMPOSITE_LOCAL_ONLY,
     GENERAL_SOURCE_NOT_SAFE,
@@ -33,18 +34,17 @@ from kalshi_predictor.opportunities.market_identity import (
     VERIFIED_BUT_PAUSED,
     VERIFIED_BUT_SETTLED,
 )
-from kalshi_predictor.learning.diagnostics import build_learning_diagnostics
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3aa import build_settlement_eta_schedule
 from kalshi_predictor.phase3ai import build_phase3ai_reconciliation
-from kalshi_predictor.phase3an import build_phase3an_crypto_feature_completeness
 from kalshi_predictor.phase3ak import write_market_data_refresh_status
+from kalshi_predictor.phase3an import build_phase3an_crypto_feature_completeness
 from kalshi_predictor.phase3ap import (
     DEFAULT_PHASE3AP_SCAN_LIMIT,
+    _phase3ap_db_writer_status,
     build_phase3ap_book_diagnostic,
     build_phase3ap_paper_ready_gate,
     build_phase3ap_settlement_check_diagnostic,
-    _phase3ap_db_writer_status,
 )
 from kalshi_predictor.reinforcement_learning.repository import rl_status
 from kalshi_predictor.utils.decimals import to_decimal
@@ -229,9 +229,7 @@ def build_phase3aq_positive_ev_link_audit(
         "stale_quote_rows": book_summary.get("stale_quote_rows", 0),
         "first_hard_blocker": book_summary.get("first_hard_blocker"),
         "paper_ready_rows": len(paper_ready_rows),
-        "positive_ev_no_executable_book_rows": sum(
-            1 for row in rows if not row["executable_book"]
-        ),
+        "positive_ev_no_executable_book_rows": sum(1 for row in rows if not row["executable_book"]),
         "specific_url_status_rows": sum(
             1 for row in rows if row["url_status"] in PHASE3AQ_ALLOWED_URL_STATUSES
         ),
@@ -288,9 +286,7 @@ def build_phase3aq_positive_ev_link_audit(
         "blocked_positive_ev_rows": [row for row in rows if not row["paper_ready"]],
         "acceptance": {
             "positive_ev_rows_classified": len(rows) == summary["specific_url_status_rows"],
-            "generic_unverified_link_removed": summary[
-                "generic_unverified_link_rows_remaining"
-            ]
+            "generic_unverified_link_removed": summary["generic_unverified_link_rows_remaining"]
             == 0,
             "no_fake_links_created": True,
             "book_refresh_requires_verified_tradeable_link": all(
@@ -349,9 +345,9 @@ def build_phase3aq_refresh_verified_opportunity_books(
         window_hours=window_hours,
         limit=limit,
     )
-    candidates = [
-        row for row in audit["positive_ev_rows"] if row["book_refresh_needed"]
-    ][: max(0, max_markets)]
+    candidates = [row for row in audit["positive_ev_rows"] if row["book_refresh_needed"]][
+        : max(0, max_markets)
+    ]
     writer = _phase3ap_db_writer_status(settings=resolved)
     blocked_by_writer = (
         apply_readonly_refresh
@@ -583,9 +579,7 @@ def write_phase3aq_link_and_book_unblock_report(
         "paper_trade_creation": False,
         "summary": {
             **audit["summary"],
-            "settlement_specific_reason_counts": settlement["summary"][
-                "specific_reason_counts"
-            ],
+            "settlement_specific_reason_counts": settlement["summary"]["specific_reason_counts"],
         },
         "phase3ap_gate_summary": gate["summary"],
         "positive_ev_rows": audit["positive_ev_rows"],
@@ -930,10 +924,12 @@ def _phase3aq_status_reason(status: str) -> str:
         STALE_CATALOG: "Catalog evidence is stale and must be refreshed before link review.",
         SYNTHETIC_ONLY: "Synthetic/internal row has no direct Kalshi listing.",
         COMPOSITE_LOCAL_ONLY: "Composite/local row has no single direct Kalshi market.",
-        PLACEHOLDER_BLOCKED: "Placeholder provenance is blocked until exact market identity exists.",
+        PLACEHOLDER_BLOCKED: "Placeholder provenance is blocked until exact ma"
+        "rket identity exists.",
         PARTIAL_PROVENANCE_BLOCKED: "Partial provenance is diagnostic-only.",
         GENERAL_SOURCE_NOT_SAFE: "Source-readiness evidence is not safe for trade-link display.",
-        AMBIGUOUS_MARKET_IDENTITY: "Exact market identity is ambiguous; sibling matching is blocked.",
+        AMBIGUOUS_MARKET_IDENTITY: "Exact market identity is ambiguous; sibling matc"
+        "hing is blocked.",
     }
     return reasons.get(status, status.replace("_", " ").title())
 
@@ -953,7 +949,10 @@ def _phase3aq_row_next_action(
     if url_status == MALFORMED_URL:
         return "Persist an official Kalshi URL or slug for the exact catalog ticker."
     if url_status == BUILT_FROM_EXACT_CATALOG:
-        return "Run Phase 3AR URL repair to persist an official Kalshi URL before book refresh or paper entry."
+        return (
+            "Run Phase 3AR URL repair to persist an official Kalshi URL before book refresh "
+            "or paper entry."
+        )
     if url_status in {MARKET_NOT_IN_CATALOG, MISSING_MARKET_TICKER}:
         return "Repair exact market_ticker lineage before book refresh or trading review."
     if url_status in {
@@ -984,7 +983,9 @@ def _phase3aq_refresh_next_action(status: str, candidates: list[dict[str, Any]])
     if status == "READONLY_REFRESH_COMPLETED":
         return "Rerun phase3aq-positive-ev-link-audit and inspect remaining book blockers."
     if candidates:
-        return "Review candidates, then rerun with --apply-readonly-refresh if writer gates are clear."
+        return (
+            "Review candidates, then rerun with --apply-readonly-refresh if writer gates are clear."
+        )
     return "No exact verified book refresh candidates; repair link/catalog status first."
 
 

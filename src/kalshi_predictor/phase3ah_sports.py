@@ -608,8 +608,7 @@ def _roster_template(
         if _blocks_generated_roster_candidate(
             league=league,
             player_name=entity,
-            also_team_alias=(league, _normalized_roster_candidate_name(entity))
-            in team_alias_keys,
+            also_team_alias=(league, _normalized_roster_candidate_name(entity)) in team_alias_keys,
         ):
             continue
         examples = [str(item) for item in candidate.get("example_tickers", [])]
@@ -694,9 +693,7 @@ def _blocks_roster_candidate_from_diagnostics(
 ) -> bool:
     if item.get("blocks_roster_evidence") is True:
         return True
-    entity_type = str(
-        item.get("verified_entity_type") or item.get("entity_type") or ""
-    ).upper()
+    entity_type = str(item.get("verified_entity_type") or item.get("entity_type") or "").upper()
     if entity_type not in PLAYER_ROSTER_ENTITY_TYPES:
         return True
     league = str(item.get("league") or "").upper()
@@ -846,9 +843,10 @@ def _manual_disambiguation_template(rows: list[dict[str, Any]]) -> list[dict[str
     review_rows: list[dict[str, Any]] = []
     for row in rows:
         cause = str(row.get("primary_cause") or row.get("cause") or "")
-        if cause not in {MULTI_LEG_CAUSE, PLAYER_PROP_CAUSE} and int(
-            row.get("clean_candidate_count") or 0
-        ) <= 0:
+        if (
+            cause not in {MULTI_LEG_CAUSE, PLAYER_PROP_CAUSE}
+            and int(row.get("clean_candidate_count") or 0) <= 0
+        ):
             continue
         review_rows.append(
             {
@@ -859,9 +857,7 @@ def _manual_disambiguation_template(rows: list[dict[str, Any]]) -> list[dict[str
                 "market_title": row.get("market_title"),
                 "primary_cause": cause,
                 "entities": row.get("entities", []),
-                "candidate_games": row.get("game_candidates")
-                or row.get("candidate_games")
-                or [],
+                "candidate_games": row.get("game_candidates") or row.get("candidate_games") or [],
                 "review_status": "UNVERIFIED",
                 "chosen_game_key": "",
                 "chosen_market_type": "",
@@ -900,8 +896,7 @@ def _phase3ae_ready_gate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "phase3ae_ready_rows": len(ready_rows),
         "ready_rows": ready_rows[:100],
         "blocked_breakdown": [
-            {"reason": reason, "count": count}
-            for reason, count in blocked_counts.most_common()
+            {"reason": reason, "count": count} for reason, count in blocked_counts.most_common()
         ],
         "policy": (
             "Rows are only informational. Rerun Phase 3AE to create verified links after "
@@ -999,13 +994,11 @@ def _next_commands(
     )
     if needs_fetch and not fetch_schedules:
         commands.append(
-            "kalshi-bot phase3ah-sports-evidence-backfill "
-            "--fetch-schedules --ingest-schedules"
+            "kalshi-bot phase3ah-sports-evidence-backfill --fetch-schedules --ingest-schedules"
         )
     if round_placeholder_rows:
         commands.append(
-            "kalshi-bot phase3ah-round-placeholder-resolution "
-            "--output-dir reports/phase3ah_sports"
+            "kalshi-bot phase3ah-round-placeholder-resolution --output-dir reports/phase3ah_sports"
         )
     commands.extend(
         [
@@ -1027,9 +1020,7 @@ def _recommended_next_action(
     fetch_schedules: bool,
 ) -> str:
     backfill_needed = [
-        window
-        for window in schedule_windows
-        if not int(window.get("verified_games_in_db") or 0)
+        window for window in schedule_windows if not int(window.get("verified_games_in_db") or 0)
     ]
     if backfill_needed and not fetch_schedules:
         return (
@@ -1123,8 +1114,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
             f"- Team/entity alias review rows: {summary['team_alias_review_rows']}",
             f"- Roster review rows: {summary['roster_review_rows']}",
             f"- Manual disambiguation rows: {summary['manual_disambiguation_rows']}",
-            "- Round placeholder resolution rows: "
-            f"{summary['round_placeholder_resolution_rows']}",
+            f"- Round placeholder resolution rows: {summary['round_placeholder_resolution_rows']}",
             "",
             "## Round Placeholder Resolution",
             "",

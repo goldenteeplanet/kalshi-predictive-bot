@@ -20,7 +20,9 @@ def write_multi_window_report(*, reports_dir: Path, output_dir: Path) -> Path:
         if not window_id:
             continue
         evaluations = payload.get("immediate_evaluations", [])
-        positive = [row for row in evaluations if Decimal(str(row.get("executable_edge") or "0")) > 0]
+        positive = [
+            row for row in evaluations if Decimal(str(row.get("executable_edge") or "0")) > 0
+        ]
         windows[window_id] = {
             "window_id": window_id,
             "source_path": str(source_path),
@@ -28,21 +30,31 @@ def write_multi_window_report(*, reports_dir: Path, output_dir: Path) -> Path:
             "positive_edge": len(positive),
             "advanced": sum(bool(row.get("advance")) for row in evaluations),
             "minimum_time_to_close_minutes": min(
-                (Decimal(str(row["time_to_close_minutes"])) for row in evaluations
-                 if row.get("time_to_close_minutes") is not None), default=None,
+                (
+                    Decimal(str(row["time_to_close_minutes"]))
+                    for row in evaluations
+                    if row.get("time_to_close_minutes") is not None
+                ),
+                default=None,
             ),
         }
         for row in positive:
             blockers = list(row.get("blockers") or [])
-            positive_rows.append({
-                "window_id": window_id, "ticker": row.get("ticker"),
-                "model_name": row.get("model_name"), "executable_edge": row.get("executable_edge"),
-                "opportunity_score": row.get("opportunity_score"),
-                "liquidity_score": row.get("liquidity_score"), "spread": row.get("spread"),
-                "time_to_close_minutes": row.get("time_to_close_minutes"),
-                "blockers": blockers, "advance": bool(row.get("advance")),
-                "remaining_blocker_count": len(blockers),
-            })
+            positive_rows.append(
+                {
+                    "window_id": window_id,
+                    "ticker": row.get("ticker"),
+                    "model_name": row.get("model_name"),
+                    "executable_edge": row.get("executable_edge"),
+                    "opportunity_score": row.get("opportunity_score"),
+                    "liquidity_score": row.get("liquidity_score"),
+                    "spread": row.get("spread"),
+                    "time_to_close_minutes": row.get("time_to_close_minutes"),
+                    "blockers": blockers,
+                    "advance": bool(row.get("advance")),
+                    "remaining_blocker_count": len(blockers),
+                }
+            )
     blocker_counts = Counter(blocker for row in positive_rows for blocker in row["blockers"])
     advanced = [row for row in positive_rows if row["advance"]]
     near_misses = sorted(
@@ -51,16 +63,23 @@ def write_multi_window_report(*, reports_dir: Path, output_dir: Path) -> Path:
     )
     ordered_windows = [windows[key] for key in sorted(windows)]
     report = {
-        "phase": "GH-1V", "generated_at": utc_now().isoformat(),
+        "phase": "GH-1V",
+        "generated_at": utc_now().isoformat(),
         "mode": "READ_ONLY_MULTI_WINDOW_NEAR_MISS_ATTRIBUTION",
-        "database_writes": 0, "execution_enabled": False, "thresholds_changed": False,
-        "windows": ordered_windows, "positive_edge_rows": positive_rows,
-        "near_misses": near_misses, "advanced_candidates": advanced,
+        "database_writes": 0,
+        "execution_enabled": False,
+        "thresholds_changed": False,
+        "windows": ordered_windows,
+        "positive_edge_rows": positive_rows,
+        "near_misses": near_misses,
+        "advanced_candidates": advanced,
         "summary": {
-            "distinct_windows": len(ordered_windows), "minimum_windows": MIN_WINDOWS,
+            "distinct_windows": len(ordered_windows),
+            "minimum_windows": MIN_WINDOWS,
             "multi_window_complete": len(ordered_windows) >= MIN_WINDOWS,
             "evaluated": sum(row["evaluated"] for row in ordered_windows),
-            "positive_edge": len(positive_rows), "advanced": len(advanced),
+            "positive_edge": len(positive_rows),
+            "advanced": len(advanced),
             "positive_edge_blocker_counts": dict(sorted(blocker_counts.items())),
             "execution_remains_disabled": True,
         },

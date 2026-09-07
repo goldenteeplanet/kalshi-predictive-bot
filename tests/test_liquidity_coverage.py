@@ -50,9 +50,7 @@ def test_complete_vector_is_marked_executable():
 
 
 def test_no_bid_becomes_yes_upper_bound_without_inventing_a_lower_bound():
-    converted = executable_yes_bounds(
-        {"yes_bid": None, "no_bid": "0.82", "no_ask": "0.41"}
-    )
+    converted = executable_yes_bounds({"yes_bid": None, "no_bid": "0.82", "no_ask": "0.41"})
     assert converted["bid"] is None
     assert converted["ask"] == pytest.approx(0.18)
     assert converted["bid_source"] == "MISSING"

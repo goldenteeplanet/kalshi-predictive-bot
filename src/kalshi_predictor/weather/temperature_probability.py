@@ -67,9 +67,7 @@ def probability_in_range(
         raise ValueError("range_high must be greater than or equal to range_low")
     if sigma <= 0:
         return 1.0 if range_low <= forecast <= range_high else 0.0
-    return normal_cdf((range_high - forecast) / sigma) - normal_cdf(
-        (range_low - forecast) / sigma
-    )
+    return normal_cdf((range_high - forecast) / sigma) - normal_cdf((range_low - forecast) / sigma)
 
 
 def probability_above_with_observed_max(

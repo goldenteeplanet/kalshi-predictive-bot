@@ -90,9 +90,7 @@ def evaluate_policies(dataset: RLDataset, *, config: RLConfig) -> dict[str, Any]
             effective_sample_size=Decimal(str(len(dataset.rows))),
             action_support_coverage=support_coverage,
             maximum_importance_weight=Decimal("1"),
-            warnings=(
-                "Minimum training rows or per-action support was not met.",
-            ),
+            warnings=("Minimum training rows or per-action support was not met.",),
         )
         return _result_payload(
             dataset=dataset,

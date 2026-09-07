@@ -76,4 +76,3 @@ def _notes(forecast_count: int, evaluated_count: int, trade_count: int) -> str:
     if trade_count == 0:
         return "Evaluated forecasts did not clear paper strategy edge filters."
     return "Compared using stored settled forecasts only."
-

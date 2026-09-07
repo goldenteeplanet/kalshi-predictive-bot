@@ -11,9 +11,7 @@ ROOT = Path(__file__).parents[1]
 def test_refresh_readiness_certification_passes_read_only_contract() -> None:
     result = certify_refresh_readiness(ROOT)
     baseline = json.loads(
-        (ROOT / "tests/fixtures/refresh_readiness_visual_baseline.json").read_text(
-            encoding="utf-8"
-        )
+        (ROOT / "tests/fixtures/refresh_readiness_visual_baseline.json").read_text(encoding="utf-8")
     )
     assert result["decision"] == "PASS"
     assert all(result["checks"].values())

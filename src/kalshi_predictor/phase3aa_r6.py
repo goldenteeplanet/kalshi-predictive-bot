@@ -53,8 +53,7 @@ SOURCE_CLOSED_STATUSES = {"closed"}
 
 
 class ExactMarketClient(Protocol):
-    def get_market(self, ticker: str) -> dict[str, Any]:
-        ...
+    def get_market(self, ticker: str) -> dict[str, Any]: ...
 
 
 @dataclass(frozen=True)
@@ -355,9 +354,7 @@ def _refresh_missing_component_settlements(
         "missing_component_tickers_before": len(missing_component_tickers),
         "component_tickers_checked": len(rows),
         "exact_market_rows_written": sum(1 for row in rows if row["exact_market_written"]),
-        "exact_settlement_rows_written": sum(
-            1 for row in rows if row["exact_settlement_written"]
-        ),
+        "exact_settlement_rows_written": sum(1 for row in rows if row["exact_settlement_written"]),
         "fetch_errors": sum(1 for row in rows if row["source_fetch_status"] == "FETCH_ERROR"),
         "identity_mismatches": sum(
             1 for row in rows if row["source_fetch_status"] == "TICKER_IDENTITY_MISMATCH"
@@ -444,9 +441,7 @@ def _refresh_one_component_ticker(
                 "exact_settlement_written": True,
                 "settlement_result": settlement.result,
                 "settlement_yes_value": settlement.yes_settlement_value,
-                "settled_at": settlement.settled_at.isoformat()
-                if settlement.settled_at
-                else None,
+                "settled_at": settlement.settled_at.isoformat() if settlement.settled_at else None,
             }
         )
     elif _source_is_closed_without_outcome(payload):
@@ -673,9 +668,7 @@ def _summary(
             "missing_component_tickers_before"
         ],
         "component_tickers_checked": component_refresh["component_tickers_checked"],
-        "component_exact_market_rows_written": component_refresh[
-            "exact_market_rows_written"
-        ],
+        "component_exact_market_rows_written": component_refresh["exact_market_rows_written"],
         "component_exact_settlement_rows_written": component_refresh[
             "exact_settlement_rows_written"
         ],

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 import csv
 import hashlib
+import json
 import subprocess
 import sys
 from collections import Counter
@@ -34,14 +34,14 @@ from kalshi_predictor.kalshi.orderbook import parse_orderbook, usable_bid_ask_bo
 from kalshi_predictor.learning.safety import learning_status
 from kalshi_predictor.opportunities.market_identity import (
     BUILT_FROM_EXACT_CATALOG,
+    CATALOG_MATCH_MISSING,
+    CATALOG_STALE,
     COMPOSITE_LOCAL_ONLY,
     GENERAL_SOURCE_NOT_SAFE,
     MALFORMED_URL,
-    CATALOG_STALE,
     MARKET_NOT_IN_CATALOG,
     PARTIAL_PROVENANCE_BLOCKED,
     PLACEHOLDER_BLOCKED,
-    CATALOG_MATCH_MISSING,
     STALE_CATALOG,
     SYNTHETIC_ONLY,
     market_identity_fields,
@@ -49,26 +49,26 @@ from kalshi_predictor.opportunities.market_identity import (
 )
 from kalshi_predictor.opportunities.window_eligibility import (
     EXPIRED_WINDOW_EXCLUDED,
-    MARKET_CLOSED_OR_SETTLED,
     MARKET_CLOSE_TOO_NEAR,
+    MARKET_CLOSED_OR_SETTLED,
     MARKET_NOT_OPEN,
     current_market_window_status,
 )
-from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES
+from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3aa import build_settlement_eta_schedule
-from kalshi_predictor.phase3al import build_phase3al_resume_plan
 from kalshi_predictor.phase3aj_gap_closure import build_paper_trade_funnel
 from kalshi_predictor.phase3ak import write_market_data_refresh_status
+from kalshi_predictor.phase3al import build_phase3al_resume_plan
 from kalshi_predictor.phase3an import (
+    _phase3an_data_watermark,
+    _phase3an_safety_flags,
     build_phase3an_crypto_feature_completeness,
     build_phase3an_economic_news_watch,
     build_phase3an_general_sources_status,
     build_phase3an_paper_funnel_explain,
     build_phase3an_settlement_health_confirm,
     build_phase3an_sports_blocker_report,
-    _phase3an_data_watermark,
-    _phase3an_safety_flags,
 )
 from kalshi_predictor.phase3ar import build_crypto_forecast_coverage
 from kalshi_predictor.phase3as import build_active_market_universe
@@ -378,10 +378,7 @@ def _script(*, max_cycles: int, interval_minutes: int) -> str:
             "  kalshi-bot collect-once --status open --limit 500 --max-pages 5 || true",
             "  kalshi-bot market-legs-parse --refresh || true",
             "  kalshi-bot link-coverage --output reports/link_coverage_report.md || true",
-            (
-                "  kalshi-bot ingest-crypto --symbols BTC,ETH,SOL,XRP,DOGE "
-                "--source coinbase || true"
-            ),
+            ("  kalshi-bot ingest-crypto --symbols BTC,ETH,SOL,XRP,DOGE --source coinbase || true"),
             "  kalshi-bot build-crypto-features --symbols BTC,ETH,SOL,XRP,DOGE || true",
             (
                 "  kalshi-bot crypto-history-warmup --symbols BTC,ETH,SOL,XRP,DOGE "
@@ -459,9 +456,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         ]
     )
     for step in payload["cycle_steps"]:
-        lines.append(
-            f"| {step['name']} | {step['enabled']} | `{step['command']}` |"
-        )
+        lines.append(f"| {step['name']} | {step['enabled']} | `{step['command']}` |")
     lines.extend(
         [
             "",
@@ -561,8 +556,7 @@ def build_phase3ap_book_diagnostic(
         "no_executable_book_rows": no_book_rows,
         "acceptance": {
             "positive_ev_rows_explained_individually": all(
-                bool(row.get("no_book_reason")) or row["executable_book"]
-                for row in positive_rows
+                bool(row.get("no_book_reason")) or row["executable_book"] for row in positive_rows
             ),
             "positive_ev_requires_executable_book": all(
                 row["executable_book"] for row in positive_rows if row["paper_ready"]
@@ -619,10 +613,9 @@ def build_phase3ap_refresh_positive_ev_books(
         window_hours=window_hours,
         limit=limit,
     )
-    candidates = [
-        row for row in book["positive_ev_rows"]
-        if not row["executable_book"]
-    ][:max_markets]
+    candidates = [row for row in book["positive_ev_rows"] if not row["executable_book"]][
+        :max_markets
+    ]
     writer = _phase3ap_db_writer_status(settings=resolved)
     blocked_by_writer = apply_readonly_refresh and not bool(writer.get("safe_to_start_write", True))
     refresh_artifact = None
@@ -692,17 +685,21 @@ def build_phase3ap_refresh_positive_ev_books(
         "refresh_completed": refresh_completed,
         "refresh_error": refresh_error,
         "refresh_artifact": refresh_artifact,
-        "markets_needing_book_refresh": [
-            row["market_ticker"] for row in candidates
-        ],
-        "markets_refreshed": [] if not refresh_completed else [row["market_ticker"] for row in candidates],
-        "markets_blocked_by_writer": [row["market_ticker"] for row in candidates] if blocked_by_writer else [],
+        "markets_needing_book_refresh": [row["market_ticker"] for row in candidates],
+        "markets_refreshed": []
+        if not refresh_completed
+        else [row["market_ticker"] for row in candidates],
+        "markets_blocked_by_writer": [row["market_ticker"] for row in candidates]
+        if blocked_by_writer
+        else [],
         "markets_not_found": [
-            row["market_ticker"] for row in candidates
+            row["market_ticker"]
+            for row in candidates
             if row["kalshi_url_status"] == "MARKET_NOT_IN_CATALOG"
         ],
         "markets_closed_or_paused": [
-            row["market_ticker"] for row in candidates
+            row["market_ticker"]
+            for row in candidates
             if row["no_book_reason"] in {"MARKET_NOT_OPEN", "MARKET_PAUSED"}
         ],
         "markets_still_empty_after_refresh": [],
@@ -714,7 +711,9 @@ def build_phase3ap_refresh_positive_ev_books(
             else (
                 "Review the refresh artifact and rerun phase3ap-book-diagnostic."
                 if refresh_completed
-                else "Run again with --apply-readonly-refresh only after db-writer-monitor is clear."
+                else (
+                    "Run again with --apply-readonly-refresh only after db-writer-monitor is clear."
+                )
             )
         ),
     }
@@ -902,9 +901,7 @@ def build_phase3ap_paper_ready_gate(
         else {
             "generated_at": utc_now().isoformat(),
             "git_commit": None,
-            "database_fingerprint": {
-                "status": "NOT_COLLECTED_FOR_EMBEDDED_SCOPED_SUMMARY"
-            },
+            "database_fingerprint": {"status": "NOT_COLLECTED_FOR_EMBEDDED_SCOPED_SUMMARY"},
             "command_arguments": command_args,
             "data_watermark": {"status": "NOT_COLLECTED_FOR_EMBEDDED_SCOPED_SUMMARY"},
             "safety_flags": {
@@ -949,9 +946,7 @@ def build_phase3ap_paper_ready_gate(
                 1 for row in current_positive_rows if row.get("primary_blocker") == "STALE_QUOTE"
             ),
             "positive_ev_no_executable_book_rows": sum(
-                1
-                for row in current_positive_rows
-                if not row["executable_book"]
+                1 for row in current_positive_rows if not row["executable_book"]
             ),
             "first_hard_blocker": first_hard_blocker,
             "reason_counts": dict(reason_counts),
@@ -1160,12 +1155,12 @@ def _phase3ap_gate_row(
     if probability is not None:
         side_probability = Decimal("1") - probability if side == BUY_NO else probability
     price = to_decimal(ranking.best_price)
-    raw_ev = side_probability - price if side_probability is not None and price is not None else None
+    raw_ev = (
+        side_probability - price if side_probability is not None and price is not None else None
+    )
     spread = to_decimal(ranking.spread)
     executable_ev = (
-        raw_ev - (spread or Decimal("0")) - RAW_EV_COST_BUFFER
-        if raw_ev is not None
-        else None
+        raw_ev - (spread or Decimal("0")) - RAW_EV_COST_BUFFER if raw_ev is not None else None
     )
     quote_age = _age_minutes(snapshot.captured_at, now) if snapshot is not None else None
     window = current_market_window_status(
@@ -1192,7 +1187,9 @@ def _phase3ap_gate_row(
     )
     forecast_id = _forecast_id_from_ranking(ranking)
     duplicate = (ranking.ticker, ranking.forecast_model, forecast_id) in paper_orders
-    phase3s_pass = (to_decimal(ranking.opportunity_score) or Decimal("0")) >= settings.opportunity_min_score
+    phase3s_pass = (
+        to_decimal(ranking.opportunity_score) or Decimal("0")
+    ) >= settings.opportunity_min_score
     phase3m_contracts = int(getattr(sizing, "proposed_contracts", 0) or 0)
     phase3m_nonzero = phase3m_contracts > 0
     phase3n_action = str(getattr(risk, "action", "") or "").upper()
@@ -1309,10 +1306,11 @@ def _phase3ap_book_probe(
     reason = None
     if not window.get("current_window_eligible"):
         reason = str(window.get("window_status") or MARKET_NOT_OPEN)
-        freshness_state = "EXPIRED_WINDOW" if reason == EXPIRED_WINDOW_EXCLUDED else "MARKET_NOT_OPEN"
+        freshness_state = (
+            "EXPIRED_WINDOW" if reason == EXPIRED_WINDOW_EXCLUDED else "MARKET_NOT_OPEN"
+        )
     elif not (
-        identity.get("kalshi_url_verified")
-        or identity.get("exact_market_identity_verified")
+        identity.get("kalshi_url_verified") or identity.get("exact_market_identity_verified")
     ):
         status = str(identity.get("kalshi_url_status") or identity.get("url_verification_status"))
         if status in {SYNTHETIC_ONLY, COMPOSITE_LOCAL_ONLY}:
@@ -1366,19 +1364,15 @@ def _phase3ap_book_probe(
         "derived_executable_buy_price": decimal_to_str(ask_price),
         "ranked_buy_price": decimal_to_str(ranked_buy_price),
         "buy_price_matches_ranking": bool(
-            ask_price is not None
-            and ranked_buy_price is not None
-            and ask_price == ranked_buy_price
+            ask_price is not None and ranked_buy_price is not None and ask_price == ranked_buy_price
         ),
         "actual_buy_side": str(ranking.best_side or ""),
-        "actual_buy_price_source": (
-            "NO_BID_COMPLEMENT" if not buying_no else "YES_BID_COMPLEMENT"
+        "actual_buy_price_source": ("NO_BID_COMPLEMENT" if not buying_no else "YES_BID_COMPLEMENT"),
+        "minimum_buy_side_size": decimal_to_str(
+            book.min_depth if book is not None else Decimal("1")
         ),
-        "minimum_buy_side_size": decimal_to_str(book.min_depth if book is not None else Decimal("1")),
         "sufficient_buy_side_size": bool(
-            book is not None
-            and ask_depth is not None
-            and ask_depth >= book.min_depth
+            book is not None and ask_depth is not None and ask_depth >= book.min_depth
         ),
         "visible_depth": decimal_to_str((bid_depth or Decimal("0")) + (ask_depth or Decimal("0"))),
         "depth_at_configured_limit": decimal_to_str(ask_depth),
@@ -1386,7 +1380,9 @@ def _phase3ap_book_probe(
         "book_freshness_state": freshness_state,
         "executable_book": executable,
         "no_book_reason": reason,
-        "book_reason": "Executable book passes configured gates." if executable else (book.reason if book else reason),
+        "book_reason": "Executable book passes configured gates."
+        if executable
+        else (book.reason if book else reason),
     }
 
 
@@ -1399,7 +1395,9 @@ def _settlement_diagnostic_row(
     ticker = str(row.get("ticker") or "")
     market = session.get(Market, ticker) if ticker else None
     ranking = session.get(MarketRanking, row.get("ranking_id")) if row.get("ranking_id") else None
-    identity = verify_market_identity(session, ticker=ticker, ranking=ranking, market=market, settings=settings)
+    identity = verify_market_identity(
+        session, ticker=ticker, ranking=ranking, market=market, settings=settings
+    )
     check = _settlement_entry_check(
         session,
         ticker=ticker,
@@ -1414,8 +1412,12 @@ def _settlement_diagnostic_row(
         "paper_entry_settlement_eligible": check["paper_entry_settlement_eligible"],
         "settlement_terms_known": check["settlement_terms_known"],
         "market_status": getattr(market, "status", None),
-        "market_close_time": market.close_time.isoformat() if market and market.close_time else None,
-        "market_settlement_ts": market.settlement_ts.isoformat() if market and market.settlement_ts else None,
+        "market_close_time": market.close_time.isoformat()
+        if market and market.close_time
+        else None,
+        "market_settlement_ts": market.settlement_ts.isoformat()
+        if market and market.settlement_ts
+        else None,
         "rules_primary_present": bool(getattr(market, "rules_primary", None)),
         "rules_secondary_present": bool(getattr(market, "rules_secondary", None)),
         "market_result": getattr(market, "result", None),
@@ -1477,7 +1479,9 @@ def _settlement_entry_check(
     else:
         code = "MARKET_NOT_SETTLEABLE_YET"
         blocks = False
-    terms_known = bool(market and (market.rules_primary or market.rules_secondary) and market.close_time)
+    terms_known = bool(
+        market and (market.rules_primary or market.rules_secondary) and market.close_time
+    )
     return {
         "specific_reason_code": code,
         "blocks_paper_entry": blocks,
@@ -1577,7 +1581,9 @@ def _latest_by_ticker(
         session.scalars(
             select(model)
             .where(model.ticker.in_(tickers))
-            .order_by(model.ticker, desc(column), desc(model.id) if hasattr(model, "id") else desc(column))
+            .order_by(
+                model.ticker, desc(column), desc(model.id) if hasattr(model, "id") else desc(column)
+            )
         )
     )
     latest: dict[str, Any] = {}
@@ -1709,7 +1715,9 @@ def _phase3ap_thresholds(settings: Settings) -> dict[str, str]:
         "opportunity_min_score": str(settings.opportunity_min_score),
         "opportunity_max_spread": str(settings.opportunity_max_spread),
         "opportunity_min_liquidity": str(settings.opportunity_min_liquidity),
-        "opportunity_min_time_to_close_minutes": str(settings.opportunity_min_time_to_close_minutes),
+        "opportunity_min_time_to_close_minutes": str(
+            settings.opportunity_min_time_to_close_minutes
+        ),
         "quote_stale_after_minutes": str(QUOTE_STALE_AFTER_MINUTES),
         "min_executable_liquidity_score": str(MIN_EXECUTABLE_LIQUIDITY_SCORE),
         "thresholds_lowered": "False",
@@ -1817,7 +1825,9 @@ def _empty_orderbook(raw_orderbook: dict[str, Any]) -> bool:
     if not raw_orderbook:
         return True
     container = raw_orderbook.get("orderbook_fp") or raw_orderbook.get("orderbook") or raw_orderbook
-    yes = container.get("yes_dollars", container.get("yes")) if isinstance(container, dict) else None
+    yes = (
+        container.get("yes_dollars", container.get("yes")) if isinstance(container, dict) else None
+    )
     no = container.get("no_dollars", container.get("no")) if isinstance(container, dict) else None
     return not yes and not no
 
@@ -1826,7 +1836,9 @@ def _market_open_for_entry(market: Market | None) -> bool:
     if market is None:
         return False
     status = str(market.status or "").lower()
-    if any(token in status for token in ("closed", "settled", "final", "expired", "paused", "halt")):
+    if any(
+        token in status for token in ("closed", "settled", "final", "expired", "paused", "halt")
+    ):
         return False
     now = utc_now()
     close_time = _aware_utc(market.close_time)
@@ -1861,7 +1873,10 @@ def _looks_like_settlement_check_row(row: dict[str, Any]) -> bool:
 
 def _settlement_reason_text(code: str, *, blocks: bool, terms_known: bool) -> str:
     if code == "MARKET_NOT_SETTLEABLE_YET" and terms_known and not blocks:
-        return "Market is open with known settlement terms; final outcome is not required for paper entry."
+        return (
+            "Market is open with known settlement terms; final outcome is not required for "
+            "paper entry."
+        )
     if code == "SETTLEMENT_RULE_MISSING":
         return "Market lacks local settlement rules/terms needed for safe paper entry."
     if code == "MARKET_CLOSE_UNKNOWN":
@@ -1894,7 +1909,8 @@ def _what_would_make_paper_ready(
         return [settlement.get("reason") or "Repair settlement terms/source evidence."]
     mapping = {
         "UNVERIFIED_KALSHI_LINK": "Repair exact Kalshi market identity and canonical URL.",
-        "BUILT_FROM_EXACT_CATALOG": "Run Phase 3AR URL repair to persist an official URL before paper entry.",
+        "BUILT_FROM_EXACT_CATALOG": "Run Phase 3AR URL repair to persist an official "
+        "URL before paper entry.",
         "MALFORMED_URL": "Run Phase 3AR URL repair for exact catalog matches.",
         "CATALOG_MATCH_MISSING": "Repair exact catalog market identity before any book refresh.",
         "MARKET_NOT_OPEN": "Wait for an open/tradeable market lifecycle.",
@@ -1902,13 +1918,15 @@ def _what_would_make_paper_ready(
         "STALE_QUOTE": "Refresh the exact market snapshot/orderbook.",
         "SPREAD_TOO_WIDE": "Wait for spread below the configured threshold.",
         "LIQUIDITY_TOO_LOW": "Wait for visible depth/liquidity above configured thresholds.",
-        "NO_POSITIVE_EXECUTABLE_EV": "Wait for executable EV to remain positive after spread/costs.",
+        "NO_POSITIVE_EXECUTABLE_EV": "Wait for executable EV to remain positive after "
+        "spread/costs.",
         "CONFIDENCE_BELOW_THRESHOLD": "Wait for model confidence to pass the configured threshold.",
         "SOURCE_NOT_FORECAST_SAFE": "Complete exact source-evidence gates before promotion.",
         "PHASE_3S_SKIP": "Wait for Phase 3S to say proceed.",
         "PHASE_3M_ZERO_SIZE": "Run/repair Phase 3M sizing only after market gates pass.",
         "PHASE_3N_RISK_BLOCK": "Run/repair Phase 3N paper risk approval only after sizing passes.",
-        "DUPLICATE_IDEMPOTENCY_KEY": "Do not duplicate an existing paper intent for the same forecast.",
+        "DUPLICATE_IDEMPOTENCY_KEY": "Do not duplicate an existing paper intent for th"
+        "e same forecast.",
     }
     return [mapping.get(primary, "Investigate the unknown paper-ready blocker.")]
 
@@ -1923,15 +1941,22 @@ def _render_phase3ap_book_markdown(payload: dict[str, Any]) -> str:
         f"- Positive EV rows: {summary['positive_ev_rows']}",
         f"- Positive EV with no executable book: {summary['positive_ev_no_executable_book_rows']}",
         "",
-        "| Ticker | Kalshi status | Raw EV | Exec EV | Book | Reason | Quote age | Spread | Depth | Next |",
+        (
+            "| Ticker | Kalshi status | Raw EV | Exec EV | Book | Reason | Quote age | "
+            "Spread | Depth | Next |"
+        ),
         "|---|---|---:|---:|---|---|---:|---:|---:|---|",
     ]
     for row in payload["positive_ev_rows"][:50]:
         lines.append(
             f"| {row['market_ticker']} | {row['kalshi_url_status']} | {row['raw_ev']} | "
-            f"{row['executable_ev']} | {row['executable_book']} | {row['no_book_reason'] or 'EXECUTABLE'} | "
+            f"{row['executable_ev']} | "
+            f"{row['executable_book']} | "
+            f"{row['no_book_reason'] or 'EXECUTABLE'} | "
             f"{row['quote_age_minutes'] or 'n/a'} | {row['spread'] or 'n/a'} | "
-            f"{row['visible_depth'] or 'n/a'} | {'; '.join(row['what_would_make_paper_ready'])} |"
+            f"{row['visible_depth'] or 'n/a'} | "
+            f"{'; '.join(row['what_would_make_paper_ready'])} "
+            f"|"
         )
     if not payload["positive_ev_rows"]:
         lines.append("| _No positive-EV rows_ | | | | | | | | | |")
@@ -1975,10 +2000,18 @@ def _render_phase3ap_settlement_markdown(payload: dict[str, Any]) -> str:
         lines.append(f"| {reason} | {count} |")
     if not payload["specific_reason_counts"]:
         lines.append("| _none_ | 0 |")
-    lines.extend(["", "| Ticker | Specific reason | Blocks entry | Eligible | Detail |", "|---|---|---|---|---|"])
+    lines.extend(
+        [
+            "",
+            "| Ticker | Specific reason | Blocks entry | Eligible | Detail |",
+            "|---|---|---|---|---|",
+        ]
+    )
     for row in payload["rows"][:50]:
         lines.append(
-            f"| {row['ticker']} | {row['specific_reason_code']} | {row['blocks_paper_entry']} | "
+            f"| {row['ticker']} | "
+            f"{row['specific_reason_code']} | "
+            f"{row['blocks_paper_entry']} | "
             f"{row['paper_entry_settlement_eligible']} | {row['reason']} |"
         )
     return "\n".join(lines) + "\n"
@@ -1996,7 +2029,8 @@ def _render_phase3ap_executive_summary(
     settlement_summary = settlement["summary"]
     no_book_reason = next(iter(book_summary["no_book_reason_counts"]), "none")
     fresh_executable = sum(
-        1 for row in book["positive_ev_rows"]
+        1
+        for row in book["positive_ev_rows"]
         if row["executable_book"] and row["book_freshness_state"] == "FRESH"
     )
     general = phase3an.get("general_sources", {}).get("summary", {})
@@ -2016,34 +2050,47 @@ def _render_phase3ap_executive_summary(
         (
             "1. Positive-EV rows are blocked because the canonical paper-ready gate found "
             f"`{gate_summary['paper_ready_rows']}` paper-ready rows and "
-            f"`{book_summary['positive_ev_no_executable_book_rows']}` positive-EV rows without executable books."
+            f"`"
+            f"{book_summary['positive_ev_no_executable_book_rows']}` "
+            "positive-EV rows without executable books."
         ),
         (
-            "2. Real Kalshi links are enforced by Phase 3AO identity fields; every paper-ready row "
-            f"has verified links: `{gate_summary['all_paper_ready_have_verified_kalshi_links']}`."
+            "2. Real Kalshi links are enforced by Phase 3AO i"
+            "dentity fields; every paper-ready row "
+            f"has verified links: `"
+            f"{gate_summary['all_paper_ready_have_verified_kalshi_links']}`."
         ),
         (
             "3. The leading book issue is "
-            f"`{no_book_reason}`; fresh executable positive-EV rows currently: `{fresh_executable}`."
+            f"`{no_book_reason}`; fresh executable positive-EV"
+            f" rows currently: `{fresh_executable}`."
         ),
         (
             "4. Settlement check is split into specific reason codes; generic remaining: "
             f"`{settlement_summary['generic_settlement_check_failed_remaining']}`. "
-            f"Open known-term rows eligible for paper entry: `{settlement_summary['open_market_entry_eligible_rows']}`."
+            f"Open known-term rows eligible for paper entry: `"
+            f"{settlement_summary['open_market_entry_eligible_rows']}`."
         ),
         (
             "5. Rows that would become paper-ready after fresh executable book data: "
             f"`{_would_be_ready_after_book(book['positive_ev_rows'])}`."
         ),
-        "6. Next single best command: `kalshi-bot phase3ap-refresh-positive-ev-books --dry-run --output-dir reports/phase3ap`.",
+        (
+            "6. Next single best command: `kalshi-bot phase3ap-refresh-positive-ev-books "
+            "--dry-run --output-dir reports/phase3ap`."
+        ),
         "7. Thresholds should not be changed.",
         "8. No command in this phase created paper trades.",
         "",
         "## Source Gates",
         "",
         (
-            f"- General sources: evidence-ready `{general.get('source_evidence_ready_rows', 0)}`, "
-            f"link-safe `{general.get('link_safe_rows', 0)}`, forecast-safe `{general.get('forecast_safe_rows', 0)}`."
+            f"- General sources: evidence-ready `"
+            f"{general.get('source_evidence_ready_rows', 0)}`,"
+            f" "
+            f"link-safe `{general.get('link_safe_rows', 0)}`, "
+            f"forecast-safe `"
+            f"{general.get('forecast_safe_rows', 0)}`."
         ),
         (
             f"- Sports: placeholders `{sports.get('placeholder_rows', 0)}`, "
@@ -2051,7 +2098,8 @@ def _render_phase3ap_executive_summary(
             f"safe repair rows `{sports.get('safe_repair_rows', 0)}`."
         ),
         (
-            f"- Economic/news: economic compatible `{econ.get('economic_compatible_parsed_markets', 0)}`, "
+            f"- Economic/news: economic compatible `"
+            f"{econ.get('economic_compatible_parsed_markets', 0)}`, "
             f"news compatible `{econ.get('news_compatible_parsed_markets', 0)}`."
         ),
         "",
@@ -2069,10 +2117,24 @@ def _render_phase3ap_next_actions(
         "# Phase 3AP Next Actions",
         "",
         "1. Keep the system paper/read-only.",
-        "2. Run `kalshi-bot phase3ap-refresh-positive-ev-books --dry-run --output-dir reports/phase3ap`.",
-        "3. If dry-run shows no active writer and the operator wants fresh book snapshots, run `kalshi-bot phase3ap-refresh-positive-ev-books --apply-readonly-refresh --max-markets 25 --max-duration-seconds 120 --output-dir reports/phase3ap`.",
-        "4. Rerun `kalshi-bot phase3ap-paper-ready-unblock-report --output-dir reports/phase3ap --reports-dir reports`.",
-        "5. Do not lower EV, confidence, liquidity, spread, quote freshness, settlement, or risk thresholds.",
+        (
+            "2. Run `kalshi-bot phase3ap-refresh-positive-ev-books --dry-run --output-dir "
+            "reports/phase3ap`."
+        ),
+        (
+            "3. If dry-run shows no active writer and the operator wants fresh book "
+            "snapshots, run `kalshi-bot phase3ap-refresh-positive-ev-books "
+            "--apply-readonly-refresh --max-markets 25 --max-duration-seconds 120 "
+            "--output-dir reports/phase3ap`."
+        ),
+        (
+            "4. Rerun `kalshi-bot phase3ap-paper-ready-unblock-report --output-dir "
+            "reports/phase3ap --reports-dir reports`."
+        ),
+        (
+            "5. Do not lower EV, confidence, liquidity, spread, quote freshness, settlement, "
+            "or risk thresholds."
+        ),
         "",
         "## Current Top Blockers",
         "",

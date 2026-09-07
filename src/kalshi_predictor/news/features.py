@@ -42,7 +42,7 @@ def build_news_features(
                     NewsItem.published_at.is_(None),
                     NewsItem.published_at >= cutoff,
                     NewsItem.ingested_at >= cutoff,
-                )
+                ),
             )
             .order_by(NewsMarketLink.ticker, NewsItem.published_at, NewsItem.id)
         )

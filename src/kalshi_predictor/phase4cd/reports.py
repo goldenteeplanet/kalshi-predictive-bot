@@ -237,16 +237,12 @@ def _category_evidence(session: Session, category: str) -> dict[str, Any]:
 
 
 def _throughput(runs: list[ResearchRun], dashboard: dict[str, Any]) -> dict[str, Any]:
-    seconds = sum(
-        max((row.updated_at - row.started_at).total_seconds(), 0) for row in runs
-    )
+    seconds = sum(max((row.updated_at - row.started_at).total_seconds(), 0) for row in runs)
     evaluated = sum(row.evaluated for row in runs)
     return {
         "replay_evaluations_per_min": evaluated / (seconds / 60) if seconds else None,
         "replay_independent_events_per_hour": (
-            dashboard["historical"]["independent_events"] / (seconds / 3600)
-            if seconds
-            else None
+            dashboard["historical"]["independent_events"] / (seconds / 3600) if seconds else None
         ),
         "shadow_decisions_per_day": dashboard["shadow"].get("decisions", 0),
         "shadow_settlements_per_day": dashboard["shadow"].get("settled", 0),

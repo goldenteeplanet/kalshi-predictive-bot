@@ -22,8 +22,7 @@ NEXT_COMMAND_CANDIDATES = (
     "--output-dir reports/phase3bb_r5_flightaware --reports-dir reports",
     "kalshi-bot phase3bb-r4-flightaware-review-link-gate "
     "--output-dir reports/phase3bb_r4_flightaware --reports-dir reports",
-    "kalshi-bot phase3bb-r2-general-source-availability "
-    "--output-dir reports/phase3bb_r2_sources",
+    "kalshi-bot phase3bb-r2-general-source-availability --output-dir reports/phase3bb_r2_sources",
     "kalshi-bot phase3ax-gap-analysis --output-dir reports/phase3ax --reports-dir reports",
 )
 
@@ -51,16 +50,12 @@ def build_phase3bb_r5_flightaware_date_stable_evidence(
 
     generated_at = utc_now()
     date_report = _read_json(
-        reports_dir
-        / "phase3bb_r2_sources"
-        / "flightaware_cancellation_date_resolution.json"
+        reports_dir / "phase3bb_r2_sources" / "flightaware_cancellation_date_resolution.json"
     )
     r4_gate = _read_json(
         reports_dir / "phase3bb_r4_flightaware" / "flightaware_review_link_gate.json"
     )
-    canonical_evidence = _read_json(
-        evidence_dir / "transportation_flight_cancellation_source.json"
-    )
+    canonical_evidence = _read_json(evidence_dir / "transportation_flight_cancellation_source.json")
     candidates = _candidate_rows(
         date_report=date_report,
         r4_gate=r4_gate,
@@ -91,9 +86,7 @@ def build_phase3bb_r5_flightaware_date_stable_evidence(
                 / "flightaware_cancellation_date_resolution.json"
             ),
             "phase3bb_r4_flightaware_gate": str(
-                reports_dir
-                / "phase3bb_r4_flightaware"
-                / "flightaware_review_link_gate.json"
+                reports_dir / "phase3bb_r4_flightaware" / "flightaware_review_link_gate.json"
             ),
             "canonical_evidence_file": str(
                 evidence_dir / "transportation_flight_cancellation_source.json"
@@ -325,9 +318,7 @@ def _candidate(
 ) -> dict[str, Any]:
     source_url_text = _text(source_url)
     underlying_url_text = _text(underlying_source_url)
-    official_url = _is_flightaware_url(source_url_text) or _is_flightaware_url(
-        underlying_url_text
-    )
+    official_url = _is_flightaware_url(source_url_text) or _is_flightaware_url(underlying_url_text)
     mutable_relative = _is_relative_live_page(source_url_text) or _is_relative_live_page(
         underlying_url_text
     )
@@ -343,13 +334,17 @@ def _candidate(
         and not mutable_relative
         and not is_kalshi_outcome
     )
-    rejection_code = "NONE" if accepted else _rejection_code(
-        official_url=official_url,
-        mutable_relative=mutable_relative,
-        exact_date=exact_date,
-        value_present=value_present,
-        is_kalshi_outcome=is_kalshi_outcome,
-        access_product=access_product,
+    rejection_code = (
+        "NONE"
+        if accepted
+        else _rejection_code(
+            official_url=official_url,
+            mutable_relative=mutable_relative,
+            exact_date=exact_date,
+            value_present=value_present,
+            is_kalshi_outcome=is_kalshi_outcome,
+            access_product=access_product,
+        )
     )
     return {
         "candidate_id": candidate_id,
@@ -381,9 +376,7 @@ def _summary(
     r4_gate: dict[str, Any],
 ) -> dict[str, Any]:
     accepted = [row for row in candidates if row["accepted_as_date_stable_evidence"]]
-    access_required = [
-        row for row in candidates if row["rejection_code"] == "ACCESS_REQUIRED"
-    ]
+    access_required = [row for row in candidates if row["rejection_code"] == "ACCESS_REQUIRED"]
     relative_rejected = [
         row for row in candidates if row["rejection_code"] == "RELATIVE_OR_MUTABLE_PAGE"
     ]
@@ -441,8 +434,7 @@ def _next_codex_task(summary: dict[str, Any]) -> dict[str, Any]:
         phase = "Phase 3BB-R6 FlightAware Manual Review Approval"
         reason = "A date-stable FlightAware candidate exists but still needs reviewed approval."
         problem = (
-            "Record report-only review approval before any link-safe or "
-            "forecast-safe dry run."
+            "Record report-only review approval before any link-safe or forecast-safe dry run."
         )
     else:
         phase = "Phase 3AH-R3 Sports Provenance Repair"

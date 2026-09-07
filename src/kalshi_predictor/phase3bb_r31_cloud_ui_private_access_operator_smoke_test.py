@@ -151,8 +151,7 @@ def build_phase3bb_r31_cloud_ui_private_access_operator_smoke_test(
     result_payloads = [_result_payload(result) for result in results]
     prechecks = _prechecks(r30, resolved_url)
     route_checks = [
-        _route_check(probe, result)
-        for probe, result in zip(probes, results, strict=True)
+        _route_check(probe, result) for probe, result in zip(probes, results, strict=True)
     ]
     checks = prechecks + route_checks
     decision = _decision(checks, r30, result_payloads, resolved_url)

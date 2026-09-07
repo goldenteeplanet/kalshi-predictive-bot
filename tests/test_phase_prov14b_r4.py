@@ -26,9 +26,7 @@ def test_partial_snapshot_preserves_existing_exact_close_time(tmp_path) -> None:
         )
         session.flush()
         assert session.get(Market, "WX-PRESERVE").close_time == close.replace(tzinfo=None)
-        rows = latest_snapshots_for_model(
-            session, model_name="weather_v2", as_of=NOW, limit=10
-        )
+        rows = latest_snapshots_for_model(session, model_name="weather_v2", as_of=NOW, limit=10)
     assert rows is not None
     assert [row.ticker for row in rows] == ["WX-PRESERVE"]
 

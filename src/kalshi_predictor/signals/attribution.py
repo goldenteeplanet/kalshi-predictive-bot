@@ -806,9 +806,9 @@ def _model_market_divergence(
     if ranking and ranking.estimated_edge is not None:
         return to_decimal(ranking.estimated_edge)
     probability = to_decimal(forecast.yes_probability if forecast else None)
-    price = to_decimal(
-        forecast.market_mid_probability if forecast else None
-    ) or _market_price(snapshot)
+    price = to_decimal(forecast.market_mid_probability if forecast else None) or _market_price(
+        snapshot
+    )
     if probability is None or price is None:
         return None
     return probability - price

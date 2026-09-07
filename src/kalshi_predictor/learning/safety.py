@@ -49,9 +49,7 @@ def daily_paper_trade_count(session: Session) -> int:
     today = utc_now().astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     return int(
         session.scalar(
-            select(func.count())
-            .select_from(PaperOrder)
-            .where(PaperOrder.created_at >= today)
+            select(func.count()).select_from(PaperOrder).where(PaperOrder.created_at >= today)
         )
         or 0
     )
@@ -76,9 +74,7 @@ def learning_daily_cap_status(
             else ""
         ),
         "next_action": (
-            "Wait until tomorrow or increase LEARNING_MAX_DAILY_PAPER_TRADES."
-            if reached
-            else ""
+            "Wait until tomorrow or increase LEARNING_MAX_DAILY_PAPER_TRADES." if reached else ""
         ),
         "tooltip": (
             "Learning cap reached. The bot will continue syncing settlements and reports, "

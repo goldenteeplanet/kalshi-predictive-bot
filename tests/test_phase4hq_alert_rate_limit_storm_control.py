@@ -49,9 +49,12 @@ def test_noncritical_capacity_is_reserved_for_critical_alerts() -> None:
 def test_short_limit_and_exact_window_expiry() -> None:
     retry = _retry()
     history = [_event(index, 95 + index, "CRITICAL") for index in range(1, 6)]
-    assert evaluate_alert_rate_limit_and_storm_control(
-        retry, "CRITICAL", history, evaluated_at_epoch_seconds=101
-    ).status == "RATE_LIMITED"
+    assert (
+        evaluate_alert_rate_limit_and_storm_control(
+            retry, "CRITICAL", history, evaluated_at_epoch_seconds=101
+        ).status
+        == "RATE_LIMITED"
+    )
     exact = [_event(1, 40, "WARNING")]
     result = evaluate_alert_rate_limit_and_storm_control(
         retry, "WARNING", exact, evaluated_at_epoch_seconds=100
@@ -78,9 +81,12 @@ def test_storm_limit_is_hard_and_exact_storm_expiry_is_excluded() -> None:
 def test_nonready_incomplete_order_bounds_duplicates_and_future_fail_closed() -> None:
     retry = _retry()
     incomplete = [_event(1, 99, "WARNING", complete=False)]
-    assert evaluate_alert_rate_limit_and_storm_control(
-        retry, "WARNING", incomplete, evaluated_at_epoch_seconds=100
-    ).status == "INCOMPLETE"
+    assert (
+        evaluate_alert_rate_limit_and_storm_control(
+            retry, "WARNING", incomplete, evaluated_at_epoch_seconds=100
+        ).status
+        == "INCOMPLETE"
+    )
     nonready = replace(
         retry,
         status="WAIT",
@@ -88,9 +94,12 @@ def test_nonready_incomplete_order_bounds_duplicates_and_future_fail_closed() ->
         retry_candidate_ready=False,
     )
     nonready = _rehash_retry(nonready)
-    assert evaluate_alert_rate_limit_and_storm_control(
-        nonready, "WARNING", [], evaluated_at_epoch_seconds=100
-    ).status == "DENIED"
+    assert (
+        evaluate_alert_rate_limit_and_storm_control(
+            nonready, "WARNING", [], evaluated_at_epoch_seconds=100
+        ).status
+        == "DENIED"
+    )
     event = _event(1, 99, "WARNING")
     with pytest.raises(AlertRateLimitStormControlError, match="HISTORY_BOUND_EXCEEDED"):
         evaluate_alert_rate_limit_and_storm_control(
@@ -168,9 +177,7 @@ def _retry():
         complete=True,
         source_identity_hash="b" * 64,
     )
-    alert = evaluate_alert_severity_and_deduplication(
-        candidate, [], evaluated_at_epoch_seconds=100
-    )
+    alert = evaluate_alert_severity_and_deduplication(candidate, [], evaluated_at_epoch_seconds=100)
     return evaluate_alert_retry_backoff(alert, [], evaluated_at_epoch_seconds=100)
 
 

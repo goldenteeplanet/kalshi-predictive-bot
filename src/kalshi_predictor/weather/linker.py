@@ -127,9 +127,9 @@ def link_weather_markets(
         existing_links = {
             link.ticker: link
             for link in session.scalars(
-                select(WeatherMarketLink).where(
-                    WeatherMarketLink.ticker.in_([market.ticker for market in markets])
-                ).order_by(WeatherMarketLink.id)
+                select(WeatherMarketLink)
+                .where(WeatherMarketLink.ticker.in_([market.ticker for market in markets]))
+                .order_by(WeatherMarketLink.id)
             )
         }
     by_metric: Counter[str] = Counter()
@@ -377,19 +377,14 @@ def _detect_target_value(text: str) -> Decimal | None:
 def _weather_candidate_statement():
     ticker_family_filters = [
         Market.ticker.like(f"{prefix}%") for prefix in WEATHER_TICKER_PREFIXES
-    ] + [
-        Market.series_ticker.like(f"{prefix}%") for prefix in WEATHER_TICKER_PREFIXES
-    ]
+    ] + [Market.series_ticker.like(f"{prefix}%") for prefix in WEATHER_TICKER_PREFIXES]
     return (
         select(Market)
         .outerjoin(MarketLeg, MarketLeg.ticker == Market.ticker)
         .where(
             or_(
                 MarketLeg.category == "weather",
-                (
-                    Market.status.in_(("active", "open"))
-                    & or_(*ticker_family_filters)
-                ),
+                (Market.status.in_(("active", "open")) & or_(*ticker_family_filters)),
             )
         )
         .distinct()

@@ -8,7 +8,6 @@ from typing import Any
 
 from kalshi_predictor.utils.time import utc_now
 
-
 EXPECTED_INPUT_REASONS = {
     "no crypto features",
     "no crypto features for linked component",
@@ -63,13 +62,18 @@ def write_gh1q_report(*, database_path: Path, output_dir: Path, skip_limit: int 
             "changes": [
                 "Select forecast candidates only when an exact model-domain link exists.",
                 "Require model-compatible feature availability before opening the writer session.",
-                "Report ineligible public markets as preview skips instead of writing snapshots and forecast skip rows.",
+                "Report ineligible public markets as preview skips instead of writing "
+                "snapshots and forecast skip rows.",
                 "Preserve current edge, score, liquidity, spread, time, and risk thresholds.",
-            ] if likely_adapter_defect else [],
+            ]
+            if likely_adapter_defect
+            else [],
             "next_command": (
-                "Implement and test the exact GH-1P eligibility filter before another guarded refresh."
-                if likely_adapter_defect else
-                "Refresh the missing model inputs, then repeat the guarded GH-1P refresh and GH-1O."
+                "Implement and test the exact GH-1P eligibility filter before another "
+                "guarded refresh."
+                if likely_adapter_defect
+                else "Refresh the missing model inputs, then repeat the guarded GH-1P refresh "
+                "and GH-1O."
             ),
         },
     }

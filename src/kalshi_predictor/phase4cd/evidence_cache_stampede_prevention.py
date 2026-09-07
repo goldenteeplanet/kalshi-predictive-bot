@@ -186,9 +186,11 @@ def _validate_snapshot_fields(payload: dict[str, Any]) -> None:
     for key in ("cache_key_hash", "source_identity_hash", "source_watermark"):
         if not isinstance(payload[key], str) or not payload[key]:
             raise EvidenceCacheStampedeError("SNAPSHOT_FIELD_INVALID")
-    if isinstance(payload["cache_age_seconds"], bool) or not isinstance(
-        payload["cache_age_seconds"], int
-    ) or payload["cache_age_seconds"] < 0:
+    if (
+        isinstance(payload["cache_age_seconds"], bool)
+        or not isinstance(payload["cache_age_seconds"], int)
+        or payload["cache_age_seconds"] < 0
+    ):
         raise EvidenceCacheStampedeError("SNAPSHOT_FIELD_INVALID")
     if not isinstance(payload["refresh_inflight"], bool):
         raise EvidenceCacheStampedeError("SNAPSHOT_FIELD_INVALID")

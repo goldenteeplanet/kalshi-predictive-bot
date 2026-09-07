@@ -238,9 +238,7 @@ def append(
 
 def reconstruct_phase4ab_history(history_dir: Path) -> dict[str, Any]:
     manifest, entries = validate_history(history_dir)
-    gates = [
-        entry["source_payload"] for entry in entries if entry["kind"] == "PHASE4AA_GATE"
-    ]
+    gates = [entry["source_payload"] for entry in entries if entry["kind"] == "PHASE4AA_GATE"]
     return {
         "schema": "phase4ac.phase4ab-history-input.v1",
         "manifest_hash": manifest["manifest_hash"],

@@ -267,9 +267,7 @@ def _possible_settlement_matches(
             {
                 "ticker": settlement.ticker,
                 "result": settlement.result,
-                "settled_at": settlement.settled_at.isoformat()
-                if settlement.settled_at
-                else None,
+                "settled_at": settlement.settled_at.isoformat() if settlement.settled_at else None,
                 "same_event": same_event,
                 "same_series": same_series,
                 "same_stem": same_stem,
@@ -293,9 +291,7 @@ def _possible_settlement_matches(
 def _leg_signature(session: Session, ticker: str) -> list[dict[str, str | None]]:
     legs = list(
         session.scalars(
-            select(MarketLeg)
-            .where(MarketLeg.ticker == ticker)
-            .order_by(MarketLeg.leg_index)
+            select(MarketLeg).where(MarketLeg.ticker == ticker).order_by(MarketLeg.leg_index)
         )
     )
     return [
@@ -319,9 +315,7 @@ def _leg_identity_status(
     if not paper_signature or not sibling_signature:
         return "UNKNOWN_LEG_IDENTITY"
     return (
-        "VALIDATED_SAME_LEG"
-        if paper_signature == sibling_signature
-        else "DIFFERENT_CONTRACT_LEG"
+        "VALIDATED_SAME_LEG" if paper_signature == sibling_signature else "DIFFERENT_CONTRACT_LEG"
     )
 
 
@@ -434,8 +428,7 @@ def _close_time_bucket(market: Market | None) -> tuple[str, float | None]:
 
 def _close_time_buckets(rows: list[dict[str, Any]]) -> dict[str, int]:
     buckets = {
-        key: 0
-        for key in ("overdue", "0-6h", "6-24h", "1-2d", "2-3d", "3-7d", "7d+", "unknown")
+        key: 0 for key in ("overdue", "0-6h", "6-24h", "1-2d", "2-3d", "3-7d", "7d+", "unknown")
     }
     for row in rows:
         if row["status"] != ORDER_FILLED or row["settlement_found"]:
@@ -446,11 +439,7 @@ def _close_time_buckets(rows: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def _sibling_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    matches = [
-        match
-        for row in rows
-        for match in row.get("possible_settlement_matches", [])
-    ]
+    matches = [match for row in rows for match in row.get("possible_settlement_matches", [])]
     by_identity: dict[str, int] = {}
     for match in matches:
         status = str(match.get("leg_identity_status") or "UNKNOWN_LEG_IDENTITY")
@@ -533,9 +522,7 @@ def _reason_explanation(reason: str, possible_matches: list[dict[str, Any]]) -> 
         "ELIGIBLE_TO_SETTLE_NOW": (
             "Exact settlement and side mapping exist; paper P&L can resolve it."
         ),
-        "ALREADY_REALIZED": (
-            "Exact settlement already matches the latest settled paper P&L row."
-        ),
+        "ALREADY_REALIZED": ("Exact settlement already matches the latest settled paper P&L row."),
         "ORDER_STILL_OPEN": "Paper order has not filled yet.",
         "ORDER_NOT_FILLED": "Paper order is not in FILLED status.",
         "MALFORMED_TICKER": "Paper order ticker does not match the expected Kalshi ticker format.",

@@ -85,9 +85,7 @@ def _row(
         "active_market": True,
         "market_status": "active",
         "structure_status": "PURE_CRYPTO",
-        "readiness_status": "PAPER_READY_CANDIDATE"
-        if paper_ready_candidate
-        else "WATCH_LOW_SCORE",
+        "readiness_status": "PAPER_READY_CANDIDATE" if paper_ready_candidate else "WATCH_LOW_SCORE",
         "final_action": "PAPER_READY_CANDIDATE" if paper_ready_candidate else "WATCH_ONLY",
         "paper_ready_candidate": paper_ready_candidate,
         "best_side": BUY_YES,

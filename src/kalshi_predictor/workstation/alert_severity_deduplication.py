@@ -175,9 +175,13 @@ def evaluate_alert_severity_and_deduplication(
     elif item.observed_at_epoch_seconds > evaluated_at_epoch_seconds:
         disposition = "DENY"
         reasons = ["ALERT_CANDIDATE_FROM_FUTURE"]
-    elif latest is not None and _severity_rank(severity) <= _severity_rank(latest.severity) and (
-        evaluated_at_epoch_seconds - latest.emitted_at_epoch_seconds
-        < deduplication_window_seconds
+    elif (
+        latest is not None
+        and _severity_rank(severity) <= _severity_rank(latest.severity)
+        and (
+            evaluated_at_epoch_seconds - latest.emitted_at_epoch_seconds
+            < deduplication_window_seconds
+        )
     ):
         disposition = "SUPPRESS_DUPLICATE"
         reasons = ["ALERT_DUPLICATE_WITHIN_WINDOW"]

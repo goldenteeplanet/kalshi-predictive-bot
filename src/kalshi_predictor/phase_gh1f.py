@@ -3,8 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 
@@ -82,7 +83,9 @@ def run_gh1f_monitor(
                     persist_every_deltas=1,
                 )
                 summary = asyncio.run(
-                    adapter.run(max_messages=max(2, len(tickers) + 1), max_seconds=stream_max_seconds)
+                    adapter.run(
+                        max_messages=max(2, len(tickers) + 1), max_seconds=stream_max_seconds
+                    )
                 )
             finally:
                 client.close()

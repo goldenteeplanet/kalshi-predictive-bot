@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -73,9 +73,7 @@ def write_phase3ax_gap_analysis_report(
     )
 
 
-def build_phase3an_sports_blocker_report(
-    *, reports_dir: Path = Path("reports")
-) -> dict[str, Any]:
+def build_phase3an_sports_blocker_report(*, reports_dir: Path = Path("reports")) -> dict[str, Any]:
     inputs = _load_inputs(reports_dir)
     rows = _load_rows(reports_dir)
     classification = _classify_rows(rows)
@@ -189,7 +187,9 @@ def _write_report(
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / json_name
     markdown_path = output_dir / markdown_name
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
     safe_rows_path = None
     if safe_rows_name and safe_rows:
@@ -245,9 +245,7 @@ def _input_summary(inputs: dict[str, dict[str, Any] | None]) -> dict[str, Any]:
     return {
         "phase3ah_phase3ae_ready_rows": int(evidence.get("phase3ae_ready_rows") or 0),
         "phase3ah_auto_upgrades_created": int(evidence.get("auto_upgrades_created") or 0),
-        "phase3ah_placeholder_safe_to_apply_rows": int(
-            placeholder.get("safe_to_apply_rows") or 0
-        ),
+        "phase3ah_placeholder_safe_to_apply_rows": int(placeholder.get("safe_to_apply_rows") or 0),
         "phase3ah_still_placeholder_rows": int(placeholder.get("still_placeholder_rows") or 0),
         "phase3z_rows_safe_to_repair": int(repair.get("rows_safe_to_repair") or 0),
         "phase3z_rows_blocked": int(repair.get("rows_blocked") or 0),
@@ -405,19 +403,34 @@ def _parse_time(value: object) -> datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _registered_next_actions() -> list[str]:
     return [
-        "kalshi-bot phase3ah-schedule-roster-evidence --output-dir reports/phase3ah_sports --limit 0",
+        (
+            "kalshi-bot phase3ah-schedule-roster-evidence --output-dir "
+            "reports/phase3ah_sports --limit 0"
+        ),
         "kalshi-bot phase3ah-sports-placeholder-watch --output-dir reports/phase3ah_sports",
-        "kalshi-bot phase3z-r2-sports-provenance-repair --output-dir reports/phase3z_r2 --reports-dir reports --max-rows 1000",
+        (
+            "kalshi-bot phase3z-r2-sports-provenance-repair --output-dir reports/phase3z_r2 "
+            "--reports-dir reports --max-rows 1000"
+        ),
         "kalshi-bot phase3az-gap-analysis --output-dir reports/phase3az --reports-dir reports",
-        "kalshi-bot phase3an-sports-blocker-report --output-dir reports/phase3an --reports-dir reports",
-        "kalshi-bot phase3aw-dashboard-truth --output-dir reports/phase3aw --reports-dir reports --stale-after-minutes 120",
-        "kalshi-bot phase3ax-gap-analysis --output-dir reports/phase3ax --reports-dir reports --stale-after-minutes 120",
+        (
+            "kalshi-bot phase3an-sports-blocker-report --output-dir reports/phase3an "
+            "--reports-dir reports"
+        ),
+        (
+            "kalshi-bot phase3aw-dashboard-truth --output-dir reports/phase3aw --reports-dir "
+            "reports --stale-after-minutes 120"
+        ),
+        (
+            "kalshi-bot phase3ax-gap-analysis --output-dir reports/phase3ax --reports-dir "
+            "reports --stale-after-minutes 120"
+        ),
     ]
 
 
@@ -450,6 +463,8 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         for action in payload["next_actions"]:
             lines.append(f"- `{action}`")
     if payload.get("recommended_next_action"):
-        lines.extend(["", "## Recommended Next Action", "", str(payload["recommended_next_action"])])
+        lines.extend(
+            ["", "## Recommended Next Action", "", str(payload["recommended_next_action"])]
+        )
     lines.append("")
     return "\n".join(lines)

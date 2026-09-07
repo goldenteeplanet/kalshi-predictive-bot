@@ -36,13 +36,15 @@ def normalize_prov14b_pipeline(
         if state == "PASSED" and not item.get("evidence"):
             state = "BLOCKED"
             diagnostics.append(f"PROV14B_{stage_id.upper()}_PASS_WITHOUT_EVIDENCE")
-        stages.append({
-            "id": stage_id,
-            "label": stage_id.replace("_", " ").title(),
-            "state": state,
-            "evidence": str(item.get("evidence") or ""),
-            "detail": str(item.get("detail") or ""),
-        })
+        stages.append(
+            {
+                "id": stage_id,
+                "label": stage_id.replace("_", " ").title(),
+                "state": state,
+                "evidence": str(item.get("evidence") or ""),
+                "detail": str(item.get("detail") or ""),
+            }
+        )
 
     raw_gates = raw.get("gates") if isinstance(raw.get("gates"), dict) else {}
     gates = []
@@ -53,19 +55,12 @@ def normalize_prov14b_pipeline(
         state = _state(item.get("state"), default="WAITING")
         sha = str(item.get("report_sha256") or "")
         failed_count = _nonnegative_int(item.get("failed_count"))
-        generated_at, evidence_age_seconds = _capture_time(
-            item.get("generated_at"), reference_time
-        )
+        generated_at, evidence_age_seconds = _capture_time(item.get("generated_at"), reference_time)
         artifact_id = str(item.get("artifact_id") or "")
         artifact_valid = bool(_SAFE_ARTIFACT_ID.fullmatch(artifact_id))
-        evidence_stale = (
-            evidence_age_seconds is None or evidence_age_seconds > GATE_MAX_AGE_SECONDS
-        )
+        evidence_stale = evidence_age_seconds is None or evidence_age_seconds > GATE_MAX_AGE_SECONDS
         evidence_valid = (
-            len(sha) == 64
-            and failed_count == 0
-            and artifact_valid
-            and not evidence_stale
+            len(sha) == 64 and failed_count == 0 and artifact_valid and not evidence_stale
         )
         if state == "PASSED" and not evidence_valid:
             state = "BLOCKED"
@@ -77,21 +72,23 @@ def normalize_prov14b_pipeline(
         if not artifact_valid:
             alerts.append(_alert(gate_id, "MISSING_ARTIFACT", "Safe local artifact link missing"))
         details = _evidence_details(item.get("evidence_details"), gate_id, diagnostics)
-        gates.append({
-            "id": gate_id,
-            "label": f"PROV-14B-{gate_id}",
-            "state": state,
-            "report_sha256": sha or None,
-            "failed_count": failed_count,
-            "runtime_certified": item.get("runtime_certified") is True,
-            "detail": str(item.get("detail") or ""),
-            "generated_at": generated_at,
-            "evidence_age_seconds": evidence_age_seconds,
-            "evidence_stale": evidence_stale,
-            "artifact_id": artifact_id if artifact_valid else None,
-            "artifact_href": f"/system/evidence/{artifact_id}" if artifact_valid else None,
-            "evidence_details": details,
-        })
+        gates.append(
+            {
+                "id": gate_id,
+                "label": f"PROV-14B-{gate_id}",
+                "state": state,
+                "report_sha256": sha or None,
+                "failed_count": failed_count,
+                "runtime_certified": item.get("runtime_certified") is True,
+                "detail": str(item.get("detail") or ""),
+                "generated_at": generated_at,
+                "evidence_age_seconds": evidence_age_seconds,
+                "evidence_stale": evidence_stale,
+                "artifact_id": artifact_id if artifact_valid else None,
+                "artifact_href": f"/system/evidence/{artifact_id}" if artifact_valid else None,
+                "evidence_details": details,
+            }
+        )
 
     all_backup_passed = all(item["state"] == "PASSED" for item in stages)
     all_gates_passed = all(item["state"] == "PASSED" for item in gates)
@@ -182,9 +179,7 @@ def _alert(gate_id: str, code: str, message: str) -> dict[str, str]:
     }
 
 
-def _evidence_details(
-    value: Any, gate_id: str, diagnostics: list[str]
-) -> list[dict[str, str]]:
+def _evidence_details(value: Any, gate_id: str, diagnostics: list[str]) -> list[dict[str, str]]:
     if value is None:
         return []
     if not isinstance(value, list):

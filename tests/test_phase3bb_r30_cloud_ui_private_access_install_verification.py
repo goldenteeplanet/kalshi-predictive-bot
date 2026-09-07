@@ -191,10 +191,7 @@ def _fake_runner(*, authenticated: bool = True, funnel_enabled: bool = False):
         "status": "RUNNING",
     }
     writer = {"status": "CLEAR", "safe_to_start_write": True, "current_writer_pid": None}
-    serve_status = (
-        "https://kalshi-bot-01.tailnet.example\n"
-        "|-- / proxy http://127.0.0.1:8080\n"
-    )
+    serve_status = "https://kalshi-bot-01.tailnet.example\n|-- / proxy http://127.0.0.1:8080\n"
     if funnel_enabled:
         serve_status += "Funnel on\n"
     tailscale_status = (

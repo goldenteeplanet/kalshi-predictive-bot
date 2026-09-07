@@ -68,4 +68,3 @@ def render_model_confidence_report(rows: list[dict[str, Any]], *, days: int) -> 
         ]
     )
     return "\n".join(lines)
-

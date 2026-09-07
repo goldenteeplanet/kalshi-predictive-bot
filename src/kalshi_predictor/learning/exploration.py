@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -22,8 +22,7 @@ from kalshi_predictor.data.schema import (
     PaperOrder,
 )
 from kalshi_predictor.lanes.repository import insert_learning_trade_for_order
-from kalshi_predictor.learning.config import learning_paper_settings
-from kalshi_predictor.learning.config import learning_config_payload
+from kalshi_predictor.learning.config import learning_config_payload, learning_paper_settings
 from kalshi_predictor.learning.duplicates import is_duplicate_candidate
 from kalshi_predictor.learning.safety import settled_paper_trade_count
 from kalshi_predictor.paper.ledger import (
@@ -36,7 +35,6 @@ from kalshi_predictor.paper.simulator import simulate_immediate_fill
 from kalshi_predictor.tournament.ranking import classify_market_category
 from kalshi_predictor.utils.decimals import ONE_DOLLAR, decimal_to_str, to_decimal
 from kalshi_predictor.utils.time import utc_now
-
 
 DEFAULT_OUTPUT_DIR = Path("reports/phase3_overnight")
 
@@ -200,9 +198,7 @@ def seed_exploratory_paper_trades(
     payload = ExplorationSeedResult(
         generated_at=now.isoformat(),
         mode=(
-            "PAPER_ONLY_EXPLORATORY_SEED_APPLY"
-            if apply
-            else "PAPER_ONLY_EXPLORATORY_SEED_DRY_RUN"
+            "PAPER_ONLY_EXPLORATORY_SEED_APPLY" if apply else "PAPER_ONLY_EXPLORATORY_SEED_DRY_RUN"
         ),
         model_name=model_name,
         apply=apply,
@@ -212,7 +208,9 @@ def seed_exploratory_paper_trades(
         fills_created=fills_created,
         learning_paper_trades_inserted=learning_rows,
         settled_paper_trades_total=settled_paper_trade_count(session),
-        reason_counts=dict(sorted(state.reason_counts.items(), key=lambda item: (-item[1], item[0]))),
+        reason_counts=dict(
+            sorted(state.reason_counts.items(), key=lambda item: (-item[1], item[0]))
+        ),
         selected_candidates=[candidate.payload() for candidate in state.candidates[:20]],
         created_orders=created_orders,
         safety={
@@ -531,7 +529,7 @@ def _position_limit_exceeded(
 
 
 def _daily_paper_trade_count(session: Session, *, now: datetime) -> int:
-    today = now.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = now.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     return int(
         session.scalar(
             select(func.count()).select_from(PaperOrder).where(PaperOrder.created_at >= today)
@@ -711,8 +709,8 @@ def _age_minutes(value: datetime | None, *, now: datetime) -> float | None:
         return None
     parsed = value
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return round((now - parsed.astimezone(timezone.utc)).total_seconds() / 60, 3)
+        parsed = parsed.replace(tzinfo=UTC)
+    return round((now - parsed.astimezone(UTC)).total_seconds() / 60, 3)
 
 
 def _iso_or_none(value: Any) -> str | None:
@@ -720,6 +718,6 @@ def _iso_or_none(value: Any) -> str | None:
         return None
     if isinstance(value, datetime):
         if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
+            value = value.replace(tzinfo=UTC)
         return value.isoformat()
     return str(value)

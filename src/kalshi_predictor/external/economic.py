@@ -21,4 +21,3 @@ class EconomicProvider:
 
 def ingest_economic_json(session: Session, payload: Mapping[str, Any]) -> ExternalIngestionResult:
     return EconomicProvider().ingest_payload(session, payload)
-

@@ -32,8 +32,12 @@ def test_phase3bb_r51_repairs_live_weather_ranking_path(tmp_path: Path) -> None:
             reports_dir=reports_dir,
             probe_runner=_fake_probe_runner(
                 seen=seen,
-                pre_state=_path_state(live_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0),
-                post_state=_path_state(live_rows=10, snapshot_rows=10, forecast_rows=10, ranking_rows=10),
+                pre_state=_path_state(
+                    live_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0
+                ),
+                post_state=_path_state(
+                    live_rows=10, snapshot_rows=10, forecast_rows=10, ranking_rows=10
+                ),
             ),
         )
 
@@ -68,9 +72,17 @@ def test_phase3bb_r51_skips_repair_for_expired_target_windows(tmp_path: Path) ->
             reports_dir=reports_dir,
             probe_runner=_fake_probe_runner(
                 seen=seen,
-                pre_state=_path_state(live_rows=0, expired_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0),
-                post_state=_path_state(live_rows=0, expired_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0),
-                writer_pre={"status": "WRITER_ACTIVE", "safe_to_start_write": False, "current_writer_pid": 123},
+                pre_state=_path_state(
+                    live_rows=0, expired_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0
+                ),
+                post_state=_path_state(
+                    live_rows=0, expired_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0
+                ),
+                writer_pre={
+                    "status": "WRITER_ACTIVE",
+                    "safe_to_start_write": False,
+                    "current_writer_pid": 123,
+                },
             ),
         )
 
@@ -79,7 +91,10 @@ def test_phase3bb_r51_skips_repair_for_expired_target_windows(tmp_path: Path) ->
     assert "weather_forecast_run" not in seen
     assert decision["status"] == "WEATHER_RANKING_PATH_TARGET_WINDOW_EXPIRED"
     assert decision["first_weather_path_blocker"] == "EXPIRED_TARGET_WINDOW"
-    assert "phase3bb-r47-weather-current-window-series-discovery-linkability-repair" in decision["operator_next_command"]
+    assert (
+        "phase3bb-r47-weather-current-window-series-discovery-linkability-repair"
+        in decision["operator_next_command"]
+    )
     assert payload["safety_flags"]["runs_weather_forecast"] is False
 
 
@@ -141,10 +156,22 @@ def _fake_probe_runner(
         "command_registry": ("COMMAND_REGISTRY_OK\n", True, 0, ""),
         "weather_ranking_path_state_pre": (json.dumps(pre_state), True, 0, ""),
         "weather_snapshot_capture": ("Captured 10 snapshots.\n", True, 0, ""),
-        "weather_forecast_run": ("Scanned 10 snapshots. Inserted 10 forecasts. Skipped 0.\n", True, 0, ""),
-        "weather_fast_lane_run": ("Wrote JSON: reports/phase3bb_r2/weather_funnel.json\n", True, 0, ""),
+        "weather_forecast_run": (
+            "Scanned 10 snapshots. Inserted 10 forecasts. Skipped 0.\n",
+            True,
+            0,
+            "",
+        ),
+        "weather_fast_lane_run": (
+            "Wrote JSON: reports/phase3bb_r2/weather_funnel.json\n",
+            True,
+            0,
+            "",
+        ),
         "db_writer_monitor_post": (
-            json.dumps({"status": "CLEAR", "safe_to_start_write": True, "current_writer_pid": None}),
+            json.dumps(
+                {"status": "CLEAR", "safe_to_start_write": True, "current_writer_pid": None}
+            ),
             True,
             0,
             "",
@@ -154,7 +181,10 @@ def _fake_probe_runner(
             json.dumps(
                 {
                     "status": "WEATHER_FAST_LANE_GAP_EXPLAINED",
-                    "summary": {"current_weather_rows": 10, "ranking_rows": post_state["summary"]["ranking_rows"]},
+                    "summary": {
+                        "current_weather_rows": 10,
+                        "ranking_rows": post_state["summary"]["ranking_rows"],
+                    },
                 }
             ),
             True,
@@ -195,7 +225,11 @@ def _path_state(
     expired_rows: int = 0,
 ) -> dict[str, object]:
     total = live_rows + expired_rows
-    blocker = "RANKING_PRESENT" if ranking_rows else ("EXPIRED_TARGET_WINDOW" if expired_rows else "SNAPSHOT_MISSING")
+    blocker = (
+        "RANKING_PRESENT"
+        if ranking_rows
+        else ("EXPIRED_TARGET_WINDOW" if expired_rows else "SNAPSHOT_MISSING")
+    )
     return {
         "ok": True,
         "rows": [

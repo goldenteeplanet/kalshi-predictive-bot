@@ -8,7 +8,6 @@ from kalshi_predictor.benchmarking.runtime_export_import import (
     write_runtime_export_import_preview,
 )
 
-
 FIXTURES = Path(__file__).parent / "fixtures/pmb34c"
 
 
@@ -24,7 +23,9 @@ def test_pmb34c_imports_mixed_json_csv_and_certifies_all_categories():
     assert report["summary"]["decisions"] == 3
     assert report["summary"]["certified"] == 3
     assert report["summary"]["category_coverage"] == ["crypto", "sports", "weather"]
-    assert all(row["shadow_preview"]["runtime_effect"] == "NONE_DISABLED_SHADOW" for row in report["rows"])
+    assert all(
+        row["shadow_preview"]["runtime_effect"] == "NONE_DISABLED_SHADOW" for row in report["rows"]
+    )
     assert report["summary"]["pmb35_deployment_unblocked"] is False
 
 
@@ -44,9 +45,13 @@ def test_pmb34c_rejects_malformed_schema_and_csv_types(tmp_path):
     payload["datasets"]["risks"] = {"format": "csv", "path": "risks.csv"}
     manifest.write_text(json.dumps(payload))
     risks_path.unlink()
-    (manifest.parent / "risks.csv").write_text("ticker,risk_gate_passed,requested_capital\nPMB34C-CRYPTO,maybe,10\n")
+    (manifest.parent / "risks.csv").write_text(
+        "ticker,risk_gate_passed,requested_capital\nPMB34C-CRYPTO,maybe,10\n"
+    )
     imported = import_runtime_export_manifest(manifest)
-    assert any(code.startswith("DATASET_READ_ERROR:risks:ValueError") for code in imported["diagnostics"])
+    assert any(
+        code.startswith("DATASET_READ_ERROR:risks:ValueError") for code in imported["diagnostics"]
+    )
 
 
 def test_pmb34c_rejects_duplicate_associations_and_path_escape(tmp_path):
@@ -67,8 +72,12 @@ def test_pmb34c_rejects_duplicate_associations_and_path_escape(tmp_path):
 
 
 def test_pmb34c_is_deterministic_local_and_disabled(tmp_path):
-    first = json.loads(write_runtime_export_import_preview(FIXTURES / "manifest.json", tmp_path / "a").read_text())
-    second = json.loads(write_runtime_export_import_preview(FIXTURES / "manifest.json", tmp_path / "b").read_text())
+    first = json.loads(
+        write_runtime_export_import_preview(FIXTURES / "manifest.json", tmp_path / "a").read_text()
+    )
+    second = json.loads(
+        write_runtime_export_import_preview(FIXTURES / "manifest.json", tmp_path / "b").read_text()
+    )
     assert first == second
     assert first["database_writes"] == 0
     assert first["cloud_access"] is False

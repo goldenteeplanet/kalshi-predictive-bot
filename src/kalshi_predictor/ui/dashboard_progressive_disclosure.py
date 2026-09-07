@@ -117,9 +117,7 @@ def build_dashboard_progressive_disclosure(
         raise DashboardProgressiveDisclosureError("PANEL_INPUT_SET_INVALID")
     identities = {item.source_identity_hash for item in validated}
     watermarks = {item.source_watermark for item in validated}
-    if identities != {registry.source_identity_hash} or watermarks != {
-        registry.source_watermark
-    }:
+    if identities != {registry.source_identity_hash} or watermarks != {registry.source_watermark}:
         raise DashboardProgressiveDisclosureError("PANEL_LINEAGE_MISMATCH")
 
     ordered = sorted(validated, key=lambda item: registry.panel_ids.index(item.panel_id))

@@ -8,7 +8,6 @@ from kalshi_predictor.ui.progress_history import (
     record_progress_snapshot,
 )
 
-
 SEQUENCE = Path(__file__).parent / "fixtures/ui_obs2c/history_sequence.json"
 
 

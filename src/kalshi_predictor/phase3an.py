@@ -31,12 +31,12 @@ from kalshi_predictor.data.schema import (
     PaperOrder,
     PaperPnl,
 )
+from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3an_crypto_source_quality import (
     build_phase3an_crypto_source_quality,
     source_quality_classification_for_phase3an,
     write_phase3an_crypto_source_quality_report,
 )
-from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.utils.time import utc_now
 
 PHASE_3AN_VERSION = "phase3an_v1"
@@ -151,9 +151,7 @@ def build_phase3an_crypto_feature_completeness(
     incomplete = [row for row in rows if row["status"] != "FRESH"]
     forecast_count = int(
         session.scalar(
-            select(func.count())
-            .select_from(Forecast)
-            .where(Forecast.model_name == "crypto_v2")
+            select(func.count()).select_from(Forecast).where(Forecast.model_name == "crypto_v2")
         )
         or 0
     )
@@ -251,9 +249,7 @@ def _symbol_row(
         "latest_generated_at": generated_at.isoformat(),
         "age_minutes": age_minutes,
         "link_count": link_count,
-        "reason": "fresh_point_in_time_feature"
-        if status == "FRESH"
-        else "stale_crypto_feature",
+        "reason": "fresh_point_in_time_feature" if status == "FRESH" else "stale_crypto_feature",
         "source": feature.source,
         "price": feature.price,
         "feature_version": _feature_version(feature),
@@ -278,10 +274,7 @@ def _quality_flags(feature: CryptoFeature) -> list[str]:
 
 
 def _linked_market_count(session: Session) -> int:
-    return int(
-        session.scalar(select(func.count(func.distinct(CryptoMarketLink.ticker))))
-        or 0
-    )
+    return int(session.scalar(select(func.count(func.distinct(CryptoMarketLink.ticker)))) or 0)
 
 
 def _aware(value: datetime) -> datetime:
@@ -333,8 +326,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     for row in payload["symbols"]:
         age = row["age_minutes"] if row["age_minutes"] is not None else "n/a"
         lines.append(
-            f"| {row['symbol']} | {row['status']} | {age} | "
-            f"{row['link_count']} | {row['reason']} |"
+            f"| {row['symbol']} | {row['status']} | {age} | {row['link_count']} | {row['reason']} |"
         )
     lines.extend(["", "## Next Commands", "", "```bash"])
     lines.extend(payload["next_commands"])
@@ -432,7 +424,9 @@ def build_phase3an_crypto_watch_doctor(
     window_summary = _dict(watch.get("window_summary"))
     readiness = _dict(watch.get("readiness_funnel"))
     heartbeat = _dict(watch.get("runner_heartbeat") or watch.get("guard"))
-    active_writer = _dict(watch.get("active_database_writer") or runtime.get("active_db_writer_status"))
+    active_writer = _dict(
+        watch.get("active_database_writer") or runtime.get("active_db_writer_status")
+    )
     runner_state = str(
         watch.get("runner_state")
         or watch.get("watch_state")
@@ -480,11 +474,11 @@ def build_phase3an_crypto_watch_doctor(
         "process_id": watch.get("runner_pid") or _dict(watch.get("guard")).get("pid"),
         "active_db_writer_identity": active_writer,
         "last_heartbeat": heartbeat.get("last_status_check") or heartbeat.get("heartbeat_at"),
-        "last_completed_cycle": heartbeat.get("last_success") or heartbeat.get("latest_generated_at"),
+        "last_completed_cycle": heartbeat.get("last_success")
+        or heartbeat.get("latest_generated_at"),
         "current_in_flight_cycle_age_seconds": heartbeat.get("latest_age_seconds"),
         "expected_cadence_minutes": freshness_minutes,
-        "overdue_threshold_seconds": heartbeat.get("freshness_seconds")
-        or freshness_minutes * 60,
+        "overdue_threshold_seconds": heartbeat.get("freshness_seconds") or freshness_minutes * 60,
         "current_stage": slow_stage["current_stage"],
         "slowest_stage": slow_stage["slowest_stage"],
         "stage_evidence": slow_stage,
@@ -716,10 +710,12 @@ def build_phase3an_paper_funnel_explain(
         },
         "stage_counts": stage_counts,
         "reason_counts": reason_counts,
-        "top_block_reasons": sorted(
-            reason_counts.items(), key=lambda item: item[1], reverse=True
-        )[:10],
-        "top_10_nearest_misses": [_normalize_funnel_row(row) for row in funnel.get("nearest_misses", [])][:10],
+        "top_block_reasons": sorted(reason_counts.items(), key=lambda item: item[1], reverse=True)[
+            :10
+        ],
+        "top_10_nearest_misses": [
+            _normalize_funnel_row(row) for row in funnel.get("nearest_misses", [])
+        ][:10],
         "best_positive_raw_ev_rows_failed_execution": positive_failed,
         "best_negative_ev_row": negative,
         "best_negative_ev_reason": _best_row_blocker(negative),
@@ -805,13 +801,13 @@ def build_phase3an_settlement_health_confirm(
             "sibling_ticker_candidates_rejected": _intish(
                 summary.get("sibling_ticker_candidates_rejected")
             ),
-            "ambiguous_candidates_rejected": _intish(
-                summary.get("ambiguous_candidates_rejected")
-            ),
+            "ambiguous_candidates_rejected": _intish(summary.get("ambiguous_candidates_rejected")),
             "written_settlements_current_window": written_current_window,
             "settlement_apply_needed": safe_to_apply > 0,
             "apply_command_exposed": safe_to_apply > 0,
-            "status": "HEALTHY" if safe_to_apply == 0 else "EXACT_APPLY_AVAILABLE_REQUIRES_OPERATOR",
+            "status": "HEALTHY"
+            if safe_to_apply == 0
+            else "EXACT_APPLY_AVAILABLE_REQUIRES_OPERATOR",
         },
         "phase3ay_watcher_status": phase3ay_status,
         "exact_apply_policy": {
@@ -940,7 +936,11 @@ def build_phase3an_3bb_r2_burndown(
     intake_summary = _dict(intake.get("summary"))
     evidence_summary = _dict(evidence.get("summary"))
     availability_summary = _dict(availability.get("summary"))
-    source_matrix = intake.get("source_readiness_matrix") if isinstance(intake.get("source_readiness_matrix"), list) else []
+    source_matrix = (
+        intake.get("source_readiness_matrix")
+        if isinstance(intake.get("source_readiness_matrix"), list)
+        else []
+    )
     payload = {
         "generated_at": metadata["generated_at"],
         "phase": "3AN",
@@ -975,7 +975,9 @@ def build_phase3an_3bb_r2_burndown(
             "usda_status": general_sources["sources"]["USDA"]["status"],
             "cushman_status": general_sources["sources"]["Cushman"]["status"],
             "flightaware_status": general_sources["sources"]["FlightAware"]["status"],
-            "source_date_mismatch_blockers": general_sources["summary"]["source_date_mismatch_blockers"],
+            "source_date_mismatch_blockers": general_sources["summary"][
+                "source_date_mismatch_blockers"
+            ],
             "review_gated_rows": _review_gated_rows(source_matrix),
             "local_evidence_files_written": _intish(intake_summary.get("evidence_files_written")),
             "link_safe_rows": _safe_rows(source_matrix, "link_safe"),
@@ -1069,7 +1071,9 @@ def build_phase3an_usda_date_mismatch_report(
         }
     )
     exact_records = [
-        record for record in usda_records if str(record.get("as_of_date") or "") == expected_report_date
+        record
+        for record in usda_records
+        if str(record.get("as_of_date") or "") == expected_report_date
     ]
     wrong_date_records = [
         record
@@ -1105,7 +1109,9 @@ def build_phase3an_usda_date_mismatch_report(
         "command_arguments": command_args,
         "data_watermark": metadata["data_watermark"],
         "safety_flags": metadata["safety_flags"],
-        "target_market_tickers": _general_market_tickers(session, terms=("avocado", "hass", "usda")),
+        "target_market_tickers": _general_market_tickers(
+            session, terms=("avocado", "hass", "usda")
+        ),
         "expected_report_date": expected_report_date,
         "local_report_date_found": local_report_date,
         "local_source_file_paths": [str(source_file)] if source_file.exists() else [],
@@ -1244,7 +1250,9 @@ def build_phase3an_general_sources_status(
         "source_reports": {
             "usda_date_mismatch": str(output_dir / "usda_date_mismatch_report.json"),
             "source_evidence": str(sources_dir / "phase3bb_r2_general_source_evidence.json"),
-            "source_availability": str(sources_dir / "phase3bb_r2_general_source_availability.json"),
+            "source_availability": str(
+                sources_dir / "phase3bb_r2_general_source_availability.json"
+            ),
             "phase3bb_r3_source_activation": str(
                 reports_dir / "phase3bb_r3_source_activation" / "source_evidence_activation.json"
             ),
@@ -1252,9 +1260,7 @@ def build_phase3an_general_sources_status(
                 reports_dir / "phase3bb_r4_flightaware" / "flightaware_review_link_gate.json"
             ),
             "phase3bb_r5_flightaware": str(
-                reports_dir
-                / "phase3bb_r5_flightaware"
-                / "flightaware_date_stable_evidence.json"
+                reports_dir / "phase3bb_r5_flightaware" / "flightaware_date_stable_evidence.json"
             ),
         },
         "exact_next_action": source_gate["next_action"],
@@ -1326,7 +1332,9 @@ def build_phase3an_sports_blocker_report(
             ),
             "partial_provenance_markets": _intish(summary.get("partial_provenance_sports_markets")),
             "partial_link_rows": _intish(summary.get("partial_provenance_sports_markets")),
-            "unlinked_parsed_sports_markets": _intish(summary.get("unlinked_parsed_sports_markets")),
+            "unlinked_parsed_sports_markets": _intish(
+                summary.get("unlinked_parsed_sports_markets")
+            ),
             "placeholder_rows": _intish(summary.get("placeholder_rows")),
             "world_cup_round_placeholders": _intish(summary.get("unresolved_round_placeholders")),
             "schedule_evidence_available": bool(summary.get("schedule_evidence_available")),
@@ -1491,9 +1499,7 @@ def build_phase3an_economic_news_watch(
                 economic_counts.get("current_parsed_missing_exact_link")
             )
             + _intish(news_counts.get("current_parsed_missing_exact_link")),
-            "economic_current_handoff_blocker": summary.get(
-                "economic_current_handoff_blocker"
-            ),
+            "economic_current_handoff_blocker": summary.get("economic_current_handoff_blocker"),
             "news_current_handoff_blocker": summary.get("news_current_handoff_blocker"),
             "context_ready_count": _intish(summary.get("context_ready_count")),
             "active_market_count": _intish(summary.get("parsed_market_count")),
@@ -1506,9 +1512,7 @@ def build_phase3an_economic_news_watch(
             "blocker_reason": first_hard_blocker,
             "domain_readiness_blocker_reason": economic.get("blocked_reason")
             or "WAITING_FOR_COMPATIBLE_MARKETS",
-            "next_registered_command": _economic_news_watch_next_command(
-                first_hard_blocker
-            ),
+            "next_registered_command": _economic_news_watch_next_command(first_hard_blocker),
         },
         "domains": domains,
         "current_market_handoff": current_handoff,
@@ -1627,8 +1631,7 @@ def _economic_news_watch_next_action(first_hard_blocker: str) -> str:
         )
     if first_hard_blocker == "EXACT_LINKS_MISSING":
         return (
-            "Current parsed markets need exact ticker links; do not use fuzzy or "
-            "sibling matching."
+            "Current parsed markets need exact ticker links; do not use fuzzy or sibling matching."
         )
     if first_hard_blocker == "ONLY_EXPIRED_OR_CLOSED_PARSED_MARKETS":
         return "Parsed economic/news markets are historical only; keep watching current markets."
@@ -1656,10 +1659,7 @@ def _render_phase3an_economic_news_watch_markdown(payload: dict[str, Any]) -> st
                 "- Economic exact-linked current without parsed leg: "
                 f"`{summary.get('economic_exact_linked_current_without_parsed_leg', 0)}`"
             ),
-            (
-                "- News current parsed markets: "
-                f"`{summary.get('news_current_parsed_markets', 0)}`"
-            ),
+            (f"- News current parsed markets: `{summary.get('news_current_parsed_markets', 0)}`"),
             f"- Context-ready count: `{summary.get('context_ready_count', 0)}`",
             f"- Source freshness: `{summary.get('source_freshness')}`",
             "",
@@ -1737,9 +1737,7 @@ def build_phase3an_economic_news_parser_backfill_plan(
                 }
             )
     reason_counts = _parser_backfill_reason_counts(rows)
-    safe_to_backfill_now = sum(
-        1 for row in rows if row.get("safe_to_backfill_parser_leg") is True
-    )
+    safe_to_backfill_now = sum(1 for row in rows if row.get("safe_to_backfill_parser_leg") is True)
     summary = _dict(watch.get("summary"))
     return {
         "generated_at": utc_now().isoformat(),
@@ -1814,16 +1812,10 @@ def build_phase3an_economic_link_event_repair_plan(
         for row in parser_plan.get("rows", [])
         if isinstance(row, dict) and row.get("domain") == "economic"
     ]
-    link_repair_candidates = [
-        row for row in rows if row["safe_to_repair_link_event"] is True
-    ]
-    safe_parser_rows = [
-        row for row in rows if row["safe_to_backfill_parser_leg"] is True
-    ]
+    link_repair_candidates = [row for row in rows if row["safe_to_repair_link_event"] is True]
+    safe_parser_rows = [row for row in rows if row["safe_to_backfill_parser_leg"] is True]
     after_repair_safe = [
-        row
-        for row in rows
-        if row["safe_to_backfill_parser_leg_after_link_repair"] is True
+        row for row in rows if row["safe_to_backfill_parser_leg_after_link_repair"] is True
     ]
     return {
         "generated_at": utc_now().isoformat(),
@@ -1971,7 +1963,9 @@ def build_phase3an_economic_link_event_repair_apply(
         "generated_at": utc_now().isoformat(),
         "phase": "3AN-R3",
         "phase_version": PHASE_3AN_OPERATIONAL_VERSION,
-        "mode": "ECONOMIC_LINK_EVENT_REPAIR_APPLY" if apply else "ECONOMIC_LINK_EVENT_REPAIR_DRY_RUN",
+        "mode": "ECONOMIC_LINK_EVENT_REPAIR_APPLY"
+        if apply
+        else "ECONOMIC_LINK_EVENT_REPAIR_DRY_RUN",
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "live_or_demo_execution": False,
         "order_submission": False,
@@ -2081,9 +2075,7 @@ def build_phase3an_economic_parser_leg_backfill(
         for row in parser_plan.get("rows", [])
         if isinstance(row, dict) and row.get("domain") == "economic"
     ]
-    candidates = [
-        row for row in rows if row.get("safe_to_write_parser_leg") is True
-    ][:max_records]
+    candidates = [row for row in rows if row.get("safe_to_write_parser_leg") is True][:max_records]
     blocked_reason_counts = _parser_leg_backfill_blocked_reason_counts(rows)
     status = "DRY_RUN"
     blocked_reason = None
@@ -2195,9 +2187,7 @@ def build_phase3an_economic_parser_leg_backfill(
             ),
         },
         "candidate_rows": candidates,
-        "blocked_rows": [
-            row for row in rows if row.get("safe_to_write_parser_leg") is not True
-        ],
+        "blocked_rows": [row for row in rows if row.get("safe_to_write_parser_leg") is not True],
         "written_rows": written_rows,
         "source_parser_backfill_plan": parser_plan,
         "exact_next_action": _economic_parser_leg_backfill_next_action(
@@ -2560,14 +2550,22 @@ def build_phase3an_economic_morning_operator_handoff(
             "paper_health_status": paper_health.get("status"),
             "eligible_exact_settlements": paper_health.get("eligible_exact_settlements"),
             "paper_pnl_realized": paper_health.get("paper_pnl_realized"),
-            "first_blocker": hard_stop_reasons[0] if hard_stop_reasons else "AWAITING_OPERATOR_REVIEW",
+            "first_blocker": hard_stop_reasons[0]
+            if hard_stop_reasons
+            else "AWAITING_OPERATOR_REVIEW",
         },
         "review_order": [
             "Read ECONOMIC_OPERATOR_APPROVAL_PACKET.md.",
             "Read ECONOMIC_APPROVAL_SAFETY_GUARD.md.",
-            "Confirm R5 remains paper-only and no paper-ready candidates exist before applying anything.",
+            (
+                "Confirm R5 remains paper-only and no paper-ready candidates exist before "
+                "applying anything."
+            ),
             "Run db-writer-monitor immediately before any approved --apply --backup-first command.",
-            "Apply link repair first only if approved, rerun parser plan, then apply parser backfill only if approved.",
+            (
+                "Apply link repair first only if approved, rerun parser plan, then apply "
+                "parser backfill only if approved."
+            ),
         ],
         "registered_next_commands": [
             "kalshi-bot phase3bc-r5-status --output-dir reports/phase3bc_r5",
@@ -2879,7 +2877,9 @@ def write_phase3an_gap_fix_report(
 
     manifest_path = output_dir / "MANIFEST.sha256"
     _write_manifest(manifest_path, list(artifact_paths.values()))
-    return Phase3ANGapFixArtifactSet(output_dir, summary_path, next_actions_path, manifest_path, artifact_paths)
+    return Phase3ANGapFixArtifactSet(
+        output_dir, summary_path, next_actions_path, manifest_path, artifact_paths
+    )
 
 
 def _phase3an_metadata_from_runtime(
@@ -2898,7 +2898,8 @@ def _phase3an_metadata_from_runtime(
         "git_branch": runtime.get("git_branch"),
         "git_commit": runtime.get("git_commit"),
         "git_dirty": runtime.get("git_dirty"),
-        "python_executable": runtime.get("python_executable") or str(Path(sys.executable).resolve()),
+        "python_executable": runtime.get("python_executable")
+        or str(Path(sys.executable).resolve()),
         "installed_package_path": runtime.get("installed_package_path"),
         "resolved_database_url": runtime.get("resolved_database_url"),
         "database_fingerprint": runtime.get("database_fingerprint"),
@@ -3032,18 +3033,25 @@ def _phase3an_crypto_classification(
         return "RUNNING_CYCLE_OVERDUE"
     if runner_state in {"RUNNER_STALE", "WATCHER_STALE"}:
         return "WATCHER_STALE"
-    if not runner_running and runner_state in {"STOPPED", "STOPPED_WITH_STALE_PID", "NO_UNATTENDED_JOB"}:
+    if not runner_running and runner_state in {
+        "STOPPED",
+        "STOPPED_WITH_STALE_PID",
+        "NO_UNATTENDED_JOB",
+    }:
         return "RESTART_SAFE"
     active_windows = _intish(window_summary.get("active_windows"))
     expired_windows = _intish(window_summary.get("expired_windows"))
     fresh_quotes = _intish(readiness.get("fresh_quotes") or window_summary.get("fresh_quote_count"))
     stale_quotes = _intish(window_summary.get("stale_quote_count"))
-    positive_raw = _intish(readiness.get("positive_raw_ev") or window_summary.get("positive_raw_ev"))
+    positive_raw = _intish(
+        readiness.get("positive_raw_ev") or window_summary.get("positive_raw_ev")
+    )
     positive_executable = _intish(
         readiness.get("positive_executable_ev") or window_summary.get("positive_executable_ev")
     )
     paper_ready = _intish(
-        readiness.get("paper_ready_opportunities") or window_summary.get("paper_ready_opportunities")
+        readiness.get("paper_ready_opportunities")
+        or window_summary.get("paper_ready_opportunities")
     )
     linked = _intish(readiness.get("linked_markets") or window_summary.get("linked_markets"))
     if active_windows == 0 and expired_windows > 0:
@@ -3076,7 +3084,8 @@ def _phase3an_crypto_slow_stage(
         or "UNKNOWN"
     )
     candidates = {
-        "window_sync": _intish(window_summary.get("stale_windows")) + _intish(window_summary.get("expired_windows")),
+        "window_sync": _intish(window_summary.get("stale_windows"))
+        + _intish(window_summary.get("expired_windows")),
         "market_quotes": _intish(window_summary.get("stale_quote_count")),
         "forecasts": max(
             _intish(readiness.get("active_windows")) - _intish(readiness.get("valid_forecasts")),
@@ -3087,7 +3096,8 @@ def _phase3an_crypto_slow_stage(
             0,
         ),
         "execution": max(
-            _intish(readiness.get("positive_raw_ev")) - _intish(readiness.get("positive_executable_ev")),
+            _intish(readiness.get("positive_raw_ev"))
+            - _intish(readiness.get("positive_executable_ev")),
             0,
         ),
     }
@@ -3104,7 +3114,9 @@ def _phase3an_crypto_slow_stage(
 def _best_ranking_row(session: Session) -> dict[str, Any] | None:
     try:
         row = session.scalars(
-            select(MarketRanking).order_by(desc(MarketRanking.ranked_at), desc(MarketRanking.opportunity_score)).limit(1)
+            select(MarketRanking)
+            .order_by(desc(MarketRanking.ranked_at), desc(MarketRanking.opportunity_score))
+            .limit(1)
         ).first()
     except Exception:  # noqa: BLE001 - report missing best row rather than failing.
         return None
@@ -3140,7 +3152,10 @@ def _best_row_blocker(row: dict[str, Any] | None) -> str:
 
 def _phase3an_crypto_next_action(classification: str, runner_state: str) -> str:
     if classification == "RUNNING_CYCLE_OVERDUE":
-        return "Inspect slow-stage evidence; run the dry-run restart plan only if heartbeat remains stale."
+        return (
+            "Inspect slow-stage evidence; run the dry-run restart plan only if heartbeat "
+            "remains stale."
+        )
     if classification == "RESTART_SAFE":
         return "Review dry-run restart steps; no automatic process stop was performed."
     if classification == "API_RATE_LIMIT_PRESSURE":
@@ -3150,17 +3165,23 @@ def _phase3an_crypto_next_action(classification: str, runner_state: str) -> str:
     if classification == "SOURCE_COVERAGE_GAP":
         return "Repair per-symbol source coverage; do not treat this as an EV-only wait."
     if classification == "WAIT_FOR_MARKET_EV":
-        return "Market fill and ranking are current; wait for positive EV without lowering thresholds."
+        return (
+            "Market fill and ranking are current; wait for positive EV without lowering thresholds."
+        )
     if classification == "WAIT_FOR_EXECUTABLE_BOOK":
         return "Positive EV exists, but executable book/risk gates are not paper-ready yet."
     if classification == "PAPER_READY_REVIEW":
         return "Paper-ready rows exist; operator review is required before paper creation."
     if classification == "NO_POSITIVE_EV":
-        return "Keep the crypto watch running; no paper trade is expected until raw EV turns positive."
+        return (
+            "Keep the crypto watch running; no paper trade is expected until raw EV turns positive."
+        )
     if classification == "NO_EXECUTABLE_EV":
         return "Wait for spread/liquidity to clear execution gates; do not lower thresholds."
     if classification == "BLOCKED_BY_ACTIVE_WRITER":
-        return "Wait for the active database writer to finish before any local-file evidence workflow."
+        return (
+            "Wait for the active database writer to finish before any local-file evidence workflow."
+        )
     if classification == "HEALTHY":
         return "Continue paper-only monitoring; inspect paper-ready candidates manually."
     return f"Investigate crypto watch state {runner_state} with bounded read-only diagnostics."
@@ -3196,7 +3217,9 @@ def _restart_plan_steps(doctor: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         {
             "step": "confirm_stale_or_overdue",
-            "status": "READY" if doctor.get("classification") in {"WATCHER_STALE", "RESTART_SAFE"} else "REVIEW",
+            "status": "READY"
+            if doctor.get("classification") in {"WATCHER_STALE", "RESTART_SAFE"}
+            else "REVIEW",
             "command": "kalshi-bot phase3an-crypto-watch-doctor --output-dir reports/phase3an",
         },
         {
@@ -3236,7 +3259,9 @@ def _normalized_reason_counts(
     counts = {reason: 0 for reason in PHASE3AN_FUNNEL_REASON_CODES}
     if isinstance(source_counts, dict):
         for reason, count in source_counts.items():
-            counts[_normalize_reason(reason)] = counts.get(_normalize_reason(reason), 0) + _intish(count)
+            counts[_normalize_reason(reason)] = counts.get(_normalize_reason(reason), 0) + _intish(
+                count
+            )
     for row in rows:
         reason = _normalize_reason(row.get("reason_code"))
         counts[reason] = max(counts.get(reason, 0), 0)
@@ -3255,7 +3280,9 @@ def _normalized_stage_counts(
     }
     rows: list[dict[str, Any]] = []
     for stage in PHASE3AN_FUNNEL_STAGES:
-        source = by_stage.get(stage) or by_stage.get(stage.replace("linked_direct", "parsed_or_link_safe"))
+        source = by_stage.get(stage) or by_stage.get(
+            stage.replace("linked_direct", "parsed_or_link_safe")
+        )
         passed = _intish(_dict(source).get("passed")) if source else 0
         failed = max(total - passed, 0) if total else 0
         rows.append({"stage": stage, "passed": passed, "dropped": failed})
@@ -3330,7 +3357,9 @@ def _recent_paper_pnl_count(session: Session, *, hours: int) -> int:
 def _adapter_count(rows: Any, adapter_key: str) -> int:
     if not isinstance(rows, list):
         return 0
-    return sum(1 for row in rows if isinstance(row, dict) and row.get("source_adapter_key") == adapter_key)
+    return sum(
+        1 for row in rows if isinstance(row, dict) and row.get("source_adapter_key") == adapter_key
+    )
 
 
 def _missing_source_fields_count(rows: Any) -> int:
@@ -3346,12 +3375,7 @@ def _missing_source_fields_count(rows: Any) -> int:
 def _review_gated_rows(rows: Any) -> int:
     if not isinstance(rows, list):
         return 0
-    return sum(
-        1
-        for row in rows
-        if isinstance(row, dict)
-        and not bool(row.get("review_approved"))
-    )
+    return sum(1 for row in rows if isinstance(row, dict) and not bool(row.get("review_approved")))
 
 
 def _safe_rows(rows: Any, key: str) -> int:
@@ -3426,9 +3450,7 @@ def _phase3an_general_source_gate_summary(
         or _intish(r4_summary.get("affected_rows"))
         or _phase3an_decision_rows(flightaware_decision)
     )
-    flightaware_date_stable_rows = _intish(
-        r5_summary.get("accepted_date_stable_evidence_rows")
-    )
+    flightaware_date_stable_rows = _intish(r5_summary.get("accepted_date_stable_evidence_rows"))
     flightaware_review_rows = (
         flightaware_rows
         if (
@@ -3461,11 +3483,7 @@ def _phase3an_general_source_gate_summary(
     link_safe_rows = _intish(activation_summary.get("link_safe_rows"))
     forecast_safe_rows = _intish(activation_summary.get("forecast_safe_rows"))
     activation_candidate_rows = _intish(activation_summary.get("activation_candidate_rows"))
-    total_rows = sum(
-        count
-        for count in (usda_rows, cushman_rows, flightaware_rows)
-        if count > 0
-    )
+    total_rows = sum(count for count in (usda_rows, cushman_rows, flightaware_rows) if count > 0)
     blocked_rows = max(0, total_rows - flightaware_review_rows - activation_candidate_rows)
     r5_complete = bool(flightaware_date_stable)
     r4_complete = bool(flightaware_gate)
@@ -3502,13 +3520,9 @@ def _phase3an_general_source_gate_summary(
         "USDA": _phase3an_source_row(
             source_name="USDA",
             fallback_status=_usda_status_from_report(usda),
-            fallback_blocker=str(
-                usda.get("current_blocker")
-                or "USDA_SOURCE_EVIDENCE_UNRESOLVED"
-            ),
+            fallback_blocker=str(usda.get("current_blocker") or "USDA_SOURCE_EVIDENCE_UNRESOLVED"),
             fallback_next_action=str(
-                usda.get("next_action")
-                or "Review exact USDA evidence before source promotion."
+                usda.get("next_action") or "Review exact USDA evidence before source promotion."
             ),
             decision=usda_decision,
             affected_rows=usda_rows,
@@ -3565,23 +3579,17 @@ def _phase3an_general_source_gate_summary(
                 if r5_complete and flightaware_date_stable_rows == 0
                 else None
             ),
-            blocker_override=(
-                str(r5_summary.get("next_action") or "") if r5_complete else None
-            ),
+            blocker_override=(str(r5_summary.get("next_action") or "") if r5_complete else None),
         ),
     }
     return {
         "source_evidence_status": source_evidence_status,
-        "activation_readiness": (
-            "READY" if link_safe_rows and forecast_safe_rows else "NOT_READY"
-        ),
+        "activation_readiness": ("READY" if link_safe_rows and forecast_safe_rows else "NOT_READY"),
         "first_hard_blocker": first_hard_blocker,
         "official_free_source_rows": usda_rows + flightaware_rows,
         "date_stable_rows": flightaware_date_stable_rows,
         "date_stable_missing_rows": (
-            flightaware_rows
-            if r5_complete and not flightaware_date_stable_rows
-            else 0
+            flightaware_rows if r5_complete and not flightaware_date_stable_rows else 0
         ),
         "review_gated_rows": flightaware_review_rows,
         "blocked_rows": blocked_rows,
@@ -3675,9 +3683,7 @@ def _phase3an_source_row(
         "blocked_rows": blocked_rows,
         "blocker": blocker_override or first_blocker or fallback_blocker,
         "blocker_codes": (
-            decision.get("blocker_codes")
-            if isinstance(decision.get("blocker_codes"), list)
-            else []
+            decision.get("blocker_codes") if isinstance(decision.get("blocker_codes"), list) else []
         ),
         "next_action": str(decision.get("next_action") or fallback_next_action),
         "paper_trade_writes": False,
@@ -3768,7 +3774,9 @@ def _sports_reason_codes(summary: dict[str, Any], existing: Any) -> list[str]:
         codes.update(str(code) for code in existing)
     elif isinstance(existing, dict):
         codes.update(str(code) for code, count in existing.items() if _intish(count))
-    if _intish(summary.get("unresolved_round_placeholders")) or _intish(summary.get("placeholder_rows")):
+    if _intish(summary.get("unresolved_round_placeholders")) or _intish(
+        summary.get("placeholder_rows")
+    ):
         codes.add("ROUND_PLACEHOLDER")
     if not bool(summary.get("schedule_evidence_available")):
         codes.add("SCHEDULE_NOT_AVAILABLE")
@@ -4070,9 +4078,7 @@ def _economic_link_event_repair_row(row: dict[str, Any]) -> dict[str, Any]:
         "safe_to_backfill_parser_leg_after_link_repair": safe_after_repair,
         "unsafe_reason": row.get("unsafe_reason"),
         "link_event_repair_policy": (
-            "REPORT_ONLY_OPERATOR_APPROVAL_REQUIRED"
-            if safe_to_repair
-            else "NO_LINK_EVENT_WRITE"
+            "REPORT_ONLY_OPERATOR_APPROVAL_REQUIRED" if safe_to_repair else "NO_LINK_EVENT_WRITE"
         ),
         "parser_backfill_policy": (
             "OPERATOR_GATED_AFTER_DB_WRITER_CLEAR_AND_BACKUP"
@@ -4643,11 +4649,16 @@ def _render_phase3an_economic_morning_operator_handoff_markdown(
         f"- Link repair candidates: `{summary.get('link_repair_candidates')}`",
         f"- Parser backfill candidates: `{summary.get('parser_backfill_candidates')}`",
         f"- Parser blocked rows: `{summary.get('parser_blocked_rows')}`",
-        f"- R5: `{summary.get('r5_status')}` cycle `{summary.get('r5_cycle_number')}/{summary.get('r5_total_cycles')}`",
+        f"- R5: `{summary.get('r5_status')}` cycle `"
+        f"{summary.get('r5_cycle_number')}/"
+        f"{summary.get('r5_total_cycles')}`",
         f"- Positive EV rows: `{summary.get('positive_ev_rows')}`",
         f"- Paper-ready candidates: `{summary.get('paper_ready_candidates')}`",
         f"- Market refresh status: `{summary.get('market_refresh_status')}`",
-        f"- Markets/snapshots/forecasts: `{summary.get('markets_seen')}/{summary.get('snapshots_inserted')}/{summary.get('forecasts_inserted')}`",
+        f"- Markets/snapshots/forecasts: `"
+        f"{summary.get('markets_seen')}/"
+        f"{summary.get('snapshots_inserted')}/"
+        f"{summary.get('forecasts_inserted')}`",
         f"- Paper health: `{summary.get('paper_health_status')}`",
         f"- Eligible exact settlements: `{summary.get('eligible_exact_settlements')}`",
         "",
@@ -4718,11 +4729,16 @@ def _render_phase3an_overnight_refresh_continuity_markdown(
         f"- Generated at: {payload.get('generated_at')}",
         f"- Status: `{payload.get('status')}`",
         f"- First blocker: `{summary.get('first_blocker')}`",
-        f"- R5: `{summary.get('r5_status')}` cycle `{summary.get('r5_cycle_number')}/{summary.get('r5_total_cycles')}`",
+        f"- R5: `{summary.get('r5_status')}` cycle `"
+        f"{summary.get('r5_cycle_number')}/"
+        f"{summary.get('r5_total_cycles')}`",
         f"- Positive EV rows: `{summary.get('positive_ev_rows')}`",
         f"- Paper-ready candidates: `{summary.get('paper_ready_candidates')}`",
         f"- Market refresh: `{summary.get('market_refresh_status')}`",
-        f"- Markets/snapshots/forecasts: `{summary.get('markets_seen')}/{summary.get('snapshots_inserted')}/{summary.get('forecasts_inserted')}`",
+        f"- Markets/snapshots/forecasts: `"
+        f"{summary.get('markets_seen')}/"
+        f"{summary.get('snapshots_inserted')}/"
+        f"{summary.get('forecasts_inserted')}`",
         f"- Paper health: `{summary.get('paper_health_status')}`",
         f"- Eligible exact settlements: `{summary.get('eligible_exact_settlements')}`",
         f"- Morning handoff: `{summary.get('handoff_status')}`",
@@ -4780,7 +4796,9 @@ def _phase3az_before_after(*, reports_dir: Path) -> dict[str, Any]:
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "before_summary": _dict(before.get("summary")),
         "after_summary": _dict(after.get("summary")),
-        "before_gap_count": len(before.get("gaps", [])) if isinstance(before.get("gaps"), list) else 0,
+        "before_gap_count": len(before.get("gaps", []))
+        if isinstance(before.get("gaps"), list)
+        else 0,
         "after_gap_count": len(after.get("gaps", [])) if isinstance(after.get("gaps"), list) else 0,
         "rerun_error": error,
         "source_reports": {
@@ -4820,23 +4838,37 @@ def _phase3an_dashboard_status(
             },
             "settlement": {
                 "status": _dict(settlement.get("summary")).get("status"),
-                "exact_eligible_trades": _dict(settlement.get("summary")).get("exact_eligible_trades"),
-                "apply_command_exposed": _dict(settlement.get("summary")).get("apply_command_exposed"),
+                "exact_eligible_trades": _dict(settlement.get("summary")).get(
+                    "exact_eligible_trades"
+                ),
+                "apply_command_exposed": _dict(settlement.get("summary")).get(
+                    "apply_command_exposed"
+                ),
             },
             "general_sources": {
                 "USDA": _dict(_dict(general.get("sources")).get("USDA")).get("status"),
                 "Cushman": _dict(_dict(general.get("sources")).get("Cushman")).get("status"),
-                "FlightAware": _dict(_dict(general.get("sources")).get("FlightAware")).get("status"),
-                "source_evidence_ready_rows": _dict(general.get("summary")).get("source_evidence_ready_rows"),
-                "source_evidence_status": _dict(general.get("summary")).get("source_evidence_status"),
+                "FlightAware": _dict(_dict(general.get("sources")).get("FlightAware")).get(
+                    "status"
+                ),
+                "source_evidence_ready_rows": _dict(general.get("summary")).get(
+                    "source_evidence_ready_rows"
+                ),
+                "source_evidence_status": _dict(general.get("summary")).get(
+                    "source_evidence_status"
+                ),
                 "first_hard_blocker": _dict(general.get("summary")).get("first_hard_blocker"),
                 "link_safe_rows": _dict(general.get("summary")).get("link_safe_rows"),
                 "forecast_safe_rows": _dict(general.get("summary")).get("forecast_safe_rows"),
                 "date_stable_rows": _dict(general.get("summary")).get("date_stable_rows"),
-                "date_stable_missing_rows": _dict(general.get("summary")).get("date_stable_missing_rows"),
+                "date_stable_missing_rows": _dict(general.get("summary")).get(
+                    "date_stable_missing_rows"
+                ),
                 "review_gated_rows": _dict(general.get("summary")).get("review_gated_rows"),
                 "blocked_rows": _dict(general.get("summary")).get("blocked_rows"),
-                "proprietary_blocked_rows": _dict(general.get("summary")).get("proprietary_blocked_rows"),
+                "proprietary_blocked_rows": _dict(general.get("summary")).get(
+                    "proprietary_blocked_rows"
+                ),
                 "wrong_date_rows": _dict(general.get("summary")).get("wrong_date_rows"),
                 "next_action": general.get("exact_next_action"),
             },
@@ -4846,7 +4878,9 @@ def _phase3an_dashboard_status(
             },
             "sports": {
                 "placeholder_rows": _dict(sports.get("summary")).get("placeholder_rows"),
-                "partial_provenance_markets": _dict(sports.get("summary")).get("partial_provenance_markets"),
+                "partial_provenance_markets": _dict(sports.get("summary")).get(
+                    "partial_provenance_markets"
+                ),
                 "reason_codes": sports.get("reason_codes", []),
             },
             "economic_news": {
@@ -4872,9 +4906,9 @@ def _phase3an_dashboard_status(
                 "economic_exact_linked_current_without_parsed_leg": _dict(
                     economic.get("summary")
                 ).get("economic_exact_linked_current_without_parsed_leg"),
-                "news_exact_linked_current_without_parsed_leg": _dict(
-                    economic.get("summary")
-                ).get("news_exact_linked_current_without_parsed_leg"),
+                "news_exact_linked_current_without_parsed_leg": _dict(economic.get("summary")).get(
+                    "news_exact_linked_current_without_parsed_leg"
+                ),
                 "economic_current_handoff_blocker": _dict(economic.get("summary")).get(
                     "economic_current_handoff_blocker"
                 ),
@@ -4912,7 +4946,8 @@ def _render_phase3an_executive_summary(
         ),
         f"- No-trade correct now: `{_dict(paper.get('summary')).get('no_trade_correct_now')}`",
         f"- Settlement healthy: `{_dict(settlement.get('summary')).get('status')}`",
-        f"- Settlement apply needed: `{_dict(settlement.get('summary')).get('settlement_apply_needed')}`",
+        f"- Settlement apply needed: `"
+        f"{_dict(settlement.get('summary')).get('settlement_apply_needed')}`",
         f"- USDA blocker: `{_dict(general_sources.get('USDA')).get('status')}`",
         f"- Cushman blocker: `{_dict(general_sources.get('Cushman')).get('status')}`",
         f"- FlightAware blocker: `{_dict(general_sources.get('FlightAware')).get('status')}`",
@@ -4920,7 +4955,8 @@ def _render_phase3an_executive_summary(
         f"- Economic/news blocker: `{_dict(economic.get('summary')).get('blocker_reason')}`",
         (
             "- Economic/news current handoff: "
-            f"economic `{_dict(economic.get('summary')).get('economic_current_handoff_blocker')}`, "
+            f"economic `"
+            f"{_dict(economic.get('summary')).get('economic_current_handoff_blocker')}`, "
             f"news `{_dict(economic.get('summary')).get('news_current_handoff_blocker')}`"
         ),
         f"- Next single best operator action: {_next_single_operator_action(crypto, general)}",
@@ -4955,12 +4991,14 @@ def _render_phase3an_next_actions(
             "## P1",
             "",
             f"- Crypto watcher: {crypto.get('exact_next_action')}",
-            f"- USDA exact source: {_dict(_dict(general.get('sources')).get('USDA')).get('next_action')}",
+            f"- USDA exact source: "
+            f"{_dict(_dict(general.get('sources')).get('USDA')).get('next_action')}",
             "",
             "## P2",
             "",
             f"- Cushman: {_dict(_dict(general.get('sources')).get('Cushman')).get('next_action')}",
-            f"- FlightAware: {_dict(_dict(general.get('sources')).get('FlightAware')).get('next_action')}",
+            f"- FlightAware: "
+            f"{_dict(_dict(general.get('sources')).get('FlightAware')).get('next_action')}",
             f"- Sports evidence: {sports.get('exact_next_action')}",
             "",
             "## P3",
@@ -5010,7 +5048,10 @@ def _render_phase3an_next_actions(
             "",
             "## P4",
             "",
-            "- Rerun `kalshi-bot phase3az-gap-analysis --output-dir reports/phase3az --reports-dir reports`.",
+            (
+                "- Rerun `kalshi-bot phase3az-gap-analysis --output-dir reports/phase3az "
+                "--reports-dir reports`."
+            ),
             "",
         ]
     )
@@ -5018,7 +5059,9 @@ def _render_phase3an_next_actions(
 
 def _next_single_operator_action(crypto: dict[str, Any], general: dict[str, Any]) -> str:
     if crypto.get("classification") in {"RUNNING_CYCLE_OVERDUE", "WATCHER_STALE", "RESTART_SAFE"}:
-        return "Review `reports/phase3an/crypto_watch_doctor.json`, then run the dry-run restart plan."
+        return (
+            "Review `reports/phase3an/crypto_watch_doctor.json`, then run the dry-run restart plan."
+        )
     return _phase3an_source_next_action(general)
 
 

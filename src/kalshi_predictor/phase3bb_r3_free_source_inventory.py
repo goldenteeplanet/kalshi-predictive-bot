@@ -250,9 +250,7 @@ def build_phase3bb_r3_free_source_inventory(
                 "paper_ready_truth": reports_dir / "phase3ba_r5" / "paper_ready_truth.json",
                 "weather_fast_lane": reports_dir / "phase3bb_r2" / "weather_funnel.json",
                 "noncrypto_backlog": reports_dir / "phase3ba_r6" / "noncrypto_engine_backlog.csv",
-                "market_coverage": reports_dir
-                / "market_coverage"
-                / "market_coverage_doctor.json",
+                "market_coverage": reports_dir / "market_coverage" / "market_coverage_doctor.json",
             }.items()
         },
     }

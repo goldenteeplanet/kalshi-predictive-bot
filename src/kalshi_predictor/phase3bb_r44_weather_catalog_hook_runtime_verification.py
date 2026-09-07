@@ -339,7 +339,8 @@ def _build_remote_probes(
         ),
         RemoteProbe(
             "weather_activation_preview_json",
-            f"cd {app} && cat reports/phase3az_r12_weather/weather_activation_preview.json 2>/dev/null || true",
+            f"cd {app} && cat reports/phase3az_r12_weather/wea"
+            f"ther_activation_preview.json 2>/dev/null || true",
             timeout_seconds,
         ),
         RemoteProbe(
@@ -349,7 +350,8 @@ def _build_remote_probes(
         ),
         RemoteProbe(
             "r40_json",
-            f"cd {app} && cat reports/phase3bb_r40/cloud_scheduler_runtime_monitor.json 2>/dev/null || true",
+            f"cd {app} && cat reports/phase3bb_r40/cloud_sched"
+            f"uler_runtime_monitor.json 2>/dev/null || true",
             timeout_seconds,
         ),
         RemoteProbe(
@@ -636,7 +638,10 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
             "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor "
             "--output-dir reports/phase3bb_r40 --reports-dir reports"
         )
-        reason = "The scheduler ran weather_current_catalog_refresh, wrote R12 preview artifacts, then ran weather_fast_lane; R40 also recognizes the hook."
+        reason = (
+            "The scheduler ran weather_current_catalog_refresh, wrote R12 preview artifacts, "
+            "then ran weather_fast_lane; R40 also recognizes the hook."
+        )
     return {
         "status": status,
         "verification_passed": not failed,
@@ -679,7 +684,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- Scheduler service: `{parsed.get('scheduler_service_active_state')}`",
             f"- Timer next: `{parsed.get('scheduler_timer_next')}`",
             f"- Runner hook present: `{parsed.get('runner_hook_present')}`",
-            f"- Runner hook before weather fast-lane: `{parsed.get('runner_hook_before_fast_lane')}`",
+            f"- Runner hook before weather fast-lane: `"
+            f"{parsed.get('runner_hook_before_fast_lane')}`",
             f"- Runtime sequence: `{sequence.get('status')}`",
             f"- Catalog hook runs in journal: `{decision['weather_catalog_hook_run_count']}`",
             f"- Weather fast-lane runs in journal: `{decision['weather_fast_lane_run_count']}`",
@@ -732,7 +738,10 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in payload["scheduler_job_events"][-60:]:
         lines.append(
-            f"| `{row.get('event')}` | `{row.get('job_id', '')}` | `{row.get('count', '')}` | {row.get('line', '')} |"
+            f"| `{row.get('event')}` | `"
+            f"{row.get('job_id', '')}` | `"
+            f"{row.get('count', '')}` | {row.get('line', '')} "
+            f"|"
         )
     lines.extend(
         [
@@ -745,7 +754,8 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in payload["weather_catalog_report_freshness"]:
         lines.append(
-            f"| `{row['path']}` | `{row['status']}` | `{row['mtime_epoch']}` | `{row['size_bytes']}` |"
+            f"| `{row['path']}` | `{row['status']}` | `"
+            f"{row['mtime_epoch']}` | `{row['size_bytes']}` |"
         )
     return "\n".join(lines) + "\n"
 

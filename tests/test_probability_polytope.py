@@ -16,9 +16,7 @@ def test_narrow_simplex_polytope_passes_information_gate():
 
 
 def test_broad_simplex_polytope_fails_even_when_every_bound_is_feasible():
-    result = polytope_information(
-        [{"lower": 0.0, "upper": 1.0} for _ in range(3)]
-    )
+    result = polytope_information([{"lower": 0.0, "upper": 1.0} for _ in range(3)])
     assert result["simplex_feasible"] is True
     assert result["gate_passed"] is False
     assert result["checks"]["mean_tightened_width"] is False
@@ -26,8 +24,6 @@ def test_broad_simplex_polytope_fails_even_when_every_bound_is_feasible():
 
 
 def test_infeasible_bounds_fail_closed():
-    result = polytope_information(
-        [{"lower": 0.7, "upper": 0.8}, {"lower": 0.6, "upper": 0.9}]
-    )
+    result = polytope_information([{"lower": 0.7, "upper": 0.8}, {"lower": 0.6, "upper": 0.9}])
     assert result["simplex_feasible"] is False
     assert result["gate_passed"] is False

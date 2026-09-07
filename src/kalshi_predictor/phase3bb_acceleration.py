@@ -668,8 +668,7 @@ def build_unified_acceleration_report(
         manual_babysitting_severe=True,
     )
     next_operator_command = (
-        "kalshi-bot phase3bb-scheduler-plan --output-dir reports/phase3bb "
-        "--reports-dir reports"
+        "kalshi-bot phase3bb-scheduler-plan --output-dir reports/phase3bb --reports-dir reports"
     )
     if selected_sprint["id"] == "WEATHER_PAPER_FUNNEL_ACTIVATION":
         next_operator_command = weather["recommended_command"]
@@ -695,9 +694,7 @@ def build_unified_acceleration_report(
         },
         "historical_replay_summary": {
             "lane_label": replay["lane_label"],
-            "counts_as_real_paper_trade_learning": (
-                replay["counts_as_real_paper_trade_learning"]
-            ),
+            "counts_as_real_paper_trade_learning": (replay["counts_as_real_paper_trade_learning"]),
         },
         "answers": {
             "why_progress_is_slow": (
@@ -988,9 +985,7 @@ def _time_estimates(
     )
     remaining_settled = max(0, target - settled)
     settled_days = (
-        math.ceil(remaining_settled / daily_paper_trades)
-        if daily_paper_trades > 0
-        else None
+        math.ceil(remaining_settled / daily_paper_trades) if daily_paper_trades > 0 else None
     )
     return {
         "positive_ev_targets": ev_targets,
@@ -1290,9 +1285,7 @@ def historical_replay_rules() -> dict[str, Any]:
 def command_safety_checks(command: str) -> dict[str, Any]:
     commands = _command_names(command)
     unregistered = [name for name in commands if name not in REPORT_COMMANDS]
-    forbidden = [
-        fragment for fragment in FORBIDDEN_COMMAND_FRAGMENTS if fragment in command
-    ]
+    forbidden = [fragment for fragment in FORBIDDEN_COMMAND_FRAGMENTS if fragment in command]
     return {
         "commands": commands,
         "unregistered_commands": unregistered,
@@ -1343,9 +1336,7 @@ def _render_throughput(payload: dict[str, Any]) -> str:
         lines.append(f"- {key}: `{value}`")
     lines.extend(["", "## Time Estimates", ""])
     for row in payload["time_estimates"]["positive_ev_targets"]:
-        lines.append(
-            f"- {row['target']} EV rows: `{row['days_at_observed_pace']}` day(s)"
-        )
+        lines.append(f"- {row['target']} EV rows: `{row['days_at_observed_pace']}` day(s)")
     settled = payload["time_estimates"]["settled_target"]
     lines.append(
         "- 500 settled paper trades: "

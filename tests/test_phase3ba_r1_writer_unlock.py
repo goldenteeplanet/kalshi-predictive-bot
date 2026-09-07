@@ -54,8 +54,7 @@ def test_phase3ba_r1_stops_overrun_r5_and_restarts_one_watcher(tmp_path, monkeyp
                 "safe_to_start_write": False,
                 "current_writer_pid": 10041,
                 "current_writer_command": (
-                    "python -m kalshi_predictor.cli "
-                    "phase3bc-r5-crypto-freshness-watch"
+                    "python -m kalshi_predictor.cli phase3bc-r5-crypto-freshness-watch"
                 ),
             },
             {"status": "CLEAR", "safe_to_start_write": True, "current_writer_pid": None},
@@ -156,9 +155,7 @@ def test_phase3ba_r1_refuses_non_r5_active_writer(tmp_path, monkeypatch) -> None
     assert payload["next_action"]["command"] == "kalshi-bot db-writer-monitor --json"
 
 
-def test_phase3ba_r1_stops_overrun_r5_even_after_writer_lane_clears(
-    tmp_path, monkeypatch
-) -> None:
+def test_phase3ba_r1_stops_overrun_r5_even_after_writer_lane_clears(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(phase3ba_r1, "_metadata", lambda **_: _metadata())
     writer_states = iter(

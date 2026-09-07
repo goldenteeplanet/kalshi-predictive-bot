@@ -165,8 +165,7 @@ def ingest_manual_weather_json(
                 precipitation_probability=record.get("precipitation_probability"),
                 precipitation_inches=record.get("precipitation_inches"),
                 short_forecast=record.get("short_forecast") or record.get("shortForecast"),
-                detailed_forecast=record.get("detailed_forecast")
-                or record.get("detailedForecast"),
+                detailed_forecast=record.get("detailed_forecast") or record.get("detailedForecast"),
                 raw_json=dict(record),
             )
             forecasts_inserted += 1

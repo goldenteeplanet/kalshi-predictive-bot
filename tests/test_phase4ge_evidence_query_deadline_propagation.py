@@ -140,9 +140,7 @@ def test_result_tampering_and_retry_contract_fail_closed() -> None:
         elapsed_ms=1,
     )
     with pytest.raises(EvidenceQueryDeadlinePropagationError, match="PROPAGATION_HASH_MISMATCH"):
-        validate_query_deadline_propagation(
-            replace(result, propagation_hash="0" * 64)
-        )
+        validate_query_deadline_propagation(replace(result, propagation_hash="0" * 64))
     with pytest.raises(
         EvidenceQueryDeadlinePropagationError, match="PROPAGATION_RETRY_CONTRACT_INVALID"
     ):
@@ -176,9 +174,7 @@ def _boundaries():
         age_seconds=1,
         configured_timeout_ms=0,
     )
-    evidence = build_busy_timeout_evidence(
-        budget=budget, observations=[observation]
-    )
+    evidence = build_busy_timeout_evidence(budget=budget, observations=[observation])
     return build_query_cancellation_boundaries(
         budget=budget,
         timeout_evidence=evidence,

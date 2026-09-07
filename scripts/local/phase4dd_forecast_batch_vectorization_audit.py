@@ -61,8 +61,10 @@ def build_report(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("PHASE4DD_INPUT_SCHEMA_OR_HASH_INVALID")
     batch_size = payload["batch_size"]
     rows = payload["rows"]
-    if not isinstance(batch_size, int) or isinstance(batch_size, bool) or not (
-        1 <= batch_size <= MAX_BATCH_SIZE
+    if (
+        not isinstance(batch_size, int)
+        or isinstance(batch_size, bool)
+        or not (1 <= batch_size <= MAX_BATCH_SIZE)
     ):
         raise ValueError("PHASE4DD_BATCH_SIZE_INVALID")
     if not isinstance(rows, list) or not rows or len(rows) > MAX_ROWS:

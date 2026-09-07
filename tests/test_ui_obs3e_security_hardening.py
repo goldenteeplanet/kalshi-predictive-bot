@@ -21,7 +21,9 @@ def test_audit_log_excludes_query_and_sensitive_value(caplog) -> None:
     with TestClient(create_app()) as client:
         response = client.get("/system/progress?token=do-not-log")
     assert response.status_code == 200
-    audit = "\n".join(record.getMessage() for record in caplog.records if "ui_audit" in record.getMessage())
+    audit = "\n".join(
+        record.getMessage() for record in caplog.records if "ui_audit" in record.getMessage()
+    )
     assert "path=/system/progress" in audit
     assert "do-not-log" not in audit
     assert "token" not in audit

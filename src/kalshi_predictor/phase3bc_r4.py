@@ -158,26 +158,18 @@ def build_phase3bc_r4_payload(
         category for row in diagnostics for category in row["blocker_categories"]
     )
     current_blocker_counts = Counter(
-        category
-        for row in current_window_diagnostics
-        for category in row["blocker_categories"]
+        category for row in current_window_diagnostics for category in row["blocker_categories"]
     )
     freshness_counts = Counter(row["freshness_issue"] for row in diagnostics)
     risk_counts = Counter(row["phase3n_risk_state"] for row in diagnostics)
-    current_risk_counts = Counter(
-        row["phase3n_risk_state"] for row in current_window_diagnostics
-    )
-    true_ranking_gap_rows = sum(
-        freshness_counts.get(issue, 0) for issue in TRUE_RANKING_GAPS
-    )
+    current_risk_counts = Counter(row["phase3n_risk_state"] for row in current_window_diagnostics)
+    true_ranking_gap_rows = sum(freshness_counts.get(issue, 0) for issue in TRUE_RANKING_GAPS)
     positive_ev_rows = sum(
         1
         for row in current_window_diagnostics
         if (to_decimal(row.get("expected_value")) or Decimal("-1")) > 0
     )
-    clean_execution_rows = sum(
-        1 for row in current_window_diagnostics if _has_clean_execution(row)
-    )
+    clean_execution_rows = sum(1 for row in current_window_diagnostics if _has_clean_execution(row))
     risk_ready_rows = sum(
         1
         for row in current_window_diagnostics
@@ -225,8 +217,7 @@ def build_phase3bc_r4_payload(
         "spread_or_liquidity_blocked_rows": sum(
             1
             for row in current_window_diagnostics
-            if "spread_block" in row["blocking_gates"]
-            or "liquidity_block" in row["blocking_gates"]
+            if "spread_block" in row["blocking_gates"] or "liquidity_block" in row["blocking_gates"]
         ),
         "missing_phase3n_risk_rows": sum(
             1 for row in current_window_diagnostics if row["phase3n_risk_state"] == "MISSING"
@@ -238,9 +229,7 @@ def build_phase3bc_r4_payload(
             and row["readiness_status"] == "PAPER_READY_CANDIDATE"
         ),
         "phase3n_risk_existing_rows": sum(
-            1
-            for row in current_window_diagnostics
-            if row["phase3n_risk_state"] != "MISSING"
+            1 for row in current_window_diagnostics if row["phase3n_risk_state"] != "MISSING"
         ),
         "primary_gap": _primary_gap(
             current_blocker_counts,
@@ -271,9 +260,7 @@ def build_phase3bc_r4_payload(
         "readiness_counts": dict(sorted(readiness_counts.items())),
         "blocking_gate_counts": dict(sorted(gate_counts.items())),
         "blocker_category_counts": dict(sorted(blocker_counts.items())),
-        "current_window_blocker_category_counts": dict(
-            sorted(current_blocker_counts.items())
-        ),
+        "current_window_blocker_category_counts": dict(sorted(current_blocker_counts.items())),
         "freshness_issue_counts": dict(sorted(freshness_counts.items())),
         "phase3n_risk_counts": dict(sorted(risk_counts.items())),
         "current_window_diagnostics": current_window_diagnostics[
@@ -292,9 +279,7 @@ def build_phase3bc_r4_payload(
             if row["readiness_status"] == "WATCH_NO_POSITIVE_EXPECTED_VALUE"
         ][:50],
         "stale_or_unranked_examples": [
-            row
-            for row in current_window_diagnostics
-            if row["freshness_issue"] in TRUE_RANKING_GAPS
+            row for row in current_window_diagnostics if row["freshness_issue"] in TRUE_RANKING_GAPS
         ][:50],
         "snapshot_freshness_rows": [
             row
@@ -563,9 +548,7 @@ def _what_would_make_ready(
     if "ranking_missing" in gates:
         actions.append("Rerun crypto opportunity ranking for this exact ticker.")
     if "ranking_stale" in gates:
-        actions.append(
-            "Refresh crypto rankings for rows with fresh snapshots and forecasts."
-        )
+        actions.append("Refresh crypto rankings for rows with fresh snapshots and forecasts.")
     if "ranking_before_forecast" in gates:
         actions.append("Refresh ranking because the forecast is newer than the ranking.")
     if "expired_crypto_window" in gates:
@@ -678,15 +661,12 @@ def _primary_gap_examples(
         return expired_window_diagnostics[:50]
     if primary_gap == "PHASE3N_RISK_NOT_REACHED":
         return [
-            row
-            for row in current_window_diagnostics
-            if row["phase3n_risk_state"] == "MISSING"
+            row for row in current_window_diagnostics if row["phase3n_risk_state"] == "MISSING"
         ][:50]
     return [
         row
         for row in current_window_diagnostics
-        if primary_gap in row["blocker_categories"]
-        or primary_gap == row["freshness_issue"]
+        if primary_gap in row["blocker_categories"] or primary_gap == row["freshness_issue"]
     ][:50]
 
 
@@ -714,8 +694,7 @@ def _recommended_next_action(summary: dict[str, Any]) -> str:
         )
     if summary["spread_or_liquidity_blocked_rows"]:
         return (
-            "Wait for tighter spread or better orderbook depth before treating rows as "
-            "paper-ready."
+            "Wait for tighter spread or better orderbook depth before treating rows as paper-ready."
         )
     return "Continue 15-minute crypto refreshes and review any new paper-ready candidates manually."
 
@@ -746,9 +725,7 @@ def _has_clean_execution(row: dict[str, Any]) -> bool:
     if liquidity_score is None or liquidity_score <= 0:
         return False
     return not (
-        "spread_block" in gates
-        or "liquidity_block" in gates
-        or "missing_executable_price" in gates
+        "spread_block" in gates or "liquidity_block" in gates or "missing_executable_price" in gates
     )
 
 

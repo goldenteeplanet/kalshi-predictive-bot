@@ -20,8 +20,7 @@ NEXT_COMMAND_CANDIDATES = (
     "--output-dir reports/phase3bb_r4_flightaware --reports-dir reports",
     "kalshi-bot phase3bb-r3-source-evidence-activation "
     "--output-dir reports/phase3bb_r3_source_activation --reports-dir reports",
-    "kalshi-bot phase3bb-r2-general-source-evidence "
-    "--output-dir reports/phase3bb_r2_sources",
+    "kalshi-bot phase3bb-r2-general-source-evidence --output-dir reports/phase3bb_r2_sources",
     "kalshi-bot phase3ax-gap-analysis --output-dir reports/phase3ax --reports-dir reports",
 )
 
@@ -51,14 +50,10 @@ def build_phase3bb_r4_flightaware_review_link_gate(
         reports_dir / "phase3bb_r2_sources" / "phase3bb_r2_general_source_evidence.json"
     )
     availability_report = _read_json(
-        reports_dir
-        / "phase3bb_r2_sources"
-        / "phase3bb_r2_general_source_availability.json"
+        reports_dir / "phase3bb_r2_sources" / "phase3bb_r2_general_source_availability.json"
     )
     date_report = _read_json(
-        reports_dir
-        / "phase3bb_r2_sources"
-        / "flightaware_cancellation_date_resolution.json"
+        reports_dir / "phase3bb_r2_sources" / "flightaware_cancellation_date_resolution.json"
     )
     activation_report = _read_json(
         reports_dir / "phase3bb_r3_source_activation" / "source_evidence_activation.json"
@@ -104,14 +99,10 @@ def build_phase3bb_r4_flightaware_review_link_gate(
         "fabricated_evidence": False,
         "source_reports_used": {
             "phase3bb_r2_general_source_evidence": str(
-                reports_dir
-                / "phase3bb_r2_sources"
-                / "phase3bb_r2_general_source_evidence.json"
+                reports_dir / "phase3bb_r2_sources" / "phase3bb_r2_general_source_evidence.json"
             ),
             "phase3bb_r2_general_source_availability": str(
-                reports_dir
-                / "phase3bb_r2_sources"
-                / "phase3bb_r2_general_source_availability.json"
+                reports_dir / "phase3bb_r2_sources" / "phase3bb_r2_general_source_availability.json"
             ),
             "flightaware_cancellation_date_resolution": str(
                 reports_dir
@@ -119,9 +110,7 @@ def build_phase3bb_r4_flightaware_review_link_gate(
                 / "flightaware_cancellation_date_resolution.json"
             ),
             "phase3bb_r3_source_activation": str(
-                reports_dir
-                / "phase3bb_r3_source_activation"
-                / "source_evidence_activation.json"
+                reports_dir / "phase3bb_r3_source_activation" / "source_evidence_activation.json"
             ),
         },
         "summary": summary,
@@ -283,8 +272,7 @@ def _summary(
         "source_value_available_for_review": exact_ready > 0,
         "observed_value": availability_row.get("observed_value")
         or _first_observed_value(evidence_rows),
-        "date_stable_evidence_available": date_report.get("exact_july_3_report_found")
-        is True,
+        "date_stable_evidence_available": date_report.get("exact_july_3_report_found") is True,
         "public_relative_page_accepted": _truthy(
             _nested(
                 date_report,
@@ -550,10 +538,7 @@ def _flightaware_evidence_reference(
 
 def _entity_scope_ok(evidence_rows: list[dict[str, Any]], date_report: dict[str, Any]) -> bool:
     target_region = str(_nested(date_report, "target", "region") or "United States").lower()
-    regions = {
-        str(_nested(row, "parsed_fields", "region") or "").lower()
-        for row in evidence_rows
-    }
+    regions = {str(_nested(row, "parsed_fields", "region") or "").lower() for row in evidence_rows}
     return bool(evidence_rows) and regions <= {target_region} and target_region in regions
 
 

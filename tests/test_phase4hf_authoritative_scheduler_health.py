@@ -73,9 +73,7 @@ def test_observation_result_and_safety_tampering_fail_closed() -> None:
     evidence = probe_authoritative_scheduler_health(observation)
     with pytest.raises(AuthoritativeSchedulerHealthError, match="EVIDENCE_HASH_MISMATCH"):
         validate_scheduler_health_evidence(replace(evidence, evidence_hash="0" * 64))
-    with pytest.raises(
-        AuthoritativeSchedulerHealthError, match="EVIDENCE_SAFETY_BOUNDARY_INVALID"
-    ):
+    with pytest.raises(AuthoritativeSchedulerHealthError, match="EVIDENCE_SAFETY_BOUNDARY_INVALID"):
         validate_scheduler_health_evidence(replace(evidence, recovery_authorized=True))
 
 

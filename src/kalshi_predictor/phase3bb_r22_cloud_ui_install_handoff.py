@@ -262,8 +262,7 @@ def _cloud_target(r20: dict[str, Any], r21: dict[str, Any]) -> dict[str, Any]:
         "app_path": ui_plan.get("remote_app_path") or "/opt/kalshi-predictive-bot",
         "env_path": ui_plan.get("remote_env_path") or "/etc/kalshi-bot/kalshi-bot.env",
         "db_path": ui_plan.get("remote_db_path") or "/var/lib/kalshi-bot/kalshi_phase1.db",
-        "reports_path": ui_plan.get("remote_reports_path")
-        or "/opt/kalshi-predictive-bot/reports",
+        "reports_path": ui_plan.get("remote_reports_path") or "/opt/kalshi-predictive-bot/reports",
     }
 
 
@@ -446,9 +445,7 @@ def _handoff_decision(
         "required_execute_env": APPROVAL_ENV_VAR,
         "required_execute_token": APPROVAL_TOKEN,
         "operator_next_command": "bash reports/phase3bb_r22/operator_ui_install_handoff.sh",
-        "next_codex_step": (
-            "Phase 3BB-R23 - Cloud UI Install Verification After Operator Run"
-        ),
+        "next_codex_step": ("Phase 3BB-R23 - Cloud UI Install Verification After Operator Run"),
     }
 
 
@@ -549,20 +546,20 @@ def _render_handoff_script(payload: dict[str, Any]) -> str:
         [
             ")",
             "",
-            "if [[ \"$TOKEN\" != \"$REQUIRED\" ]]; then",
+            'if [[ "$TOKEN" != "$REQUIRED" ]]; then',
             "  echo '[phase3bb-r22] dry-run command list:'",
             "  printf '  %s\\n' \"${commands[@]}\"",
             "  echo '[phase3bb-r22] no install/enable/start command executed'",
             "  echo '[phase3bb-r22] to execute install+enable-no-start, set:'",
-            f"  echo \"  {APPROVAL_ENV_VAR}=$REQUIRED bash $0\"",
+            f'  echo "  {APPROVAL_ENV_VAR}=$REQUIRED bash $0"',
             "  exit 0",
             "fi",
             "",
             "echo '[phase3bb-r22] approval token accepted'",
             "echo '[phase3bb-r22] running UI install + enable-no-start handoff'",
-            "for command in \"${commands[@]}\"; do",
-            "  echo \"+ $command\"",
-            "  bash -lc \"$command\"",
+            'for command in "${commands[@]}"; do',
+            '  echo "+ $command"',
+            '  bash -lc "$command"',
             "done",
             "echo '[phase3bb-r22] handoff commands completed'",
             "echo '[phase3bb-r22] verify with Phase 3BB-R23 next'",

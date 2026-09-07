@@ -103,7 +103,9 @@ def write_phase3bb_r24_cloud_ui_start_tunnel_verification_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_probe_csv(probe_csv_path, payload["remote_ui_probe_results"])
     _write_checks_csv(checks_csv_path, payload["verification_checks"])
     operator_command_path.write_text(_render_operator_command(payload), encoding="utf-8")
@@ -220,9 +222,7 @@ def build_phase3bb_r24_cloud_ui_start_tunnel_verification(
         "starts_r5_watcher": False,
         "starts_duplicate_watchers": False,
         "stops_processes": False,
-        "systemctl_mutating_commands_executed": 1
-        if start_result is not None
-        else 0,
+        "systemctl_mutating_commands_executed": 1 if start_result is not None else 0,
         "systemctl_read_only_commands_executed": 3,
         "remote_commands_executed": len(results) + (1 if start_result is not None else 0),
         "remote_db_writes_performed": 0,
@@ -314,7 +314,9 @@ def _verification_checks(
             _check(
                 "ui_service_started",
                 bool(ui_state.get("service_started")),
-                f"ActiveState={ui_state.get('service_active_state')}; pid={ui_state.get('service_exec_main_pid')}.",
+                f"ActiveState="
+                f"{ui_state.get('service_active_state')}; pid="
+                f"{ui_state.get('service_exec_main_pid')}.",
             ),
             _check(
                 "local_ui_http_ok",
@@ -436,7 +438,9 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- Verification passed: `{decision['verification_passed']}`",
             f"- UI service started: `{decision['ui_service_started']}`",
             f"- Local UI HTTP OK: `{decision['local_ui_http_ok']}`",
-            f"- Public HTTP/HTTPS listening: `{decision['public_http_listening']}` / `{decision['public_https_listening']}`",
+            f"- Public HTTP/HTTPS listening: `"
+            f"{decision['public_http_listening']}` / `"
+            f"{decision['public_https_listening']}`",
             f"- First failed check: `{decision['first_failed_check']}`",
             f"- Reason: {decision['primary_reason']}",
             "",
@@ -468,13 +472,24 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     for row in payload["verification_checks"]:
         marker = "PASS" if row["passed"] else "FAIL"
         lines.append(f"- `{marker}` `{row['check']}` - {row['detail']}")
-    lines.extend(["", "## Parsed UI State", "", "```json", json.dumps(payload["parsed_ui_state"], indent=2, sort_keys=True), "```"])
+    lines.extend(
+        [
+            "",
+            "## Parsed UI State",
+            "",
+            "```json",
+            json.dumps(payload["parsed_ui_state"], indent=2, sort_keys=True),
+            "```",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
     decision = payload["verification_decision"]
-    return "\n".join(["#!/usr/bin/env bash", "set -euo pipefail", "", decision["operator_next_command"], ""])
+    return "\n".join(
+        ["#!/usr/bin/env bash", "set -euo pipefail", "", decision["operator_next_command"], ""]
+    )
 
 
 def _render_next_actions(payload: dict[str, Any]) -> str:

@@ -70,4 +70,3 @@ class MarketImpliedForecaster:
 
 def _decimal_feature(value: Decimal | None) -> str | None:
     return format(value, "f") if value is not None else None
-

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 from zoneinfo import ZoneInfo
-
 
 LOCAL_CHANNELS = {
     "CRITICAL": ["local_audible", "local_desktop", "dashboard"],
@@ -26,11 +26,16 @@ def _time(value: str) -> datetime:
 
 def _quiet(now: datetime, start_hour: int, end_hour: int) -> bool:
     hour = now.hour
-    return hour >= start_hour or hour < end_hour if start_hour > end_hour else start_hour <= hour < end_hour
+    return (
+        hour >= start_hour or hour < end_hour
+        if start_hour > end_hour
+        else start_hour <= hour < end_hour
+    )
 
 
 def build_notification_routing_preview(
-    incident_preview: Mapping[str, Any], policy: Mapping[str, Any],
+    incident_preview: Mapping[str, Any],
+    policy: Mapping[str, Any],
     prior_ledger: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     timezone_name = str(policy.get("timezone") or "America/Chicago")
@@ -47,13 +52,28 @@ def build_notification_routing_preview(
         severity = str(incident.get("severity") or "WARNING")
         status = str(incident.get("status") or "UNRESOLVED")
         channels = list(LOCAL_CHANNELS.get(severity, ["dashboard"]))
-        if any(token in channel.lower() for channel in channels for token in EXTERNAL_CHANNEL_TOKENS):
+        if any(
+            token in channel.lower() for channel in channels for token in EXTERNAL_CHANNEL_TOKENS
+        ):
             diagnostics.append(f"EXTERNAL_CHANNEL_REJECTED:{incident.get('incident_id')}")
-            channels = [channel for channel in channels if not any(token in channel.lower() for token in EXTERNAL_CHANNEL_TOKENS)]
-        previous = next((item for item in reversed(ledger) if item.get("incident_id") == incident.get("incident_id")), None)
+            channels = [
+                channel
+                for channel in channels
+                if not any(token in channel.lower() for token in EXTERNAL_CHANNEL_TOKENS)
+            ]
+        previous = next(
+            (
+                item
+                for item in reversed(ledger)
+                if item.get("incident_id") == incident.get("incident_id")
+            ),
+            None,
+        )
         duplicate = False
         if previous and previous.get("severity") == severity and previous.get("status") == status:
-            age = int((_time(str(policy["as_of"])) - _time(str(previous["delivered_at"]))).total_seconds())
+            age = int(
+                (_time(str(policy["as_of"])) - _time(str(previous["delivered_at"]))).total_seconds()
+            )
             duplicate = 0 <= age < cooldown
         critical = severity == "CRITICAL"
         resolution = status == "RESOLVED"
@@ -68,14 +88,22 @@ def build_notification_routing_preview(
             action, reason = "DELIVER_NOW", "LOCAL_ROUTE_AVAILABLE"
         if status == "OBSERVED" and severity == "INFO":
             action, reason = "TIMELINE_ONLY", "BENIGN_OBSERVED_EVENT"
-        decisions.append({
-            "incident_id": incident.get("incident_id"), "code": incident.get("code"),
-            "severity": severity, "status": status, "acknowledged": bool(incident.get("acknowledged")),
-            "action": action, "reason": reason, "channels": channels,
-            "quiet_hours_active": quiet_hours, "duplicate": duplicate,
-            "critical_delivery_guaranteed": critical and action == "DELIVER_NOW",
-            "resolution_notification": resolution,
-        })
+        decisions.append(
+            {
+                "incident_id": incident.get("incident_id"),
+                "code": incident.get("code"),
+                "severity": severity,
+                "status": status,
+                "acknowledged": bool(incident.get("acknowledged")),
+                "action": action,
+                "reason": reason,
+                "channels": channels,
+                "quiet_hours_active": quiet_hours,
+                "duplicate": duplicate,
+                "critical_delivery_guaranteed": critical and action == "DELIVER_NOW",
+                "resolution_notification": resolution,
+            }
+        )
     canonical = json.dumps(decisions, sort_keys=True, separators=(",", ":")).encode()
     critical_rows = [row for row in decisions if row["severity"] == "CRITICAL"]
     return {
@@ -87,9 +115,12 @@ def build_notification_routing_preview(
         "database_writes": 0,
         "execution_changed": False,
         "policy": {
-            "timezone": timezone_name, "as_of_local": now.isoformat(),
-            "quiet_start_hour": quiet_start, "quiet_end_hour": quiet_end,
-            "quiet_hours_active": quiet_hours, "dedupe_cooldown_seconds": cooldown,
+            "timezone": timezone_name,
+            "as_of_local": now.isoformat(),
+            "quiet_start_hour": quiet_start,
+            "quiet_end_hour": quiet_end,
+            "quiet_hours_active": quiet_hours,
+            "dedupe_cooldown_seconds": cooldown,
         },
         "decisions": decisions,
         "diagnostics": diagnostics,
@@ -99,7 +130,9 @@ def build_notification_routing_preview(
             "deferred": sum(row["action"] == "DEFER_UNTIL_QUIET_END" for row in decisions),
             "deduplicated": sum(row["action"] == "DEDUPLICATED" for row in decisions),
             "timeline_only": sum(row["action"] == "TIMELINE_ONLY" for row in decisions),
-            "all_critical_deliver_now": all(row["critical_delivery_guaranteed"] for row in critical_rows),
+            "all_critical_deliver_now": all(
+                row["critical_delivery_guaranteed"] for row in critical_rows
+            ),
             "external_channels": 0,
             "deterministic_digest": hashlib.sha256(canonical).hexdigest(),
         },
@@ -107,13 +140,20 @@ def build_notification_routing_preview(
 
 
 def write_notification_routing_preview(
-    incident_path: Path, policy_path: Path, ledger_path: Path, output_dir: Path,
+    incident_path: Path,
+    policy_path: Path,
+    ledger_path: Path,
+    output_dir: Path,
 ) -> Path:
     incident_report = json.loads(incident_path.read_text(encoding="utf-8"))
     incident_preview = incident_report.get("preview") or incident_report
     policy = json.loads(policy_path.read_text(encoding="utf-8"))
-    ledger_payload = json.loads(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else {}
-    report = build_notification_routing_preview(incident_preview, policy, ledger_payload.get("deliveries") or [])
+    ledger_payload = (
+        json.loads(ledger_path.read_text(encoding="utf-8")) if ledger_path.exists() else {}
+    )
+    report = build_notification_routing_preview(
+        incident_preview, policy, ledger_payload.get("deliveries") or []
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / "ui_obs2e_notification_routing_preview.json"
     path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")

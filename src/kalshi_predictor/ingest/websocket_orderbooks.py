@@ -101,7 +101,7 @@ class ReadOnlyOrderbookWebSocketAdapter:
                             timed_out = True
                             break
                         raw_message = await asyncio.wait_for(anext(iterator), timeout=remaining)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     timed_out = True
                     break
                 except StopAsyncIteration:
@@ -190,9 +190,7 @@ class ReadOnlyOrderbookWebSocketAdapter:
         safe_ticker = re.sub(r"[^A-Za-z0-9_.-]+", "_", ticker)
         sequence = book.sequence if book.sequence is not None else 0
         unique_suffix = time.time_ns()
-        path = self.staging_dir / (
-            f"{safe_ticker}_{sequence:020d}_{unique_suffix}_{reason}.json"
-        )
+        path = self.staging_dir / (f"{safe_ticker}_{sequence:020d}_{unique_suffix}_{reason}.json")
         path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         return path
 

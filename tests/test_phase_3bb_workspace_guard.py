@@ -22,9 +22,7 @@ def test_phase3bb_guard_blocks_missing_current_phase_command(tmp_path) -> None:
     )
 
     assert payload["summary"]["status"] == "BLOCKED"
-    assert "phase3ah-sports-placeholder-watch" in payload["commands"][
-        "missing_required_commands"
-    ]
+    assert "phase3ah-sports-placeholder-watch" in payload["commands"]["missing_required_commands"]
     assert any(item["code"] == "STALE_COMMAND_BUILD" for item in payload["findings"])
     assert payload["safety"]["exchange_writes"] is False
 
@@ -52,15 +50,15 @@ def test_phase3bb_guard_source_scan_handles_multiline_typer_decorators(tmp_path)
     (repo_root / "src" / "kalshi_predictor" / "cli.py").write_text(
         "\n".join(
             [
-                'from typer import Typer',
-                'app = Typer()',
+                "from typer import Typer",
+                "app = Typer()",
                 '@app.command("db-writer-monitor")',
-                'def db_writer_monitor(): pass',
-                '@app.command(',
+                "def db_writer_monitor(): pass",
+                "@app.command(",
                 '    "runtime-identity",',
                 '    help="Show runtime identity.",',
-                ')',
-                'def runtime_identity(): pass',
+                ")",
+                "def runtime_identity(): pass",
             ]
         ),
         encoding="utf-8",
@@ -124,9 +122,10 @@ def test_dashboard_current_snapshot_api_uses_bounded_status_snapshot(tmp_path) -
     assert response.status_code == 200
     assert payload["data"]["snapshot_mode"] == "BOUNDED_OPERATOR_STATUS"
     assert payload["dashboard_snapshot_id"].startswith("bounded-current-")
-    assert payload["source_watermarks"][0]["database_fingerprint"] == payload["data"][
-        "database_fingerprint"
-    ]
+    assert (
+        payload["source_watermarks"][0]["database_fingerprint"]
+        == payload["data"]["database_fingerprint"]
+    )
     assert payload["source_watermarks"][0]["required"] is True
     assert payload["read_only_boundary"]["read_only"] is True
 

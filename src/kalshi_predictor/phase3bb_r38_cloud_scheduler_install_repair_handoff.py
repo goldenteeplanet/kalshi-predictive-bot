@@ -259,8 +259,8 @@ def _build_remote_probes(
             "tmp_scheduler_files",
             (
                 "for f in "
-                f"{tmp_files}; do if test -f \"$f\"; then echo \"$f PRESENT\"; "
-                "else echo \"$f MISSING\"; fi; done"
+                f'{tmp_files}; do if test -f "$f"; then echo "$f PRESENT"; '
+                'else echo "$f MISSING"; fi; done'
             ),
             timeout_seconds,
         ),
@@ -415,7 +415,8 @@ def _repair_checks(
         _check("r37_verification_present", bool(r37), "R37 verification artifact exists."),
         _check(
             "r37_blocked_by_scheduler_install",
-            r37_decision.get("status") in {
+            r37_decision.get("status")
+            in {
                 "BLOCKED_SCHEDULER_INSTALL_VERIFICATION",
                 "VERIFIED_SCHEDULER_INSTALL_ENABLE_NO_START",
             },
@@ -478,7 +479,10 @@ def _repair_decision(
     failed = [row for row in checks if not row["passed"]]
     r37_decision = r37.get("verification_decision") or {}
     needs_code_sync = not bool(parsed.get("r8_registered"))
-    if r37_decision.get("status") == "VERIFIED_SCHEDULER_INSTALL_ENABLE_NO_START" and not needs_code_sync:
+    if (
+        r37_decision.get("status") == "VERIFIED_SCHEDULER_INSTALL_ENABLE_NO_START"
+        and not needs_code_sync
+    ):
         status = "REPAIR_NOT_NEEDED_READY_FOR_TIMER_START_HANDOFF"
         reason = "R37 already verifies scheduler install and R8 is registered."
         next_command = (
@@ -553,28 +557,28 @@ def _render_root_console_script(payload: dict[str, Any]) -> str:
         "RUNNER='kalshi-multicategory-refresh-runner.sh'",
         f"APP={_shell_quote(app_path)}",
         "",
-        "if [[ \"$(id -u)\" -ne 0 ]]; then",
+        'if [[ "$(id -u)" -ne 0 ]]; then',
         "  echo '[phase3bb-r38] run this script as root from the cloud console'",
         "  exit 2",
         "fi",
         "",
         "echo '[phase3bb-r38] verifying copied /tmp scheduler files'",
-        "test -f \"/tmp/${SERVICE}\"",
-        "test -f \"/tmp/${TIMER}\"",
-        "test -f \"/tmp/${RUNNER}\"",
+        'test -f "/tmp/${SERVICE}"',
+        'test -f "/tmp/${TIMER}"',
+        'test -f "/tmp/${RUNNER}"',
         "",
         "echo '[phase3bb-r38] installing scheduler runner/service/timer; no start occurs'",
-        "install -D -m 0755 \"/tmp/${RUNNER}\" \"${APP}/scripts/${RUNNER}\"",
-        "install -m 0644 \"/tmp/${SERVICE}\" \"/etc/systemd/system/${SERVICE}\"",
-        "install -m 0644 \"/tmp/${TIMER}\" \"/etc/systemd/system/${TIMER}\"",
+        'install -D -m 0755 "/tmp/${RUNNER}" "${APP}/scripts/${RUNNER}"',
+        'install -m 0644 "/tmp/${SERVICE}" "/etc/systemd/system/${SERVICE}"',
+        'install -m 0644 "/tmp/${TIMER}" "/etc/systemd/system/${TIMER}"',
         "systemctl daemon-reload",
-        "systemctl enable \"${TIMER}\"",
+        'systemctl enable "${TIMER}"',
         "",
         "echo '[phase3bb-r38] verification after install'",
-        "systemctl is-enabled \"${TIMER}\"",
-        "systemctl is-active \"${TIMER}\" || true",
-        "systemctl is-active \"${SERVICE}\" || true",
-        "systemctl status \"${TIMER}\" \"${SERVICE}\" --no-pager || true",
+        'systemctl is-enabled "${TIMER}"',
+        'systemctl is-active "${TIMER}" || true',
+        'systemctl is-active "${SERVICE}" || true',
+        'systemctl status "${TIMER}" "${SERVICE}" --no-pager || true',
         "",
         "echo '[phase3bb-r38] install+enable-no-start complete'",
         "echo '[phase3bb-r38] do not start the timer until R37 verifies cleanly'",
@@ -599,21 +603,21 @@ def _render_code_sync_script(payload: dict[str, Any]) -> str:
         f"COPY_ROOT_SCRIPT={_shell_quote(commands['copy_root_console_script_to_tmp'])}",
         f"CODE_SYNC={_shell_quote(commands['code_sync_and_verify_r8'])}",
         "",
-        "if [[ \"$TOKEN\" != \"$REQUIRED\" ]]; then",
+        'if [[ "$TOKEN" != "$REQUIRED" ]]; then',
         "  echo '[phase3bb-r38] dry-run command list:'",
         "  printf '  %s\\n' \"$COPY_ROOT_SCRIPT\"",
         "  printf '  %s\\n' \"$CODE_SYNC\"",
         "  echo '[phase3bb-r38] no code sync or remote copy executed'",
-        f"  echo \"[phase3bb-r38] to execute: {CODE_SYNC_ENV_VAR}=$REQUIRED bash $0\"",
+        f'  echo "[phase3bb-r38] to execute: {CODE_SYNC_ENV_VAR}=$REQUIRED bash $0"',
         "  exit 0",
         "fi",
         "",
         "echo '[phase3bb-r38] approval token accepted'",
         "echo '[phase3bb-r38] copying root-console helper to /tmp'",
-        "bash -lc \"$COPY_ROOT_SCRIPT\"",
+        'bash -lc "$COPY_ROOT_SCRIPT"',
         "",
         "echo '[phase3bb-r38] syncing local code and verifying R8 command'",
-        "bash -lc \"$CODE_SYNC\"",
+        'bash -lc "$CODE_SYNC"',
         "",
         "echo '[phase3bb-r38] code sync complete; now run the root-console install script as root'",
         f"echo '  {commands['run_root_console_install_manually']}'",
@@ -653,7 +657,10 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             "## Safety",
             "",
             "- Codex did not install files as root.",
-            "- Codex did not sync code, unless the generated operator handoff is explicitly run later.",
+            (
+                "- Codex did not sync code, unless the generated operator handoff is "
+                "explicitly run later."
+            ),
             "- Codex did not start the scheduler service or timer.",
             "- Codex did not stop or duplicate R5.",
             "- No paper/live/demo trades were created.",

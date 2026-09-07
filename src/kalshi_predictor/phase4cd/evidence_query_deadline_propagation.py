@@ -79,9 +79,7 @@ def propagate_query_deadline(
     if not isinstance(boundaries, EvidenceQueryCancellationBoundaries):
         raise EvidenceQueryDeadlinePropagationError("BOUNDARY_INPUT_INVALID")
 
-    remaining = max(
-        0, boundaries.cancel_after_ms - elapsed_ms - propagation_overhead_ms
-    )
+    remaining = max(0, boundaries.cancel_after_ms - elapsed_ms - propagation_overhead_ms)
     reasons: list[str] = []
     if boundaries.decision != "ARM":
         reasons.append("BOUNDARY_NOT_ARMED")

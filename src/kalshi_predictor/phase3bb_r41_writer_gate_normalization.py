@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -109,7 +108,9 @@ def write_phase3bb_r41_writer_gate_normalization_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["writer_gate_checks"])
     _write_rows_csv(writer_gate_csv_path, payload["writer_gate_skips"])
@@ -261,8 +262,7 @@ def _build_remote_probes(
     r5_service = _shell_quote(r5_service_name)
     ui_service = _shell_quote(ui_service_name)
     writer_cmd = (
-        f"cd {app} && set -a && . {env} && set +a && "
-        ".venv/bin/kalshi-bot db-writer-monitor --json"
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
     )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
@@ -272,10 +272,18 @@ def _build_remote_probes(
             f"{writer_cmd} | python3 -m json.tool >/dev/null",
             timeout_seconds,
         ),
-        RemoteProbe("scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds),
-        RemoteProbe("r5_service_active", f"systemctl is-active {r5_service} || true", timeout_seconds),
-        RemoteProbe("ui_service_active", f"systemctl is-active {ui_service} || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "r5_service_active", f"systemctl is-active {r5_service} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "ui_service_active", f"systemctl is-active {ui_service} || true", timeout_seconds
+        ),
         RemoteProbe(
             "scheduler_journal",
             f"journalctl -u {service} -n {int(journal_lines)} --no-pager || true",
@@ -318,7 +326,9 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         "writer_count": writer_payload.get("writer_count"),
         "holder_count": writer_payload.get("holder_count"),
         "scheduler_timer_active_state": _first_line(_stdout(by_name.get("scheduler_timer_active"))),
-        "scheduler_service_active_state": _first_line(_stdout(by_name.get("scheduler_service_active"))),
+        "scheduler_service_active_state": _first_line(
+            _stdout(by_name.get("scheduler_service_active"))
+        ),
         "r5_service_active_state": _first_line(_stdout(by_name.get("r5_service_active"))),
         "ui_service_active_state": _first_line(_stdout(by_name.get("ui_service_active"))),
         "weather_fast_lane_command_registered": bool(
@@ -335,7 +345,8 @@ def _writer_gate_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
             "db_writer_monitor_json_valid",
             bool(parsed.get("db_writer_monitor_strict_json_valid"))
             and bool(parsed.get("db_writer_monitor_json_tool_ok")),
-            parsed.get("db_writer_monitor_parse_error") or "db-writer-monitor --json parses cleanly.",
+            parsed.get("db_writer_monitor_parse_error")
+            or "db-writer-monitor --json parses cleanly.",
         ),
         _check(
             "writer_safe_to_start_write",
@@ -382,12 +393,21 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         status = "BLOCKED_WRITER_GATE_NORMALIZATION"
         reason = f"First failing check: {failed[0]['check']}."
         next_step = "Phase 3BB-R41 - Resolve Writer Gate Runtime Dependency"
-        command = "kalshi-bot phase3bb-r41-writer-gate-normalization --output-dir reports/phase3bb_r41 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r41-writer-gate-normalization --output-dir "
+            "reports/phase3bb_r41 --reports-dir reports"
+        )
     else:
         status = "WRITER_GATE_NORMALIZED_WEATHER_FAST_LANE_UNBLOCKED"
-        reason = "db-writer-monitor JSON is valid and safe_to_start_write=true; the next scheduler cycle can run weather fast-lane when its cadence is due."
+        reason = (
+            "db-writer-monitor JSON is valid and safe_to_start_write=true; the next "
+            "scheduler cycle can run weather fast-lane when its cadence is due."
+        )
         next_step = "Phase 3BB-R42 - Weather Fast-Lane Post-Unblock Verification"
-        command = "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir reports/phase3bb_r40 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor --output-dir "
+            "reports/phase3bb_r40 --reports-dir reports"
+        )
     return {
         "status": status,
         "normalization_passed": not failed,
@@ -427,12 +447,14 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- Status: `{decision['status']}`",
             f"- Normalization passed: `{decision['normalization_passed']}`",
             f"- Reason: {decision['primary_reason']}",
-            f"- db-writer-monitor strict JSON: `{parsed.get('db_writer_monitor_strict_json_valid')}`",
+            f"- db-writer-monitor strict JSON: `"
+            f"{parsed.get('db_writer_monitor_strict_json_valid')}`",
             f"- safe_to_start_write: `{parsed.get('writer_safe_to_start_write')}`",
             f"- Writer status: `{parsed.get('writer_status')}`",
             f"- Writer PID: `{parsed.get('writer_pid')}`",
             f"- Writer-gate skips in journal window: `{parsed.get('writer_gate_skip_count')}`",
-            f"- Weather fast-lane registered: `{parsed.get('weather_fast_lane_command_registered')}`",
+            f"- Weather fast-lane registered: `"
+            f"{parsed.get('weather_fast_lane_command_registered')}`",
             "",
             "## Safety",
             "",
@@ -522,11 +544,23 @@ def _render_operator_command(payload: dict[str, Any]) -> str:
 
 
 def _write_probe_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    fieldnames = ["name", "ok", "exit_code", "duration_seconds", "timed_out", "stdout_excerpt", "stderr_excerpt"]
-    _write_rows_csv(path, [{name: row.get(name) for name in fieldnames} for row in rows], fieldnames=fieldnames)
+    fieldnames = [
+        "name",
+        "ok",
+        "exit_code",
+        "duration_seconds",
+        "timed_out",
+        "stdout_excerpt",
+        "stderr_excerpt",
+    ]
+    _write_rows_csv(
+        path, [{name: row.get(name) for name in fieldnames} for row in rows], fieldnames=fieldnames
+    )
 
 
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None) -> None:
+def _write_rows_csv(
+    path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None
+) -> None:
     if fieldnames is None:
         keys: list[str] = []
         for row in rows:

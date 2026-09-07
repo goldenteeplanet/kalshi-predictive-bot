@@ -19,4 +19,3 @@ def build_feature_snapshot(
         market_features=market_features,
         external_features=external_features,
     )
-

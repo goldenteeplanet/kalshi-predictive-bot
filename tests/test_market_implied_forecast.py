@@ -70,4 +70,3 @@ def test_market_implied_skips_when_no_price_available() -> None:
         )
         is None
     )
-

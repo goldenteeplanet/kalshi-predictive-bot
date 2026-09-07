@@ -174,7 +174,9 @@ def run_forecast_models(
                     skipped += 1
                     continue
                 record = insert_forecast(
-                    session, forecast, market_snapshot_id=snapshot.id,
+                    session,
+                    forecast,
+                    market_snapshot_id=snapshot.id,
                 )
                 if not builtin_signals_ensured:
                     ensure_builtin_signals(session)

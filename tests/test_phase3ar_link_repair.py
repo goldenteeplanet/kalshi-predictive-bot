@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from sqlalchemy import func, select
 from typer.testing import CliRunner
 
+from kalshi_predictor import phase3ar as phase3ar_module
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -21,6 +22,7 @@ from kalshi_predictor.data.schema import (
     PaperOrder,
     PositionSizingDecisionLog,
 )
+from kalshi_predictor.kalshi.client import RATE_LIMITED_RETRY_EXHAUSTED, KalshiRetryError
 from kalshi_predictor.opportunities.market_identity import (
     BUILT_FROM_EXACT_CATALOG,
     CATALOG_MATCH_MISSING,
@@ -34,12 +36,10 @@ from kalshi_predictor.opportunities.market_identity import (
 )
 from kalshi_predictor.paper.models import BUY_YES
 from kalshi_predictor.phase3ap import build_phase3ap_paper_ready_gate
-from kalshi_predictor import phase3ar as phase3ar_module
-from kalshi_predictor.kalshi.client import RATE_LIMITED_RETRY_EXHAUSTED, KalshiRetryError
 from kalshi_predictor.phase3ar import (
     build_phase3ar_catalog_stale_diagnostic,
-    build_phase3ar_refresh_catalog_for_opportunities,
     build_phase3ar_refresh_books_for_verified_links,
+    build_phase3ar_refresh_catalog_for_opportunities,
     build_phase3ar_url_audit,
     build_phase3ar_url_repair,
     write_phase3ar_link_repair_report,
@@ -90,7 +90,12 @@ def test_phase3ar_url_builder_exact_identity_and_rejection_rules(tmp_path) -> No
         assert built.kalshi_url_status == BUILT_FROM_EXACT_CATALOG
         assert built.kalshi_url is not None
         assert fresh.event_ticker.lower() in built.kalshi_url
-        assert build_canonical_kalshi_url(market=None, market_ticker="", settings=settings).kalshi_url_status == MISSING_MARKET_TICKER
+        assert (
+            build_canonical_kalshi_url(
+                market=None, market_ticker="", settings=settings
+            ).kalshi_url_status
+            == MISSING_MARKET_TICKER
+        )
         assert (
             build_canonical_kalshi_url(
                 market=None,
@@ -101,9 +106,24 @@ def test_phase3ar_url_builder_exact_identity_and_rejection_rules(tmp_path) -> No
             ).kalshi_url_status
             == CATALOG_MATCH_MISSING
         )
-        assert build_canonical_kalshi_url(market=session.get(Market, mismatch.ticker), settings=settings).kalshi_url_status == TICKER_MISMATCH
-        assert build_canonical_kalshi_url(market=session.get(Market, synthetic.ticker), settings=settings).kalshi_url_status == SYNTHETIC_ONLY
-        assert build_canonical_kalshi_url(market=session.get(Market, composite.ticker), settings=settings).kalshi_url_status == COMPOSITE_LOCAL_ONLY
+        assert (
+            build_canonical_kalshi_url(
+                market=session.get(Market, mismatch.ticker), settings=settings
+            ).kalshi_url_status
+            == TICKER_MISMATCH
+        )
+        assert (
+            build_canonical_kalshi_url(
+                market=session.get(Market, synthetic.ticker), settings=settings
+            ).kalshi_url_status
+            == SYNTHETIC_ONLY
+        )
+        assert (
+            build_canonical_kalshi_url(
+                market=session.get(Market, composite.ticker), settings=settings
+            ).kalshi_url_status
+            == COMPOSITE_LOCAL_ONLY
+        )
         assert stale_result.kalshi_url_status == CATALOG_STALE
         assert stale_result.kalshi_url is not None
 
@@ -187,9 +207,17 @@ def test_phase3ar_catalog_stale_diagnostic_and_refresh_safety(tmp_path, monkeypa
     assert dry_run["catalog_metadata_writes"] is False
     assert dry_run["summary"]["exact_positive_ev_tickers"] == 1
     assert dry_run["summary"]["exact_ticker_not_refreshed_rows"] == 1
-    assert dry_run["freshness_views"]["exact_opportunity_catalog"]["status"] == "EXACT_TICKER_NOT_REFRESHED"
-    assert dry_run["exact_catalog_handoff_rows"][0]["refresh_status"] == "EXACT_TICKER_NOT_REFRESHED"
-    assert dry_run["exact_catalog_handoff_rows"][0]["catalog_freshness_reason"] == "CATALOG_LAST_SEEN_TOO_OLD"
+    assert (
+        dry_run["freshness_views"]["exact_opportunity_catalog"]["status"]
+        == "EXACT_TICKER_NOT_REFRESHED"
+    )
+    assert (
+        dry_run["exact_catalog_handoff_rows"][0]["refresh_status"] == "EXACT_TICKER_NOT_REFRESHED"
+    )
+    assert (
+        dry_run["exact_catalog_handoff_rows"][0]["catalog_freshness_reason"]
+        == "CATALOG_LAST_SEEN_TOO_OLD"
+    )
     assert after_dry_run_last_seen == before_last_seen
     assert after_dry_run_raw == before_raw
     assert blocked["status"] == "BLOCKED_BY_ACTIVE_WRITER"
@@ -336,7 +364,9 @@ def test_phase3ar_ui_shows_expired_positive_ev_separately() -> None:
     assert "2 expired positive-EV" in str(blockers[0]["evidence"])
 
 
-def test_phase3ar_catalog_refresh_apply_requires_explicit_flag_and_writes_only_catalog(tmp_path) -> None:
+def test_phase3ar_catalog_refresh_apply_requires_explicit_flag_and_writes_only_catalog(
+    tmp_path,
+) -> None:
     settings = _settings(tmp_path, stale_after_seconds=60)
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
@@ -416,9 +446,14 @@ def test_phase3ar_catalog_refresh_reports_rate_limit_without_paper_trades(tmp_pa
     assert payload["rate_limit"]["data_completeness"] == "partial"
     assert payload["summary"]["data_completeness"] == "partial"
     assert payload["summary"]["exact_ticker_not_refreshed_rows"] == 1
-    assert payload["freshness_views"]["exact_opportunity_catalog"]["status"] == RATE_LIMITED_RETRY_EXHAUSTED
+    assert (
+        payload["freshness_views"]["exact_opportunity_catalog"]["status"]
+        == RATE_LIMITED_RETRY_EXHAUSTED
+    )
     assert payload["failed_rows"][0]["status"] == RATE_LIMITED_RETRY_EXHAUSTED
-    assert payload["exact_catalog_handoff_rows"][0]["refresh_status"] == RATE_LIMITED_RETRY_EXHAUSTED
+    assert (
+        payload["exact_catalog_handoff_rows"][0]["refresh_status"] == RATE_LIMITED_RETRY_EXHAUSTED
+    )
     assert payload["paper_trade_creation"] is False
     assert after_orders == before_orders
 
@@ -520,8 +555,12 @@ def test_phase3ar_ui_payload_and_unified_report_artifacts(tmp_path) -> None:
     settings = _settings(tmp_path)
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
-        verified = _seed_ranked_market(session, ticker="KXP3AR-UI-VERIFIED", include_url_fields=True)
-        unverified = _seed_ranked_market(session, ticker="KXP3AR-UI-BLOCKED", include_url_fields=False)
+        verified = _seed_ranked_market(
+            session, ticker="KXP3AR-UI-VERIFIED", include_url_fields=True
+        )
+        unverified = _seed_ranked_market(
+            session, ticker="KXP3AR-UI-BLOCKED", include_url_fields=False
+        )
 
         audit = build_phase3ar_url_audit(
             session,

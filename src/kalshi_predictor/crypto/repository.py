@@ -153,4 +153,3 @@ def get_crypto_links(session: Session, *, limit: int | None = None) -> list[Cryp
     if limit is not None:
         statement = statement.limit(limit)
     return list(session.scalars(statement))
-

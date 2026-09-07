@@ -171,8 +171,7 @@ def test_weather_linker_prefers_operator_threshold_over_time_fields(tmp_path) ->
                 "ticker": "KXTEMPNYCH-26JUN2703-T61.99",
                 "event_ticker": "KXTEMPNYCH-26JUN2703",
                 "title": (
-                    "Will the temp in New York City be above 61.99° "
-                    "on Jun 27, 2026 at 3am EDT?"
+                    "Will the temp in New York City be above 61.99° on Jun 27, 2026 at 3am EDT?"
                 ),
             },
         )
@@ -195,8 +194,7 @@ def test_weather_linker_scans_parsed_weather_candidates_first(tmp_path) -> None:
                 "ticker": "KXTEMPNYCH-26JUN2703-T61.99",
                 "event_ticker": "KXTEMPNYCH-26JUN2703",
                 "title": (
-                    "Will the temp in New York City be above 61.99° "
-                    "on Jun 27, 2026 at 3am EDT?"
+                    "Will the temp in New York City be above 61.99° on Jun 27, 2026 at 3am EDT?"
                 ),
             },
         )
@@ -245,8 +243,7 @@ def test_weather_linker_scans_kalshi_weather_family_without_parsed_leg(tmp_path)
                 "series_ticker": "KXTEMPNYCH",
                 "status": "active",
                 "title": (
-                    "Will the temp in New York City be above 81.99° "
-                    "on Jul 1, 2026 at 1pm EDT?"
+                    "Will the temp in New York City be above 81.99° on Jul 1, 2026 at 1pm EDT?"
                 ),
             },
         )
@@ -277,8 +274,7 @@ def test_weather_linker_is_idempotent_for_existing_links(tmp_path) -> None:
                 "ticker": "KXTEMPNYCH-26JUN2703-T61.99",
                 "event_ticker": "KXTEMPNYCH-26JUN2703",
                 "title": (
-                    "Will the temp in New York City be above 61.99° "
-                    "on Jun 27, 2026 at 3am EDT?"
+                    "Will the temp in New York City be above 61.99° on Jun 27, 2026 at 3am EDT?"
                 ),
             },
         )
@@ -304,9 +300,9 @@ def test_weather_linker_is_idempotent_for_existing_links(tmp_path) -> None:
         first = link_weather_markets(session)
         second = link_weather_markets(session)
         link_count = session.scalar(
-            select(func.count()).select_from(WeatherMarketLink).where(
-                WeatherMarketLink.ticker == market.ticker
-            )
+            select(func.count())
+            .select_from(WeatherMarketLink)
+            .where(WeatherMarketLink.ticker == market.ticker)
         )
 
         assert first.links_created == 1

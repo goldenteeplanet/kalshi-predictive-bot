@@ -69,9 +69,7 @@ def evaluate_wsl_reliability_workstream_gate(
     _validate_upstream(
         "CANONICAL_BUNDLE", validate_canonical_recovery_evidence_bundle, canonical_bundle
     )
-    _validate_upstream(
-        "DECISION_REPORT", validate_recovery_decision_tamper_report, decision_report
-    )
+    _validate_upstream("DECISION_REPORT", validate_recovery_decision_tamper_report, decision_report)
 
     observed_age = max(
         keepalive_audit.observed_max_age_seconds,

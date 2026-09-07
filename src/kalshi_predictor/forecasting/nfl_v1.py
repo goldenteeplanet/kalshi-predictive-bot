@@ -11,4 +11,3 @@ class NFLV1Forecaster(SportsV1Forecaster):
             model_name=self.model_name,
             max_adjustment_field="nfl_v1_max_adjustment",
         )
-

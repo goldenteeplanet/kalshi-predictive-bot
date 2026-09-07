@@ -58,11 +58,9 @@ def load_gate(path: Path) -> dict[str, Any]:
 
 
 def _progress(previous: dict[str, Any], current: dict[str, Any]) -> bool:
-    return (
-        int(current["canonical_count"]) > int(previous["canonical_count"])
-        or int(current["fully_evaluated_count"])
-        > int(previous["fully_evaluated_count"])
-    )
+    return int(current["canonical_count"]) > int(previous["canonical_count"]) or int(
+        current["fully_evaluated_count"]
+    ) > int(previous["fully_evaluated_count"])
 
 
 def _regressed(previous: dict[str, Any], current: dict[str, Any]) -> bool:
@@ -71,8 +69,7 @@ def _regressed(previous: dict[str, Any], current: dict[str, Any]) -> bool:
     )
     return same_hint_lineage and (
         int(current["canonical_count"]) < int(previous["canonical_count"])
-        or int(current["fully_evaluated_count"])
-        < int(previous["fully_evaluated_count"])
+        or int(current["fully_evaluated_count"]) < int(previous["fully_evaluated_count"])
         or int(current["hint_count"]) != int(previous["hint_count"])
     )
 
@@ -87,11 +84,14 @@ def build_status(
 ) -> dict[str, Any]:
     if not gates:
         raise ValueError("PHASE4AB_SOURCE_HISTORY_EMPTY")
-    if min(
-        maximum_evidence_age_seconds,
-        settlement_dwell_seconds,
-        reconciliation_dwell_seconds,
-    ) < 0:
+    if (
+        min(
+            maximum_evidence_age_seconds,
+            settlement_dwell_seconds,
+            reconciliation_dwell_seconds,
+        )
+        < 0
+    ):
         raise ValueError("PHASE4AB_THRESHOLD_NEGATIVE")
     ordered = sorted(gates, key=lambda row: _utc(row["generated_at"]))
     timestamps = [_utc(row["generated_at"]) for row in ordered]

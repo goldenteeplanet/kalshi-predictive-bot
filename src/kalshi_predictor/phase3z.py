@@ -270,9 +270,7 @@ def build_market_coverage_doctor(
             "parse_first": parse_result is not None,
             "parse_limit": parse_limit,
             "deep_checks": deep_checks,
-            "orphan_link_check": (
-                "COMPLETED" if deep_checks else "SKIPPED_FAST_REFRESH"
-            ),
+            "orphan_link_check": ("COMPLETED" if deep_checks else "SKIPPED_FAST_REFRESH"),
             "detail_exports": "BOUNDED_EXAMPLES",
         },
         "parse_result": _parse_result_payload(parse_result),
@@ -508,9 +506,7 @@ def _forecast_metrics(session: Session, model_names: tuple[str, ...]) -> dict[st
     if evaluated == 0:
         brier = None
     else:
-        brier = str(
-            (sum(errors, Decimal("0")) / Decimal(evaluated)).quantize(Decimal("0.0001"))
-        )
+        brier = str((sum(errors, Decimal("0")) / Decimal(evaluated)).quantize(Decimal("0.0001")))
     return {
         "evaluated_count": evaluated,
         "unresolved_count": unresolved,
@@ -627,9 +623,7 @@ def _paper_trade_totals(session: Session) -> dict[str, Any]:
 
 def _paper_model_names(session: Session) -> list[str]:
     return list(
-        session.scalars(
-            select(PaperOrder.model_name).distinct().order_by(PaperOrder.model_name)
-        )
+        session.scalars(select(PaperOrder.model_name).distinct().order_by(PaperOrder.model_name))
     )
 
 
@@ -719,15 +713,11 @@ def _market_coverage_stage_counts(
     market_count = _count(session, Market)
     active_eligible = int(
         session.scalar(
-            select(func.count())
-            .select_from(Market)
-            .where(current_market_predicate(now=utc_now()))
+            select(func.count()).select_from(Market).where(current_market_predicate(now=utc_now()))
         )
         or 0
     )
-    parsed_markets = int(
-        session.scalar(select(func.count(func.distinct(MarketLeg.ticker)))) or 0
-    )
+    parsed_markets = int(session.scalar(select(func.count(func.distinct(MarketLeg.ticker)))) or 0)
     parsed_legs = _count(session, MarketLeg)
     domain_mapped = int(
         session.scalar(
@@ -745,11 +735,7 @@ def _market_coverage_stage_counts(
         "news": _count(session, NewsMarketLink),
         "sports": _count(session, SportsMarketLink),
     }
-    parse_attempts = (
-        parse_result.markets_scanned
-        if parse_result is not None
-        else parsed_markets
-    )
+    parse_attempts = parse_result.markets_scanned if parse_result is not None else parsed_markets
     parse_failures = (
         max(
             0,
@@ -823,9 +809,7 @@ def _coverage_contract_row(row: dict[str, Any], stage_counts: dict[str, Any]) ->
     current_denominator = int(row.get("current_linkable_markets") or 0)
     current_usable = int(row.get("current_linked_markets") or 0)
     current_coverage = (
-        None
-        if current_denominator == 0
-        else round(current_usable / current_denominator, 4)
+        None if current_denominator == 0 else round(current_usable / current_denominator, 4)
     )
     health = _coverage_health(row, stage_counts)
     return {
@@ -872,9 +856,10 @@ def _coverage_health(row: dict[str, Any], stage_counts: dict[str, Any]) -> str:
         return "NO_CATALOG_DATA"
     if int(row.get("current_parsed_markets", row["parsed_markets"])) == 0:
         return "NO_COMPATIBLE_ACTIVE_MARKETS" if row["category"] in LINKED_CATEGORIES else "HEALTHY"
-    if int(row.get("current_linked_markets", row["linked_markets"])) == 0 and row[
-        "category"
-    ] in LINKED_CATEGORIES:
+    if (
+        int(row.get("current_linked_markets", row["linked_markets"])) == 0
+        and row["category"] in LINKED_CATEGORIES
+    ):
         return "LINKER_NOT_RUN"
     if int(row.get("current_unlinked_markets") or 0) > 0 or row["partial_markets"] > 0:
         return "LINKER_DEGRADED"
@@ -1003,9 +988,7 @@ def _model_repair_recommendations(
 
 def _coverage_recommendations(rows: list[dict[str, Any]], collapse: dict[str, Any]) -> list[str]:
     degraded = [
-        row
-        for row in rows
-        if row["health"] not in {"HEALTHY", "NO_COMPATIBLE_ACTIVE_MARKETS"}
+        row for row in rows if row["health"] not in {"HEALTHY", "NO_COMPATIBLE_ACTIVE_MARKETS"}
     ]
     if degraded:
         return [f"{row['scope_key']}: {row['next_action']['summary']}" for row in degraded]
@@ -1089,8 +1072,8 @@ def _render_coverage_doctor_markdown(payload: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-        "## Stage Counts",
-        "",
+            "## Stage Counts",
+            "",
         ]
     )
     for key, value in payload["stage_counts"].items():
@@ -1166,9 +1149,7 @@ def _sqlite_identity(
             "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
             "sha256": _sha256_file(resolved) if deep_checks else None,
             "integrity_check": (
-                _sqlite_integrity_check(resolved)
-                if deep_checks
-                else "SKIPPED_BOUNDED_IDENTITY"
+                _sqlite_integrity_check(resolved) if deep_checks else "SKIPPED_BOUNDED_IDENTITY"
             ),
         }
     )

@@ -86,4 +86,3 @@ def confidence_rows_for_ui(
         }
         for row in latest_model_confidence_scores(session, limit=limit)
     ]
-

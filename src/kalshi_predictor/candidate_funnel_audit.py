@@ -87,12 +87,8 @@ def build_candidate_funnel_audit(
         if ticker
     }
     if manifest_scope:
-        crypto_source = [
-            row for row in crypto_source if str(row.get("ticker")) in manifest_scope
-        ]
-        weather_source = [
-            row for row in weather_source if str(row.get("ticker")) in manifest_scope
-        ]
+        crypto_source = [row for row in crypto_source if str(row.get("ticker")) in manifest_scope]
+        weather_source = [row for row in weather_source if str(row.get("ticker")) in manifest_scope]
     rows = [
         _crypto_candidate(row, ranking_evidence.get(str(row.get("ticker"))) or {})
         for row in crypto_source
@@ -133,9 +129,7 @@ def build_candidate_funnel_audit(
     }
 
 
-def latest_ranking_evidence(
-    session: Session, tickers: list[str]
-) -> dict[str, dict[str, Any]]:
+def latest_ranking_evidence(session: Session, tickers: list[str]) -> dict[str, dict[str, Any]]:
     if not tickers:
         return {}
     rankings = session.scalars(
@@ -171,9 +165,7 @@ def latest_ranking_evidence(
 
 def _crypto_candidate(source: dict[str, Any], ranking: dict[str, Any]) -> dict[str, Any]:
     source_blocker = str(
-        source.get("blocked_reason")
-        or source.get("readiness_status")
-        or "UNKNOWN"
+        source.get("blocked_reason") or source.get("readiness_status") or "UNKNOWN"
     )
     blocker = _canonical_crypto_blocker(source_blocker, source, ranking)
     return _candidate(
@@ -247,8 +239,7 @@ def _candidate(
             else source.get("book_usable"),
             "book_reason": source.get("book_reason"),
             "liquidity": ranking.get("liquidity") or source.get("liquidity"),
-            "liquidity_score": ranking.get("liquidity_score")
-            or source.get("liquidity_score"),
+            "liquidity_score": ranking.get("liquidity_score") or source.get("liquidity_score"),
             "spread": ranking.get("spread") or source.get("spread"),
             "time_to_close_minutes": ranking.get("time_to_close_minutes"),
             "current_window_eligible": source.get("current_window_eligible"),
@@ -258,9 +249,7 @@ def _candidate(
         "downstream_gates": {
             "phase3m_nonzero_size": source.get("phase3m_nonzero_size"),
             "phase3n_approved": source.get("phase3n_approved"),
-            "risk_eligible": _first_present(
-                source, "risk_eligible", "phase3s_proceed"
-            ),
+            "risk_eligible": _first_present(source, "risk_eligible", "phase3s_proceed"),
         },
         "evidence_timestamps": {
             "ranking": ranking.get("ranked_at") or source.get("latest_ranking_at"),

@@ -136,9 +136,7 @@ def build_phase3aw_dashboard_truth(
     resolved = settings or get_settings()
     generated_at = utc_now()
     r5_status = _read_json(reports_dir / "phase3bc_r5" / "phase3bc_r5_status.json")
-    r5_watch = _read_json(
-        reports_dir / "phase3bc_r5" / "phase3bc_r5_crypto_freshness_watch.json"
-    )
+    r5_watch = _read_json(reports_dir / "phase3bc_r5" / "phase3bc_r5_crypto_freshness_watch.json")
     r5_summary = _latest_r5_summary(r5_status, r5_watch)
     r5_guard = r5_status.get("guard") if isinstance(r5_status.get("guard"), dict) else {}
     r5_cycle_at = (
@@ -146,9 +144,7 @@ def build_phase3aw_dashboard_truth(
         or parse_datetime(r5_watch.get("generated_at"))
         or parse_datetime(r5_status.get("generated_at"))
     )
-    phase3at_diagnostic = _read_json(
-        reports_dir / "phase3at" / "forecast_ranking_diagnostic.json"
-    )
+    phase3at_diagnostic = _read_json(reports_dir / "phase3at" / "forecast_ranking_diagnostic.json")
     current_scope_summary = _current_scope_summary_from_artifacts(
         r5_summary=r5_summary,
         phase3at_diagnostic=phase3at_diagnostic,
@@ -228,9 +224,7 @@ def build_phase3aw_dashboard_truth(
             "r5_runner_state": current_funnel["r5_runner_state"],
             "r5_stale_report": current_funnel["r5_stale_report"],
             "r5_latest_report_generated_at": _iso_or_none(r5_cycle_at),
-            "current_active_crypto_markets": current_funnel[
-                "current_active_crypto_markets"
-            ],
+            "current_active_crypto_markets": current_funnel["current_active_crypto_markets"],
             "snapshots_fresh": current_funnel["snapshots_fresh"],
             "forecasts_fresh": current_funnel["forecasts_fresh"],
             "rankings_fresh": current_funnel["rankings_fresh"],
@@ -240,9 +234,7 @@ def build_phase3aw_dashboard_truth(
             "best_current_expected_value_cents": current_funnel[
                 "best_current_expected_value_cents"
             ],
-            "best_ev_gap_to_positive_cents": current_funnel[
-                "best_ev_gap_to_positive_cents"
-            ],
+            "best_ev_gap_to_positive_cents": current_funnel["best_ev_gap_to_positive_cents"],
             "best_ev_candidate_ticker": current_funnel["best_ev_candidate_ticker"],
             "stale_artifacts_ignored": stale_artifacts_ignored,
             "operator_next_command": next_command,
@@ -353,9 +345,8 @@ def _latest_r5_summary(
         return status_summary
     status_generated_at = _artifact_generated_at(r5_status)
     watch_generated_at = _artifact_generated_at(r5_watch)
-    if (
-        watch_generated_at is not None
-        and (status_generated_at is None or watch_generated_at >= status_generated_at)
+    if watch_generated_at is not None and (
+        status_generated_at is None or watch_generated_at >= status_generated_at
     ):
         return watch_summary
     return status_summary
@@ -434,13 +425,15 @@ def _true_dashboard_blocker(
         if primary_gap == "POSITIVE_EV_NO_EXECUTABLE_BOOK":
             return LIQUIDITY_OR_SPREAD_BLOCK
         return primary_gap
-    if _int_value(r5_summary.get("snapshot_stale_rows")) > 0 or _int_value(
-        r5_summary.get("snapshot_missing_rows")
-    ) > 0:
+    if (
+        _int_value(r5_summary.get("snapshot_stale_rows")) > 0
+        or _int_value(r5_summary.get("snapshot_missing_rows")) > 0
+    ):
         return SNAPSHOT_STALE
-    if _int_value(r5_summary.get("forecast_stale_rows")) > 0 or _int_value(
-        r5_summary.get("forecast_missing_rows")
-    ) > 0:
+    if (
+        _int_value(r5_summary.get("forecast_stale_rows")) > 0
+        or _int_value(r5_summary.get("forecast_missing_rows")) > 0
+    ):
         return FORECAST_STALE
     if _ranking_gap(r5_summary) > 0:
         return RANKING_GAP
@@ -450,9 +443,10 @@ def _true_dashboard_blocker(
         return LIQUIDITY_OR_SPREAD_BLOCK
     if _int_value(r5_summary.get("positive_ev_spread_blocked_rows")) > 0:
         return LIQUIDITY_OR_SPREAD_BLOCK
-    if _int_value(r5_summary.get("positive_ev_clean_book_rows")) > 0 and _int_value(
-        r5_summary.get("positive_ev_clean_book_risk_missing_rows")
-    ) > 0:
+    if (
+        _int_value(r5_summary.get("positive_ev_clean_book_rows")) > 0
+        and _int_value(r5_summary.get("positive_ev_clean_book_risk_missing_rows")) > 0
+    ):
         return RISK_OR_SIZE_BLOCK
     if str(r5_summary.get("liquidity_actionability_state") or "") in {
         "POSITIVE_EV_NO_EXECUTABLE_BOOK",
@@ -484,13 +478,11 @@ def _current_crypto_funnel(
         "true_current_blocker": true_blocker,
         "current_active_crypto_markets": current_active,
         "current_snapshots": _int_value(current_scope_summary.get("current_snapshots")),
-        "snapshots_fresh": snapshot_stale == 0 and _int_value(
-            r5_summary.get("snapshot_missing_rows")
-        ) == 0,
+        "snapshots_fresh": snapshot_stale == 0
+        and _int_value(r5_summary.get("snapshot_missing_rows")) == 0,
         "snapshot_stale_rows": snapshot_stale,
-        "forecasts_fresh": forecast_stale == 0 and _int_value(
-            r5_summary.get("forecast_missing_rows")
-        ) == 0,
+        "forecasts_fresh": forecast_stale == 0
+        and _int_value(r5_summary.get("forecast_missing_rows")) == 0,
         "forecast_stale_rows": forecast_stale,
         "rankings_fresh": ranking_gap == 0,
         "ranking_gap_after_repair": ranking_gap,
@@ -527,21 +519,14 @@ def _current_crypto_funnel(
             "stale_after_minutes",
         ),
         "watch_state": r5_summary.get("watch_state") or "UNKNOWN",
-        "primary_gap_after_refresh": r5_summary.get("primary_gap_after_refresh")
-        or "UNKNOWN",
+        "primary_gap_after_refresh": r5_summary.get("primary_gap_after_refresh") or "UNKNOWN",
         "phase3bc_main_blocker": r5_summary.get("phase3bc_main_blocker") or "UNKNOWN",
-        "data_freshness_gap_after_refresh": r5_summary.get(
-            "data_freshness_gap_after_refresh"
-        )
+        "data_freshness_gap_after_refresh": r5_summary.get("data_freshness_gap_after_refresh")
         or "UNKNOWN",
-        "snapshot_backlog_status": r5_summary.get("snapshot_backlog_status")
-        or "UNKNOWN",
-        "forecast_backlog_status": r5_summary.get("forecast_backlog_status")
-        or "UNKNOWN",
+        "snapshot_backlog_status": r5_summary.get("snapshot_backlog_status") or "UNKNOWN",
+        "forecast_backlog_status": r5_summary.get("forecast_backlog_status") or "UNKNOWN",
         "data_freshness_complete": bool(r5_summary.get("data_freshness_complete")),
-        "data_freshness_partial_reason": r5_summary.get(
-            "data_freshness_partial_reason"
-        ),
+        "data_freshness_partial_reason": r5_summary.get("data_freshness_partial_reason"),
         "preflight_blocker_counts": (
             r5_summary.get("preflight_blocker_counts")
             if isinstance(r5_summary.get("preflight_blocker_counts"), dict)
@@ -577,9 +562,10 @@ def _freshness_backlog_blocks_current_positive_ev(
 ) -> bool:
     if bool(r5_summary.get("freshness_backlog_blocks_current_positive_ev")):
         return True
-    return _int_value(r5_summary.get("positive_ev_snapshot_stale_rows")) > 0 or _int_value(
-        r5_summary.get("positive_ev_forecast_stale_rows")
-    ) > 0
+    return (
+        _int_value(r5_summary.get("positive_ev_snapshot_stale_rows")) > 0
+        or _int_value(r5_summary.get("positive_ev_forecast_stale_rows")) > 0
+    )
 
 
 def _artifact_audit_row(
@@ -685,13 +671,9 @@ def _ui_panel(
     status_kind = _ui_status_kind(true_blocker)
     positive_ev_rows = current_funnel["current_positive_ev_rows"]
     candidate_rows = (
-        _positive_ev_candidate_rows(r5_watch)[:positive_ev_rows]
-        if positive_ev_rows > 0
-        else []
+        _positive_ev_candidate_rows(r5_watch)[:positive_ev_rows] if positive_ev_rows > 0 else []
     )
-    gate_counts = _preflight_gate_counts_label(
-        current_funnel.get("preflight_blocker_counts")
-    )
+    gate_counts = _preflight_gate_counts_label(current_funnel.get("preflight_blocker_counts"))
     evidence = (
         f"Best EV {_format_cents(current_funnel['best_current_expected_value_cents'])}; "
         f"{positive_ev_rows} positive-EV row(s); "
@@ -699,9 +681,7 @@ def _ui_panel(
     )
     if gate_counts:
         evidence += f" Remaining gates: {gate_counts}."
-    runner_status_kind = (
-        "healthy" if current_funnel["refresh_owner_active"] else "stale"
-    )
+    runner_status_kind = "healthy" if current_funnel["refresh_owner_active"] else "stale"
     if current_funnel["r5_runner_state"] == RUNNING_CYCLE_OVERDUE:
         runner_status_kind = "warn"
     runner_label = _display_runner_label(current_funnel)
@@ -1146,9 +1126,7 @@ def _data_watermark(
     r5_watch: dict[str, Any],
     phase3at_diagnostic: dict[str, Any],
 ) -> dict[str, Any]:
-    r3_refresh = _read_json(
-        reports_dir / "phase3bc_r3" / "phase3bc_r3_active_crypto_refresh.json"
-    )
+    r3_refresh = _read_json(reports_dir / "phase3bc_r3" / "phase3bc_r3_active_crypto_refresh.json")
     r7_ranking = _read_json(
         reports_dir / "phase3bc_r7" / "phase3bc_r7_crypto_ranking_coverage_repair.json"
     )
@@ -1164,9 +1142,7 @@ def _data_watermark(
         "phase3at_diagnostic_generated_at": _iso_or_none(
             _artifact_generated_at(phase3at_diagnostic)
         ),
-        "phase3bc_router_generated_at": _iso_or_none(
-            _artifact_generated_at(phase3bc_router)
-        ),
+        "phase3bc_router_generated_at": _iso_or_none(_artifact_generated_at(phase3bc_router)),
         "market_snapshot_latest_evidence_at": _first_watermark(
             r5_watch,
             r3_refresh,
@@ -1305,10 +1281,7 @@ def _operator_next_command(true_blocker: str) -> str:
         NO_CURRENT_ACTIVE_CRYPTO_MARKETS,
     }:
         return guarded_status_command
-    return (
-        "kalshi-bot phase3aw-dashboard-truth "
-        "--output-dir reports/phase3aw --reports-dir reports"
-    )
+    return "kalshi-bot phase3aw-dashboard-truth --output-dir reports/phase3aw --reports-dir reports"
 
 
 def _bot_state(true_blocker: str) -> str:

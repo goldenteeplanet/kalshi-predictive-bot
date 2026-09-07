@@ -44,24 +44,24 @@ def test_exact_invariants_and_writer_proof_pass_prerequisites_only() -> None:
     ],
 )
 def test_each_protected_invariant_mismatch_is_denied(field: str, value: object) -> None:
-    changed = replace(
-        _observation(), **{field: value}, observation_hash=_rehash(field, value)
-    )
-    result = evaluate_protected_invariant_recovery_gate(
-        _writer_gate(), changed
-    )
+    changed = replace(_observation(), **{field: value}, observation_hash=_rehash(field, value))
+    result = evaluate_protected_invariant_recovery_gate(_writer_gate(), changed)
     assert result.status == "DENIED"
     assert f"INVARIANT_MISMATCH:{field}" in result.reasons
     assert result.alert_required is True
 
 
 def test_exact_freshness_boundary_passes_and_older_is_stale() -> None:
-    assert evaluate_protected_invariant_recovery_gate(
-        _writer_gate(age=120), _observation(age=120)
-    ).status == "PASSED"
-    assert evaluate_protected_invariant_recovery_gate(
-        _writer_gate(), _observation(age=121)
-    ).status == "STALE"
+    assert (
+        evaluate_protected_invariant_recovery_gate(
+            _writer_gate(age=120), _observation(age=120)
+        ).status
+        == "PASSED"
+    )
+    assert (
+        evaluate_protected_invariant_recovery_gate(_writer_gate(), _observation(age=121)).status
+        == "STALE"
+    )
 
 
 def test_incomplete_and_failed_writer_prerequisites_fail_closed() -> None:

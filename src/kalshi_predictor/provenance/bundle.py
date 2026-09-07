@@ -31,12 +31,14 @@ def build_offline_certification_bundle(
         if payload.get("phase") != phase:
             raise ValueError(f"artifact phase mismatch for {phase}: {payload.get('phase')}")
         payloads[phase] = payload
-        entries.append({
-            "phase": phase,
-            "path": _relative_path(logical_path, root.absolute()),
-            "bytes": len(data),
-            "sha256": hashlib.sha256(data).hexdigest(),
-        })
+        entries.append(
+            {
+                "phase": phase,
+                "path": _relative_path(logical_path, root.absolute()),
+                "bytes": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+            }
+        )
     checks = _cross_report_checks(payloads)
     bundle_valid = all(check["passed"] for check in checks)
     runtime_ready = bool(
@@ -75,9 +77,7 @@ def write_offline_certification_bundle(
     root: Path,
     output_dir: Path,
 ) -> tuple[Path, Path]:
-    bundle = build_offline_certification_bundle(
-        artifacts, generated_at=generated_at, root=root
-    )
+    bundle = build_offline_certification_bundle(artifacts, generated_at=generated_at, root=root)
     output_dir.mkdir(parents=True, exist_ok=True)
     bundle_path = output_dir / "prov15f_offline_certification_bundle.json"
     _atomic_write(bundle_path, json.dumps(bundle, indent=2, sort_keys=True) + "\n")

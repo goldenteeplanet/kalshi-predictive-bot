@@ -3,16 +3,33 @@ import copy
 from kalshi_predictor.ui.notification_delivery_simulator import simulate_local_delivery
 from kalshi_predictor.ui.notification_receipt_audit import reconcile_notification_receipts
 
-
 ROUTED_AT = "2026-07-18T09:10:00Z"
 
 
 def _routing():
-    return {"policy":{"as_of_local":"2026-07-18T04:10:00-05:00"},"decisions":[
-        {"incident_id":"critical","severity":"CRITICAL","action":"DELIVER_NOW","channels":["local_audible","local_desktop","dashboard"]},
-        {"incident_id":"info","severity":"INFO","action":"TIMELINE_ONLY","channels":["timeline"]},
-        {"incident_id":"deferred","severity":"HIGH","action":"DEFER_UNTIL_QUIET_END","channels":["local_desktop","dashboard"]},
-    ]}
+    return {
+        "policy": {"as_of_local": "2026-07-18T04:10:00-05:00"},
+        "decisions": [
+            {
+                "incident_id": "critical",
+                "severity": "CRITICAL",
+                "action": "DELIVER_NOW",
+                "channels": ["local_audible", "local_desktop", "dashboard"],
+            },
+            {
+                "incident_id": "info",
+                "severity": "INFO",
+                "action": "TIMELINE_ONLY",
+                "channels": ["timeline"],
+            },
+            {
+                "incident_id": "deferred",
+                "severity": "HIGH",
+                "action": "DEFER_UNTIL_QUIET_END",
+                "channels": ["local_desktop", "dashboard"],
+            },
+        ],
+    }
 
 
 def _delivery():
@@ -30,7 +47,9 @@ def test_ui_obs2g_proves_complete_critical_local_channel_coverage():
 
 def test_ui_obs2g_detects_missing_and_duplicate_receipts():
     delivery = _delivery()
-    delivery["new_receipts"] = [row for row in delivery["new_receipts"] if row["channel"] != "local_audible"]
+    delivery["new_receipts"] = [
+        row for row in delivery["new_receipts"] if row["channel"] != "local_audible"
+    ]
     delivery["new_receipts"].append(copy.deepcopy(delivery["new_receipts"][0]))
     report = reconcile_notification_receipts(_routing(), delivery)
     assert "critical:local_audible" in report["findings"]["missing"]
@@ -41,10 +60,15 @@ def test_ui_obs2g_detects_missing_and_duplicate_receipts():
 def test_ui_obs2g_detects_late_and_unexpected_receipts():
     delivery = _delivery()
     delivery["new_receipts"][0]["delivered_at"] = "2026-07-18T09:12:00Z"
-    delivery["new_receipts"].append({
-        "incident_id":"unknown","severity":"WARNING","channel":"dashboard",
-        "status":"SIMULATED_DELIVERED","delivered_at":ROUTED_AT,
-    })
+    delivery["new_receipts"].append(
+        {
+            "incident_id": "unknown",
+            "severity": "WARNING",
+            "channel": "dashboard",
+            "status": "SIMULATED_DELIVERED",
+            "delivered_at": ROUTED_AT,
+        }
+    )
     report = reconcile_notification_receipts(_routing(), delivery, max_latency_seconds=60)
     assert report["summary"]["late"] == 1
     assert report["findings"]["unexpected"] == ["unknown:dashboard"]

@@ -71,8 +71,7 @@ def run_phase3bd_r5_consensus_feed_watch(
         days_ahead=days_ahead,
     )
     should_run_r4 = bool(
-        source_state["source_configured"]
-        and (force_refresh or window_state["in_release_window"])
+        source_state["source_configured"] and (force_refresh or window_state["in_release_window"])
     )
     r4_payload: dict[str, Any] | None = None
     if should_run_r4:
@@ -224,9 +223,7 @@ def release_window_state(
         (row for row in event_payloads if row["minutes_until_release"] >= 0),
         None,
     )
-    previous_events = [
-        row for row in event_payloads if row["minutes_until_release"] < 0
-    ]
+    previous_events = [row for row in event_payloads if row["minutes_until_release"] < 0]
     previous_event = previous_events[-1] if previous_events else None
     return {
         "checked_at": current.isoformat(),
@@ -428,9 +425,7 @@ def _history_entry(payload: dict[str, Any]) -> dict[str, Any]:
         "r4_ran": summary["r4_ran"],
         "r4_status": summary["r4_status"],
         "consensus_value_observations": summary["consensus_value_observations"],
-        "actual_and_consensus_observations": summary[
-            "actual_and_consensus_observations"
-        ],
+        "actual_and_consensus_observations": summary["actual_and_consensus_observations"],
         "features_inserted": summary["features_inserted"],
         "forecasts_inserted": summary["forecasts_inserted"],
         "rankings_inserted": summary["rankings_inserted"],
@@ -506,8 +501,7 @@ def _markdown(payload: dict[str, Any]) -> str:
             f"- Source configured: {summary['source_configured']}",
             "- Trading Economics API configured: "
             f"{source_state['trading_economics_api_configured']}",
-            "- Verified input file configured: "
-            f"{source_state['verified_input_file_configured']}",
+            f"- Verified input file configured: {source_state['verified_input_file_configured']}",
             "- Credential value reported: false",
             "",
             "## Next Action",

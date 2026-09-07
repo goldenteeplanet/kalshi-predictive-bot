@@ -366,7 +366,7 @@ def _build_remote_probes(
             "command_registry",
             (
                 f"cd {app} && for cmd in {registry_loop}; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,

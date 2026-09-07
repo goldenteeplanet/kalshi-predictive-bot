@@ -243,10 +243,7 @@ def test_student_t_cdf_is_symmetric_and_has_heavier_tail() -> None:
     module = _module()
 
     assert module._student_t_cdf(0.0, 5.0) == 0.5
-    assert abs(
-        module._student_t_cdf(-2.0, 5.0)
-        - (1.0 - module._student_t_cdf(2.0, 5.0))
-    ) < 1e-12
+    assert abs(module._student_t_cdf(-2.0, 5.0) - (1.0 - module._student_t_cdf(2.0, 5.0))) < 1e-12
     assert module._student_t_cdf(-3.0, 5.0) > 0.001
 
 

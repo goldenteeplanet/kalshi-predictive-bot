@@ -65,8 +65,7 @@ def audit_concurrent_readers(
         raise ConcurrentReaderAuditError("PUBLISH_SEQUENCE_EMPTY")
     expected = (initial_sequence, *publish_sequences)
     invalid_sequence = any(
-        not isinstance(value, int) or isinstance(value, bool) or value < 0
-        for value in expected
+        not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in expected
     )
     if invalid_sequence:
         raise ConcurrentReaderAuditError("SEQUENCE_INVALID")

@@ -27,9 +27,7 @@ def test_refresh_readiness_defaults_to_canonical_runtime_artifacts() -> None:
     assert DEFAULT_HISTORY_PATH == Path(
         "/var/lib/kalshi-bot-gh2/reports/gh2_paper_only_soak_history.jsonl"
     )
-    assert DEFAULT_MANIFEST_PATH == Path(
-        "/var/lib/kalshi-bot-gh1/watch/actionable_tickers.json"
-    )
+    assert DEFAULT_MANIFEST_PATH == Path("/var/lib/kalshi-bot-gh1/watch/actionable_tickers.json")
 
 
 def test_dashboard_distinguishes_missing_source_from_valid_zero(tmp_path: Path) -> None:
@@ -72,9 +70,7 @@ def test_dashboard_builds_stage_blocker_trend_and_candidate_lifecycle(tmp_path: 
                 "status": "PAPER_ONLY_SOAK_RUNNING",
                 "websocket_drain": {"files_drained": 3},
                 "cycle_telemetry": {
-                    "stages": [
-                        {"stage": "drain_websocket_stage", "duration_seconds": 1.25}
-                    ]
+                    "stages": [{"stage": "drain_websocket_stage", "duration_seconds": 1.25}]
                 },
                 "soak": {"healthy_cycle": True, "consecutive_healthy_cycles": 4},
                 "paper_readiness": {"total_paper_ready_candidates": 0},

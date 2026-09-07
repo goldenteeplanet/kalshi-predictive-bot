@@ -43,9 +43,7 @@ from kalshi_predictor.reinforcement_learning.repository import rl_status
 from kalshi_predictor.utils.time import utc_now
 
 PHASE_3AD_VERSION = "phase3ad_v1"
-PHASE3AH_SPORTS_REPORT_PATH = Path(
-    "reports/phase3ah_sports/phase3ah_sports_evidence_backfill.json"
-)
+PHASE3AH_SPORTS_REPORT_PATH = Path("reports/phase3ah_sports/phase3ah_sports_evidence_backfill.json")
 PHASE3AH_ROSTER_REPORT_PATH = Path(
     "reports/phase3ah_sports/phase3ah_roster_participant_verification.json"
 )
@@ -55,9 +53,7 @@ PHASE3AH_PLACEHOLDER_REPORT_PATH = Path(
 PHASE3AH_PLACEHOLDER_WATCH_PATH = Path(
     "reports/phase3ah_sports/phase3ah_sports_placeholder_watch.json"
 )
-PHASE3AA_R5_REPORT_PATH = Path(
-    "reports/phase3aa_r5/phase3aa_r5_closed_market_outcome_capture.json"
-)
+PHASE3AA_R5_REPORT_PATH = Path("reports/phase3aa_r5/phase3aa_r5_closed_market_outcome_capture.json")
 PHASE3AE_FAST_MARKET_REPORT_PATH = Path(
     "reports/phase3ae_fast_market/phase3ae_fast_market_harvester.json"
 )
@@ -206,14 +202,10 @@ def build_phase_orchestrator(
         "market_coverage": coverage,
         "phase3ah_sports_evidence": _report_summary(PHASE3AH_SPORTS_REPORT_PATH),
         "phase3ah_roster_verification": _report_summary(PHASE3AH_ROSTER_REPORT_PATH),
-        "phase3ah_round_placeholder_resolution": _report_summary(
-            PHASE3AH_PLACEHOLDER_REPORT_PATH
-        ),
+        "phase3ah_round_placeholder_resolution": _report_summary(PHASE3AH_PLACEHOLDER_REPORT_PATH),
         "phase3ah_placeholder_watch": _report_summary(PHASE3AH_PLACEHOLDER_WATCH_PATH),
         "phase3aa_r5_closed_market_capture": _report_summary(PHASE3AA_R5_REPORT_PATH),
-        "phase3ae_fast_market_harvester": _report_summary(
-            PHASE3AE_FAST_MARKET_REPORT_PATH
-        ),
+        "phase3ae_fast_market_harvester": _report_summary(PHASE3AE_FAST_MARKET_REPORT_PATH),
         "phase3az_gap_analysis": _report_summary(PHASE3AZ_GAP_ANALYSIS_PATH),
         "self_improvement": _self_improvement_status(session),
         "phase_status": _phase_status(),
@@ -560,16 +552,12 @@ def _sports_provenance_from_market_coverage_report(path: Path) -> dict[str, Any]
     if not sports_row:
         return None
     derived = int(
-        sports_row.get("derived_usable_markets")
-        or sports_row.get("derived_markets")
-        or 0
+        sports_row.get("derived_usable_markets") or sports_row.get("derived_markets") or 0
     )
     verified = int(sports_row.get("verified_schedule_markets") or 0)
     partial = int(sports_row.get("partial_markets") or 0)
     link_rows = int(
-        sports_row.get("external_linked_markets")
-        or sports_row.get("linked_markets")
-        or 0
+        sports_row.get("external_linked_markets") or sports_row.get("linked_markets") or 0
     )
     return {
         "source": f"cached_market_coverage_report:{path}",
@@ -630,8 +618,7 @@ def _learning_diagnostics_evidence(
             "roadmap generation."
         ),
         "bottleneck_next_action": (
-            "Run kalshi-bot learning-diagnostics separately when full rejection replay is "
-            "needed."
+            "Run kalshi-bot learning-diagnostics separately when full rejection replay is needed."
         ),
         "rejection_breakdown": [],
         "threshold_advisor": {},
@@ -1023,130 +1010,136 @@ def _improvement_candidates(
         [
             {
                 "id": "paper_market_health_refresh",
-            "title": "Keep paper and market health fresh automatically",
-            "model_family": "health_refresh",
-            "priority": 92 if settlement["due_or_overdue"] else 72,
-            "why": (
-                "A bounded refresh loop can keep exact-ticker settlement harvests, "
-                "paper P&L realization, market collection, market coverage, placeholder "
-                "watch, and the roadmap current without manual reruns."
-            ),
-            "next_command": (
-                "kalshi-bot phase3ay-health-refresh --cycles 999 "
-                "--interval-seconds 300 --all-markets"
-            ),
-            "blocked_by": "none",
-        },
-        {
-            "id": "settlement_outcome_feedback",
-            "title": "Realize exact paper outcomes into confidence and RL rewards",
-            "model_family": "reinforcement_learning + model_confidence",
-            "priority": 90 if settlement["eligible_exact_settlements"] else 55,
-            "why": (
-                "Settled paper outcomes are the reward signal. Without them, the bot can only "
-                "guess which policies are improving."
-            ),
-            "next_command": "kalshi-bot phase3aa-realize --dry-run --no-sync-settlements",
-            "blocked_by": "no exact settled paper trades"
-            if settlement["eligible_exact_settlements"] == 0
-            else "human approval to realize exact outcomes",
-        },
-        {
-            "id": "exact_settlement_harvest",
-            "title": "Harvest exact ticker settlement evidence for due paper orders",
-            "model_family": "settlement_reconciliation",
-            "priority": _settlement_harvest_priority(
-                due=settlement["due_or_overdue"],
-                eligible=settlement["eligible_exact_settlements"],
-                closed_without_outcome=r5_closed_without_outcome,
-                usable_candidates=r5_usable_candidates,
-            ),
-            "why": (
-                "Due paper trades cannot become reward signals until the local settlement "
-                "table has exact ticker outcomes."
-            ),
-            "next_command": settlement_harvest_next_command,
-            "blocked_by": settlement_harvest_blocked_by,
-        },
-        {
-            "id": "fast_settlement_router",
-            "title": "Route learning toward markets that settle soonest",
-            "model_family": "learning_governor",
-            "priority": 85 if learning["fast_settlement_candidates"] == 0 else 65,
-            "why": "Faster settlements create faster reward feedback for model improvement.",
-            "next_command": "kalshi-bot phase3ab-learning-governor",
-            "blocked_by": "needs more fresh short-dated candidates"
-            if learning["fast_settlement_candidates"] == 0
-            else "none",
-        },
-        {
-            "id": "feature_discovery",
-            "title": "Search for new predictive features from paper evidence",
-            "model_family": "feature_discovery",
-            "priority": 80 if improvement["feature_discovery"]["run_count"] == 0 else 45,
-            "why": "Feature discovery can propose data/features that reduce recurring bottlenecks.",
-            "next_command": "kalshi-bot feature-discovery-run --run-type INCREMENTAL",
-            "blocked_by": "needs enough historical rows"
-            if diagnostics["funnel"]["settled_paper_trades"] == 0
-            else "none",
-        },
-        {
-            "id": "rl_policy_replay",
-            "title": "Evaluate policy actions with offline/shadow reinforcement learning",
-            "model_family": "reinforcement_learning",
-            "priority": 80
-            if diagnostics["funnel"]["settled_paper_trades"] > 0
-            and improvement["reinforcement_learning"]["run_count"] == 0
-            else 50,
-            "why": "RL should learn from finalized paper rewards before it advises policy gates.",
-            "next_command": "kalshi-bot rl-evaluate --enable-research",
-            "blocked_by": "needs settled paper rewards"
-            if diagnostics["funnel"]["settled_paper_trades"] == 0
-            else "none",
-        },
-        {
-            "id": "sports_round_placeholder_resolution",
-            "title": "Watch sports bracket placeholders until source schedules name teams",
-            "model_family": "market_linking",
-            "priority": 78 if placeholder_rows else 35,
-            "why": (
-                "Bracket placeholder teams must become real teams before Phase 3AE can "
-                "safely apply the clean team + time + market-type gate."
-            ),
-            "next_command": (
-                "kalshi-bot phase3ah-sports-placeholder-watch "
-                "--output-dir reports/phase3ah_sports"
-            ),
-            "blocked_by": "source still has bracket placeholders"
-            if still_placeholder_rows
-            else "needs source resolution run"
-            if placeholder_rows
-            else "none",
-        },
-        {
-            "id": "sports_provenance_repair",
-            "title": "Verify sports player/participant roster evidence",
-            "model_family": "market_linking",
-            "priority": 75 if roster_rework_rows else 35,
-            "why": (
-                "Player props require roster/team evidence before Phase 3AE can safely "
-                "upgrade verified links."
-            ),
-            "next_command": (
-                "kalshi-bot phase3ah-roster-participant-verification "
-                "--output-dir reports/phase3ah_sports"
-            ),
-            "blocked_by": "needs verified roster/team evidence"
-            if roster_rework_rows
-            else "none",
-        },
+                "title": "Keep paper and market health fresh automatically",
+                "model_family": "health_refresh",
+                "priority": 92 if settlement["due_or_overdue"] else 72,
+                "why": (
+                    "A bounded refresh loop can keep exact-ticker settlement harvests, "
+                    "paper P&L realization, market collection, market coverage, placeholder "
+                    "watch, and the roadmap current without manual reruns."
+                ),
+                "next_command": (
+                    "kalshi-bot phase3ay-health-refresh --cycles 999 "
+                    "--interval-seconds 300 --all-markets"
+                ),
+                "blocked_by": "none",
+            },
+            {
+                "id": "settlement_outcome_feedback",
+                "title": "Realize exact paper outcomes into confidence and RL rewards",
+                "model_family": "reinforcement_learning + model_confidence",
+                "priority": 90 if settlement["eligible_exact_settlements"] else 55,
+                "why": (
+                    "Settled paper outcomes are the reward signal. Wi"
+                    "thout them, the bot can only "
+                    "guess which policies are improving."
+                ),
+                "next_command": "kalshi-bot phase3aa-realize --dry-run --no-sync-settlements",
+                "blocked_by": "no exact settled paper trades"
+                if settlement["eligible_exact_settlements"] == 0
+                else "human approval to realize exact outcomes",
+            },
+            {
+                "id": "exact_settlement_harvest",
+                "title": "Harvest exact ticker settlement evidence for due paper orders",
+                "model_family": "settlement_reconciliation",
+                "priority": _settlement_harvest_priority(
+                    due=settlement["due_or_overdue"],
+                    eligible=settlement["eligible_exact_settlements"],
+                    closed_without_outcome=r5_closed_without_outcome,
+                    usable_candidates=r5_usable_candidates,
+                ),
+                "why": (
+                    "Due paper trades cannot become reward signals until the local settlement "
+                    "table has exact ticker outcomes."
+                ),
+                "next_command": settlement_harvest_next_command,
+                "blocked_by": settlement_harvest_blocked_by,
+            },
+            {
+                "id": "fast_settlement_router",
+                "title": "Route learning toward markets that settle soonest",
+                "model_family": "learning_governor",
+                "priority": 85 if learning["fast_settlement_candidates"] == 0 else 65,
+                "why": "Faster settlements create faster reward feedback for model improvement.",
+                "next_command": "kalshi-bot phase3ab-learning-governor",
+                "blocked_by": "needs more fresh short-dated candidates"
+                if learning["fast_settlement_candidates"] == 0
+                else "none",
+            },
+            {
+                "id": "feature_discovery",
+                "title": "Search for new predictive features from paper evidence",
+                "model_family": "feature_discovery",
+                "priority": 80 if improvement["feature_discovery"]["run_count"] == 0 else 45,
+                "why": (
+                    "Feature discovery can propose data/features that reduce recurring bottlenecks."
+                ),
+                "next_command": "kalshi-bot feature-discovery-run --run-type INCREMENTAL",
+                "blocked_by": "needs enough historical rows"
+                if diagnostics["funnel"]["settled_paper_trades"] == 0
+                else "none",
+            },
+            {
+                "id": "rl_policy_replay",
+                "title": "Evaluate policy actions with offline/shadow reinforcement learning",
+                "model_family": "reinforcement_learning",
+                "priority": 80
+                if diagnostics["funnel"]["settled_paper_trades"] > 0
+                and improvement["reinforcement_learning"]["run_count"] == 0
+                else 50,
+                "why": (
+                    "RL should learn from finalized paper rewards before it advises policy gates."
+                ),
+                "next_command": "kalshi-bot rl-evaluate --enable-research",
+                "blocked_by": "needs settled paper rewards"
+                if diagnostics["funnel"]["settled_paper_trades"] == 0
+                else "none",
+            },
+            {
+                "id": "sports_round_placeholder_resolution",
+                "title": "Watch sports bracket placeholders until source schedules name teams",
+                "model_family": "market_linking",
+                "priority": 78 if placeholder_rows else 35,
+                "why": (
+                    "Bracket placeholder teams must become real teams before Phase 3AE can "
+                    "safely apply the clean team + time + market-type gate."
+                ),
+                "next_command": (
+                    "kalshi-bot phase3ah-sports-placeholder-watch "
+                    "--output-dir reports/phase3ah_sports"
+                ),
+                "blocked_by": "source still has bracket placeholders"
+                if still_placeholder_rows
+                else "needs source resolution run"
+                if placeholder_rows
+                else "none",
+            },
+            {
+                "id": "sports_provenance_repair",
+                "title": "Verify sports player/participant roster evidence",
+                "model_family": "market_linking",
+                "priority": 75 if roster_rework_rows else 35,
+                "why": (
+                    "Player props require roster/team evidence before Phase 3AE can safely "
+                    "upgrade verified links."
+                ),
+                "next_command": (
+                    "kalshi-bot phase3ah-roster-participant-verification "
+                    "--output-dir reports/phase3ah_sports"
+                ),
+                "blocked_by": "needs verified roster/team evidence"
+                if roster_rework_rows
+                else "none",
+            },
             {
                 "id": "self_evaluation_journal",
-            "title": "Write recurring failure journal and next-build rationale",
-            "model_family": "self_evaluation",
-            "priority": 70 if improvement["self_evaluation"]["run_count"] == 0 else 40,
-            "why": "Self-evaluation turns repeated symptoms into stable engineering lessons.",
-            "next_command": "kalshi-bot self-evaluate --output reports/self_evaluation_journal.md",
+                "title": "Write recurring failure journal and next-build rationale",
+                "model_family": "self_evaluation",
+                "priority": 70 if improvement["self_evaluation"]["run_count"] == 0 else 40,
+                "why": "Self-evaluation turns repeated symptoms into stable engineering lessons.",
+                "next_command": "kalshi-bot self-evaluate --output reports/self_e"
+                "valuation_journal.md",
                 "blocked_by": "none",
             },
         ]
@@ -1207,7 +1200,9 @@ def _choose_next_phase(
         }
     if "PARTIAL_SPORTS_PROVENANCE" in codes:
         verified_count = int(
-            evidence["sports_provenance"].get("provenance_counts", {}).get(
+            evidence["sports_provenance"]
+            .get("provenance_counts", {})
+            .get(
                 "verified_schedule",
                 0,
             )
@@ -1288,9 +1283,7 @@ def _choose_next_phase(
         return {
             "phase": "3AE",
             "title": (
-                "Fast Market Harvest Refresh"
-                if report_available
-                else "Fast Market Harvester"
+                "Fast Market Harvest Refresh" if report_available else "Fast Market Harvester"
             ),
             "objective": (
                 "Refresh forecasts and rankings for harvested 0-24h markets, then route "
@@ -1389,10 +1382,10 @@ def _implementation_prompt(
         for row in improvement_candidates[:6]
     )
     title = str(next_phase["title"]).rstrip(".")
-    return f"""Build: Phase {next_phase['phase']}: {title}.
+    return f"""Build: Phase {next_phase["phase"]}: {title}.
 
 Objective:
-{next_phase['objective']}
+{next_phase["objective"]}
 
 Safety:
 - Do NOT add live trading.
@@ -1404,25 +1397,25 @@ Safety:
 - The bot may generate reports/prompts, but must not auto-edit or auto-deploy code.
 
 Current evidence:
-- Exact settlement eligible trades: {settlement['eligible_exact_settlements']}
-- Active unsettled trades: {settlement['active_unsettled']}
-- Due or overdue trades: {settlement['due_or_overdue']}
-- ETA buckets: {settlement['eta_buckets']}
-- Phase 3AA-R5 closed/no-outcome rows: {phase3aa_r5.get('closed_without_outcome_rows', 0)}
-- Phase 3AA-R5 usable outcome candidates: {phase3aa_r5.get('usable_outcome_candidate_rows', 0)}
-- Fast settlement candidates: {learning['fast_settlement_candidates']}
-- Slow settlement avoids: {learning['slow_settlement_avoids']}
-- Sports partial links without upgrade: {sports['partial_without_upgrade']}
-- Sports provenance counts: {sports['provenance_counts']}
-- Phase 3AH round placeholder rows: {phase3ah_sports.get('round_placeholder_resolution_rows', 0)}
+- Exact settlement eligible trades: {settlement["eligible_exact_settlements"]}
+- Active unsettled trades: {settlement["active_unsettled"]}
+- Due or overdue trades: {settlement["due_or_overdue"]}
+- ETA buckets: {settlement["eta_buckets"]}
+- Phase 3AA-R5 closed/no-outcome rows: {phase3aa_r5.get("closed_without_outcome_rows", 0)}
+- Phase 3AA-R5 usable outcome candidates: {phase3aa_r5.get("usable_outcome_candidate_rows", 0)}
+- Fast settlement candidates: {learning["fast_settlement_candidates"]}
+- Slow settlement avoids: {learning["slow_settlement_avoids"]}
+- Sports partial links without upgrade: {sports["partial_without_upgrade"]}
+- Sports provenance counts: {sports["provenance_counts"]}
+- Phase 3AH round placeholder rows: {phase3ah_sports.get("round_placeholder_resolution_rows", 0)}
 - Phase 3AH placeholder resolver safe rows: {placeholder_safe_rows}
 - Phase 3AH placeholder resolver still placeholders: {placeholder_still_rows}
-- Phase 3AH placeholder watch rows: {placeholder_watch.get('placeholder_rows_reviewed', 0)}
-- Phase 3AH placeholder watch gate: {placeholder_watch_gate or 'unknown'}
-- Phase 3AH roster rework rows: {phase3ah_roster.get('rework_rows', 0)}
+- Phase 3AH placeholder watch rows: {placeholder_watch.get("placeholder_rows_reviewed", 0)}
+- Phase 3AH placeholder watch gate: {placeholder_watch_gate or "unknown"}
+- Phase 3AH roster rework rows: {phase3ah_roster.get("rework_rows", 0)}
 - Phase 3AZ implementation queue: {phase3az_queue}
-- Phase 3AZ recommended next action: {phase3az.get('recommended_next_action', '')}
-- Market coverage recommendations: {coverage['recommendations']}
+- Phase 3AZ recommended next action: {phase3az.get("recommended_next_action", "")}
+- Market coverage recommendations: {coverage["recommendations"]}
 
 Detected bottlenecks:
 {bottleneck_lines}
@@ -1492,14 +1485,8 @@ def _recommended_loop(next_phase: dict[str, Any]) -> list[str]:
         "kalshi-bot phase3ay-status",
         "kalshi-bot phase3bb-domain-readiness --output-dir reports/phase3bb",
         "kalshi-bot phase3bb-r2-general-candidate-routing --output-dir reports/phase3bb_r2",
-        (
-            "kalshi-bot phase3bb-r2-general-source-intake "
-            "--output-dir reports/phase3bb_r2_sources"
-        ),
-        (
-            "kalshi-bot phase3bb-r2-general-source-evidence "
-            "--output-dir reports/phase3bb_r2_sources"
-        ),
+        ("kalshi-bot phase3bb-r2-general-source-intake --output-dir reports/phase3bb_r2_sources"),
+        ("kalshi-bot phase3bb-r2-general-source-evidence --output-dir reports/phase3bb_r2_sources"),
         (
             "kalshi-bot phase3bb-r2-general-source-availability "
             "--output-dir reports/phase3bb_r2_sources"
@@ -1520,14 +1507,8 @@ def _recommended_loop(next_phase: dict[str, Any]) -> list[str]:
             "kalshi-bot phase3ah-sports-evidence-backfill "
             "--output-dir reports/phase3ah_sports --fetch-schedules --ingest-schedules"
         ),
-        (
-            "kalshi-bot phase3ah-round-placeholder-resolution "
-            "--output-dir reports/phase3ah_sports"
-        ),
-        (
-            "kalshi-bot phase3ah-sports-placeholder-watch "
-            "--output-dir reports/phase3ah_sports"
-        ),
+        ("kalshi-bot phase3ah-round-placeholder-resolution --output-dir reports/phase3ah_sports"),
+        ("kalshi-bot phase3ah-sports-placeholder-watch --output-dir reports/phase3ah_sports"),
         (
             "kalshi-bot phase3ah-roster-participant-verification "
             "--output-dir reports/phase3ah_sports"
@@ -1554,14 +1535,8 @@ def _render_markdown(payload: dict[str, Any], next_prompt_path: Path) -> str:
         f"- Mode: {payload['mode']}",
         f"- Safety: {payload['paper_only_safety']}",
         f"- Scan limit: {payload['bounded_runtime']['scan_limit']}",
-        (
-            "- Market coverage source: "
-            f"{payload['bounded_runtime']['market_coverage_source']}"
-        ),
-        (
-            "- Sports provenance source: "
-            f"{payload['bounded_runtime']['sports_provenance_source']}"
-        ),
+        (f"- Market coverage source: {payload['bounded_runtime']['market_coverage_source']}"),
+        (f"- Sports provenance source: {payload['bounded_runtime']['sports_provenance_source']}"),
         (
             "- Learning diagnostics source: "
             f"{payload['bounded_runtime']['learning_diagnostics_source']}"

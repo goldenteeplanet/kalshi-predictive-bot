@@ -63,7 +63,11 @@ def test_phase3bb_r50_waits_when_writer_busy(tmp_path: Path) -> None:
             reports_dir=reports_dir,
             probe_runner=_fake_probe_runner(
                 seen=seen,
-                writer_pre={"status": "WRITER_ACTIVE", "safe_to_start_write": False, "current_writer_pid": 42},
+                writer_pre={
+                    "status": "WRITER_ACTIVE",
+                    "safe_to_start_write": False,
+                    "current_writer_pid": 42,
+                },
             ),
         )
 
@@ -162,7 +166,9 @@ def _fake_probe_runner(
             "",
         ),
         "db_writer_monitor_post": (
-            json.dumps({"status": "OPEN_READERS", "safe_to_start_write": True, "current_writer_pid": None}),
+            json.dumps(
+                {"status": "OPEN_READERS", "safe_to_start_write": True, "current_writer_pid": None}
+            ),
             True,
             0,
             "",

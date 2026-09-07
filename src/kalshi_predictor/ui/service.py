@@ -288,9 +288,7 @@ class DecisionUiService:
             ),
             "crypto_freshness": crypto_freshness,
             "free_source_hunt": free_source_hunt,
-            "paper_trade_blockers": paper_trade_blocker_status(
-                crypto_freshness=crypto_freshness
-            ),
+            "paper_trade_blockers": paper_trade_blocker_status(crypto_freshness=crypto_freshness),
             "safety": self.safety_state(),
             "summary": _dashboard_summary(
                 opportunities,
@@ -358,6 +356,7 @@ class DecisionUiService:
                 break
             if index >= minimum_scan and len(blocked_opportunities) >= blocked_limit:
                 break
+
         def sort_key(item: OpportunityView) -> float:
             return float(item.decision_clarity.get("rank_sort") or 0)
 
@@ -422,9 +421,7 @@ class DecisionUiService:
             "learning_status": learning,
             "crypto_freshness": crypto_freshness,
             "gh3_soak": gh3_soak,
-            "paper_trade_blockers": paper_trade_blocker_status(
-                crypto_freshness=crypto_freshness
-            ),
+            "paper_trade_blockers": paper_trade_blocker_status(crypto_freshness=crypto_freshness),
             "today_workspace": today_workspace,
             "opportunity_links": _opportunity_links_health_summary(
                 self.session,
@@ -775,9 +772,13 @@ class DecisionUiService:
         short_title = decision_clarity["market_structure"]["clean_title"] or summarize_market_title(
             title
         )
-        category = identity.category or decision_clarity["market_structure"]["category"] or classify_market_category(
-            title,
-            ranking.series_ticker,
+        category = (
+            identity.category
+            or decision_clarity["market_structure"]["category"]
+            or classify_market_category(
+                title,
+                ranking.series_ticker,
+            )
         )
         fresh = is_fresh_timestamp(
             getattr(snapshot, "captured_at", None),
@@ -1484,9 +1485,7 @@ def crypto_freshness_watch_status(
     ):
         generated_at = scheduler_status_generated_at
     guard_recommended_next_action = str(
-        guard.get("recommended_next_action")
-        or status_payload.get("recommended_next_action")
-        or ""
+        guard.get("recommended_next_action") or status_payload.get("recommended_next_action") or ""
     )
 
     resolved_now = now or utc_now()
@@ -1496,9 +1495,7 @@ def crypto_freshness_watch_status(
     freshness = int(options.get("freshness_minutes") or cadence)
     freshness_window = max(cadence, freshness, 1)
     age_minutes = (
-        (resolved_now - generated_at).total_seconds() / 60
-        if generated_at is not None
-        else None
+        (resolved_now - generated_at).total_seconds() / 60 if generated_at is not None else None
     )
     if age_minutes is None:
         status = "NOT_RUN"
@@ -1540,8 +1537,7 @@ def crypto_freshness_watch_status(
         label = "Stale"
         badge_kind = "warn"
         description = (
-            "Crypto rankings are older than the configured "
-            f"{freshness_window}-minute watch window."
+            f"Crypto rankings are older than the configured {freshness_window}-minute watch window."
         )
 
     actionability_gap = _crypto_actionability_gap(summary)
@@ -1574,9 +1570,7 @@ def crypto_freshness_watch_status(
         "description": description,
         "generated_at": generated_at.isoformat() if generated_at else "n/a",
         "age_label": _format_age_minutes(age_minutes),
-        "auto_refresh_seconds": (
-            60 if bool(guard.get("running")) or scheduled_owner_active else 0
-        ),
+        "auto_refresh_seconds": (60 if bool(guard.get("running")) or scheduled_owner_active else 0),
         "auto_refresh_label": (
             "60s" if bool(guard.get("running")) or scheduled_owner_active else "off"
         ),
@@ -1661,8 +1655,7 @@ def crypto_freshness_watch_status(
             "exact_snapshot_refresh_candidate_filter",
             "n/a",
         ),
-        "liquidity_actionability_state": summary.get("liquidity_actionability_state")
-        or "UNKNOWN",
+        "liquidity_actionability_state": summary.get("liquidity_actionability_state") or "UNKNOWN",
         "actionability_gap": actionability_gap,
         "actionability_gap_label": _crypto_actionability_gap_label(actionability_gap),
         "actionability_note": _crypto_actionability_note(summary, actionability_gap),
@@ -1692,9 +1685,7 @@ def crypto_freshness_watch_status(
         ),
         "clean_execution_rows": summary.get("clean_execution_rows", 0),
         "ev_calibration_state": summary.get("ev_calibration_state") or "UNKNOWN",
-        "ev_calibration_label": _crypto_ev_calibration_label(
-            summary.get("ev_calibration_state")
-        ),
+        "ev_calibration_label": _crypto_ev_calibration_label(summary.get("ev_calibration_state")),
         "best_current_expected_value_cents": summary.get(
             "best_current_expected_value_cents",
             "n/a",
@@ -1742,9 +1733,7 @@ def crypto_freshness_watch_status(
         ),
         "liquidity_emergence_summary": _crypto_liquidity_emergence_summary(summary),
         "liquidity_emergence_examples": _crypto_liquidity_emergence_examples(payload),
-        "ev_near_miss_band_label": _format_cents(
-            summary.get("ev_near_miss_band_cents")
-        ),
+        "ev_near_miss_band_label": _format_cents(summary.get("ev_near_miss_band_cents")),
         "near_miss_summary": _crypto_near_miss_summary(summary),
         "near_miss_examples": _crypto_near_miss_examples(payload),
         "gate_failure_examples": _crypto_gate_failure_examples(payload),
@@ -1850,8 +1839,7 @@ def paper_trade_blocker_status(*, crypto_freshness: dict[str, Any]) -> dict[str,
     runner_status = str(crypto_freshness.get("runner_status") or "UNKNOWN")
     actionability_gap = str(crypto_freshness.get("actionability_gap") or "UNKNOWN")
     actionability_note = str(
-        crypto_freshness.get("actionability_note")
-        or "Paper-readiness evidence is unavailable."
+        crypto_freshness.get("actionability_note") or "Paper-readiness evidence is unavailable."
     )
     runner_next_action = str(
         crypto_freshness.get("runner_next_action")
@@ -1907,9 +1895,7 @@ def paper_trade_blocker_status(*, crypto_freshness: dict[str, Any]) -> dict[str,
     elif actionability_gap in {"SNAPSHOT_STALE", "FORECAST_STALE"}:
         readiness_kind = "stale"
 
-    runner_kind = (
-        "healthy" if bool(crypto_freshness.get("runner_running")) else "unknown"
-    )
+    runner_kind = "healthy" if bool(crypto_freshness.get("runner_running")) else "unknown"
     if status == "RUNNING_CYCLE_OVERDUE":
         runner_kind = "warn"
     elif status in {"WATCHER_STOPPED", "RUNNER_STALLED"}:
@@ -1949,9 +1935,7 @@ def paper_trade_blocker_status(*, crypto_freshness: dict[str, Any]) -> dict[str,
     ]
     phase3an_payload = _phase3an_dashboard_status_payload()
     phase3an_summary = (
-        phase3an_payload.get("summary")
-        if isinstance(phase3an_payload.get("summary"), dict)
-        else {}
+        phase3an_payload.get("summary") if isinstance(phase3an_payload.get("summary"), dict) else {}
     )
     if phase3an_summary:
         _extend_phase3an_blockers(blockers, phase3an_summary)
@@ -1962,10 +1946,7 @@ def paper_trade_blocker_status(*, crypto_freshness: dict[str, Any]) -> dict[str,
         )
         if phase3an_crypto.get("status"):
             status_label = _format_enum_label(str(phase3an_crypto["status"]))
-            summary = str(
-                phase3an_crypto.get("next_action")
-                or summary
-            )
+            summary = str(phase3an_crypto.get("next_action") or summary)
 
     phase3bc_r3_payload = _phase3bc_r3_dashboard_status_payload()
     phase3ar_payload = _phase3ar_dashboard_status_payload()
@@ -1991,9 +1972,7 @@ def paper_trade_blocker_status(*, crypto_freshness: dict[str, Any]) -> dict[str,
         phase3ar_ready = _safe_int(phase3ar_summary.get("paper_ready_rows"))
         phase3ar_positive = _safe_int(phase3ar_summary.get("positive_ev_rows"))
         phase3ar_expired = _safe_int(phase3ar_summary.get("expired_positive_ev_rows"))
-        phase3ar_first_blocker = str(
-            phase3ar_summary.get("first_hard_blocker") or ""
-        )
+        phase3ar_first_blocker = str(phase3ar_summary.get("first_hard_blocker") or "")
         top_phase3ar_reason = (
             phase3ar_first_blocker
             or _top_count_key(phase3ar_summary.get("primary_blocker_counts"))
@@ -2049,23 +2028,19 @@ def paper_trade_blocker_status(*, crypto_freshness: dict[str, Any]) -> dict[str,
             status_kind = "neutral"
             status_label = "EXPIRED_WINDOW_EXCLUDED"
             summary = (
-                "Phase 3AQ excluded expired positive-EV row(s); "
-                "no current positive-EV rows remain."
+                "Phase 3AQ excluded expired positive-EV row(s); no current positive-EV rows remain."
             )
     elif phase3ap_summary:
         _extend_phase3ap_blockers(blockers, phase3ap_payload)
         phase3ap_ready = _safe_int(phase3ap_summary.get("paper_ready_rows"))
         phase3ap_positive = _safe_int(phase3ap_summary.get("positive_ev_rows"))
-        phase3ap_no_book = _safe_int(
-            phase3ap_summary.get("positive_ev_no_executable_book_rows")
-        )
+        phase3ap_no_book = _safe_int(phase3ap_summary.get("positive_ev_no_executable_book_rows"))
         top_phase3ap_reason = _top_count_key(phase3ap_summary.get("reason_counts"))
         if phase3ap_ready > 0:
             status_kind = "good"
             status_label = "Paper ready"
             summary = (
-                f"Phase 3AP found {phase3ap_ready} paper-ready row(s) after "
-                "the canonical gate."
+                f"Phase 3AP found {phase3ap_ready} paper-ready row(s) after the canonical gate."
             )
         elif phase3ap_positive > 0:
             status_kind = "warn"
@@ -2079,8 +2054,7 @@ def paper_trade_blocker_status(*, crypto_freshness: dict[str, Any]) -> dict[str,
             status_kind = "neutral"
             status_label = "EXPIRED_WINDOW_EXCLUDED"
             summary = (
-                "Phase 3AP excluded expired positive-EV row(s); "
-                "no current positive-EV rows remain."
+                "Phase 3AP excluded expired positive-EV row(s); no current positive-EV rows remain."
             )
 
     phase3bc_r3_rate_limit = _phase3bc_r3_rate_limit(phase3bc_r3_payload)
@@ -2099,21 +2073,15 @@ def paper_trade_blocker_status(*, crypto_freshness: dict[str, Any]) -> dict[str,
     if phase3ar_summary:
         metric_paper_ready = _safe_int(phase3ar_summary.get("paper_ready_rows"))
         metric_positive_ev = _safe_int(phase3ar_summary.get("positive_ev_rows"))
-        metric_no_book = _safe_int(
-            phase3ar_summary.get("positive_ev_no_executable_book_rows")
-        )
+        metric_no_book = _safe_int(phase3ar_summary.get("positive_ev_no_executable_book_rows"))
     elif phase3aq_summary:
         metric_paper_ready = _safe_int(phase3aq_summary.get("paper_ready_rows"))
         metric_positive_ev = _safe_int(phase3aq_summary.get("positive_ev_rows"))
-        metric_no_book = _safe_int(
-            phase3aq_summary.get("positive_ev_no_executable_book_rows")
-        )
+        metric_no_book = _safe_int(phase3aq_summary.get("positive_ev_no_executable_book_rows"))
     elif phase3ap_summary:
         metric_paper_ready = _safe_int(phase3ap_summary.get("paper_ready_rows"))
         metric_positive_ev = _safe_int(phase3ap_summary.get("positive_ev_rows"))
-        metric_no_book = _safe_int(
-            phase3ap_summary.get("positive_ev_no_executable_book_rows")
-        )
+        metric_no_book = _safe_int(phase3ap_summary.get("positive_ev_no_executable_book_rows"))
     if phase3bc_r3_rate_limit:
         metric_paper_ready = 0
 
@@ -2247,7 +2215,11 @@ def _paper_trade_blocker_status_from_phase3aw(payload: dict[str, Any]) -> dict[s
     report_links = ui_panel.get("report_links")
     if not isinstance(report_links, list):
         report_links = []
-    if not any(link.get("href") == PHASE3AW_EXECUTIVE_SUMMARY_HREF for link in report_links if isinstance(link, dict)):
+    if not any(
+        link.get("href") == PHASE3AW_EXECUTIVE_SUMMARY_HREF
+        for link in report_links
+        if isinstance(link, dict)
+    ):
         report_links.insert(
             0,
             {"label": "Truth report", "href": PHASE3AW_EXECUTIVE_SUMMARY_HREF},
@@ -2300,9 +2272,7 @@ def _paper_trade_blocker_status_from_crypto_truth(
 ) -> dict[str, Any]:
     blocker = _crypto_truth_blocker(crypto_freshness)
     status_label = (
-        "Waiting for Positive EV"
-        if blocker == "EV_NOT_POSITIVE"
-        else _format_enum_label(blocker)
+        "Waiting for Positive EV" if blocker == "EV_NOT_POSITIVE" else _format_enum_label(blocker)
     )
     status_kind = "neutral" if blocker == "EV_NOT_POSITIVE" else "warn"
     positive_ev = _safe_int(crypto_freshness.get("positive_ev_rows"))
@@ -2319,7 +2289,9 @@ def _paper_trade_blocker_status_from_crypto_truth(
         "are healthy. No current crypto market has strictly positive expected value, "
         "so no paper trade should be created."
         if blocker == "EV_NOT_POSITIVE"
-        else str(crypto_freshness.get("actionability_note") or "Current crypto truth is unavailable.")
+        else str(
+            crypto_freshness.get("actionability_note") or "Current crypto truth is unavailable."
+        )
     )
     blockers = [
         {
@@ -2371,9 +2343,7 @@ def _paper_trade_blocker_status_from_crypto_truth(
                 "status_kind": "warn",
                 "status_label": "Old Artifact Ignored",
                 "evidence": f"{stale_artifacts_ignored} artifact(s) ignored.",
-                "next_action": (
-                    "Regenerate phase3aw-dashboard-truth for a full artifact audit."
-                ),
+                "next_action": ("Regenerate phase3aw-dashboard-truth for a full artifact audit."),
             }
         )
     last_updated = str(
@@ -2415,9 +2385,10 @@ def _paper_trade_blocker_status_from_crypto_truth(
 
 
 def _crypto_truth_blocker(crypto_freshness: dict[str, Any]) -> str:
-    if (
-        str(crypto_freshness.get("primary_gap") or "") == "EV_NOT_POSITIVE"
-        and not _crypto_freshness_backlog_blocks_current_positive_ev(crypto_freshness)
+    if str(
+        crypto_freshness.get("primary_gap") or ""
+    ) == "EV_NOT_POSITIVE" and not _crypto_freshness_backlog_blocks_current_positive_ev(
+        crypto_freshness
     ):
         return "EV_NOT_POSITIVE"
     if _safe_int(crypto_freshness.get("snapshot_stale_rows")) > 0:
@@ -2485,9 +2456,7 @@ def _phase3ap_dashboard_status_payload(
         "book_summary": book.get("summary") if isinstance(book.get("summary"), dict) else {},
         "gate_rows": gate.get("rows") if isinstance(gate.get("rows"), list) else [],
         "positive_ev_rows": (
-            book.get("positive_ev_rows")
-            if isinstance(book.get("positive_ev_rows"), list)
-            else []
+            book.get("positive_ev_rows") if isinstance(book.get("positive_ev_rows"), list) else []
         ),
         "generated_at": gate.get("generated_at") or book.get("generated_at"),
     }
@@ -2533,7 +2502,9 @@ def _phase3ar_dashboard_status_payload(
         return {}
     gate_summary = gate.get("summary") if isinstance(gate.get("summary"), dict) else {}
     audit_summary = audit.get("summary") if isinstance(audit.get("summary"), dict) else {}
-    gate_rows = gate.get("positive_ev_rows") if isinstance(gate.get("positive_ev_rows"), list) else []
+    gate_rows = (
+        gate.get("positive_ev_rows") if isinstance(gate.get("positive_ev_rows"), list) else []
+    )
     audit_rows = audit.get("rows") if isinstance(audit.get("rows"), list) else []
     audit_by_ticker = {
         str(row.get("market_ticker") or row.get("ticker")): row
@@ -2547,10 +2518,7 @@ def _phase3ar_dashboard_status_payload(
         ticker = str(row.get("market_ticker") or row.get("ticker") or "")
         merged = dict(row)
         merged.update(
-            {
-                f"phase3ar_{key}": value
-                for key, value in audit_by_ticker.get(ticker, {}).items()
-            }
+            {f"phase3ar_{key}": value for key, value in audit_by_ticker.get(ticker, {}).items()}
         )
         audit_row = audit_by_ticker.get(ticker, {})
         for key in (
@@ -2572,14 +2540,19 @@ def _phase3ar_dashboard_status_payload(
         summary.setdefault("current_verified_links", audit_summary.get("current_verified_links", 0))
         summary.setdefault("current_malformed_urls", audit_summary.get("current_malformed_urls", 0))
         summary.setdefault("safe_to_persist", audit_summary.get("safe_to_persist", 0))
-        summary.setdefault("specific_malformed_reason_counts", audit_summary.get("specific_malformed_reason_counts", {}))
+        summary.setdefault(
+            "specific_malformed_reason_counts",
+            audit_summary.get("specific_malformed_reason_counts", {}),
+        )
     return {
         "gate": gate,
         "audit": audit,
         "catalog_refresh": catalog_refresh,
         "gate_summary": summary or audit_summary,
         "positive_ev_rows": merged_rows,
-        "generated_at": gate.get("generated_at") or audit.get("generated_at") or catalog_refresh.get("generated_at"),
+        "generated_at": gate.get("generated_at")
+        or audit.get("generated_at")
+        or catalog_refresh.get("generated_at"),
     }
 
 
@@ -2677,28 +2650,32 @@ def _extend_phase3aq_blockers(
     blockers: list[dict[str, Any]],
     payload: dict[str, Any],
 ) -> None:
-    summary = (
-        payload.get("gate_summary")
-        if isinstance(payload.get("gate_summary"), dict)
+    summary = payload.get("gate_summary") if isinstance(payload.get("gate_summary"), dict) else {}
+    top_status = (
+        _top_count_key(summary.get("url_status_counts")) or "UNKNOWN_REQUIRES_INVESTIGATION"
+    )
+    sample_rows = [row for row in payload.get("positive_ev_rows", []) if isinstance(row, dict)][:3]
+    samples = (
+        ", ".join(
+            str(row.get("market_ticker") or row.get("ticker") or "unknown") for row in sample_rows
+        )
+        or "none"
+    )
+    url_counts = (
+        summary.get("url_status_counts")
+        if isinstance(summary.get("url_status_counts"), dict)
         else {}
     )
-    top_status = _top_count_key(summary.get("url_status_counts")) or "UNKNOWN_REQUIRES_INVESTIGATION"
-    sample_rows = [
-        row for row in payload.get("positive_ev_rows", [])
-        if isinstance(row, dict)
-    ][:3]
-    samples = ", ".join(
-        str(row.get("market_ticker") or row.get("ticker") or "unknown")
-        for row in sample_rows
-    ) or "none"
-    url_counts = summary.get("url_status_counts") if isinstance(summary.get("url_status_counts"), dict) else {}
-    top_counts = ", ".join(
-        f"{_format_enum_label(str(key))}: {_safe_int(value)}"
-        for key, value in sorted(
-            url_counts.items(),
-            key=lambda item: (-_safe_int(item[1]), str(item[0])),
-        )[:4]
-    ) or "none"
+    top_counts = (
+        ", ".join(
+            f"{_format_enum_label(str(key))}: {_safe_int(value)}"
+            for key, value in sorted(
+                url_counts.items(),
+                key=lambda item: (-_safe_int(item[1]), str(item[0])),
+            )[:4]
+        )
+        or "none"
+    )
     blockers.insert(
         0,
         {
@@ -2706,9 +2683,7 @@ def _extend_phase3aq_blockers(
             "source": "Phase 3AQ link and book unblock report",
             "status": _format_enum_label(top_status),
             "status_kind": (
-                "healthy"
-                if _safe_int(summary.get("paper_ready_rows")) > 0
-                else "blocked"
+                "healthy" if _safe_int(summary.get("paper_ready_rows")) > 0 else "blocked"
             ),
             "status_label": _format_enum_label(top_status),
             "evidence": (
@@ -2733,43 +2708,31 @@ def _extend_phase3ar_blockers(
     payload: dict[str, Any],
 ) -> None:
     catalog_refresh = (
-        payload.get("catalog_refresh")
-        if isinstance(payload.get("catalog_refresh"), dict)
-        else {}
+        payload.get("catalog_refresh") if isinstance(payload.get("catalog_refresh"), dict) else {}
     )
     _extend_phase3ar_exact_catalog_blockers(blockers, catalog_refresh)
-    summary = (
-        payload.get("gate_summary")
-        if isinstance(payload.get("gate_summary"), dict)
-        else {}
-    )
+    summary = payload.get("gate_summary") if isinstance(payload.get("gate_summary"), dict) else {}
     current_positive = _safe_int(summary.get("positive_ev_rows"))
     expired_positive = _safe_int(summary.get("expired_positive_ev_rows"))
+    verified_links = summary.get(
+        "verified_tradeable_links", summary.get("current_verified_links", 0)
+    )
     first_hard_blocker = str(summary.get("first_hard_blocker") or "")
     top_reason = (
-        (
-            "EXPIRED_WINDOW_EXCLUDED"
-            if current_positive == 0 and expired_positive > 0
-            else None
-        )
+        ("EXPIRED_WINDOW_EXCLUDED" if current_positive == 0 and expired_positive > 0 else None)
         or first_hard_blocker
-        or (
-            "NO_CURRENT_POSITIVE_EV"
-            if current_positive == 0
-            else None
-        )
+        or ("NO_CURRENT_POSITIVE_EV" if current_positive == 0 else None)
         or _top_count_key(summary.get("primary_blocker_counts"))
         or _top_count_key(summary.get("url_status_counts"))
         or "UNKNOWN_REQUIRES_INVESTIGATION"
     )
-    sample_rows = [
-        row for row in payload.get("positive_ev_rows", [])
-        if isinstance(row, dict)
-    ][:3]
-    samples = ", ".join(
-        str(row.get("market_ticker") or row.get("ticker") or "unknown")
-        for row in sample_rows
-    ) or "none"
+    sample_rows = [row for row in payload.get("positive_ev_rows", []) if isinstance(row, dict)][:3]
+    samples = (
+        ", ".join(
+            str(row.get("market_ticker") or row.get("ticker") or "unknown") for row in sample_rows
+        )
+        or "none"
+    )
     blockers.insert(
         0,
         {
@@ -2777,15 +2740,15 @@ def _extend_phase3ar_blockers(
             "source": "Phase 3AR link repair report",
             "status": top_reason,
             "status_kind": (
-                "healthy"
-                if _safe_int(summary.get("paper_ready_rows")) > 0
-                else "blocked"
+                "healthy" if _safe_int(summary.get("paper_ready_rows")) > 0 else "blocked"
             ),
             "status_label": _format_enum_label(top_reason),
             "evidence": (
                 f"{summary.get('positive_ev_rows', 0)} current positive-EV row(s); "
                 f"{summary.get('expired_positive_ev_rows', 0)} expired positive-EV row(s); "
-                f"verified links {summary.get('verified_tradeable_links', summary.get('current_verified_links', 0))}; "
+                f"verified links "
+                f"{verified_links}"
+                "; "
                 f"malformed current URLs {summary.get('current_malformed_urls', 0)}; "
                 f"safe repairs {summary.get('safe_to_persist', 0)}; "
                 f"book refresh candidates {summary.get('book_refresh_needed_rows', 0)}. "
@@ -2843,7 +2806,8 @@ def _extend_phase3ar_exact_catalog_blockers(
                 f"{exact.get('fresh_rows', 0)} exact fresh row(s) of "
                 f"{exact.get('rows_checked', 0)} checked; "
                 f"{exact.get('not_refreshed_rows', 0)} not refreshed; "
-                f"data {catalog_refresh.get('summary', {}).get('data_completeness', 'partial')}."
+                f"data "
+                f"{catalog_refresh.get('summary', {}).get('data_completeness', 'partial')}."
             ),
             "next_action": str(
                 catalog_refresh.get("next_action")
@@ -2870,16 +2834,21 @@ def _phase3ar_positive_ev_rows_for_ui(payload: dict[str, Any]) -> list[dict[str,
         book_status = str(row.get("book_status") or row.get("legacy_no_book_reason") or "UNKNOWN")
         primary = str(row.get("primary_blocker") or "UNKNOWN")
         malformed_reason = str(
-            row.get("specific_malformed_reason")
-            or row.get("previous_malformed_reason")
-            or ""
+            row.get("specific_malformed_reason") or row.get("previous_malformed_reason") or ""
         )
         formatted.append(
             {
                 "market_ticker": str(row.get("market_ticker") or row.get("ticker") or "unknown"),
-                "market_title": str(row.get("market_title") or row.get("catalog_market_title") or "Untitled market"),
+                "market_title": str(
+                    row.get("market_title") or row.get("catalog_market_title") or "Untitled market"
+                ),
                 "forecast_model": str(row.get("forecast_model") or "model"),
-                "raw_ev": str(row.get("raw_ev_cents") or row.get("raw_ev") or row.get("current_raw_ev") or "n/a"),
+                "raw_ev": str(
+                    row.get("raw_ev_cents")
+                    or row.get("raw_ev")
+                    or row.get("current_raw_ev")
+                    or "n/a"
+                ),
                 "quote_age": str(row.get("quote_age_minutes") or "n/a"),
                 "url_status": url_status,
                 "url_status_label": _format_enum_label(url_status),
@@ -2888,13 +2857,24 @@ def _phase3ar_positive_ev_rows_for_ui(payload: dict[str, Any]) -> list[dict[str,
                 "book_status_label": _format_enum_label(book_status),
                 "primary_blocker": primary,
                 "primary_blocker_label": _format_enum_label(primary),
-                "catalog_match_exists": bool(row.get("catalog_match_exists", row.get("canonical_catalog_match"))),
-                "url_exists": bool(row.get("url_exists") or row.get("current_stored_kalshi_url") or row.get("kalshi_url")),
-                "stored_official_url": bool(row.get("current_stored_kalshi_url") or row.get("kalshi_url")),
+                "catalog_match_exists": bool(
+                    row.get("catalog_match_exists", row.get("canonical_catalog_match"))
+                ),
+                "url_exists": bool(
+                    row.get("url_exists")
+                    or row.get("current_stored_kalshi_url")
+                    or row.get("kalshi_url")
+                ),
+                "stored_official_url": bool(
+                    row.get("current_stored_kalshi_url") or row.get("kalshi_url")
+                ),
                 "book_refresh_needed": bool(row.get("book_refresh_needed")),
                 "kalshi_url": row.get("kalshi_url") or row.get("current_stored_kalshi_url"),
-                "kalshi_url_verified": bool(row.get("kalshi_url_verified")) or url_status == "VERIFIED",
-                "malformed_reason": _format_enum_label(malformed_reason) if malformed_reason else "",
+                "kalshi_url_verified": bool(row.get("kalshi_url_verified"))
+                or url_status == "VERIFIED",
+                "malformed_reason": _format_enum_label(malformed_reason)
+                if malformed_reason
+                else "",
                 "repair_command_required": str(row.get("repair_command_required") or ""),
                 "next_action": str(row.get("next_action") or ""),
             }
@@ -2943,29 +2923,30 @@ def _extend_phase3ap_blockers(
     payload: dict[str, Any],
 ) -> None:
     gate_summary = (
-        payload.get("gate_summary")
-        if isinstance(payload.get("gate_summary"), dict)
-        else {}
+        payload.get("gate_summary") if isinstance(payload.get("gate_summary"), dict) else {}
     )
     book_summary = (
-        payload.get("book_summary")
-        if isinstance(payload.get("book_summary"), dict)
-        else {}
+        payload.get("book_summary") if isinstance(payload.get("book_summary"), dict) else {}
     )
-    top_reason = _top_count_key(gate_summary.get("reason_counts")) or "UNKNOWN_REQUIRES_INVESTIGATION"
+    top_reason = (
+        _top_count_key(gate_summary.get("reason_counts")) or "UNKNOWN_REQUIRES_INVESTIGATION"
+    )
     top_book_reason = (
         _top_count_key(book_summary.get("no_book_reason_counts"))
         or "UNKNOWN_REQUIRES_INVESTIGATION"
     )
     sample_rows = [
-        row for row in payload.get("gate_rows", [])
+        row
+        for row in payload.get("gate_rows", [])
         if isinstance(row, dict)
         and (row.get("paper_ready_blocker") or row.get("primary_blocker")) != "PAPER_READY"
     ][:3]
-    samples = ", ".join(
-        str(row.get("market_ticker") or row.get("ticker") or "unknown")
-        for row in sample_rows
-    ) or "none"
+    samples = (
+        ", ".join(
+            str(row.get("market_ticker") or row.get("ticker") or "unknown") for row in sample_rows
+        )
+        or "none"
+    )
     blockers.insert(
         0,
         {
@@ -2973,9 +2954,7 @@ def _extend_phase3ap_blockers(
             "source": "Phase 3AP unblock report",
             "status": _format_enum_label(top_reason),
             "status_kind": (
-                "healthy"
-                if _safe_int(gate_summary.get("paper_ready_rows")) > 0
-                else "blocked"
+                "healthy" if _safe_int(gate_summary.get("paper_ready_rows")) > 0 else "blocked"
             ),
             "status_label": _format_enum_label(top_reason),
             "evidence": (
@@ -2998,10 +2977,14 @@ def _extend_phase3an_blockers(
 ) -> None:
     paper = summary.get("paper_funnel") if isinstance(summary.get("paper_funnel"), dict) else {}
     settlement = summary.get("settlement") if isinstance(summary.get("settlement"), dict) else {}
-    sources = summary.get("general_sources") if isinstance(summary.get("general_sources"), dict) else {}
+    sources = (
+        summary.get("general_sources") if isinstance(summary.get("general_sources"), dict) else {}
+    )
     phase3bb = summary.get("phase3bb_r2") if isinstance(summary.get("phase3bb_r2"), dict) else {}
     sports = summary.get("sports") if isinstance(summary.get("sports"), dict) else {}
-    economic = summary.get("economic_news") if isinstance(summary.get("economic_news"), dict) else {}
+    economic = (
+        summary.get("economic_news") if isinstance(summary.get("economic_news"), dict) else {}
+    )
     if paper:
         top_reason = paper.get("top_reason")
         blockers.append(
@@ -3009,11 +2992,14 @@ def _extend_phase3an_blockers(
                 "area": "Paper funnel",
                 "source": "Phase 3AN paper funnel explain",
                 "status": _format_enum_label(str(paper.get("first_hard_blocker") or "UNKNOWN")),
-                "status_kind": "blocked" if int(paper.get("tradeable_rows") or 0) == 0 else "healthy",
-                "status_label": _format_enum_label(str(paper.get("first_hard_blocker") or "UNKNOWN")),
+                "status_kind": "blocked"
+                if int(paper.get("tradeable_rows") or 0) == 0
+                else "healthy",
+                "status_label": _format_enum_label(
+                    str(paper.get("first_hard_blocker") or "UNKNOWN")
+                ),
                 "evidence": (
-                    f"{paper.get('tradeable_rows', 0)} tradeable row(s); "
-                    f"top reason {top_reason}."
+                    f"{paper.get('tradeable_rows', 0)} tradeable row(s); top reason {top_reason}."
                 ),
                 "next_action": "Keep funnel read-only; do not lower thresholds to create trades.",
             }
@@ -3024,7 +3010,9 @@ def _extend_phase3an_blockers(
                 "area": "Settlement evidence",
                 "source": "Phase 3AN settlement health confirm",
                 "status": _format_enum_label(str(settlement.get("status") or "UNKNOWN")),
-                "status_kind": "healthy" if not settlement.get("apply_command_exposed") else "blocked",
+                "status_kind": "healthy"
+                if not settlement.get("apply_command_exposed")
+                else "blocked",
                 "status_label": _format_enum_label(str(settlement.get("status") or "UNKNOWN")),
                 "evidence": (
                     f"{settlement.get('exact_eligible_trades', 0)} exact eligible; "
@@ -3071,7 +3059,9 @@ def _extend_phase3an_blockers(
                 "status_kind": "blocked",
                 "status_label": "Evidence gated",
                 "evidence": f"{phase3bb.get('evidence_ready_rows', 0)} evidence-ready row(s).",
-                "next_action": str(phase3bb.get("source_blocker") or "Keep report-only source review running."),
+                "next_action": str(
+                    phase3bb.get("source_blocker") or "Keep report-only source review running."
+                ),
             }
         )
     if sports:
@@ -3084,7 +3074,8 @@ def _extend_phase3an_blockers(
                 "status_label": "Placeholders/provenance blocked",
                 "evidence": (
                     f"{sports.get('placeholder_rows', 0)} placeholder row(s), "
-                    f"{sports.get('partial_provenance_markets', 0)} partial provenance market(s); "
+                    f"{sports.get('partial_provenance_markets', 0)} pa"
+                    f"rtial provenance market(s); "
                     f"reasons {sports.get('reason_codes', [])}."
                 ),
                 "next_action": "Do not treat placeholders as teams or upgrade partial provenance.",
@@ -3097,9 +3088,12 @@ def _extend_phase3an_blockers(
                 "source": "Phase 3AN economic/news watch",
                 "status": _format_enum_label(str(economic.get("blocker_reason") or "UNKNOWN")),
                 "status_kind": "blocked",
-                "status_label": _format_enum_label(str(economic.get("blocker_reason") or "UNKNOWN")),
+                "status_label": _format_enum_label(
+                    str(economic.get("blocker_reason") or "UNKNOWN")
+                ),
                 "evidence": (
-                    f"Economic compatible {economic.get('economic_compatible_parsed_markets', 0)}, "
+                    f"Economic compatible "
+                    f"{economic.get('economic_compatible_parsed_markets', 0)}, "
                     f"news compatible {economic.get('news_compatible_parsed_markets', 0)}; "
                     f"current parsed econ/news "
                     f"{economic.get('economic_current_parsed_markets', 0)}/"
@@ -3162,8 +3156,12 @@ def _apply_phase3ak_crypto_watch_status(
             }
         )
         return
-    window_summary = payload.get("window_summary") if isinstance(payload.get("window_summary"), dict) else {}
-    funnel = payload.get("readiness_funnel") if isinstance(payload.get("readiness_funnel"), dict) else {}
+    window_summary = (
+        payload.get("window_summary") if isinstance(payload.get("window_summary"), dict) else {}
+    )
+    funnel = (
+        payload.get("readiness_funnel") if isinstance(payload.get("readiness_funnel"), dict) else {}
+    )
     primary_blocker = str(payload.get("primary_blocker") or "UNKNOWN")
     runner_state = str(payload.get("runner_state") or payload.get("runner_status") or "UNKNOWN")
     status.update(
@@ -3516,9 +3514,7 @@ def _crypto_gate_failure_examples(
                     "ticker": ticker,
                     "title": str(raw.get("clean_title") or raw.get("title") or ticker),
                     "detail_href": f"/opportunities/{ticker}",
-                    "expected_value_label": _format_cents(
-                        raw.get("expected_value_cents")
-                    ),
+                    "expected_value_label": _format_cents(raw.get("expected_value_cents")),
                     "expected_value_cents": raw.get("expected_value_cents"),
                     "book_label": _crypto_candidate_book_label(raw, blockers),
                     "failed_gate_label": ", ".join(
@@ -3645,9 +3641,7 @@ def _crypto_book_probe(
         "spread_label": _format_price_cents(raw.get("spread")),
         "blockers_label": _format_book_probe_blockers(raw),
         "needed_label": needed_label,
-        "safety_label": (
-            "Paper-only: does not create exchange liquidity or place orders."
-        ),
+        "safety_label": ("Paper-only: does not create exchange liquidity or place orders."),
     }
 
 
@@ -3720,17 +3714,11 @@ def _crypto_liquidity_emergence_examples(
                 "ticker": ticker,
                 "title": str(raw.get("clean_title") or ticker),
                 "detail_href": f"/opportunities/{ticker}",
-                "transition_label": str(
-                    raw.get("transition_label") or "Liquidity changed"
-                ),
+                "transition_label": str(raw.get("transition_label") or "Liquidity changed"),
                 "watch_type": str(raw.get("watch_type") or "EV_WATCH"),
-                "expected_value_label": _format_cents(
-                    raw.get("expected_value_cents")
-                ),
+                "expected_value_label": _format_cents(raw.get("expected_value_cents")),
                 "gap_label": _format_cents(raw.get("gap_to_positive_cents")),
-                "current_liquidity_label": _crypto_liquidity_label(
-                    raw.get("liquidity_score")
-                ),
+                "current_liquidity_label": _crypto_liquidity_label(raw.get("liquidity_score")),
                 "previous_liquidity_label": _crypto_liquidity_label(
                     raw.get("previous_liquidity_score")
                 ),
@@ -3762,24 +3750,16 @@ def _crypto_near_miss_examples(payload: dict[str, Any], *, limit: int = 5) -> li
                 "ticker": ticker,
                 "title": str(raw.get("clean_title") or ticker),
                 "detail_href": f"/opportunities/{ticker}",
-                "expected_value_label": _format_cents(
-                    raw.get("expected_value_cents")
-                ),
+                "expected_value_label": _format_cents(raw.get("expected_value_cents")),
                 "gap_label": _format_cents(raw.get("gap_to_positive_cents")),
                 "price_label": _format_price_cents(raw.get("best_price")),
                 "spread_label": _format_price_cents(raw.get("spread")),
-                "liquidity_label": _crypto_liquidity_label(
-                    raw.get("liquidity_score")
-                ),
+                "liquidity_label": _crypto_liquidity_label(raw.get("liquidity_score")),
                 "liquidity_raw": _format_plain_decimal(raw.get("liquidity_score")),
-                "model_probability_label": _format_probability(
-                    raw.get("side_probability")
-                ),
+                "model_probability_label": _format_probability(raw.get("side_probability")),
                 "best_side": str(raw.get("best_side") or "n/a"),
                 "status_label": _crypto_near_miss_status(raw),
-                "what_would_make_ready": _first_text(
-                    raw.get("what_would_make_paper_ready")
-                ),
+                "what_would_make_ready": _first_text(raw.get("what_would_make_paper_ready")),
                 "blocking_gates": _format_gate_list(raw.get("blocking_gates")),
             }
         )
@@ -4084,9 +4064,10 @@ def _today_portfolio_summary_fast(session: Session) -> dict[str, Any]:
 def _paper_position_exposure(position: PaperPosition) -> Decimal:
     yes_price = to_decimal(position.avg_yes_price) or Decimal("0")
     no_price = to_decimal(position.avg_no_price) or Decimal("0")
-    return abs(Decimal(position.yes_contracts)) * yes_price + abs(
-        Decimal(position.no_contracts)
-    ) * no_price
+    return (
+        abs(Decimal(position.yes_contracts)) * yes_price
+        + abs(Decimal(position.no_contracts)) * no_price
+    )
 
 
 def _today_learning_status_fast(

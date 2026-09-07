@@ -47,8 +47,7 @@ class MetaModelV1Forecaster:
                 ),
             },
             notes=(
-                "meta_model_v1 selects the locally most trustworthy stored model, "
-                "paper/demo only."
+                "meta_model_v1 selects the locally most trustworthy stored model, paper/demo only."
             ),
         )
 

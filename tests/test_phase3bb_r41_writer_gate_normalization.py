@@ -128,7 +128,8 @@ def _fake_probe_runner(
         "r5_service_active": ("active\n", True, 0, ""),
         "ui_service_active": ("active\n", True, 0, ""),
         "scheduler_journal": (
-            "Jul 13 05:08:57 runner[1]: [phase3bb-r35] Writer active; skip writer-gated job weather_fast_lane\n",
+            "Jul 13 05:08:57 runner[1]: [phase3bb-r35] Writer active; skip writer-gated "
+            "job weather_fast_lane\n",
             True,
             0,
             "",

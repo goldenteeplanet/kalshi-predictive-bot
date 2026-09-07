@@ -47,12 +47,8 @@ def latest_discovery_run(session: Session) -> FeatureDiscoveryRun | None:
 def feature_discovery_status(session: Session) -> dict[str, Any]:
     latest = latest_discovery_run(session)
     run_count = int(session.scalar(select(func.count()).select_from(FeatureDiscoveryRun)) or 0)
-    candidate_count = int(
-        session.scalar(select(func.count()).select_from(FeatureCandidate)) or 0
-    )
-    evaluation_count = int(
-        session.scalar(select(func.count()).select_from(FeatureEvaluation)) or 0
-    )
+    candidate_count = int(session.scalar(select(func.count()).select_from(FeatureCandidate)) or 0)
+    evaluation_count = int(session.scalar(select(func.count()).select_from(FeatureEvaluation)) or 0)
     return {
         "run_count": run_count,
         "candidate_count": candidate_count,

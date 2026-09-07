@@ -23,12 +23,8 @@ from kalshi_predictor.workstation.recovery_evidence_canonicalization import (
 def test_bound_decision_is_verified_but_never_authorizes_recovery() -> None:
     bundle = _bundle()
     decision = _decision(bundle)
-    first = detect_recovery_decision_tampering(
-        bundle, decision, evaluated_at_epoch_seconds=200
-    )
-    second = detect_recovery_decision_tampering(
-        bundle, decision, evaluated_at_epoch_seconds=200
-    )
+    first = detect_recovery_decision_tampering(bundle, decision, evaluated_at_epoch_seconds=200)
+    second = detect_recovery_decision_tampering(bundle, decision, evaluated_at_epoch_seconds=200)
     validate_recovery_decision_tamper_report(first)
     assert first.status == "VERIFIED"
     assert first.report_hash == second.report_hash
@@ -39,9 +35,7 @@ def test_bound_decision_is_verified_but_never_authorizes_recovery() -> None:
 def test_bundle_substitution_and_readiness_claim_mismatch_are_tampered() -> None:
     bundle = _bundle()
     substituted = _decision(bundle, bundle_hash="f" * 64)
-    report = detect_recovery_decision_tampering(
-        bundle, substituted, evaluated_at_epoch_seconds=200
-    )
+    report = detect_recovery_decision_tampering(bundle, substituted, evaluated_at_epoch_seconds=200)
     assert report.status == "TAMPERED"
     assert "RECOVERY_DECISION_BUNDLE_MISMATCH" in report.reasons
     claim = _decision(bundle, ready=False)
@@ -52,30 +46,40 @@ def test_bundle_substitution_and_readiness_claim_mismatch_are_tampered() -> None
 def test_exact_expiry_and_ttl_boundaries_pass_then_expire() -> None:
     bundle = _bundle()
     exact = _decision(bundle, created=100, expires=400)
-    assert detect_recovery_decision_tampering(
-        bundle, exact, evaluated_at_epoch_seconds=400
-    ).status == "VERIFIED"
-    assert detect_recovery_decision_tampering(
-        bundle, exact, evaluated_at_epoch_seconds=401
-    ).status == "STALE"
+    assert (
+        detect_recovery_decision_tampering(bundle, exact, evaluated_at_epoch_seconds=400).status
+        == "VERIFIED"
+    )
+    assert (
+        detect_recovery_decision_tampering(bundle, exact, evaluated_at_epoch_seconds=401).status
+        == "STALE"
+    )
     too_long = _decision(bundle, created=100, expires=401)
-    assert detect_recovery_decision_tampering(
-        bundle, too_long, evaluated_at_epoch_seconds=200
-    ).status == "DENIED"
+    assert (
+        detect_recovery_decision_tampering(bundle, too_long, evaluated_at_epoch_seconds=200).status
+        == "DENIED"
+    )
 
 
 def test_incomplete_future_and_wrong_action_fail_closed() -> None:
     bundle = _bundle()
-    assert detect_recovery_decision_tampering(
-        bundle, _decision(bundle, complete=False), evaluated_at_epoch_seconds=200
-    ).status == "INCOMPLETE"
-    assert detect_recovery_decision_tampering(
-        bundle, _decision(bundle, created=201, expires=300), evaluated_at_epoch_seconds=200
-    ).status == "DENIED"
+    assert (
+        detect_recovery_decision_tampering(
+            bundle, _decision(bundle, complete=False), evaluated_at_epoch_seconds=200
+        ).status
+        == "INCOMPLETE"
+    )
+    assert (
+        detect_recovery_decision_tampering(
+            bundle, _decision(bundle, created=201, expires=300), evaluated_at_epoch_seconds=200
+        ).status
+        == "DENIED"
+    )
     wrong = _decision(bundle, action="DENY_RECOVERY")
-    assert detect_recovery_decision_tampering(
-        bundle, wrong, evaluated_at_epoch_seconds=200
-    ).status == "DENIED"
+    assert (
+        detect_recovery_decision_tampering(bundle, wrong, evaluated_at_epoch_seconds=200).status
+        == "DENIED"
+    )
 
 
 def test_malformed_bound_decision_and_bundle_tampering_fail_closed() -> None:

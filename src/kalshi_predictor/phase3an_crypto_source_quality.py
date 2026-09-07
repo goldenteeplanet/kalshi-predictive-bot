@@ -73,8 +73,7 @@ def build_phase3an_crypto_source_quality(
 
     requested_symbols = _requested_symbols(symbols or options.get("symbols"))
     requested_series = _requested_series(
-        r3_summary.get("crypto_series_tickers")
-        or options.get("crypto_series_tickers")
+        r3_summary.get("crypto_series_tickers") or options.get("crypto_series_tickers")
     )
     snapshot_counts = _symbol_counts(
         r3_summary.get("per_symbol_snapshot_counts"),
@@ -288,8 +287,7 @@ def render_phase3an_crypto_source_quality_markdown(payload: dict[str, Any]) -> s
 
 def source_quality_classification_for_phase3an(payload: dict[str, Any]) -> str:
     return str(
-        _dict(payload.get("summary")).get("classification")
-        or "UNKNOWN_REQUIRES_INVESTIGATION"
+        _dict(payload.get("summary")).get("classification") or "UNKNOWN_REQUIRES_INVESTIGATION"
     )
 
 
@@ -335,8 +333,7 @@ def _source_quality_next_action(classification: str, missing_symbols: list[str])
         )
     if classification == "WAIT_FOR_MARKET_EV":
         return (
-            "Market fill and ranking are current; wait for positive EV without "
-            "lowering thresholds."
+            "Market fill and ranking are current; wait for positive EV without lowering thresholds."
         )
     if classification == "WAIT_FOR_EXECUTABLE_BOOK":
         return "Positive EV exists, but executable book/risk gates are not paper-ready yet."
@@ -365,9 +362,7 @@ def _source_quality_next_commands(classification: str) -> list[str]:
     elif classification == "API_RATE_LIMIT_PRESSURE":
         commands.append("Inspect R5 unattended logs for HTTP 429/rate-limit events.")
     elif classification == "PAPER_READY_REVIEW":
-        commands.append(
-            "Review paper-ready rows manually before any paper-only creation command."
-        )
+        commands.append("Review paper-ready rows manually before any paper-only creation command.")
     else:
         commands.append("Keep the guarded R5 watch running; do not run accelerate-learning.")
     return commands
@@ -562,9 +557,7 @@ def _structured_rate_limit_evidence(value: Any, path: str = "root") -> list[dict
                 }
             )
         for child_key, child_value in value.items():
-            evidence.extend(
-                _structured_rate_limit_evidence(child_value, f"{path}.{child_key}")
-            )
+            evidence.extend(_structured_rate_limit_evidence(child_value, f"{path}.{child_key}"))
     elif isinstance(value, list):
         for index, item in enumerate(value):
             evidence.extend(_structured_rate_limit_evidence(item, f"{path}[{index}]"))

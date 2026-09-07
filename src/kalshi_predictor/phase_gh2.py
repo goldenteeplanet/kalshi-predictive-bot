@@ -930,11 +930,7 @@ def _import_active_market_catalog(
         imported.append(ticker)
     return {
         "status": (
-            "NOT_AVAILABLE"
-            if not payload
-            else "COMPLETE_WITH_ERRORS"
-            if errors
-            else "COMPLETE"
+            "NOT_AVAILABLE" if not payload else "COMPLETE_WITH_ERRORS" if errors else "COMPLETE"
         ),
         "path": str(path),
         "catalog_generated_at": payload.get("generated_at"),
@@ -1172,8 +1168,7 @@ def _build_candidate_diagnostics(
                     ),
                     "quote_age_minutes": raw.get("snapshot_age_minutes")
                     or raw.get("quote_age_minutes"),
-                    "raw_ev": raw.get("expected_value")
-                    or raw.get("expected_value_cents"),
+                    "raw_ev": raw.get("expected_value") or raw.get("expected_value_cents"),
                     "executable_ev": raw.get("expected_value"),
                     "spread": raw.get("spread"),
                     "liquidity": raw.get("liquidity_score") or raw.get("liquidity"),

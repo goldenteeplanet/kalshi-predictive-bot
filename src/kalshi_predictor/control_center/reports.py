@@ -138,10 +138,7 @@ def _autopilot_lane_card(
         or 0,
         "dry_run_orders": metric.get("dry_run_orders")
         or len(
-            (autopilot.get("latest_cycle") or {})
-            .get("summary", {})
-            .get("dry_run_orders")
-            or []
+            (autopilot.get("latest_cycle") or {}).get("summary", {}).get("dry_run_orders") or []
         ),
         "top_model": (top_model or {}).get("model_name") or "Needs more data",
         "current_confidence": metric.get("current_confidence")

@@ -89,9 +89,7 @@ def test_gh3_soak_status_prefers_active_fixed_rate_health(tmp_path: Path) -> Non
                 "overall_status": "DEGRADED",
                 "consecutive_healthy_cycles": 0,
                 "required_healthy_cycles": 24,
-                "timeout_reasons": [
-                    "GH2_DECISION_REFRESH_TIMEOUT_AFTER_330_SECONDS"
-                ],
+                "timeout_reasons": ["GH2_DECISION_REFRESH_TIMEOUT_AFTER_330_SECONDS"],
                 "scheduler": {"status": "COMPLETE_WITH_ATTENTION"},
                 "sources": {
                     "websocket": {
@@ -115,26 +113,18 @@ def test_gh3_soak_status_prefers_active_fixed_rate_health(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    status = build_gh3_soak_status(
-        **paths, unified_health_path=unified_path, now=NOW
-    )
+    status = build_gh3_soak_status(**paths, unified_health_path=unified_path, now=NOW)
 
     assert status["status"] == "NEEDS_ATTENTION"
     assert status["completed_cycles"] == 0
     assert status["healthy_cycle"] is False
     assert status["scheduler_status"] == "Complete With Attention"
-    assert status["deferred_cycle_reason"] == (
-        "Gh2 Decision Refresh Timeout After 330 Seconds"
-    )
+    assert status["deferred_cycle_reason"] == ("Gh2 Decision Refresh Timeout After 330 Seconds")
     assert status["reconnect"]["unified_health"] is True
     assert status["reconnect"]["sources"][0]["status"] == "NOT_APPLICABLE"
-    assert status["reconnect"]["sources"][0]["source"] == (
-        "Kalshi transport: REST scheduler"
-    )
+    assert status["reconnect"]["sources"][0]["source"] == ("Kalshi transport: REST scheduler")
     assert status["reconnect"]["sources"][1]["status"] == "HEALTHY"
-    assert status["reconnect"]["sources"][2]["status"] == (
-        "UNAVAILABLE_DUE_TO_STAGE_TIMEOUT"
-    )
+    assert status["reconnect"]["sources"][2]["status"] == ("UNAVAILABLE_DUE_TO_STAGE_TIMEOUT")
 
 
 def test_gh4_preflight_becomes_ready_but_does_not_enable_orders(tmp_path: Path) -> None:

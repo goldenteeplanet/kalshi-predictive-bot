@@ -60,9 +60,7 @@ def test_partial_and_malformed_evidence_fail_closed() -> None:
 
 def test_lineage_observation_and_result_tampering_fail_closed() -> None:
     with pytest.raises(WslBootIdentityMonitorError, match="OBSERVATION_LINEAGE_MIXED"):
-        monitor_wsl_boot_identity(
-            [_observation(1, 100), _observation(2, 130, source="b" * 64)]
-        )
+        monitor_wsl_boot_identity([_observation(1, 100), _observation(2, 130, source="b" * 64)])
     item = _observation(1, 100)
     with pytest.raises(WslBootIdentityMonitorError, match="OBSERVATION_HASH_MISMATCH"):
         monitor_wsl_boot_identity([replace(item, boot_identity=BOOT_B)])

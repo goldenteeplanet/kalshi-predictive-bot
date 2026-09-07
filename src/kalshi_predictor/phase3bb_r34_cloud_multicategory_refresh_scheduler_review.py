@@ -302,8 +302,7 @@ def _refresh_jobs(scorecard_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "--output-dir reports/phase3bb_r33 --reports-dir reports"
             ),
             purpose=(
-                "Keep cloud UI, systemd R5, paper-only guardrails, and dashboard "
-                "truth checked."
+                "Keep cloud UI, systemd R5, paper-only guardrails, and dashboard truth checked."
             ),
             writer_capable=False,
             source_state="R33",
@@ -438,8 +437,7 @@ def _refresh_jobs(scorecard_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             purpose=_category_purpose(
                 crypto,
                 fallback=(
-                    "Crypto stays a background status/watch lane; do not start a "
-                    "duplicate R5."
+                    "Crypto stays a background status/watch lane; do not start a duplicate R5."
                 ),
             ),
             writer_capable=False,
@@ -494,8 +492,7 @@ def _scheduler_checks(
         }
     )
     duplicate_r5_start = any(
-        "phase3bc-r5-unattended-start" in str(row.get("command", ""))
-        for row in refresh_jobs
+        "phase3bc-r5-unattended-start" in str(row.get("command", "")) for row in refresh_jobs
     )
     writer_jobs_without_gate = [
         row["job_id"]
@@ -601,10 +598,7 @@ def _all_command_names(refresh_jobs: list[dict[str, Any]]) -> list[str]:
     for row in refresh_jobs:
         parts = shlex.split(str(row.get("command") or ""))
         for index, part in enumerate(parts):
-            if (
-                (part == "kalshi-bot" or part.endswith("/kalshi-bot"))
-                and index + 1 < len(parts)
-            ):
+            if (part == "kalshi-bot" or part.endswith("/kalshi-bot")) and index + 1 < len(parts):
                 names.append(parts[index + 1])
     return names
 

@@ -68,17 +68,20 @@ def test_exponential_delay_caps_and_attempt_budget_exhausts() -> None:
 def test_delivered_incomplete_and_non_emittable_histories_are_terminal() -> None:
     alert = _alert()
     delivered = _attempt(alert, number=1, at=100, outcome="DELIVERED")
-    assert evaluate_alert_retry_backoff(
-        alert, [delivered], evaluated_at_epoch_seconds=101
-    ).status == "DELIVERED"
+    assert (
+        evaluate_alert_retry_backoff(alert, [delivered], evaluated_at_epoch_seconds=101).status
+        == "DELIVERED"
+    )
     incomplete = _attempt(alert, number=1, at=100, complete=False)
-    assert evaluate_alert_retry_backoff(
-        alert, [incomplete], evaluated_at_epoch_seconds=101
-    ).status == "INCOMPLETE"
+    assert (
+        evaluate_alert_retry_backoff(alert, [incomplete], evaluated_at_epoch_seconds=101).status
+        == "INCOMPLETE"
+    )
     denied_alert = _alert(category="UNKNOWN")
-    assert evaluate_alert_retry_backoff(
-        denied_alert, [], evaluated_at_epoch_seconds=100
-    ).status == "DENIED"
+    assert (
+        evaluate_alert_retry_backoff(denied_alert, [], evaluated_at_epoch_seconds=100).status
+        == "DENIED"
+    )
 
 
 def test_sequence_time_binding_future_and_post_delivery_fail_closed() -> None:
@@ -158,9 +161,7 @@ def _alert(*, category="WSL_LIVENESS", reason="WSL_UNAVAILABLE"):
         complete=True,
         source_identity_hash="b" * 64,
     )
-    return evaluate_alert_severity_and_deduplication(
-        candidate, [], evaluated_at_epoch_seconds=100
-    )
+    return evaluate_alert_severity_and_deduplication(candidate, [], evaluated_at_epoch_seconds=100)
 
 
 def _attempt(alert, *, number, at, outcome="FAILED", complete=True):

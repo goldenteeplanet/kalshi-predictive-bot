@@ -24,9 +24,7 @@ from kalshi_predictor.phase4cd.read_model_staleness import StalenessEscalation
 
 def test_valid_candidate_is_independently_approved() -> None:
     candidate, dashboard, replay = _evidence()
-    review = independently_review_candidate(
-        candidate=candidate, dashboard=dashboard, replay=replay
-    )
+    review = independently_review_candidate(candidate=candidate, dashboard=dashboard, replay=replay)
     validate_independent_review(review)
     assert review.decision == "APPROVE"
     assert review.reasons == ()
@@ -62,12 +60,8 @@ def test_exact_freshness_boundaries_approve() -> None:
     ("snapshot_age", "progress_age", "reason"),
     [(301, 900, "SNAPSHOT_STALE"), (300, 901, "PROGRESS_STALE")],
 )
-def test_over_boundary_staleness_rejects(
-    snapshot_age: int, progress_age: int, reason: str
-) -> None:
-    candidate, dashboard, replay = _evidence(
-        snapshot_age=snapshot_age, progress_age=progress_age
-    )
+def test_over_boundary_staleness_rejects(snapshot_age: int, progress_age: int, reason: str) -> None:
+    candidate, dashboard, replay = _evidence(snapshot_age=snapshot_age, progress_age=progress_age)
     review = independently_review_candidate(
         candidate=candidate,
         dashboard=dashboard,
@@ -91,9 +85,7 @@ def test_invalid_bounds_and_malformed_age_fail_closed() -> None:
     malformed = dict(dashboard)
     malformed["freshness"] = dict(dashboard["freshness"], snapshot_age_seconds="1")
     with pytest.raises(IndependentReviewError, match="REVIEW_INPUT_INVALID"):
-        independently_review_candidate(
-            candidate=candidate, dashboard=malformed, replay=replay
-        )
+        independently_review_candidate(candidate=candidate, dashboard=malformed, replay=replay)
 
 
 def test_tampering_and_cross_artifact_mismatch_fail_closed() -> None:
@@ -113,9 +105,7 @@ def test_tampering_and_cross_artifact_mismatch_fail_closed() -> None:
 
 def test_review_result_tampering_and_safety_boundary_fail_closed() -> None:
     candidate, dashboard, replay = _evidence()
-    review = independently_review_candidate(
-        candidate=candidate, dashboard=dashboard, replay=replay
-    )
+    review = independently_review_candidate(candidate=candidate, dashboard=dashboard, replay=replay)
     with pytest.raises(IndependentReviewError, match="REVIEW_HASH_MISMATCH"):
         validate_independent_review(replace(review, review_hash="0" * 64))
     with pytest.raises(IndependentReviewError, match="REVIEW_SAFETY_BOUNDARY_INVALID"):

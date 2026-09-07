@@ -25,12 +25,8 @@ def write_refresh_control_plane_bundle(
     previous_path = _latest_history_path(history_dir)
     previous = _read_json(previous_path) if previous_path else {}
     changes = build_cycle_changes(previous, current)
-    lifecycle = update_candidate_lifecycle(
-        root / "candidate_lifecycle.json", previous, current
-    )
-    blockers = build_blocker_intelligence(
-        root / "blocker_intelligence.json", current
-    )
+    lifecycle = update_candidate_lifecycle(root / "candidate_lifecycle.json", previous, current)
+    blockers = build_blocker_intelligence(root / "blocker_intelligence.json", current)
     scorecard = build_data_quality_scorecard(current)
     alerts = update_incident_history(root / "incident_history.json", current, scorecard)
     cycle_id = str(current["cycle_id"])
@@ -185,9 +181,7 @@ def update_candidate_lifecycle(
 def build_blocker_intelligence(path: Path, current: dict[str, Any]) -> dict[str, Any]:
     previous = _read_json(path)
     previous_rows = {
-        str(row.get("blocker")): row
-        for row in previous.get("rows") or []
-        if isinstance(row, dict)
+        str(row.get("blocker")): row for row in previous.get("rows") or [] if isinstance(row, dict)
     }
     total = len(current.get("candidates") or [])
     counts = Counter(current.get("blocker_counts") or {})
@@ -284,9 +278,7 @@ def _normalized_cycle(payload: dict[str, Any], manifest: dict[str, Any]) -> dict
         for row in manifest.get("candidates") or []
         if isinstance(row, dict)
     ]
-    blockers = Counter(
-        gate for row in candidates for gate in row.get("blocking_gates") or []
-    )
+    blockers = Counter(gate for row in candidates for gate in row.get("blocking_gates") or [])
     websocket = payload.get("websocket_drain") or {}
     return {
         "schema_version": SCHEMA_VERSION,
@@ -387,8 +379,7 @@ def _executive_report(
 ) -> str:
     soak = current.get("soak") or {}
     soak_label = (
-        f"{soak.get('consecutive_healthy_cycles', 0)}/"
-        f"{soak.get('required_healthy_cycles', 24)}"
+        f"{soak.get('consecutive_healthy_cycles', 0)}/{soak.get('required_healthy_cycles', 24)}"
     )
     added_removed = (
         f"{len(changes.get('candidates_added') or [])}/"

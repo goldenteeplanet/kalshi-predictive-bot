@@ -133,11 +133,7 @@ def _candidate(tmp_path):
     _write(pair_state, {"completed_pair_keys": [pair_key]})
     _write(
         cache,
-        {
-            "entries": {
-                "old": {"ticker": TICKER, "model_name": "weather_v2", "evidence": {}}
-            }
-        },
+        {"entries": {"old": {"ticker": TICKER, "model_name": "weather_v2", "evidence": {}}}},
     )
     settings = Settings(advanced_risk_quote_max_age_ms=120_000)
     candidate = validate_one_contract_paper_activation(

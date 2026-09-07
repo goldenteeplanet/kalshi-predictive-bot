@@ -113,9 +113,7 @@ def test_phase_3x_status_and_report_are_incomplete_without_3w_pass(tmp_path) -> 
 def test_phase_3x_today_route_renders_authority_labels(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/today")
 
@@ -131,9 +129,7 @@ def test_phase_3x_today_route_renders_authority_labels(tmp_path) -> None:
 def test_phase_3x_root_uses_bounded_today_workspace(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/")
 
@@ -153,9 +149,7 @@ def test_phase_3x_root_uses_bounded_today_workspace(tmp_path) -> None:
 def test_phase_3x_opportunities_route_uses_scanner_shell(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/opportunities")
 
@@ -182,9 +176,7 @@ def test_phase_3x_opportunities_route_lists_fast_bounded_rows(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
     _seed_stale_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/opportunities")
 
@@ -197,9 +189,7 @@ def test_phase_3x_opportunities_route_lists_fast_bounded_rows(tmp_path) -> None:
 def test_phase_3x_opportunities_route_explains_blocked_rows(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_blocked_crypto_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/opportunities")
 
@@ -215,9 +205,7 @@ def test_phase_3x_opportunities_route_explains_blocked_rows(tmp_path) -> None:
 def test_phase_3x_models_route_uses_live_shell_status(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/models")
 

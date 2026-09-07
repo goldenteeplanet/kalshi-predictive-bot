@@ -163,11 +163,14 @@ def run_phase3bd_economic_market_discovery(
             )
             snapshots_captured_by_series[candidate.series_ticker] = len(snapshots)
 
-        forecast_snapshots = latest_snapshots_for_model(
-            session,
-            model_name="economic_v1",
-            limit=forecast_limit,
-        ) or []
+        forecast_snapshots = (
+            latest_snapshots_for_model(
+                session,
+                model_name="economic_v1",
+                limit=forecast_limit,
+            )
+            or []
+        )
         forecast_summary = run_forecast_models(
             session,
             model_name="economic_v1",

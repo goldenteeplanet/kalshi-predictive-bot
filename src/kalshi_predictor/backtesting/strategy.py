@@ -100,4 +100,3 @@ def _decision(
             "strategy": "paper_v1",
         },
     )
-

@@ -111,9 +111,7 @@ def write_phase3bc_r3_active_crypto_refresh_report(
     requested_series = _parse_csv(crypto_series_tickers)
     output_dir.mkdir(parents=True, exist_ok=True)
     generated_at = utc_now()
-    active_watch_blocker = (
-        _active_crypto_watch_blocker() if refresh_open_markets else None
-    )
+    active_watch_blocker = _active_crypto_watch_blocker() if refresh_open_markets else None
     if active_watch_blocker is not None:
         return _write_concurrent_refresh_blocked_report(
             output_dir=output_dir,
@@ -171,7 +169,7 @@ def write_phase3bc_r3_active_crypto_refresh_report(
             ingest_crypto_quotes(session, symbols=requested_symbols, source=source)
             if external_crypto_ingest
             else None
-    )
+        )
     stage_timer.mark("build_crypto_features")
     feature_summary = build_crypto_features(session, symbols=requested_symbols)
     stage_timer.mark("link_crypto_markets")
@@ -533,19 +531,13 @@ def _payload(
     phase3bc_summary = phase3bc_payload.get("summary", {})
     phase3ar_summary = phase3ar_payload.get("summary", {})
     per_symbol_snapshot_counts = _aggregate_symbol_counts(collect_summaries)
-    per_symbol_liquidity_first_counts = _aggregate_liquidity_first_counts(
-        collect_summaries
-    )
+    per_symbol_liquidity_first_counts = _aggregate_liquidity_first_counts(collect_summaries)
     rate_limit = _rate_limit_summary(collect_summaries)
     rate_limit_blocked = bool(rate_limit.get("rate_limited"))
     raw_paper_ready_candidates = phase3bc_summary.get("paper_ready_candidates", 0)
-    phase3bc_paper_ready_candidates = (
-        0 if rate_limit_blocked else raw_paper_ready_candidates
-    )
+    phase3bc_paper_ready_candidates = 0 if rate_limit_blocked else raw_paper_ready_candidates
     phase3bc_main_blocker = (
-        "RATE_LIMITED_KALSHI_API"
-        if rate_limit_blocked
-        else phase3bc_summary.get("main_blocker")
+        "RATE_LIMITED_KALSHI_API" if rate_limit_blocked else phase3bc_summary.get("main_blocker")
     )
     return {
         "generated_at": generated_at.isoformat(),
@@ -559,8 +551,7 @@ def _payload(
         "cadence": {
             "target_minutes": cadence_minutes,
             "reason": (
-                "Kalshi crypto markets and actionable quotes should be refreshed every "
-                "15 minutes."
+                "Kalshi crypto markets and actionable quotes should be refreshed every 15 minutes."
             ),
         },
         "options": {
@@ -577,9 +568,7 @@ def _payload(
             "snapshot_fetch_concurrency": snapshot_fetch_concurrency,
             "crypto_market_scan_limit": crypto_market_scan_limit,
             "linker_scope": (
-                "NEAR_MONEY_SNAPSHOT_TICKERS"
-                if near_money_only
-                else "FULL_MARKET_SCAN"
+                "NEAR_MONEY_SNAPSHOT_TICKERS" if near_money_only else "FULL_MARKET_SCAN"
             ),
             "linker_ticker_count": link_ticker_count,
             "phase3ar_scope": (
@@ -591,9 +580,7 @@ def _payload(
         },
         "rate_limit": rate_limit,
         "summary": {
-            "kalshi_api_status": (
-                "RATE_LIMITED_KALSHI_API" if rate_limit_blocked else "COMPLETE"
-            ),
+            "kalshi_api_status": ("RATE_LIMITED_KALSHI_API" if rate_limit_blocked else "COMPLETE"),
             "data_complete": not rate_limit_blocked,
             "data_completeness": "partial" if rate_limit_blocked else "complete",
             "paper_ready_blocked_by_rate_limit": (
@@ -603,9 +590,7 @@ def _payload(
                 _collect_summary_payload(
                     row,
                     series_ticker=(
-                        crypto_series_tickers[index]
-                        if index < len(crypto_series_tickers)
-                        else None
+                        crypto_series_tickers[index] if index < len(crypto_series_tickers) else None
                     ),
                     symbol=symbols[index] if index < len(symbols) else None,
                 )
@@ -623,16 +608,12 @@ def _payload(
                 sum(row.orderbook_seconds for row in collect_summaries),
                 3,
             ),
-            "near_money_candidates": sum(
-                row.near_money_candidates for row in collect_summaries
-            ),
+            "near_money_candidates": sum(row.near_money_candidates for row in collect_summaries),
             "near_money_snapshots_inserted": sum(
                 row.near_money_snapshots_inserted for row in collect_summaries
             ),
             "liquidity_first_scan_mode": (
-                "RECENT_NONZERO_BOOK_DEPTH_PRIORITY"
-                if near_money_only
-                else "DISABLED_FULL_SCAN"
+                "RECENT_NONZERO_BOOK_DEPTH_PRIORITY" if near_money_only else "DISABLED_FULL_SCAN"
             ),
             "liquidity_hint_candidates": sum(
                 row.liquidity_hint_candidates for row in collect_summaries
@@ -648,12 +629,8 @@ def _payload(
             ),
             "skipped_far_otm_rows": sum(row.skipped_far_otm_rows for row in collect_summaries),
             "per_symbol_snapshot_counts": dict(per_symbol_snapshot_counts),
-            "per_symbol_liquidity_first_counts": dict(
-                per_symbol_liquidity_first_counts
-            ),
-            "market_pages_processed": sum(
-                row.market_pages_processed for row in collect_summaries
-            ),
+            "per_symbol_liquidity_first_counts": dict(per_symbol_liquidity_first_counts),
+            "market_pages_processed": sum(row.market_pages_processed for row in collect_summaries),
             "open_markets_seen": sum(row.markets_seen for row in collect_summaries),
             "open_market_snapshots_inserted": sum(
                 row.snapshots_inserted for row in collect_summaries
@@ -677,15 +654,11 @@ def _payload(
             "ready_to_forecast": phase3ar_summary.get("ready_to_forecast", 0),
             "forecast_scope": forecast_scope["scope"],
             "forecast_candidate_snapshots": forecast_scope["candidate_snapshots"],
-            "forecast_current_window_snapshots": forecast_scope[
-                "current_window_snapshots"
-            ],
+            "forecast_current_window_snapshots": forecast_scope["current_window_snapshots"],
             "forecast_expired_window_snapshots_skipped": forecast_scope[
                 "expired_window_snapshots_skipped"
             ],
-            "forecast_unknown_window_snapshots": forecast_scope[
-                "unknown_window_snapshots"
-            ],
+            "forecast_unknown_window_snapshots": forecast_scope["unknown_window_snapshots"],
             "forecast_snapshots_scanned": forecast_summary.snapshots_scanned,
             "forecasts_inserted": forecast_summary.forecasts_inserted,
             "forecast_skipped": forecast_summary.skipped,
@@ -724,9 +697,7 @@ def _payload(
         },
         "freshness": freshness,
         "stage_timings": stage_timings,
-        "stage_duration_seconds": {
-            row["stage"]: row["duration_seconds"] for row in stage_timings
-        },
+        "stage_duration_seconds": {row["stage"]: row["duration_seconds"] for row in stage_timings},
         "reports": {
             "phase3ar_json": str(phase3ar_artifacts.json_path),
             "phase3ar_markdown": str(phase3ar_artifacts.markdown_path),
@@ -855,8 +826,7 @@ def _forecast_snapshot_candidates(
             "COLLECTED_NEAR_MONEY_TICKERS",
         )
     return (
-        latest_snapshots_for_model(session, model_name=model_name, limit=effective_limit)
-        or [],
+        latest_snapshots_for_model(session, model_name=model_name, limit=effective_limit) or [],
         "MODEL_LINKED_LATEST_SNAPSHOTS",
     )
 
@@ -1017,9 +987,7 @@ def _collect_near_money_crypto_series(
                 limit=limit,
                 max_pages=max_pages,
                 series_ticker=series_ticker,
-                page_callback=lambda payload: page_state.update(
-                    _page_state_update(payload)
-                ),
+                page_callback=lambda payload: page_state.update(_page_state_update(payload)),
             )
         )
     except KalshiRetryError as exc:
@@ -1070,11 +1038,7 @@ def _collect_near_money_crypto_series(
     stopped_reason = page_state.get("stopped_reason")
     resume_cursor = page_state.get("resume_cursor")
     has_more = bool(page_state.get("has_more"))
-    collection_status = (
-        "PARTIAL_REFRESH_CONTINUABLE"
-        if stopped_reason or has_more
-        else "COMPLETE"
-    )
+    collection_status = "PARTIAL_REFRESH_CONTINUABLE" if stopped_reason or has_more else "COMPLETE"
     rate_limit_details = client.telemetry.as_dict(
         rows_fetched_before_limit=len(markets) + len(candidates)
     )
@@ -1144,9 +1108,7 @@ def _select_near_money_candidates(
         target_price = _crypto_ticker_target_price(ticker)
         distance_ratio = _distance_ratio(target_price, latest_prices.get(symbol))
         liquidity_hint = hints.get(ticker)
-        liquidity_score = (
-            liquidity_hint.liquidity_score if liquidity_hint is not None else None
-        )
+        liquidity_score = liquidity_hint.liquidity_score if liquidity_hint is not None else None
         candidates.append(
             _NearMoneyCandidate(
                 ticker=ticker,
@@ -1156,14 +1118,10 @@ def _select_near_money_candidates(
                 distance_ratio=distance_ratio,
                 close_time=close_time,
                 window_key=_crypto_window_key(ticker, close_time),
-                liquidity_priority=1
-                if liquidity_score is not None and liquidity_score > 0
-                else 0,
+                liquidity_priority=1 if liquidity_score is not None and liquidity_score > 0 else 0,
                 liquidity_score_hint=liquidity_score,
                 spread_hint=liquidity_hint.spread if liquidity_hint is not None else None,
-                liquidity_source=liquidity_hint.source
-                if liquidity_hint is not None
-                else None,
+                liquidity_source=liquidity_hint.source if liquidity_hint is not None else None,
             )
         )
 
@@ -1183,12 +1141,8 @@ def _select_near_money_candidates(
     return {
         "selected_candidates": selected,
         "near_money_candidates": len(candidates),
-        "liquidity_hint_candidates": sum(
-            1 for row in candidates if row.liquidity_priority > 0
-        ),
-        "liquidity_first_selected": sum(
-            1 for row in selected if row.liquidity_priority > 0
-        ),
+        "liquidity_hint_candidates": sum(1 for row in candidates if row.liquidity_priority > 0),
+        "liquidity_first_selected": sum(1 for row in selected if row.liquidity_priority > 0),
         "per_symbol_liquidity_first_selected_counts": dict(
             Counter(row.symbol for row in selected if row.liquidity_priority > 0)
         ),
@@ -1464,9 +1418,7 @@ def _rate_limit_summary(rows: list[CollectOnceSummary]) -> dict[str, Any]:
             stat["retry_exhausted"] = bool(stat["retry_exhausted"]) or bool(
                 endpoint.get("retry_exhausted")
             )
-        events.extend(
-            event for event in details.get("events") or [] if isinstance(event, dict)
-        )
+        events.extend(event for event in details.get("events") or [] if isinstance(event, dict))
 
     rate_limited = bool(statuses) or rate_limited_count > 0 or retry_exhausted_count > 0
     if RATE_LIMITED_RETRY_EXHAUSTED in statuses or retry_exhausted_count > 0:
@@ -1539,14 +1491,10 @@ def _collect_summary_payload(
         "near_money_snapshots_inserted": summary.near_money_snapshots_inserted,
         "liquidity_hint_candidates": summary.liquidity_hint_candidates,
         "liquidity_first_snapshots_inserted": summary.liquidity_first_snapshots_inserted,
-        "no_liquidity_hint_snapshots_inserted": (
-            summary.no_liquidity_hint_snapshots_inserted
-        ),
+        "no_liquidity_hint_snapshots_inserted": (summary.no_liquidity_hint_snapshots_inserted),
         "skipped_expired_windows": summary.skipped_expired_windows,
         "skipped_far_otm_rows": summary.skipped_far_otm_rows,
-        "per_symbol_liquidity_first_counts": dict(
-            summary.per_symbol_liquidity_first_counts
-        ),
+        "per_symbol_liquidity_first_counts": dict(summary.per_symbol_liquidity_first_counts),
         "per_symbol_snapshot_counts": dict(summary.per_symbol_snapshot_counts),
         "snapshot_ticker_count": len(summary.snapshot_tickers),
     }

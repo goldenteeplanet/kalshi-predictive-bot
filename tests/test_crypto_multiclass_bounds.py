@@ -23,7 +23,7 @@ def test_market_bounds_do_not_impute_missing_side_midpoint():
             "buckets": [
                 {"ticker": "A", "market_bid": 0.2, "market_ask": 0.3},
                 {"ticker": "B", "market_bid": None, "market_ask": 0.8},
-            ]
+            ],
         }
     )
     assert result["bounds"][1] == {"ticker": "B", "lower": 0.0, "upper": 0.8}

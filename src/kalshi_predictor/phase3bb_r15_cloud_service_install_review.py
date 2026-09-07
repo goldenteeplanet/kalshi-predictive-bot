@@ -376,9 +376,7 @@ def _install_review_decision(
             "kalshi-bot phase3bb-r13-cloud-scheduler-adoption "
             "--output-dir reports/phase3bb_r13 --reports-dir reports"
         ),
-        "next_codex_step": (
-            "Phase 3BB-R16 - Operator-Approved Cloud Service Install Handoff"
-        ),
+        "next_codex_step": ("Phase 3BB-R16 - Operator-Approved Cloud Service Install Handoff"),
     }
 
 

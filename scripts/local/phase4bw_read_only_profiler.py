@@ -66,9 +66,8 @@ def _validate_pack(pack: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(entries, list) or len(entries) != len(fixtures):
         raise ValueError("PHASE4BW_MANIFEST_ENTRIES_INVALID")
     for fixture, entry in zip(fixtures, entries, strict=True):
-        if (
-            fixture.get("schema") != FIXTURE_SCHEMA
-            or fixture.get("artifact_hash") != _hash(fixture)
+        if fixture.get("schema") != FIXTURE_SCHEMA or fixture.get("artifact_hash") != _hash(
+            fixture
         ):
             raise ValueError("PHASE4BW_FIXTURE_HASH_INVALID")
         events = fixture.get("events")

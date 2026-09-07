@@ -108,9 +108,7 @@ def test_phase3ba_status_uses_r5_status_json_positive_ev_truth(
         )
 
     summary = payload["summary"]
-    assert summary["r5_truth_source"].endswith(
-        "reports/phase3bc_r5/phase3bc_r5_status.json"
-    )
+    assert summary["r5_truth_source"].endswith("reports/phase3bc_r5/phase3bc_r5_status.json")
     assert summary["r5_running"] is True
     assert summary["r5_guard_status"] == "RUNNING"
     assert summary["r5_watch_state"] == "WAITING_FOR_EXECUTABLE_BOOK"

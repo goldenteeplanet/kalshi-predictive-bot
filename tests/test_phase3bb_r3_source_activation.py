@@ -25,9 +25,7 @@ def test_phase3bb_r3_source_activation_blocks_unapproved_sources(tmp_path) -> No
     )
 
     summary = payload["summary"]
-    decisions = {
-        row["source_name"]: row for row in payload["source_activation_decisions"]
-    }
+    decisions = {row["source_name"]: row for row in payload["source_activation_decisions"]}
     assert summary["activation_readiness"] == "NOT_READY"
     assert summary["activation_outcome"] == "NO_ACTIVATION_UNSAFE_OR_UNAPPROVED"
     assert summary["evidence_ready_rows"] == 9
@@ -216,8 +214,7 @@ def _write_source_fixture(reports_dir: Path) -> None:
                     "affected_tickers": [
                         row["ticker"]
                         for row in evidence_rows
-                        if row["source_adapter_key"]
-                        == "transportation_flight_cancellation_source"
+                        if row["source_adapter_key"] == "transportation_flight_cancellation_source"
                     ],
                     "observed_value": "1247",
                     "block_reason": "The required source value is present in local evidence.",
@@ -232,8 +229,7 @@ def _write_source_fixture(reports_dir: Path) -> None:
                     "affected_tickers": [
                         row["ticker"]
                         for row in evidence_rows
-                        if row["source_adapter_key"]
-                        == "infrastructure_data_center_capacity_source"
+                        if row["source_adapter_key"] == "infrastructure_data_center_capacity_source"
                     ],
                     "block_reason": "Waiting for exact 2026 capacity_gw value.",
                     "source_name": "Cushman & Wakefield Americas Data Center Update",

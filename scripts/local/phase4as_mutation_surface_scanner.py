@@ -84,14 +84,18 @@ def _python_findings(root: Path, path: Path) -> list[dict[str, Any]]:
                 )
             method = name.rsplit(".", 1)[-1]
             receiver = name.rsplit(".", 1)[0].lower() if "." in name else ""
-            orm_session_mutation = method in {
-                "add",
-                "add_all",
-                "bulk_insert_mappings",
-                "bulk_update_mappings",
-                "delete",
-                "merge",
-            } and "session" in receiver
+            orm_session_mutation = (
+                method
+                in {
+                    "add",
+                    "add_all",
+                    "bulk_insert_mappings",
+                    "bulk_update_mappings",
+                    "delete",
+                    "merge",
+                }
+                and "session" in receiver
+            )
             dynamic_execute = method == "execute" and any(
                 token in receiver for token in ("connection", "cursor", "engine", "session")
             )

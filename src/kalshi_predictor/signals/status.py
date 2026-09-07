@@ -103,9 +103,7 @@ def signal_status_rows(
                 "forecast_count": counts["forecast_count"],
                 "trade_count": counts["trade_count"],
                 "event_count": counts["event_count"],
-                "latest_generated_time": latest_generated.isoformat()
-                if latest_generated
-                else None,
+                "latest_generated_time": latest_generated.isoformat() if latest_generated else None,
                 "latest_signal": latest_generated.isoformat() if latest_generated else "none",
                 "required_data": definition.required_data,
                 "next_command": next_command,
@@ -356,10 +354,7 @@ def _count(session: Session, model: type) -> int:
 
 
 def _count_where(session: Session, model: type, column: Any, value: str) -> int:
-    return int(
-        session.scalar(select(func.count()).select_from(model).where(column == value))
-        or 0
-    )
+    return int(session.scalar(select(func.count()).select_from(model).where(column == value)) or 0)
 
 
 def _forecast_count_like(session: Session, pattern: str) -> int:

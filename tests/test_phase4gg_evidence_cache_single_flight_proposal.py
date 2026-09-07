@@ -126,9 +126,7 @@ def test_tampering_and_cross_link_fail_closed() -> None:
             follower_wait_ms=1,
         )
     other_propagation, _ = _inputs(watermark="other")
-    with pytest.raises(
-        EvidenceCacheSingleFlightError, match="POLICY_PROPAGATION_LINK_MISMATCH"
-    ):
+    with pytest.raises(EvidenceCacheSingleFlightError, match="POLICY_PROPAGATION_LINK_MISMATCH"):
         propose_evidence_cache_single_flight(
             policy=policy,
             propagation=other_propagation,
@@ -179,9 +177,7 @@ def _inputs(
         age_seconds=1,
         configured_timeout_ms=0,
     )
-    timeout_evidence = build_busy_timeout_evidence(
-        budget=budget, observations=[observation]
-    )
+    timeout_evidence = build_busy_timeout_evidence(budget=budget, observations=[observation])
     boundaries = build_query_cancellation_boundaries(
         budget=budget,
         timeout_evidence=timeout_evidence,
@@ -218,9 +214,7 @@ def _proposal(
     requesters: list[str] | None = None,
     policy_age: int = 1,
 ):
-    propagation, policy = _inputs(
-        cache_age=cache_age, inflight=inflight, lease_age=lease_age
-    )
+    propagation, policy = _inputs(cache_age=cache_age, inflight=inflight, lease_age=lease_age)
     return propose_evidence_cache_single_flight(
         policy=policy,
         propagation=propagation,

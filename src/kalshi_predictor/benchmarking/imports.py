@@ -53,10 +53,15 @@ def _tabular_payload(rows: list[dict[str, Any]]) -> dict[str, Any]:
         message = row.get("message") or row.get("message_json")
         if isinstance(message, str):
             message = json.loads(message)
-        events.append({"timestamp": row.get("timestamp"), "ticker": row.get("ticker"),
-                       "kind": row.get("kind"), "message": message})
-    return {"episode_id": "user-import", "category": "user", "events": events,
-            "settlements": {}}
+        events.append(
+            {
+                "timestamp": row.get("timestamp"),
+                "ticker": row.get("ticker"),
+                "kind": row.get("kind"),
+                "message": message,
+            }
+        )
+    return {"episode_id": "user-import", "category": "user", "events": events, "settlements": {}}
 
 
 def _diagnostics(payload: dict[str, Any]) -> list[str]:

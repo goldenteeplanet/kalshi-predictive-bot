@@ -40,23 +40,36 @@ def build_oos_robust_policy_validation() -> dict[str, Any]:
         episode_id, category, spread, depth, delta, settlement = values
         training_ticker = CATEGORY_TICKER[category]
         forecast = BASELINE_FORECASTS[training_ticker] + Decimal(delta)
-        scenario = _evaluate(
-            training_ticker, Decimal(spread), Decimal(depth), forecast
-        )
+        scenario = _evaluate(training_ticker, Decimal(spread), Decimal(depth), forecast)
         zone = zones[(training_ticker, spread, depth)]
         baseline_allocate = scenario["status"] == "ALLOCATED"
         robust_allocate = baseline_allocate and zone == "ROBUST_ALLOCATE"
-        baseline_rows.append(_episode_row(
-            index, episode_id, category, settlement, scenario, zone,
-            baseline_allocate, None,
-        ))
-        robust_rows.append(_episode_row(
-            index, episode_id, category, settlement, scenario, zone,
-            robust_allocate,
-            None if robust_allocate else (
-                "ROBUST_ZONE_REQUIRED" if baseline_allocate else scenario["blocker"]
-            ),
-        ))
+        baseline_rows.append(
+            _episode_row(
+                index,
+                episode_id,
+                category,
+                settlement,
+                scenario,
+                zone,
+                baseline_allocate,
+                None,
+            )
+        )
+        robust_rows.append(
+            _episode_row(
+                index,
+                episode_id,
+                category,
+                settlement,
+                scenario,
+                zone,
+                robust_allocate,
+                None
+                if robust_allocate
+                else ("ROBUST_ZONE_REQUIRED" if baseline_allocate else scenario["blocker"]),
+            )
+        )
     baseline = _metrics("baseline", baseline_rows)
     robust = _metrics("frozen_robust_zone", robust_rows)
     canonical = json.dumps(
@@ -111,14 +124,19 @@ def write_oos_robust_policy_validation(output_dir: Path) -> Path:
 
 
 def _episode_row(
-    index: int, episode_id: str, category: str, settlement: str,
-    scenario: dict[str, Any], zone: str, allocated: bool, blocker: str | None,
+    index: int,
+    episode_id: str,
+    category: str,
+    settlement: str,
+    scenario: dict[str, Any],
+    zone: str,
+    allocated: bool,
+    blocker: str | None,
 ) -> dict[str, Any]:
     filled = Decimal(scenario["filled_size"]) if allocated else Decimal("0")
     cost = Decimal(scenario["executed_value"]) if allocated else Decimal("0")
     pnl = (
-        filled - cost if allocated and settlement == "yes"
-        else -cost if allocated else Decimal("0")
+        filled - cost if allocated and settlement == "yes" else -cost if allocated else Decimal("0")
     )
     return {
         "episode_index": index,
@@ -139,7 +157,8 @@ def _episode_row(
         "feature_ref": scenario["feature_ref"],
         "observation_ref": scenario["observation_ref"],
         "orderbook_ref": {
-            **scenario["orderbook_ref"], "oos_episode_id": episode_id,
+            **scenario["orderbook_ref"],
+            "oos_episode_id": episode_id,
         },
         "attribution_complete": scenario["attribution_complete"],
     }
@@ -156,9 +175,7 @@ def _metrics(name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "name": name,
         "trade_count": sum(row["allocated"] for row in rows),
-        "capital_usage": str(sum(
-            (Decimal(row["capital_used"]) for row in rows), Decimal("0")
-        )),
+        "capital_usage": str(sum((Decimal(row["capital_used"]) for row in rows), Decimal("0"))),
         "total_pnl": str(cumulative),
         "max_drawdown": str(max_drawdown),
         "rows": rows,

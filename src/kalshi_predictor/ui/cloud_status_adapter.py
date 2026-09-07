@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from kalshi_predictor.ui.progress import VALID_STATES
 
-
 EXPECTED_DATABASE_PATH = "/var/lib/kalshi-bot/kalshi_phase1.db"
-REQUIRED_WORKSTREAMS = ("PMB evaluation", "PROV attribution", "NYC weather", "GH liquidity", "Paper readiness")
+REQUIRED_WORKSTREAMS = (
+    "PMB evaluation",
+    "PROV attribution",
+    "NYC weather",
+    "GH liquidity",
+    "Paper readiness",
+)
 
 
 def _utc(value: Any, label: str, diagnostics: list[str]) -> datetime | None:
@@ -52,14 +58,19 @@ def adapt_cloud_status_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
         diagnostics.append("WRITER_LOCK_CONTRADICTION")
     if bool(writer.get("safe_to_start_write")) and writer_active:
         diagnostics.append("WRITER_SAFETY_CONTRADICTION")
-    if process.get("pid") and writer_active and process.get("pid") != writer.get("current_writer_pid"):
+    if (
+        process.get("pid")
+        and writer_active
+        and process.get("pid") != writer.get("current_writer_pid")
+    ):
         diagnostics.append("PROCESS_WRITER_PID_MISMATCH")
     if execution.get("execution_enabled") is not False:
         diagnostics.append("EXECUTION_NOT_EXPLICITLY_DISABLED")
 
     backup_complete = (
         backup.get("integrity_check") == "ok"
-        and isinstance(backup.get("sha256"), str) and len(backup["sha256"]) == 64
+        and isinstance(backup.get("sha256"), str)
+        and len(backup["sha256"]) == 64
         and backup.get("backup_path")
     )
     if backup and not backup_complete:
@@ -88,10 +99,14 @@ def adapt_cloud_status_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             diagnostics.append(f"REPORT_PASS_UNVERIFIED:{normalized['phase']}")
         reports.append(normalized)
 
-    process_state = _state(process.get("state") or ("RUNNING" if writer_active else "WAITING"), "process", diagnostics)
+    process_state = _state(
+        process.get("state") or ("RUNNING" if writer_active else "WAITING"), "process", diagnostics
+    )
     completion_evidence = process.get("completion_evidence")
     if process_state == "PASSED" and (
-        not completion_evidence or completion_evidence not in {item["path"] for item in reports if item["state"] == "PASSED"}
+        not completion_evidence
+        or completion_evidence
+        not in {item["path"] for item in reports if item["state"] == "PASSED"}
     ):
         process_state = "BLOCKED"
         diagnostics.append("PROCESS_COMPLETION_EVIDENCE_INVALID")
@@ -102,25 +117,33 @@ def adapt_cloud_status_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
     for item in phase_rows:
         name = item.get("name") or "Unknown"
         names.add(name)
-        workstreams.append({
-            "name": name,
-            "state": _state(item.get("state"), f"workstream:{name}", diagnostics),
-            "current_phase": item.get("current_phase") or "Unspecified",
-            "completed": list(item.get("completed") or []),
-            "blocked": list(item.get("blocked") or []),
-            "next_safe_phase": item.get("next_safe_phase") or "No certified next phase",
-        })
-    diagnostics.extend(f"WORKSTREAM_MISSING:{name}" for name in REQUIRED_WORKSTREAMS if name not in names)
+        workstreams.append(
+            {
+                "name": name,
+                "state": _state(item.get("state"), f"workstream:{name}", diagnostics),
+                "current_phase": item.get("current_phase") or "Unspecified",
+                "completed": list(item.get("completed") or []),
+                "blocked": list(item.get("blocked") or []),
+                "next_safe_phase": item.get("next_safe_phase") or "No certified next phase",
+            }
+        )
+    diagnostics.extend(
+        f"WORKSTREAM_MISSING:{name}" for name in REQUIRED_WORKSTREAMS if name not in names
+    )
 
     total_cycles = scheduler.get("total_cycles")
     current_cycle = scheduler.get("current_cycle")
-    cycle_label = f"{current_cycle} / {total_cycles}" if current_cycle and total_cycles else "unknown"
+    cycle_label = (
+        f"{current_cycle} / {total_cycles}" if current_cycle and total_cycles else "unknown"
+    )
     snapshot = {
         "generated_at": collected_at.isoformat().replace("+00:00", "Z") if collected_at else None,
         "execution_enabled": execution.get("execution_enabled") is True,
         "paper_enabled": execution.get("paper_enabled") is True,
         "active_process": {
-            "name": process.get("name") or writer.get("current_writer_command") or "No certified active process",
+            "name": process.get("name")
+            or writer.get("current_writer_command")
+            or "No certified active process",
             "pid": process.get("pid") or writer.get("current_writer_pid"),
             "runtime": process.get("runtime") or writer.get("current_writer_elapsed") or "n/a",
             "stage": process.get("stage") or writer.get("long_job_stage") or "unknown",
@@ -152,8 +175,15 @@ def adapt_cloud_status_bundle(bundle: Mapping[str, Any]) -> dict[str, Any]:
             "stage": scheduler.get("stage") or "unknown",
             "estimated_remaining": scheduler.get("estimated_remaining"),
         },
-        "alerts": list(bundle.get("alerts") or []) + [
-            {"severity": "CRITICAL" if "EXECUTION" in code or "CONTRADICTION" in code else "WARNING", "code": code, "message": code.replace("_", " ").title()}
+        "alerts": list(bundle.get("alerts") or [])
+        + [
+            {
+                "severity": "CRITICAL"
+                if "EXECUTION" in code or "CONTRADICTION" in code
+                else "WARNING",
+                "code": code,
+                "message": code.replace("_", " ").title(),
+            }
             for code in diagnostics
         ],
         "reports": reports,

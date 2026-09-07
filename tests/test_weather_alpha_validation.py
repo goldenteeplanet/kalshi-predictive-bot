@@ -25,18 +25,42 @@ from kalshi_predictor.weather_alpha_validation import (
 
 def test_all_settlement_lineage_classes() -> None:
     base = {"duplicate": False, "has_market": True, "has_link": True}
-    assert classify_lineage(**base, settlement_result="yes", market_result=None) == VALID_EXACT_SETTLEMENT
-    assert classify_lineage(**base, settlement_result=None, market_result="no") == MARKET_RESULT_MISSING_ROW
+    assert (
+        classify_lineage(**base, settlement_result="yes", market_result=None)
+        == VALID_EXACT_SETTLEMENT
+    )
+    assert (
+        classify_lineage(**base, settlement_result=None, market_result="no")
+        == MARKET_RESULT_MISSING_ROW
+    )
     assert classify_lineage(**base, settlement_result=None, market_result=None) == UNRESOLVED
-    assert classify_lineage(**{**base, "has_link": False}, settlement_result=None, market_result=None) == IDENTITY_MISMATCH
+    assert (
+        classify_lineage(**{**base, "has_link": False}, settlement_result=None, market_result=None)
+        == IDENTITY_MISMATCH
+    )
     assert classify_lineage(**base, settlement_result="void", market_result=None) == INVALID_RESULT
-    assert classify_lineage(**{**base, "duplicate": True}, settlement_result="yes", market_result="yes") == DUPLICATE_WINDOW
+    assert (
+        classify_lineage(
+            **{**base, "duplicate": True}, settlement_result="yes", market_result="yes"
+        )
+        == DUPLICATE_WINDOW
+    )
 
 
 def test_no_lookahead_order_is_strict() -> None:
     source = datetime(2026, 1, 1, tzinfo=UTC)
-    assert timestamps_in_order(source, source + timedelta(minutes=1), source + timedelta(minutes=2), source + timedelta(minutes=3))
-    assert not timestamps_in_order(source, source + timedelta(minutes=2), source + timedelta(minutes=1), source + timedelta(minutes=3))
+    assert timestamps_in_order(
+        source,
+        source + timedelta(minutes=1),
+        source + timedelta(minutes=2),
+        source + timedelta(minutes=3),
+    )
+    assert not timestamps_in_order(
+        source,
+        source + timedelta(minutes=2),
+        source + timedelta(minutes=1),
+        source + timedelta(minutes=3),
+    )
     assert not timestamps_in_order(None, source, source, source)
 
 
@@ -51,11 +75,18 @@ def test_scores_and_drawdown() -> None:
     assert brier_score(Decimal("0.8"), 1) == Decimal("0.04")
     assert log_loss(Decimal("0.8"), 1) > 0
     assert trading_fee(price=Decimal("0.60"), contracts=1) == Decimal("0.0168")
-    assert maximum_drawdown([Decimal("1"), Decimal("-0.4"), Decimal("-0.8"), Decimal("0.5")]) == Decimal("1.2")
+    assert maximum_drawdown(
+        [Decimal("1"), Decimal("-0.4"), Decimal("-0.8"), Decimal("0.5")]
+    ) == Decimal("1.2")
 
 
 def test_readiness_cannot_enable_paper_creation() -> None:
-    performance = {"settled_observations": 100, "no_lookahead_violations": 0, "outperforms_market": True, "positive_post_cost": True}
+    performance = {
+        "settled_observations": 100,
+        "no_lookahead_violations": 0,
+        "outperforms_market": True,
+        "positive_post_cost": True,
+    }
     result = paper_readiness(performance, {"guarded_counts_unchanged": True})
     assert result["settled_sample_gate"] is True
     assert result["paper_order_creation_enabled"] is False

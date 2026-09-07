@@ -94,12 +94,8 @@ def test_result_tampering_and_safety_boundary_fail_closed() -> None:
     candidate, review = _evidence()
     result = certify_read_model_workstream(candidate=candidate, review=review)
     with pytest.raises(WorkstreamCertificationError, match="CERTIFICATION_HASH_MISMATCH"):
-        validate_workstream_certification(
-            replace(result, certification_hash="0" * 64)
-        )
-    with pytest.raises(
-        WorkstreamCertificationError, match="CERTIFICATION_SAFETY_BOUNDARY_INVALID"
-    ):
+        validate_workstream_certification(replace(result, certification_hash="0" * 64))
+    with pytest.raises(WorkstreamCertificationError, match="CERTIFICATION_SAFETY_BOUNDARY_INVALID"):
         validate_workstream_certification(replace(result, execution_authorized=True))
 
 
@@ -108,9 +104,7 @@ def test_certifier_has_no_production_mutation_surface() -> None:
     assert names.isdisjoint({"commit", "connect", "execute", "open", "replace", "unlink"})
 
 
-def _evidence(
-    *, age: int = 1, review_max_age: int = 900, staleness: str = "FRESH"
-):
+def _evidence(*, age: int = 1, review_max_age: int = 900, staleness: str = "FRESH"):
     view = ReadModelView(
         schema_version="phase4fm-evidence-read-model-v1",
         generated_at="2026-08-27T00:00:00+00:00",

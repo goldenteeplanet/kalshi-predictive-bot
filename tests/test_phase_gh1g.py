@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from kalshi_predictor.config import Settings
@@ -11,10 +11,16 @@ def test_gh1g_outside_window_never_calls_monitor(tmp_path: Path) -> None:
         raise AssertionError("monitor must not run outside an active window")
 
     path = run_gh1g_census(
-        settings=Settings(), output_dir=tmp_path, series=["KXBTC"],
-        windows_utc=["13:00-14:00"], poll_cycles=1, poll_interval_seconds=0,
-        max_markets_per_series=1, max_quoted_per_category=1, stream_max_seconds=1,
-        now_fn=lambda: datetime(2026, 7, 15, 15, 0, tzinfo=timezone.utc),
+        settings=Settings(),
+        output_dir=tmp_path,
+        series=["KXBTC"],
+        windows_utc=["13:00-14:00"],
+        poll_cycles=1,
+        poll_interval_seconds=0,
+        max_markets_per_series=1,
+        max_quoted_per_category=1,
+        stream_max_seconds=1,
+        now_fn=lambda: datetime(2026, 7, 15, 15, 0, tzinfo=UTC),
         monitor_fn=forbidden_monitor,
     )
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -30,10 +36,16 @@ def test_gh1g_stops_after_first_certification(tmp_path: Path) -> None:
         return path
 
     path = run_gh1g_census(
-        settings=Settings(), output_dir=tmp_path, series=["KXBTC"],
-        windows_utc=["00:00-23:59"], poll_cycles=3, poll_interval_seconds=0,
-        max_markets_per_series=1, max_quoted_per_category=1, stream_max_seconds=1,
-        now_fn=lambda: datetime(2026, 7, 15, 15, 0, tzinfo=timezone.utc),
+        settings=Settings(),
+        output_dir=tmp_path,
+        series=["KXBTC"],
+        windows_utc=["00:00-23:59"],
+        poll_cycles=3,
+        poll_interval_seconds=0,
+        max_markets_per_series=1,
+        max_quoted_per_category=1,
+        stream_max_seconds=1,
+        now_fn=lambda: datetime(2026, 7, 15, 15, 0, tzinfo=UTC),
         monitor_fn=certified_monitor,
     )
     payload = json.loads(path.read_text(encoding="utf-8"))

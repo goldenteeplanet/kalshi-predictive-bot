@@ -653,7 +653,9 @@ def validate_phase_registry(
         errors.append(f"unexpected phase ids: {', '.join(extra)}")
     for row in entries:
         if row.implementation_state not in PHASE_STATES:
-            errors.append(f"{row.phase_id}: invalid implementation_state {row.implementation_state}")
+            errors.append(
+                f"{row.phase_id}: invalid implementation_state {row.implementation_state}"
+            )
         for field_name in (
             "name",
             "capability",

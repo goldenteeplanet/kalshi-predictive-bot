@@ -15,16 +15,30 @@ def synthetic_scenarios() -> dict[str, dict[str, Any]]:
     }
 
 
-def _scenario(category: str, ticker: str, settlement: str,
-              prices: tuple[str, ...]) -> dict[str, Any]:
+def _scenario(
+    category: str, ticker: str, settlement: str, prices: tuple[str, ...]
+) -> dict[str, Any]:
     events = []
     for index, yes_bid in enumerate(prices, start=1):
         no_bid = str(Decimal("1") - Decimal(yes_bid) - Decimal("0.02"))
-        events.append({
-            "timestamp": f"2026-01-01T00:00:0{index}Z", "ticker": ticker,
-            "kind": "snapshot",
-            "message": {"seq": index, "msg": {"market_ticker": ticker,
-                "yes_dollars": [[yes_bid, "10"]], "no_dollars": [[no_bid, "10"]]}},
-        })
-    return {"episode_id": f"synthetic-{category}", "category": category,
-            "events": events, "settlements": {ticker: settlement}}
+        events.append(
+            {
+                "timestamp": f"2026-01-01T00:00:0{index}Z",
+                "ticker": ticker,
+                "kind": "snapshot",
+                "message": {
+                    "seq": index,
+                    "msg": {
+                        "market_ticker": ticker,
+                        "yes_dollars": [[yes_bid, "10"]],
+                        "no_dollars": [[no_bid, "10"]],
+                    },
+                },
+            }
+        )
+    return {
+        "episode_id": f"synthetic-{category}",
+        "category": category,
+        "events": events,
+        "settlements": {ticker: settlement},
+    }

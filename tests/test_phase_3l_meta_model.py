@@ -136,9 +136,10 @@ def test_selector_penalizes_stale_features() -> None:
         freshness="0",
     )
 
-    assert score_candidate_models(stale)["market_implied_v1"] < score_candidate_models(fresh)[
-        "market_implied_v1"
-    ]
+    assert (
+        score_candidate_models(stale)["market_implied_v1"]
+        < score_candidate_models(fresh)["market_implied_v1"]
+    )
 
 
 def test_selector_falls_back_to_ensemble_v2() -> None:

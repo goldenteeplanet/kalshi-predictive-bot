@@ -131,9 +131,7 @@ def _trade_pnl(trade: Any, settlement: Settlement) -> Decimal:
 
 def _count_since(session: Session, table: Any, since: Any) -> int:
     return int(
-        session.scalar(
-            select(func.count()).select_from(table).where(table.created_at >= since)
-        )
+        session.scalar(select(func.count()).select_from(table).where(table.created_at >= since))
         or 0
     )
 

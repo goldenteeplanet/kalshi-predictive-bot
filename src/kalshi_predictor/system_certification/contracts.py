@@ -118,7 +118,10 @@ PHASES: tuple[dict[str, Any], ...] = (
     {
         "phase_id": "2.9",
         "name": "Tournament and ensemble v2",
-        "locations": ["src/kalshi_predictor/tournament", "src/kalshi_predictor/forecasting/ensemble_v2.py"],
+        "locations": [
+            "src/kalshi_predictor/tournament",
+            "src/kalshi_predictor/forecasting/ensemble_v2.py",
+        ],
         "feature_flags": [],
         "inputs": ["domain forecasts", "historical outcomes"],
         "outputs": ["model weights", "ensemble forecasts"],
@@ -378,16 +381,48 @@ PHASES = legacy_phases()
 CONNECTIONS = legacy_connections()
 
 SCENARIO_GROUPS: tuple[dict[str, Any], ...] = (
-    {"scenario_id": "GOLDEN-TRACE", "name": "Full market-to-outcome golden trace", "phases": [phase["phase_id"] for phase in PHASES]},
-    {"scenario_id": "NO-TRADE", "name": "Weak or stale opportunity remains untraded", "phases": ["1", "2.6", "3S", "3M", "3N", "3O", "3T", "3U"]},
-    {"scenario_id": "RISK-BLOCK", "name": "Risk-blocked opportunity is retained and observable", "phases": ["3M", "3N", "3O", "3T", "3U"]},
-    {"scenario_id": "SYNTHETIC-ISOLATION", "name": "Synthetic market cannot reach sizing, risk, or gateway", "phases": ["3R", "3M", "3N", "3T"]},
-    {"scenario_id": "AUTH-INVALID-CERT", "name": "Missing or invalid Phase 3V certificate blocks new risk", "phases": ["3V"]},
+    {
+        "scenario_id": "GOLDEN-TRACE",
+        "name": "Full market-to-outcome golden trace",
+        "phases": [phase["phase_id"] for phase in PHASES],
+    },
+    {
+        "scenario_id": "NO-TRADE",
+        "name": "Weak or stale opportunity remains untraded",
+        "phases": ["1", "2.6", "3S", "3M", "3N", "3O", "3T", "3U"],
+    },
+    {
+        "scenario_id": "RISK-BLOCK",
+        "name": "Risk-blocked opportunity is retained and observable",
+        "phases": ["3M", "3N", "3O", "3T", "3U"],
+    },
+    {
+        "scenario_id": "SYNTHETIC-ISOLATION",
+        "name": "Synthetic market cannot reach sizing, risk, or gateway",
+        "phases": ["3R", "3M", "3N", "3T"],
+    },
+    {
+        "scenario_id": "AUTH-INVALID-CERT",
+        "name": "Missing or invalid Phase 3V certificate blocks new risk",
+        "phases": ["3V"],
+    },
     {"scenario_id": "DOMAIN-CRYPTO", "name": "Crypto domain path", "phases": ["2.7", "2.9", "3L"]},
-    {"scenario_id": "DOMAIN-WEATHER", "name": "Weather domain path", "phases": ["2.8", "2.9", "3L"]},
+    {
+        "scenario_id": "DOMAIN-WEATHER",
+        "name": "Weather domain path",
+        "phases": ["2.8", "2.9", "3L"],
+    },
     {"scenario_id": "DOMAIN-SPORTS", "name": "Sports domain path", "phases": ["3J", "2.9", "3L"]},
-    {"scenario_id": "DOMAIN-NEWS", "name": "News and prompt-injection path", "phases": ["3I", "2.9", "3L"]},
-    {"scenario_id": "DOMAIN-MICROSTRUCTURE", "name": "Microstructure stale/gap path", "phases": ["3K", "3E", "3M", "3N"]},
+    {
+        "scenario_id": "DOMAIN-NEWS",
+        "name": "News and prompt-injection path",
+        "phases": ["3I", "2.9", "3L"],
+    },
+    {
+        "scenario_id": "DOMAIN-MICROSTRUCTURE",
+        "name": "Microstructure stale/gap path",
+        "phases": ["3K", "3E", "3M", "3N"],
+    },
 )
 
 

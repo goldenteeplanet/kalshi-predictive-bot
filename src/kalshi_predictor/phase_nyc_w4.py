@@ -29,13 +29,15 @@ def write_nyc_w4_report(
     if not certification.get("exact_ticker_certification"):
         raise ValueError("NYC-W4 requires exact-ticker NYC-W3B certification")
     certified_rows = [
-        row for row in certification.get("rows", [])
+        row
+        for row in certification.get("rows", [])
         if row.get("metadata_passed") and row.get("alignment_passed")
     ][:market_limit]
 
     owned_client = kalshi_client is None
     active_client = kalshi_client or httpx.Client(
-        base_url=PRODUCTION_PUBLIC_REST_URL, timeout=15.0,
+        base_url=PRODUCTION_PUBLIC_REST_URL,
+        timeout=15.0,
     )
     rows: list[dict[str, Any]] = []
     try:
@@ -43,8 +45,13 @@ def write_nyc_w4_report(
             ticker = str(certified.get("ticker") or "")
             contract = parse_point_temperature_ticker(ticker)
             if contract is None or contract.contract_kind != "ABOVE":
-                rows.append({"ticker": ticker, "preview_passed": False,
-                             "blocker": "UNSUPPORTED_CERTIFIED_CONTRACT"})
+                rows.append(
+                    {
+                        "ticker": ticker,
+                        "preview_passed": False,
+                        "blocker": "UNSUPPORTED_CERTIFIED_CONTRACT",
+                    }
+                )
                 continue
             response = active_client.get(f"/markets/{ticker}")
             response.raise_for_status()
@@ -53,29 +60,36 @@ def write_nyc_w4_report(
             baseline = _market_probability(market)
             observation = to_decimal(certified.get("observation_temperature_f"))
             if baseline is None or observation is None:
-                rows.append({"ticker": ticker, "preview_passed": False,
-                             "blocker": "BASELINE_OR_OBSERVATION_MISSING"})
+                rows.append(
+                    {
+                        "ticker": ticker,
+                        "preview_passed": False,
+                        "blocker": "BASELINE_OR_OBSERVATION_MISSING",
+                    }
+                )
                 continue
             signal = _clamp_signal((observation - contract.raw_strike) / Decimal("20"))
             adjustment = signal * max_adjustment
             preview_probability = _clamp_probability(baseline + adjustment)
-            rows.append({
-                "ticker": ticker,
-                "preview_passed": True,
-                "blocker": None,
-                "target_utc_time": certified.get("target_utc_time"),
-                "observation_at": certified.get("observation_at"),
-                "observation_offset_seconds": certified.get("offset_seconds"),
-                "observation_temperature_f": str(observation),
-                "evidence_source": certified.get("evidence_source"),
-                "settlement_source": certified.get("settlement_source"),
-                "baseline_probability_without_observation": str(baseline),
-                "weather_v2_temperature_signal_preview": str(signal),
-                "weather_v2_adjustment_preview": str(adjustment),
-                "probability_with_observation_preview": str(preview_probability),
-                "probability_change": str(preview_probability - baseline),
-                "runtime_weather_v2_changed": False,
-            })
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "preview_passed": True,
+                    "blocker": None,
+                    "target_utc_time": certified.get("target_utc_time"),
+                    "observation_at": certified.get("observation_at"),
+                    "observation_offset_seconds": certified.get("offset_seconds"),
+                    "observation_temperature_f": str(observation),
+                    "evidence_source": certified.get("evidence_source"),
+                    "settlement_source": certified.get("settlement_source"),
+                    "baseline_probability_without_observation": str(baseline),
+                    "weather_v2_temperature_signal_preview": str(signal),
+                    "weather_v2_adjustment_preview": str(adjustment),
+                    "probability_with_observation_preview": str(preview_probability),
+                    "probability_change": str(preview_probability - baseline),
+                    "runtime_weather_v2_changed": False,
+                }
+            )
     finally:
         if owned_client:
             active_client.close()
@@ -100,12 +114,10 @@ def write_nyc_w4_report(
             "rows_previewed": sum(bool(row.get("preview_passed")) for row in rows),
             "rows_blocked": sum(not bool(row.get("preview_passed")) for row in rows),
             "probability_increased": sum(
-                (to_decimal(row.get("probability_change")) or Decimal("0")) > 0
-                for row in rows
+                (to_decimal(row.get("probability_change")) or Decimal("0")) > 0 for row in rows
             ),
             "probability_decreased": sum(
-                (to_decimal(row.get("probability_change")) or Decimal("0")) < 0
-                for row in rows
+                (to_decimal(row.get("probability_change")) or Decimal("0")) < 0 for row in rows
             ),
             "probability_unchanged": sum(
                 row.get("preview_passed")

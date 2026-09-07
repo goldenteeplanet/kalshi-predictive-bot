@@ -210,9 +210,10 @@ def _validate_sample_fields(payload: dict[str, Any]) -> None:
     for key in ("present", "complete"):
         if not isinstance(payload[key], bool):
             raise KeepaliveGapClassifierError("SAMPLE_FIELD_INVALID")
-    if not isinstance(payload["source_identity_hash"], str) or not payload[
-        "source_identity_hash"
-    ].strip():
+    if (
+        not isinstance(payload["source_identity_hash"], str)
+        or not payload["source_identity_hash"].strip()
+    ):
         raise KeepaliveGapClassifierError("SAMPLE_FIELD_INVALID")
     for key in ("sequence", "observed_at_epoch_seconds", "evidence_age_seconds"):
         value = payload[key]

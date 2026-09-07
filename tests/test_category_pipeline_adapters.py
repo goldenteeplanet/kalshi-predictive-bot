@@ -90,9 +90,7 @@ def test_timestamp_order_is_enforced_with_deterministic_blockers() -> None:
 
 
 def test_missing_counts_and_times_emit_stable_funnel_blockers() -> None:
-    evidence = adapt_category_evidence(
-        "news", {"source_name": "rss", "source_state": "NO_DATA"}
-    )
+    evidence = adapt_category_evidence("news", {"source_name": "rss", "source_state": "NO_DATA"})
     assert evidence.deterministic_blockers[:3] == (
         "SOURCE_AVAILABLE_AT_MISSING",
         "INGESTED_AT_MISSING",
@@ -112,9 +110,7 @@ def test_missing_counts_and_times_emit_stable_funnel_blockers() -> None:
 
 
 def test_batch_adapter_uses_canonical_category_order_and_rejects_unknown() -> None:
-    rows = adapt_all_category_evidence(
-        {"news": _complete_payload(), "crypto": _complete_payload()}
-    )
+    rows = adapt_all_category_evidence({"news": _complete_payload(), "crypto": _complete_payload()})
     assert [row.category for row in rows] == ["crypto", "news"]
     with pytest.raises(ValueError, match="Unknown category"):
         adapt_category_evidence("politics", _complete_payload())

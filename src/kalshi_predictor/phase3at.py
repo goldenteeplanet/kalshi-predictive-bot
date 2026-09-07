@@ -204,9 +204,7 @@ def build_active_crypto_router(
     requested_symbols = [normalize_symbol(symbol) for symbol in (symbols or [])]
     active_rows = _active_crypto_rows(session, limit=limit)
     if requested_symbols:
-        active_rows = [
-            row for row in active_rows if _row_symbols(row) & set(requested_symbols)
-        ]
+        active_rows = [row for row in active_rows if _row_symbols(row) & set(requested_symbols)]
     tickers = [row["ticker"] for row in active_rows]
     forecasts = _latest_by_ticker(
         session,
@@ -282,9 +280,7 @@ def build_active_crypto_router(
             "active_opportunities": sum(1 for row in rows if row["latest_opportunity_at"]),
             "learning_candidates": sum(1 for row in rows if row["learning_target_at"]),
             "paper_trades": sum(int(row["paper_orders"]) for row in rows),
-            "main_router_blocker": blocker_counts.most_common(1)[0][0]
-            if blocker_counts
-            else None,
+            "main_router_blocker": blocker_counts.most_common(1)[0][0] if blocker_counts else None,
             "feature_symbols_ready": sum(1 for row in feature_rows if row["status"] == "READY"),
             "feature_symbols_blocked": sum(1 for row in feature_rows if row["status"] != "READY"),
         },
@@ -559,7 +555,9 @@ def build_phase3at_opportunity_funnel(
     )
     rows = [_funnel_row(session, row, settings=resolved) for row in diagnostic["current_rows"]]
     stages = _funnel_stages(rows)
-    first_hard_blocker = _first_funnel_blocker(stages) or diagnostic["summary"]["first_hard_blocker"]
+    first_hard_blocker = (
+        _first_funnel_blocker(stages) or diagnostic["summary"]["first_hard_blocker"]
+    )
     summary = {
         "active_pure_crypto_markets": len(rows),
         "current_forecasts": diagnostic["summary"]["current_forecasts"],
@@ -567,9 +565,7 @@ def build_phase3at_opportunity_funnel(
         "opportunity_count": sum(
             1 for row in rows if row["stage_status"].get("paper_ready_candidates")
         ),
-        "forecast_ranking_join_result": _forecast_ranking_join_result(
-            diagnostic["summary"]
-        ),
+        "forecast_ranking_join_result": _forecast_ranking_join_result(diagnostic["summary"]),
         "expired_historical_rows_excluded": diagnostic["summary"][
             "expired_historical_rows_excluded"
         ],
@@ -880,10 +876,7 @@ def _history_minutes(prices: list[Any]) -> int:
     return max(
         0,
         int(
-            (
-                _aware(ordered[-1].observed_at) - _aware(ordered[0].observed_at)
-            ).total_seconds()
-            // 60
+            (_aware(ordered[-1].observed_at) - _aware(ordered[0].observed_at)).total_seconds() // 60
         ),
     )
 
@@ -924,8 +917,10 @@ def current_crypto_opportunity_scope(
         snapshot = snapshots.get(link.ticker)
         raw = decode_json(link.raw_json)
         link_deprecated = bool(raw.get("phase3as_deprecated"))
-        market_status = market.status if market is not None and market.status else (
-            snapshot.status if snapshot is not None else None
+        market_status = (
+            market.status
+            if market is not None and market.status
+            else (snapshot.status if snapshot is not None else None)
         )
         status_bucket = market_status_bucket(market_status)
         window = current_market_window_status(market, settings=resolved, now=now)
@@ -1016,7 +1011,9 @@ def current_crypto_opportunity_scope(
                 1 for row in excluded_rows if row.get("excluded_reason") == MARKET_CLOSED_OR_SETTLED
             ),
             "historical_rows_excluded": sum(
-                1 for row in excluded_rows if row.get("excluded_reason") == "HISTORICAL_ROW_EXCLUDED"
+                1
+                for row in excluded_rows
+                if row.get("excluded_reason") == "HISTORICAL_ROW_EXCLUDED"
             ),
         },
     }
@@ -1082,7 +1079,10 @@ def _forecast_ranking_blocker(
     freshness_minutes: int,
     now: datetime,
 ) -> str:
-    if str(active_row.get("ticker") or "").strip() != str(active_row.get("ticker") or "").strip().upper():
+    if (
+        str(active_row.get("ticker") or "").strip()
+        != str(active_row.get("ticker") or "").strip().upper()
+    ):
         return "TICKER_MISMATCH"
     if forecast is None and latest_any_forecast is not None:
         return "MODEL_NAME_MISMATCH"
@@ -1121,9 +1121,15 @@ def _funnel_row(
 ) -> dict[str, Any]:
     ticker = str(row["ticker"])
     market = session.get(Market, ticker)
-    ranking = session.get(MarketRanking, row.get("latest_ranking_id")) if row.get("latest_ranking_id") else None
+    ranking = (
+        session.get(MarketRanking, row.get("latest_ranking_id"))
+        if row.get("latest_ranking_id")
+        else None
+    )
     snapshot = _latest_snapshot_for_ticker(session, ticker)
-    identity = verify_market_identity(session, ticker=ticker, ranking=ranking, market=market, settings=settings)
+    identity = verify_market_identity(
+        session, ticker=ticker, ranking=ranking, market=market, settings=settings
+    )
     sizing = _latest_sizing(session, ticker)
     risk = _latest_risk(session, ticker)
     edge = to_decimal(row.get("estimated_edge")) or Decimal("0")
@@ -1132,7 +1138,9 @@ def _funnel_row(
     liquidity = to_decimal(row.get("liquidity")) or Decimal("0")
     ranking_score = to_decimal(row.get("opportunity_score")) or Decimal("0")
     ranking_spread = to_decimal(row.get("spread"))
-    settlement_terms = bool(market and (market.rules_primary or market.rules_secondary) and market.close_time)
+    settlement_terms = bool(
+        market and (market.rules_primary or market.rules_secondary) and market.close_time
+    )
     executable_book = _has_executable_book(snapshot)
     snapshot_reason = str(row.get("snapshot_join_status") or _snapshot_join_status(row))
     orderbook_reason = _orderbook_join_status(snapshot)
@@ -1237,8 +1245,7 @@ def _funnel_stages(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     {
                         "ticker": row["ticker"],
                         "reason_code": str(
-                            row.get("stage_reason_codes", {}).get(key)
-                            or _stage_reason_code(key)
+                            row.get("stage_reason_codes", {}).get(key) or _stage_reason_code(key)
                         ),
                     }
                     for row in failed[:5]
@@ -1393,9 +1400,7 @@ def _symbol_feature_row(
     history = _int(raw.get("history_minutes"))
     flags = raw.get("quality_flags") if isinstance(raw.get("quality_flags"), list) else []
     status = (
-        "READY"
-        if history >= required_history_minutes and feature.momentum_score
-        else "BLOCKED"
+        "READY" if history >= required_history_minutes and feature.momentum_score else "BLOCKED"
     )
     return {
         "symbol": symbol,
@@ -1590,7 +1595,9 @@ def _latest_sizing(session: Session, ticker: str) -> PositionSizingDecisionLog |
     return session.scalar(
         select(PositionSizingDecisionLog)
         .where(PositionSizingDecisionLog.ticker == ticker)
-        .order_by(desc(PositionSizingDecisionLog.decision_timestamp), desc(PositionSizingDecisionLog.id))
+        .order_by(
+            desc(PositionSizingDecisionLog.decision_timestamp), desc(PositionSizingDecisionLog.id)
+        )
         .limit(1)
     )
 
@@ -1599,7 +1606,9 @@ def _latest_risk(session: Session, ticker: str) -> AdvancedRiskDecisionLog | Non
     return session.scalar(
         select(AdvancedRiskDecisionLog)
         .where(AdvancedRiskDecisionLog.ticker == ticker)
-        .order_by(desc(AdvancedRiskDecisionLog.decision_timestamp), desc(AdvancedRiskDecisionLog.id))
+        .order_by(
+            desc(AdvancedRiskDecisionLog.decision_timestamp), desc(AdvancedRiskDecisionLog.id)
+        )
         .limit(1)
     )
 
@@ -1993,9 +2002,8 @@ def _render_handoff_next_actions(
     diagnostic: dict[str, Any],
     funnel: dict[str, Any],
 ) -> str:
-    first_hard_blocker = (
-        funnel["summary"].get("first_hard_blocker")
-        or diagnostic["summary"].get("first_hard_blocker")
+    first_hard_blocker = funnel["summary"].get("first_hard_blocker") or diagnostic["summary"].get(
+        "first_hard_blocker"
     )
     command = _phase3at_next_action({"first_hard_blocker": first_hard_blocker})
     lines = [
@@ -2052,10 +2060,7 @@ def _phase3at_next_action(summary: dict[str, Any]) -> str:
             "--output-dir reports/phase3bc_r3 --forecast-current-windows-only "
             "--diagnose-snapshots --generate-opportunity-report"
         )
-    return (
-        "kalshi-bot phase3at-handoff-report "
-        "--output-dir reports/phase3at --reports-dir reports"
-    )
+    return "kalshi-bot phase3at-handoff-report --output-dir reports/phase3at --reports-dir reports"
 
 
 def _report_metadata(
@@ -2166,9 +2171,7 @@ def _format_stage_examples(examples: list[Any]) -> str:
     rendered: list[str] = []
     for example in examples:
         if isinstance(example, dict):
-            rendered.append(
-                f"{example.get('ticker', 'n/a')}:{example.get('reason_code', 'n/a')}"
-            )
+            rendered.append(f"{example.get('ticker', 'n/a')}:{example.get('reason_code', 'n/a')}")
         else:
             rendered.append(str(example))
     return ", ".join(rendered)

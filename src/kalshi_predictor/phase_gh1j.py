@@ -27,7 +27,9 @@ def write_gh1j_report(*, gh1i_report: Path, database_path: Path, output_dir: Pat
                     "ticker": ticker,
                     "category": public.get("category"),
                     "calibration_ranking_advance": public["calibration"]["ranking_advance"],
-                    "calibration_risk_executable_advance": public["calibration"]["risk_executable_advance"],
+                    "calibration_risk_executable_advance": public["calibration"][
+                        "risk_executable_advance"
+                    ],
                     "local": {
                         "snapshot_present": snapshot is not None,
                         "snapshot_at": _value(snapshot, "captured_at"),
@@ -60,7 +62,9 @@ def write_gh1j_report(*, gh1i_report: Path, database_path: Path, output_dir: Pat
         "ticker_audits": rows,
         "summary": {
             "tickers_audited": len(rows),
-            "calibration_ranking_qualified": sum(row["calibration_ranking_advance"] for row in rows),
+            "calibration_ranking_qualified": sum(
+                row["calibration_ranking_advance"] for row in rows
+            ),
             "local_snapshots": sum(row["local"]["snapshot_present"] for row in rows),
             "local_rankings": sum(row["local"]["ranking_present"] for row in rows),
             "local_opportunities": sum(row["local"]["opportunity_present"] for row in rows),
@@ -74,14 +78,21 @@ def write_gh1j_report(*, gh1i_report: Path, database_path: Path, output_dir: Pat
     return path
 
 
-def _latest(connection: sqlite3.Connection, table: str, ticker: str, timestamp: str) -> sqlite3.Row | None:
+def _latest(
+    connection: sqlite3.Connection, table: str, ticker: str, timestamp: str
+) -> sqlite3.Row | None:
     return connection.execute(
         f"SELECT * FROM {table} WHERE ticker = ? ORDER BY {timestamp} DESC LIMIT 1", (ticker,)
     ).fetchone()
 
 
-def _first_break(public: dict[str, Any], snapshot: sqlite3.Row | None, ranking: sqlite3.Row | None,
-                 opportunity: sqlite3.Row | None, risk: sqlite3.Row | None) -> str:
+def _first_break(
+    public: dict[str, Any],
+    snapshot: sqlite3.Row | None,
+    ranking: sqlite3.Row | None,
+    opportunity: sqlite3.Row | None,
+    risk: sqlite3.Row | None,
+) -> str:
     if not public["calibration"]["ranking_advance"]:
         return "PUBLIC_LIQUIDITY_THRESHOLD"
     if snapshot is None:
@@ -105,7 +116,12 @@ def _has_orderbook(row: sqlite3.Row | None) -> bool:
     except json.JSONDecodeError:
         return False
     container = payload.get("orderbook_fp", payload)
-    return bool(container.get("yes_dollars") or container.get("no_dollars") or container.get("yes") or container.get("no"))
+    return bool(
+        container.get("yes_dollars")
+        or container.get("no_dollars")
+        or container.get("yes")
+        or container.get("no")
+    )
 
 
 def _value(row: sqlite3.Row | None, key: str) -> Any:

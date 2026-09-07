@@ -131,9 +131,7 @@ def consume_payload(
         raise ReadModelContractError("REALIZED_PNL_INVALID")
 
     unhashed = {
-        key: value
-        for key, value in payload.items()
-        if key not in {"payload_hash", "manifest_hash"}
+        key: value for key, value in payload.items() if key not in {"payload_hash", "manifest_hash"}
     }
     expected_payload_hash = _hash(unhashed)
     if payload["payload_hash"] != expected_payload_hash:

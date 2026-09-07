@@ -91,9 +91,7 @@ def apply_r5_truth_to_blocker_summary(
     summary[blocker_key] = alignment["primary_gap_after_refresh"]
     summary["r5_alignment_reason"] = alignment["reason"]
     summary["r5_alignment_source_path"] = alignment["source_path"]
-    summary["r5_alignment_latest_report_generated_at"] = alignment.get(
-        "latest_report_generated_at"
-    )
+    summary["r5_alignment_latest_report_generated_at"] = alignment.get("latest_report_generated_at")
     return alignment
 
 
@@ -127,14 +125,10 @@ def _alignment_evidence(
         "snapshot_stale_rows": snapshot_stale,
         "forecast_stale_rows": forecast_stale,
         "ranking_coverage_gap_after_repair": ranking_gap,
-        "true_ranking_gap_after_repair": _int_value(
-            summary.get("true_ranking_gap_after_repair")
-        ),
+        "true_ranking_gap_after_repair": _int_value(summary.get("true_ranking_gap_after_repair")),
         "ranking_missing_rows": _int_value(summary.get("ranking_missing_rows")),
         "ranking_stale_rows": _int_value(summary.get("ranking_stale_rows")),
-        "ranking_before_forecast_rows": _int_value(
-            summary.get("ranking_before_forecast_rows")
-        ),
+        "ranking_before_forecast_rows": _int_value(summary.get("ranking_before_forecast_rows")),
         "positive_ev_rows": _int_value(summary.get("positive_ev_rows")),
         "clean_execution_rows": _int_value(summary.get("clean_execution_rows")),
         "paper_ready_candidates": _int_value(summary.get("paper_ready_candidates")),

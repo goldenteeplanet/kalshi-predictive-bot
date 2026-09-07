@@ -75,7 +75,9 @@ def write_phase3bb_r26_cloud_ui_access_control_gate_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_csv(checks_csv_path, payload["access_control_checks"], ["check", "passed", "detail"])
     _write_csv(
         options_csv_path,
@@ -239,17 +241,63 @@ def _access_checks(
     r25_decision = r25.get("smoke_decision") or {}
     auth_mode = str(inputs.get("auth_mode") or "none")
     return [
-        _check("r24_tunnel_ready", r24_decision.get("status") == "VERIFIED_UI_RUNNING_SSH_TUNNEL_READY", f"R24 status is {r24_decision.get('status')}."),
-        _check("r25_smoke_passed", r25_decision.get("status") == "VERIFIED_CLOUD_UI_OPERATOR_SMOKE_PASS", f"R25 status is {r25_decision.get('status')}."),
-        _check("ui_listener_localhost_only", "127.0.0.1:8080" in str(r24_ui_state.get("listener_text") or ""), f"Listener: {r24_ui_state.get('listener_text') or 'unknown'}."),
-        _check("no_public_http_listener", r24_decision.get("public_http_listening") is False, f"public_http_listening={r24_decision.get('public_http_listening')}."),
-        _check("no_public_https_listener", r24_decision.get("public_https_listening") is False, f"public_https_listening={r24_decision.get('public_https_listening')}."),
-        _check("r20_public_exposure_deferred", r20_plan.get("expose_public_allowed_now") is False, f"R20 expose_public_allowed_now={r20_plan.get('expose_public_allowed_now')}."),
-        _check("r21_public_exposure_deferred", r21_decision.get("public_exposure_allowed_now") is False, f"R21 public_exposure_allowed_now={r21_decision.get('public_exposure_allowed_now')}."),
-        _check("domain_provided_for_public_https", bool(inputs.get("public_domain")), "A DNS name is required before HTTPS exposure review."),
-        _check("operator_ip_cidr_provided", bool(inputs.get("operator_ip_cidr")), "An operator IP/CIDR allowlist is required before public exposure review."),
-        _check("auth_mode_is_public_safe", auth_mode in PUBLIC_AUTH_MODES, f"auth_mode={auth_mode}; expected one of {', '.join(sorted(PUBLIC_AUTH_MODES))}."),
-        _check("no_slow_routes_for_public_exposure", not slow_routes, f"Slow routes over {inputs.get('max_public_route_seconds')}s: {', '.join(row['name'] for row in slow_routes) if slow_routes else 'none'}."),
+        _check(
+            "r24_tunnel_ready",
+            r24_decision.get("status") == "VERIFIED_UI_RUNNING_SSH_TUNNEL_READY",
+            f"R24 status is {r24_decision.get('status')}.",
+        ),
+        _check(
+            "r25_smoke_passed",
+            r25_decision.get("status") == "VERIFIED_CLOUD_UI_OPERATOR_SMOKE_PASS",
+            f"R25 status is {r25_decision.get('status')}.",
+        ),
+        _check(
+            "ui_listener_localhost_only",
+            "127.0.0.1:8080" in str(r24_ui_state.get("listener_text") or ""),
+            f"Listener: {r24_ui_state.get('listener_text') or 'unknown'}.",
+        ),
+        _check(
+            "no_public_http_listener",
+            r24_decision.get("public_http_listening") is False,
+            f"public_http_listening={r24_decision.get('public_http_listening')}.",
+        ),
+        _check(
+            "no_public_https_listener",
+            r24_decision.get("public_https_listening") is False,
+            f"public_https_listening={r24_decision.get('public_https_listening')}.",
+        ),
+        _check(
+            "r20_public_exposure_deferred",
+            r20_plan.get("expose_public_allowed_now") is False,
+            f"R20 expose_public_allowed_now={r20_plan.get('expose_public_allowed_now')}.",
+        ),
+        _check(
+            "r21_public_exposure_deferred",
+            r21_decision.get("public_exposure_allowed_now") is False,
+            f"R21 public_exposure_allowed_now={r21_decision.get('public_exposure_allowed_now')}.",
+        ),
+        _check(
+            "domain_provided_for_public_https",
+            bool(inputs.get("public_domain")),
+            "A DNS name is required before HTTPS exposure review.",
+        ),
+        _check(
+            "operator_ip_cidr_provided",
+            bool(inputs.get("operator_ip_cidr")),
+            "An operator IP/CIDR allowlist is required before public exposure review.",
+        ),
+        _check(
+            "auth_mode_is_public_safe",
+            auth_mode in PUBLIC_AUTH_MODES,
+            f"auth_mode={auth_mode}; expected one of {', '.join(sorted(PUBLIC_AUTH_MODES))}.",
+        ),
+        _check(
+            "no_slow_routes_for_public_exposure",
+            not slow_routes,
+            f"Slow routes over "
+            f"{inputs.get('max_public_route_seconds')}s: "
+            f"{', '.join(row['name'] for row in slow_routes) if slow_routes else 'none'}.",
+        ),
     ]
 
 
@@ -263,7 +311,16 @@ def _decision(
 ) -> dict[str, Any]:
     failed = [row for row in checks if not row["passed"]]
     base_failures = [
-        row for row in failed if row["check"] in {"r24_tunnel_ready", "r25_smoke_passed", "ui_listener_localhost_only", "no_public_http_listener", "no_public_https_listener"}
+        row
+        for row in failed
+        if row["check"]
+        in {
+            "r24_tunnel_ready",
+            "r25_smoke_passed",
+            "ui_listener_localhost_only",
+            "no_public_http_listener",
+            "no_public_https_listener",
+        }
     ]
     public_gates = [
         "domain_provided_for_public_https",
@@ -312,7 +369,9 @@ def _decision(
         "requires_operator_ip_cidr": bool(not inputs.get("operator_ip_cidr")),
         "requires_auth_mode": str(inputs.get("auth_mode") or "none") not in PUBLIC_AUTH_MODES,
         "slow_route_count": len(slow_routes),
-        "slowest_route_seconds": max((float(row.get("duration_seconds") or 0.0) for row in route_timings), default=0.0),
+        "slowest_route_seconds": max(
+            (float(row.get("duration_seconds") or 0.0) for row in route_timings), default=0.0
+        ),
         "failed_check_count": len(failed),
         "first_failed_check": failed[0]["check"] if failed else None,
         "primary_reason": reason,
@@ -339,14 +398,22 @@ def _exposure_options(decision: dict[str, Any], inputs: dict[str, Any]) -> list[
             "status": "GOOD_NEXT_PRIVATE_ACCESS_OPTION",
             "risk": "LOW_TO_MEDIUM",
             "operator_action": "Review a private-network access draft before any install.",
-            "notes": "Better always-on ergonomics than SSH tunnels without open public web exposure.",
+            "notes": (
+                "Better always-on ergonomics than SSH tunnels without open public web exposure."
+            ),
         },
         {
             "option": "PUBLIC_HTTPS_WITH_IP_ALLOWLIST_AND_AUTH",
             "status": "REVIEW_READY" if decision["public_https_review_ready"] else "BLOCKED",
             "risk": "MEDIUM",
-            "operator_action": "Provide domain, operator IP/CIDR, and approved auth mode before proxy review.",
-            "notes": f"domain={inputs.get('public_domain') or 'missing'}; ip={inputs.get('operator_ip_cidr') or 'missing'}; auth={inputs.get('auth_mode')}; blocker={public_blocker}",
+            "operator_action": (
+                "Provide domain, operator IP/CIDR, and approved auth mode before proxy review."
+            ),
+            "notes": f"domain="
+            f"{inputs.get('public_domain') or 'missing'}; ip="
+            f"{inputs.get('operator_ip_cidr') or 'missing'}; a"
+            f"uth={inputs.get('auth_mode')}; blocker="
+            f"{public_blocker}",
         },
         {
             "option": "PUBLIC_HTTPS_OPEN_INTERNET_NO_AUTH",
@@ -451,7 +518,10 @@ def _render_https_draft(payload: dict[str, Any]) -> str:
     lines = [
         "# Draft only. Do not install until a later operator-approved phase.",
         "# Public HTTPS is not allowed by Phase 3BB-R26.",
-        "# Required before install: real domain, operator IP/CIDR allowlist, auth wall, TLS certificate, and R26/R27 approval.",
+        (
+            "# Required before install: real domain, operator IP/CIDR allowlist, auth wall, "
+            "TLS certificate, and R26/R27 approval."
+        ),
         "",
         f"# domain: {domain}",
         f"# operator_ip_cidr: {cidr}",
@@ -471,7 +541,7 @@ def _render_https_draft(payload: dict[str, Any]) -> str:
     if auth == "basic_auth":
         lines.extend(
             [
-                "    auth_basic \"Kalshi operator UI\";",
+                '    auth_basic "Kalshi operator UI";',
                 "    auth_basic_user_file /etc/nginx/kalshi-ui.htpasswd;",
                 "",
             ]
@@ -503,7 +573,15 @@ def _render_https_draft(payload: dict[str, Any]) -> str:
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
     command = payload["access_control_decision"]["operator_next_command"]
-    return "\n".join(["#!/usr/bin/env bash", "set -euo pipefail", "", f"printf '%s\\n' {_shell_quote(command)}", ""])
+    return "\n".join(
+        [
+            "#!/usr/bin/env bash",
+            "set -euo pipefail",
+            "",
+            f"printf '%s\\n' {_shell_quote(command)}",
+            "",
+        ]
+    )
 
 
 def _render_next_actions(payload: dict[str, Any]) -> str:

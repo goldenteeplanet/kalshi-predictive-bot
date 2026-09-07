@@ -113,11 +113,13 @@ def test_prov16_rejects_empty_export_even_when_dashboard_matches(tmp_path: Path)
     dashboard = tmp_path / "dashboard.json"
     events.write_text(json.dumps({"events": []}), encoding="utf-8")
     dashboard.write_text(
-        json.dumps({
-            "event_count": 0,
-            "complete_reference_count": 0,
-            "model_counts": {},
-        }),
+        json.dumps(
+            {
+                "event_count": 0,
+                "complete_reference_count": 0,
+                "model_counts": {},
+            }
+        ),
         encoding="utf-8",
     )
     report = certify_provenance_export(
@@ -151,11 +153,13 @@ def test_prov16_requires_complete_references_and_both_models(tmp_path: Path) -> 
     payload["events"][0]["observation_id"] = None
     events.write_text(json.dumps(payload), encoding="utf-8")
     dashboard.write_text(
-        json.dumps({
-            "event_count": 1,
-            "complete_reference_count": 0,
-            "model_counts": {"crypto_v2": 1},
-        }),
+        json.dumps(
+            {
+                "event_count": 1,
+                "complete_reference_count": 0,
+                "model_counts": {"crypto_v2": 1},
+            }
+        ),
         encoding="utf-8",
     )
     report = certify_provenance_export(

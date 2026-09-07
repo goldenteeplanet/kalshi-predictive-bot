@@ -70,9 +70,7 @@ def test_malformed_lineage_sample_and_result_tampering_fail_closed() -> None:
     result = classify_keepalive_gaps(_samples())
     with pytest.raises(KeepaliveGapClassifierError, match="CLASSIFICATION_HASH_MISMATCH"):
         validate_keepalive_gap_classification(replace(result, classification_hash="0" * 64))
-    with pytest.raises(
-        KeepaliveGapClassifierError, match="CLASSIFICATION_SAFETY_BOUNDARY_INVALID"
-    ):
+    with pytest.raises(KeepaliveGapClassifierError, match="CLASSIFICATION_SAFETY_BOUNDARY_INVALID"):
         validate_keepalive_gap_classification(replace(result, service_control_authorized=True))
 
 
