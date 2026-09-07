@@ -625,7 +625,7 @@ def _executable_depth(raw_orderbook: dict[str, Any], *, side: str) -> Decimal | 
         return None
     depth = Decimal("0")
     for level in levels:
-        if not isinstance(level, (list, tuple)) or len(level) < 2:
+        if not isinstance(level, list | tuple) or len(level) < 2:
             continue
         quantity = to_decimal(level[1])
         if quantity is not None:

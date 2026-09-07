@@ -4,8 +4,6 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -18,6 +16,7 @@ from kalshi_predictor.phase3bb_r17_cloud_service_install_verification import (
     build_phase3bb_r17_cloud_service_install_verification,
     write_phase3bb_r17_cloud_service_install_verification_report,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3bb_r17_verifies_enable_no_start_handoff(tmp_path: Path) -> None:

@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.supervisor_crash_recovery import (
     SupervisorCrashRecoveryError,
     evaluate_supervisor_crash_recovery,

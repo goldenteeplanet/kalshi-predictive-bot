@@ -3,8 +3,6 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
-
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_forecast, insert_market_snapshot
@@ -23,6 +21,7 @@ from kalshi_predictor.paper.simulator import run_paper_trading
 from kalshi_predictor.paper.strategy import generate_paper_decisions
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import select
 
 
 def test_learning_rejection_log_insert_works(tmp_path) -> None:

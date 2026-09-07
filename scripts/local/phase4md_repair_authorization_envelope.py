@@ -188,7 +188,7 @@ def validate_token(
         if now >= expires:
             errors.append("TOKEN_EXPIRED")
     nonce = token.get("nonce")
-    if not isinstance(consumed_nonces, (set, frozenset, list, tuple)) or any(
+    if not isinstance(consumed_nonces, set | frozenset | list | tuple) or any(
         not isinstance(value, str) for value in consumed_nonces
     ):
         errors.append("CONSUMED_NONCE_LEDGER_INVALID")

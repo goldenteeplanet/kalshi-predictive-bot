@@ -198,7 +198,7 @@ def _nonnegative_int(value: Any) -> int:
 def _normalize_blockers(value: Any) -> list[str]:
     if isinstance(value, str):
         value = [value]
-    if not isinstance(value, (list, tuple, set)):
+    if not isinstance(value, list | tuple | set):
         return []
     return [str(item).strip().upper().replace(" ", "_") for item in value if str(item).strip()]
 

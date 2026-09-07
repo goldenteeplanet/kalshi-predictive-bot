@@ -3,7 +3,6 @@ import json
 from datetime import UTC, datetime
 
 import pytest
-
 from kalshi_predictor.provenance.bundle import (
     build_offline_certification_bundle,
     verify_offline_certification_bundle,

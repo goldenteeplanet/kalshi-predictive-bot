@@ -3,9 +3,6 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.repository import insert_crypto_market_link
@@ -31,6 +28,8 @@ from kalshi_predictor.signals.skip_log import log_signal_skip
 from kalshi_predictor.signals.status import signal_status_rows
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import func, select
+from typer.testing import CliRunner
 
 
 def test_all_expected_signals_are_registered(tmp_path) -> None:

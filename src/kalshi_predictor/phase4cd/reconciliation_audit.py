@@ -99,7 +99,7 @@ def valid_json_container(value: object, *, allow_empty: bool = False) -> bool:
         decoded = json.loads(str(value))
     except (json.JSONDecodeError, TypeError, ValueError):
         return False
-    return isinstance(decoded, (dict, list)) and (allow_empty or bool(decoded))
+    return isinstance(decoded, dict | list) and (allow_empty or bool(decoded))
 
 
 def executable_evidence_reason(capture: Mapping[str, Any]) -> str | None:

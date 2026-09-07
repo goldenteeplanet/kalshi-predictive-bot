@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.supervisor_singleton_enforcement import (
     SupervisorSingletonEnforcementError,
     evaluate_supervisor_singleton_enforcement,

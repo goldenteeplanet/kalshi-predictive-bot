@@ -4,8 +4,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
-from typer.testing import CliRunner
-
 from kalshi_predictor.autopilot.runner import run_autopilot_once
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
@@ -20,6 +18,7 @@ from kalshi_predictor.opportunities.repository import insert_market_ranking
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.ui.decision_clarity import build_market_structure
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_opportunity_explainer_handles_missing_data() -> None:

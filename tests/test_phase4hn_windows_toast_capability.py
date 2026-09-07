@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.windows_toast_capability import (
     WindowsToastCapabilityError,
     make_windows_toast_capability_observation,

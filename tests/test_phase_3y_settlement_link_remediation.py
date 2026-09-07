@@ -2,9 +2,6 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import func, select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.crypto.linker import detect_crypto_market, link_crypto_markets
@@ -35,6 +32,8 @@ from kalshi_predictor.sports.derived_schedule import derive_sports_schedule_from
 from kalshi_predictor.sports.linker import link_sports_markets
 from kalshi_predictor.utils.time import utc_now
 from kalshi_predictor.weather.linker import detect_weather_market
+from sqlalchemy import func, select
+from typer.testing import CliRunner
 
 
 def test_crypto_linker_uses_ticker_prefix_and_raw_payload(tmp_path) -> None:

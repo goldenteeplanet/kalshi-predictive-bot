@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.startup_ordering_delay_model import (
     REQUIRED_STAGES,
     STARTUP_DELAY_SECONDS,

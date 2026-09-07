@@ -5,8 +5,6 @@ import json
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import func, select
-
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.schema import MarketSnapshot
 from kalshi_predictor.ingest.websocket_orderbooks import (
@@ -14,6 +12,7 @@ from kalshi_predictor.ingest.websocket_orderbooks import (
     drain_staged_websocket_orderbooks,
 )
 from kalshi_predictor.kalshi.orderbook import LocalOrderbook, OrderbookSequenceGap
+from sqlalchemy import func, select
 
 TICKER = "KXTEMPNYCH-26JUL1514-T88.99"
 AUTH = {

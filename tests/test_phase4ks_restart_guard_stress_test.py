@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.restart_guard_stress_test import (
     COOLDOWN_SECONDS,
     RestartGuardStressTestError,

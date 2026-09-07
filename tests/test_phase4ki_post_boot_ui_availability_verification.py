@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.post_boot_ui_availability_verification import (
     PostBootUiAvailabilityError,
     evaluate_post_boot_ui_availability,

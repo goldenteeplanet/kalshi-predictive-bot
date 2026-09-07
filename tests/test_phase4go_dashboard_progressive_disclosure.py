@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.ui.dashboard_panel_registry import (
     build_dashboard_panel_registry,
     make_dashboard_panel_descriptor,

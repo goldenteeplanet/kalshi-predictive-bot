@@ -4,10 +4,9 @@ import argparse
 import json
 from pathlib import Path
 
-from sqlalchemy import Engine, Table
-
 from kalshi_predictor.data import schema
 from kalshi_predictor.data.db import get_session_factory, make_engine, make_sqlite_read_only_engine
+from sqlalchemy import Engine, Table
 
 _RESEARCH_MODELS = {
     "ProspectiveCaptureRun": "prospective_capture_runs",

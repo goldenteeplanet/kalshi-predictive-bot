@@ -5,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.phase_prov14b_r2a import build_certification_bundle
 from kalshi_predictor.phase_prov14b_r2b import capture_runtime_evidence
 

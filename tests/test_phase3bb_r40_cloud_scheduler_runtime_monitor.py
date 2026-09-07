@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -17,6 +15,7 @@ from kalshi_predictor.phase3bb_r40_cloud_scheduler_runtime_monitor import (
     build_phase3bb_r40_cloud_scheduler_runtime_monitor,
     write_phase3bb_r40_cloud_scheduler_runtime_monitor_report,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3bb_r40_reports_overnight_ready_with_writer_gate_warning(tmp_path: Path) -> None:

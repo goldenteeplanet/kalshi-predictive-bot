@@ -1,13 +1,12 @@
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.phase3az import (
     write_phase3az_gap_analysis_report,
     write_phase3az_r11_non_crypto_activation_report,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3az_gap_analysis_prioritizes_actionable_report_gaps(tmp_path, monkeypatch) -> None:

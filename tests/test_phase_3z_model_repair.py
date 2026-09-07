@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -15,6 +13,7 @@ from kalshi_predictor.phase3z import (
     write_market_coverage_doctor,
     write_model_repair_audit,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3z_audit_keeps_undefined_metrics_null(tmp_path) -> None:

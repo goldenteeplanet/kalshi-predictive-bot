@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.ui.dashboard_export_safety_review import (
     DashboardExportSafetyReviewError,
     make_export_evidence,

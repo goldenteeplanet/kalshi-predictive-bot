@@ -1,14 +1,13 @@
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.phase3ax import _source_evidence_gap_status
 from kalshi_predictor.phase3bb_r5_flightaware import (
     build_phase3bb_r5_flightaware_date_stable_evidence,
     write_phase3bb_r5_flightaware_date_stable_evidence_report,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3bb_r5_documents_missing_date_stable_flightaware_evidence(tmp_path) -> None:

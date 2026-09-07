@@ -57,7 +57,7 @@ def build(history_path: Path, *, now: datetime) -> tuple[dict[str, Any], dict[st
             "database_state_after_hash",
             "outcome",
         )
-        if any(not isinstance(event.get(field), (str, int)) for field in required):
+        if any(not isinstance(event.get(field), str | int) for field in required):
             raise ValueError("PHASE4AW_EVENT_FIELDS_INVALID")
         attempt, operation, ticker = (
             str(event["attempt_id"]),

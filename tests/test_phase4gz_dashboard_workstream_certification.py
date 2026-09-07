@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.ui.dashboard_workstream_certification import (
     REQUIRED_PHASES,
     DashboardWorkstreamCertificationError,

@@ -2,7 +2,6 @@ import json
 from decimal import Decimal
 
 import pytest
-
 from kalshi_predictor.benchmarking.liquidity_boundary import (
     build_liquidity_boundary_sweep,
     write_liquidity_boundary_sweep,

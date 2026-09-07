@@ -3,8 +3,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from sqlalchemy import func, select
-
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.schema import NewsItem
 from kalshi_predictor.news.ingestion import ingest_news_items
@@ -14,6 +12,7 @@ from kalshi_predictor.source_safety import (
     canonicalize_source_url,
     validate_official_economic_evidence,
 )
+from sqlalchemy import func, select
 
 FIXTURES = Path(__file__).parent / "fixtures" / "source_safety"
 

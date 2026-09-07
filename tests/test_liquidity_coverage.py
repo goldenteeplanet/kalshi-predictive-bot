@@ -1,7 +1,6 @@
 import json
 
 import pytest
-
 from kalshi_predictor.research.event_quote_collector import (
     EventCandidate,
     executable_yes_bounds,

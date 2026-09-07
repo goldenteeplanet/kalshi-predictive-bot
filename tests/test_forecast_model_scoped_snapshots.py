@@ -2,9 +2,6 @@ from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
-from sqlalchemy import select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.crypto.repository import insert_crypto_features, insert_crypto_market_link
@@ -15,6 +12,8 @@ from kalshi_predictor.forecasting import registry
 from kalshi_predictor.forecasting.registry import latest_snapshots_for_model, run_forecast_models
 from kalshi_predictor.utils.time import utc_now
 from kalshi_predictor.weather.repository import insert_weather_market_link
+from sqlalchemy import select
+from typer.testing import CliRunner
 
 
 def test_latest_snapshots_for_model_uses_crypto_link_table(tmp_path) -> None:

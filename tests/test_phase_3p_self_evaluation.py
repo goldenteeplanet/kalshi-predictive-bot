@@ -2,9 +2,6 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import func, select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -18,6 +15,8 @@ from kalshi_predictor.data.schema import (
 )
 from kalshi_predictor.scheduler import scheduler_plan
 from kalshi_predictor.self_evaluation.reports import generate_self_evaluation_report
+from sqlalchemy import func, select
+from typer.testing import CliRunner
 
 
 def test_self_evaluation_generates_final_journal_from_phase3o_memory(tmp_path) -> None:

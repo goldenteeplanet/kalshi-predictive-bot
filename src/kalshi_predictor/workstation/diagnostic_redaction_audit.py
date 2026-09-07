@@ -64,7 +64,7 @@ def audit_diagnostic_redaction(
 ) -> DiagnosticRedactionAuditDecision:
     if isinstance(max_records, bool) or not isinstance(max_records, int) or max_records <= 0:
         raise DiagnosticRedactionAuditError("REDACTION_AUDIT_BOUND_INVALID")
-    if isinstance(attestations, (str, bytes)) or len(attestations) > max_records:
+    if isinstance(attestations, str | bytes) or len(attestations) > max_records:
         raise DiagnosticRedactionAuditError("REDACTION_AUDIT_RECORD_BOUND_EXCEEDED")
     records = [_validated_attestation(item) for item in attestations]
     types = [item.artifact_type for item in records]

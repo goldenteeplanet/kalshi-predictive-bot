@@ -63,7 +63,7 @@ def capture_process_tree_evidence(
     for value in (captured_at_epoch_seconds, max_nodes, max_depth):
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise ProcessTreeEvidenceCaptureError("PROCESS_TREE_BOUND_INVALID")
-    if isinstance(nodes, (str, bytes)) or len(nodes) > max_nodes:
+    if isinstance(nodes, str | bytes) or len(nodes) > max_nodes:
         raise ProcessTreeEvidenceCaptureError("PROCESS_TREE_NODE_BOUND_EXCEEDED")
     records = [_validated_node(item) for item in nodes]
     records.sort(key=lambda item: item.process_id_hash)

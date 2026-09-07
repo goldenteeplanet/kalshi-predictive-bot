@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.phase4cd.evidence_query_regression_corpus import (
     EvidenceQueryRegressionCorpusError,
     build_evidence_query_regression_corpus,

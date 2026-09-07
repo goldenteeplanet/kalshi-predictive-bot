@@ -107,7 +107,7 @@ def build(input_path: Path, *, now: datetime) -> tuple[dict[str, Any], dict[str,
         if any(str(key).lower() in FORBIDDEN_KEYS for key in attributes):
             raise ValueError("PHASE4BH_SENSITIVE_ATTRIBUTE_KEY")
         if any(
-            not isinstance(value, (str, int, bool))
+            not isinstance(value, str | int | bool)
             or (isinstance(value, str) and (SQL_PATTERN.search(value) or "-----BEGIN" in value))
             for value in attributes.values()
         ):

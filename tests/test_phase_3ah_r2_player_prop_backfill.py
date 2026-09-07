@@ -2,14 +2,13 @@ import json
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.phase3ah_r2 import (
     CURATED_ROSTER_EVIDENCE,
     run_phase3ah_r2_backfill,
     write_phase3ah_r2_backfill_report,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3ah_r2_applies_curated_roster_rows_and_schedule_backfill(tmp_path) -> None:

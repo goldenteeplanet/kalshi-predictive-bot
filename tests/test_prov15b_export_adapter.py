@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-
 from kalshi_predictor.provenance.export_adapter import (
     adapt_runtime_provenance_export,
     compare_runtime_export_to_golden,

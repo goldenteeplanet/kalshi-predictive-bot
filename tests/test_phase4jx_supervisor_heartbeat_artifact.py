@@ -2,7 +2,6 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.workstation.supervisor_heartbeat_artifact import (
     SupervisorHeartbeatArtifactError,
     make_supervisor_heartbeat,

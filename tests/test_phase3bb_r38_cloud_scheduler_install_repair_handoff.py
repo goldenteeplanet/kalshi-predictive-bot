@@ -5,8 +5,6 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -19,6 +17,7 @@ from kalshi_predictor.phase3bb_r38_cloud_scheduler_install_repair_handoff import
     build_phase3bb_r38_cloud_scheduler_install_repair_handoff,
     write_phase3bb_r38_cloud_scheduler_install_repair_handoff_report,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3bb_r38_writes_repair_handoff_for_sudo_block_and_missing_r8(

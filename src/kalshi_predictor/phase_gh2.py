@@ -1372,7 +1372,7 @@ def _enrich_stage_telemetry(
 def _metric(payload: dict[str, Any], *keys: str) -> int:
     for key in keys:
         value = payload.get(key)
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return int(value)
     return 0
 

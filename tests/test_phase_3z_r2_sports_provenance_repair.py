@@ -4,8 +4,6 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -16,6 +14,7 @@ from kalshi_predictor.phase3z_r2 import (
     write_phase3z_r2_sports_provenance_repair_report,
 )
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_phase3zr2_groups_partial_legacy_and_blocks_placeholder_rows(tmp_path) -> None:

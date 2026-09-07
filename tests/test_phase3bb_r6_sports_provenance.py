@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -15,6 +13,7 @@ from kalshi_predictor.phase3bb_r6_sports_provenance import (
     write_phase3bb_r6_sports_provenance_repair_report,
 )
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_phase3bb_r6_keeps_partial_placeholder_rows_unsafe(tmp_path) -> None:

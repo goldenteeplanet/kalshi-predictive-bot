@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.seven_day_restart_budget import (
     WINDOW_SECONDS,
     SevenDayRestartBudgetError,

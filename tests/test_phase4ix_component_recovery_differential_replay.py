@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.component_recovery_differential_replay import (
     ComponentRecoveryDifferentialReplayError,
     evaluate_component_recovery_differential_replay,

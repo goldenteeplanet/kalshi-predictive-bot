@@ -3,8 +3,6 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -28,6 +26,7 @@ from kalshi_predictor.personal_trader.service import (
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.ui.routes import create_router
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_phase_3u_normalizes_today_in_user_timezone() -> None:

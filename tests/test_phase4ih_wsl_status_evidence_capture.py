@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.wsl_status_evidence_capture import (
     WslStatusEvidenceCaptureError,
     capture_wsl_status_evidence,

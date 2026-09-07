@@ -68,7 +68,7 @@ def evaluate_supervisor_deployment_gate(
 ) -> SupervisorDeploymentDecision:
     if isinstance(max_records, bool) or not isinstance(max_records, int) or max_records <= 0:
         raise SupervisorDeploymentGateError("SUPERVISOR_DEPLOYMENT_GATE_BOUND_INVALID")
-    if isinstance(evidence, (str, bytes)) or len(evidence) > max_records:
+    if isinstance(evidence, str | bytes) or len(evidence) > max_records:
         raise SupervisorDeploymentGateError("SUPERVISOR_DEPLOYMENT_GATE_RECORD_BOUND_EXCEEDED")
     records = [_validated_evidence(item) for item in evidence]
     names = [item.component for item in records]

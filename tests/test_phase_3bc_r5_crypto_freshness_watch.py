@@ -4,8 +4,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
-from typer.testing import CliRunner
-
 from kalshi_predictor import cli as cli_module
 from kalshi_predictor import phase3bc_r5, phase3bc_r6
 from kalshi_predictor.cli import _phase3bc_r5_fast_path_command, app
@@ -24,6 +22,7 @@ from kalshi_predictor.scheduler import scheduler_plan
 from kalshi_predictor.ui import service as ui_service
 from kalshi_predictor.ui.service import crypto_freshness_watch_status
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_artifact_only_risk_preflight_rolls_back_nested_writes(monkeypatch) -> None:

@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.windows_startup_task_proposal import (
     WindowsStartupTaskProposalError,
     evaluate_windows_startup_task_proposal,

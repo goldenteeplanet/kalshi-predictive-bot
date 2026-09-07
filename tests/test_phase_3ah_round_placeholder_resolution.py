@@ -1,13 +1,12 @@
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.phase3ah_placeholders import (
     build_phase3ah_round_placeholder_resolution,
     write_phase3ah_round_placeholder_resolution_report,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3ah_placeholder_resolver_fills_real_source_teams(tmp_path) -> None:

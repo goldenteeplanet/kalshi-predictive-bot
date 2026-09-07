@@ -3,8 +3,6 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 
-from sqlalchemy import select
-
 from kalshi_predictor.category_coverage_gap_audit import (
     _limitation_class,
     build_category_coverage_gap_audit,
@@ -15,6 +13,7 @@ from kalshi_predictor.data.repositories import insert_market_snapshot, upsert_ma
 from kalshi_predictor.data.schema import Market
 from kalshi_predictor.market_legs import parse_and_store_market_legs
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import select
 
 
 def test_category_gap_funnel_is_cumulative_and_reports_profitability(tmp_path) -> None:
@@ -96,10 +95,9 @@ def test_dashboard_exposes_linkable_denominator(tmp_path) -> None:
 
 
 def test_read_only_engine_rejects_writes(tmp_path: Path) -> None:
-    from sqlalchemy import create_engine
-
     from kalshi_predictor.candidate_funnel_audit import make_candidate_funnel_read_only_engine
     from kalshi_predictor.data.schema import Base
+    from sqlalchemy import create_engine
 
     database = tmp_path / "audit.db"
     writable = create_engine(f"sqlite:///{database}")

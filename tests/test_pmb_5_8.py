@@ -5,7 +5,6 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.benchmarking.adapter import compare_database_model_versions
 from kalshi_predictor.benchmarking.exchange import LimitOrder, ReplayExchange
 from kalshi_predictor.benchmarking.imports import import_user_replay

@@ -6,7 +6,6 @@ import tracemalloc
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor import cli, phase3bc
 from kalshi_predictor.phase3bc_r5 import _StageTimer as R5StageTimer
 from kalshi_predictor.runtime_stage_heartbeat import AtomicStageHeartbeat

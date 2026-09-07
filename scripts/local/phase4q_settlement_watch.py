@@ -4,9 +4,8 @@ import argparse
 import json
 from pathlib import Path
 
-from phase4m_research_handoff import _load_isolated_research_models
-
 from kalshi_predictor.data.db import get_session_factory, make_engine, make_sqlite_read_only_engine
+from phase4m_research_handoff import _load_isolated_research_models
 
 
 def main() -> None:

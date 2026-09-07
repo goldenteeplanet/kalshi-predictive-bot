@@ -2,9 +2,6 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import select
-from typer.testing import CliRunner
-
 from kalshi_predictor.active_universe import latest_links_for_table
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
@@ -24,6 +21,8 @@ from kalshi_predictor.phase3ar import STATUS_READY, build_crypto_forecast_covera
 from kalshi_predictor.phase3as import build_active_market_universe, write_phase3as_report
 from kalshi_predictor.sports.repository import insert_sports_market_link
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import select
+from typer.testing import CliRunner
 
 
 def test_phase3as_marks_closed_crypto_and_sports_links_deprecated(tmp_path) -> None:

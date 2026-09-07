@@ -61,7 +61,7 @@ def export_alert_delivery_audit(
             raise AlertDeliveryAuditExportError("EXPORT_BOUND_INVALID")
     if max_records == 0 or window_start_epoch_seconds > window_end_epoch_seconds:
         raise AlertDeliveryAuditExportError("EXPORT_BOUND_INVALID")
-    if isinstance(records, (str, bytes)) or len(records) > max_records:
+    if isinstance(records, str | bytes) or len(records) > max_records:
         raise AlertDeliveryAuditExportError("EXPORT_RECORD_BOUND_EXCEEDED")
     items = [_validated_record(item) for item in records]
     if len({item.event_id_hash for item in items}) != len(items):

@@ -11,7 +11,7 @@ def parse_datetime(value: Any) -> datetime | None:
         return None
     if isinstance(value, datetime):
         return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return datetime.fromtimestamp(value, tz=UTC)
     if isinstance(value, str):
         normalized = value.strip()

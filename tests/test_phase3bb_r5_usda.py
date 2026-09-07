@@ -3,10 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.schema import Base
 from kalshi_predictor.phase3bb_r5_usda import (
@@ -14,6 +10,9 @@ from kalshi_predictor.phase3bb_r5_usda import (
     evaluate_usda_row,
     write_phase3bb_r5_usda_source_activation_report,
 )
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from typer.testing import CliRunner
 
 
 def test_phase3bb_r5_blocks_usda_date_mismatch_and_cushman(tmp_path) -> None:

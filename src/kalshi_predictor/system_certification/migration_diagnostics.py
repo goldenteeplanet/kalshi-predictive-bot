@@ -141,7 +141,7 @@ def _literal_down_revisions(node: ast.AST) -> tuple[str, ...]:
         return ()
     if isinstance(value, str):
         return (value,)
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return tuple(str(item) for item in value if item is not None)
     return (str(value),)
 

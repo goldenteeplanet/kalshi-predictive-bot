@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typer.testing import CliRunner
-
 from kalshi_predictor import phase3ba_r7
 from kalshi_predictor.cli import app
+from typer.testing import CliRunner
 
 
 def test_phase3ba_r7_classifies_composite_types() -> None:

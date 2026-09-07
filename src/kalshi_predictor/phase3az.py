@@ -613,7 +613,7 @@ def _r11_candidate(
     linkable = int(row.get("linkable_markets") or 0)
     linked = int(row.get("linked_markets") or 0)
     coverage = row.get("coverage")
-    coverage_ratio = float(coverage) if isinstance(coverage, (int, float)) else None
+    coverage_ratio = float(coverage) if isinstance(coverage, int | float) else None
     partial = int(row.get("partial_markets") or 0)
     unsupported = int(row.get("unsupported_multileg_markets") or 0)
     derived = int(row.get("derived_markets") or 0)

@@ -4,9 +4,6 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
-from sqlalchemy import event
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -24,6 +21,8 @@ from kalshi_predictor.phase3bb_r8_unified_paper_gate import (
     write_phase3bb_r8_unified_paper_gate_report,
 )
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import event
+from typer.testing import CliRunner
 
 
 def test_phase3bb_r8_crypto_linked_row_gets_source_missing_blocker(tmp_path) -> None:

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typer.testing import CliRunner
-
 from kalshi_predictor import phase3bb_r1
 from kalshi_predictor.cli import app
+from typer.testing import CliRunner
 
 
 def _running_r5_status(*, should_stop: bool = False) -> dict[str, object]:

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.phase4cd.evidence_latency_workstream_gate import (
     EvidenceLatencyWorkstreamGateError,
     evaluate_evidence_latency_workstream_gate,

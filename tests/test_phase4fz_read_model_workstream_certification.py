@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.phase4cd.read_model_chain import ReadModelChainResult
 from kalshi_predictor.phase4cd.read_model_compatibility import CompatibilityResult
 from kalshi_predictor.phase4cd.read_model_consumer import ReadModelView

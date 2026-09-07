@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -11,6 +9,7 @@ from kalshi_predictor.phase3au import (
     write_phase3au_report,
 )
 from kalshi_predictor.phase3y import run_link_remediation
+from typer.testing import CliRunner
 
 
 def test_phase3au_heartbeat_writes_status_and_checkpoint(tmp_path) -> None:

@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.test_host_restart_prohibition import (
     HostTestRestartProhibitionError,
     evaluate_test_host_restart_prohibition,

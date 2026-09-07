@@ -5,7 +5,6 @@ import json
 from dataclasses import asdict, replace
 
 import pytest
-
 from kalshi_predictor.workstation.recovery_decision_tamper_detection import (
     RecoveryDecisionTamperDetectionError,
     detect_recovery_decision_tampering,

@@ -143,7 +143,7 @@ def _scan_file(root: Path, path: Path) -> list[dict[str, Any]]:
                         relative, node.lineno, "REGISTRY_OR_MAPPING_DISPATCH", "SUBSCRIPT_CALL"
                     )
                 )
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
+        if isinstance(node, ast.Import | ast.ImportFrom):
             names = []
             if isinstance(node, ast.Import):
                 names.extend(alias.name for alias in node.names)
@@ -156,13 +156,13 @@ def _scan_file(root: Path, path: Path) -> list[dict[str, Any]]:
                         relative, node.lineno, "INDIRECT_MUTATION_ADAPTER_IMPORT", "AST_IMPORT"
                     )
                 )
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and any(
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and any(
             token in node.name.lower() for token in ENTRYPOINT_TOKENS
         ):
             findings.append(
                 _finding(relative, node.lineno, "MUTATION_ENTRYPOINT_DEFINITION", node.name)
             )
-        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+        if isinstance(node, ast.Assign | ast.AnnAssign):
             value = node.value
             alias_receiver = (
                 ast.unparse(value.value).lower() if isinstance(value, ast.Attribute) else ""

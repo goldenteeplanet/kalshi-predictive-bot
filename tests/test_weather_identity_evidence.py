@@ -5,8 +5,6 @@ import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
-
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_market_snapshot, upsert_market
 from kalshi_predictor.data.schema import Market, MarketSnapshot
@@ -17,6 +15,7 @@ from kalshi_predictor.weather_identity_evidence import (
     BoundedProtocolCache,
     collect_weather_identity_evidence,
 )
+from sqlalchemy import select
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
 TICKER = "KXTEMPNYCH-26AUG1012-T84.99"

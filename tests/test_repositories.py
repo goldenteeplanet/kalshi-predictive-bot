@@ -1,7 +1,5 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import select
-
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import (
     get_forecasts_with_settlements,
@@ -12,6 +10,7 @@ from kalshi_predictor.data.repositories import (
 )
 from kalshi_predictor.data.schema import Forecast, Market, MarketSnapshot, Settlement
 from kalshi_predictor.forecasting.base import ForecastOutput
+from sqlalchemy import select
 
 
 def test_repositories_init_and_insert_upsert(tmp_path) -> None:

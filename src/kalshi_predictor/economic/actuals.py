@@ -970,7 +970,7 @@ def _decimal(value: Any) -> Decimal | None:
 def _consensus_number(value: Any) -> str | None:
     if value is None or str(value).strip() in {"", "-", "None", "null"}:
         return None
-    if isinstance(value, (int, float, Decimal)):
+    if isinstance(value, int | float | Decimal):
         return decimal_to_str(value)
     text = str(value).strip().replace(",", "")
     multiplier = Decimal("1")

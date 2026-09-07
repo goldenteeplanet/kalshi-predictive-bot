@@ -5,8 +5,6 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
-
 from kalshi_predictor.advanced_risk.engine import (
     AdvancedRiskConfig,
     AdvancedRiskEngine,
@@ -33,6 +31,7 @@ from kalshi_predictor.paper.ledger import create_paper_order
 from kalshi_predictor.paper.models import BUY_YES, ORDER_FILLED, PaperDecision
 from kalshi_predictor.paper.simulator import run_paper_trading
 from kalshi_predictor.ui.app import create_app
+from sqlalchemy import select
 
 
 def test_engine_never_increases_phase_3m_and_buckets_caps_down() -> None:

@@ -4,10 +4,9 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from typer.testing import CliRunner
-
 from kalshi_predictor import phase3ba_r2
 from kalshi_predictor.cli import app
+from typer.testing import CliRunner
 
 
 def _settings() -> SimpleNamespace:

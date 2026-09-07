@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -15,6 +13,7 @@ from kalshi_predictor.phase3ab import build_learning_governor, phase3ab_fast_set
 from kalshi_predictor.phase3ac import run_sports_provenance_repair
 from kalshi_predictor.sports.repository import insert_sports_market_link
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_phase3aa_realizes_only_exact_settlement_with_paper_jobs(tmp_path) -> None:

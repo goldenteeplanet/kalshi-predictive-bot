@@ -2,8 +2,6 @@ from datetime import timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
-
 from kalshi_predictor.autopilot.guardrails import (
     evaluate_opportunity_guardrails,
     evaluate_start_guardrails,
@@ -22,6 +20,7 @@ from kalshi_predictor.forecasting.base import ForecastOutput
 from kalshi_predictor.forecasting.registry import ForecastRunSummary
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import select
 
 
 def test_autopilot_blocked_when_disabled(tmp_path) -> None:

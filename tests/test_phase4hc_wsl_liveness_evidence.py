@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.wsl_liveness_evidence import (
     WslLivenessEvidenceError,
     collect_wsl_liveness_evidence,

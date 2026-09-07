@@ -1,8 +1,6 @@
 import json
 from datetime import timedelta
 
-from sqlalchemy import select
-
 from kalshi_predictor.data.schema import (
     CryptoFeature,
     EvidenceExpansionMember,
@@ -13,6 +11,8 @@ from kalshi_predictor.phase4cd.attribution import build_edge_attribution
 from kalshi_predictor.phase4cd.expansion import expand_verified_crypto_cohort
 from kalshi_predictor.phase4cd.lineage import audit_crypto_feature_lineage
 from kalshi_predictor.phase4cd.replay import run_research_replay
+from sqlalchemy import select
+
 from tests.test_phase4cd import _count, _factory, _seed
 
 

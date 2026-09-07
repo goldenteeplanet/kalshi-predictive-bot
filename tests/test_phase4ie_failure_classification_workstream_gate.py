@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.failure_classification_workstream_gate import (
     REQUIRED_COMPONENTS,
     FailureClassificationWorkstreamGateError,

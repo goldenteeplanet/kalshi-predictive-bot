@@ -2,8 +2,6 @@ import json
 from datetime import timedelta
 from decimal import Decimal
 
-from sqlalchemy import func, select
-
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.schema import (
     CalibrationObservation,
@@ -17,6 +15,8 @@ from kalshi_predictor.phase4cd.replay import (
     MISSING_POINT_IN_TIME_FEATURES,
     run_research_replay,
 )
+from sqlalchemy import func, select
+
 from tests.test_phase4cd import _count, _factory, _seed
 
 

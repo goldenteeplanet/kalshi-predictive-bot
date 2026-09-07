@@ -2,9 +2,6 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.repository import insert_crypto_market_link
@@ -21,6 +18,8 @@ from kalshi_predictor.professional_ux.service import build_default_shell_context
 from kalshi_predictor.sports.repository import insert_sports_market_link
 from kalshi_predictor.ui import routes as ui_routes
 from kalshi_predictor.ui.app import create_app
+from sqlalchemy import func, select
+from typer.testing import CliRunner
 
 
 def test_market_leg_parser_extracts_player_prop_legs(tmp_path) -> None:

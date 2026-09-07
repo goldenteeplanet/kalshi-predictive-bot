@@ -2,8 +2,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import upsert_market, upsert_settlement
@@ -16,6 +14,7 @@ from kalshi_predictor.phase3aa_r3 import (
     build_phase3aa_r3_residual_audit,
     write_phase3aa_r3_residual_audit_report,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3aa_r3_classifies_scalar_ready_then_cleared_after_realizer(tmp_path) -> None:

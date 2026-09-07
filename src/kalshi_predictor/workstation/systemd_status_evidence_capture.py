@@ -60,7 +60,7 @@ def capture_systemd_status_evidence(
     for value in (captured_at_epoch_seconds, max_units):
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise SystemdStatusEvidenceCaptureError("SYSTEMD_STATUS_BOUND_INVALID")
-    if isinstance(units, (str, bytes)) or len(units) > max_units:
+    if isinstance(units, str | bytes) or len(units) > max_units:
         raise SystemdStatusEvidenceCaptureError("SYSTEMD_UNIT_BOUND_EXCEEDED")
     records = [_validated_unit(item) for item in units]
     records.sort(key=lambda item: (item.scope, item.unit_id_hash))

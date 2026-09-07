@@ -79,7 +79,7 @@ def evaluate_alerting_workstream_gate(
     for value in (evaluated_at_epoch_seconds, max_records):
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise AlertingWorkstreamGateError("GATE_BOUND_INVALID")
-    if isinstance(evidence, (str, bytes)) or len(evidence) > max_records:
+    if isinstance(evidence, str | bytes) or len(evidence) > max_records:
         raise AlertingWorkstreamGateError("GATE_EVIDENCE_BOUND_EXCEEDED")
     records = [_validated_evidence(item) for item in evidence]
     components = [item.component for item in records]

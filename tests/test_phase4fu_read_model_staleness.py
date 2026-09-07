@@ -4,7 +4,6 @@ import copy
 from datetime import UTC, datetime, timedelta
 
 import pytest
-
 from kalshi_predictor.phase4cd.read_model_staleness import (
     StalenessEscalationError,
     build_staleness_evidence,

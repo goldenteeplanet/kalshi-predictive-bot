@@ -70,7 +70,7 @@ def propagate_recovery_timeout(
             raise RecoveryTimeoutPropagationError("TIMEOUT_BOUND_INVALID")
     if max_steps == 0 or parent_deadline_epoch_seconds < issued_at_epoch_seconds:
         raise RecoveryTimeoutPropagationError("TIMEOUT_BOUND_INVALID")
-    if isinstance(steps, (str, bytes)) or len(steps) > max_steps:
+    if isinstance(steps, str | bytes) or len(steps) > max_steps:
         raise RecoveryTimeoutPropagationError("TIMEOUT_STEP_BOUND_EXCEEDED")
     records = [_validated_step(item) for item in steps]
     codes = [item.step_code for item in records]

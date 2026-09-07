@@ -98,7 +98,7 @@ def evaluate_failure_observation_quorum(
         validate_critical_dependency_decision(allowlist_decision)
     except ValueError as exc:
         raise FailureObservationQuorumError("ALLOWLIST_DECISION_INVALID") from exc
-    if isinstance(observations, (str, bytes)) or len(observations) > max_records:
+    if isinstance(observations, str | bytes) or len(observations) > max_records:
         raise FailureObservationQuorumError("QUORUM_RECORD_BOUND_EXCEEDED")
     records = [_validated_observation(item) for item in observations]
     records.sort(

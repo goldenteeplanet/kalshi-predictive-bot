@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.keepalive_restoration_dry_run_planner import (
     KeepaliveRestorationDryRunPlannerError,
     make_keepalive_restoration_context,

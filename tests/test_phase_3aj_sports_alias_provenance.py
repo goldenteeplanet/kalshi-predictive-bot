@@ -3,9 +3,6 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import decode_json, encode_json, upsert_market
@@ -16,6 +13,8 @@ from kalshi_predictor.phase3aj import (
 )
 from kalshi_predictor.sports.repository import insert_sports_market_link, upsert_sports_team
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import select
+from typer.testing import CliRunner
 
 
 def test_phase3aj_classifies_multileg_market_without_forcing_verified_link(tmp_path) -> None:

@@ -3,8 +3,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
-
 from kalshi_predictor.config import Settings
 from kalshi_predictor.consensus.repository import insert_forum_consensus_signal
 from kalshi_predictor.consensus.scoring import assess_forum_consensus
@@ -15,6 +13,7 @@ from kalshi_predictor.overnight.health import run_health_checks
 from kalshi_predictor.overnight.runner import run_overnight_once, run_overnight_scheduler
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import select
 
 
 def test_overnight_once_creates_run_cycle_rows(tmp_path) -> None:

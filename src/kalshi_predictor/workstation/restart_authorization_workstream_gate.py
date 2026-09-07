@@ -69,7 +69,7 @@ def evaluate_restart_authorization_workstream_gate(
 ) -> RestartAuthorizationWorkstreamDecision:
     if isinstance(max_records, bool) or not isinstance(max_records, int) or max_records <= 0:
         raise RestartAuthorizationWorkstreamGateError("RESTART_AUTHORIZATION_GATE_BOUND_INVALID")
-    if isinstance(evidence, (str, bytes)) or len(evidence) > max_records:
+    if isinstance(evidence, str | bytes) or len(evidence) > max_records:
         raise RestartAuthorizationWorkstreamGateError(
             "RESTART_AUTHORIZATION_GATE_RECORD_BOUND_EXCEEDED"
         )

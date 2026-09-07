@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.alert_loss_failure_injection import (
     AlertLossFailureInjectionError,
     evaluate_alert_loss_failure_injection,

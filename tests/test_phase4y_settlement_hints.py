@@ -8,7 +8,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.ingest.settlement_hints import (
     ALLOWED_HINT_FIELDS,
     SCHEMA,

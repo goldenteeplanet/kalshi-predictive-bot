@@ -3,8 +3,8 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.phase4cd.reconciliation_audit import canonical_hash
+
 from scripts.local.phase4dm_ranking_drift_detector import INPUT_SCHEMA, build_report, publish
 
 H1, H2, H3 = "1" * 64, "2" * 64, "3" * 64

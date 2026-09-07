@@ -3,7 +3,6 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import httpx
-
 from kalshi_predictor.weather.station_observations import (
     StationObservation,
     align_point_observation,

@@ -1,8 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
-
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_forecast, insert_market_snapshot
@@ -18,6 +16,7 @@ from kalshi_predictor.opportunities.scoring import (
 from kalshi_predictor.paper.ledger import get_latest_forecast_per_ticker
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import select
 
 
 def test_liquidity_scoring_handles_missing_values() -> None:

@@ -2,8 +2,6 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import select
-
 from kalshi_predictor.config import Settings
 from kalshi_predictor.crypto.features import calculate_crypto_features
 from kalshi_predictor.crypto.linker import detect_crypto_market, link_crypto_markets
@@ -20,6 +18,7 @@ from kalshi_predictor.data.repositories import encode_json, insert_market_snapsh
 from kalshi_predictor.data.schema import ForecastSkipLog, MarketLeg
 from kalshi_predictor.forecasting.crypto_v2 import CryptoV2Forecaster, _clamp_probability
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import select
 
 
 def test_coinbase_provider_response_parsing() -> None:

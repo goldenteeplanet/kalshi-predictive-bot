@@ -7,8 +7,6 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -24,6 +22,7 @@ from kalshi_predictor.phase3bb_r48_weather_feature_refresh_runtime_verification 
     build_phase3bb_r48_weather_feature_refresh_runtime_verification,
     write_phase3bb_r48_weather_feature_refresh_runtime_verification_report,
 )
+from typer.testing import CliRunner
 
 
 def test_r48_exact_new_york_rows_survive_large_fresh_feature_catalog(tmp_path: Path) -> None:

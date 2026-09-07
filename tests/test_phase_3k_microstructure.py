@@ -3,9 +3,6 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -36,6 +33,8 @@ from kalshi_predictor.opportunities.repository import insert_market_ranking
 from kalshi_predictor.scheduler import scheduler_plan
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import func, select
+from typer.testing import CliRunner
 
 
 def test_orderbook_depth_parser_handles_missing_data() -> None:

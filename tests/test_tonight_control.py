@@ -2,7 +2,6 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
 from kalshi_predictor.config import Settings
 from kalshi_predictor.crypto.assets import DEFAULT_CRYPTO_SYMBOLS
 from kalshi_predictor.crypto.repository import (

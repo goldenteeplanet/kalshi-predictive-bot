@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.phase4cd.evidence_cache_cold_start_seeding import (
     EvidenceCacheColdStartSeedError,
     make_cache_seed_candidate,

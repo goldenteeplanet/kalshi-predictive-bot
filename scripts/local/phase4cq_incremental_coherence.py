@@ -62,7 +62,7 @@ def _validate_component(component: Any) -> str:
         key, value = record["key"], record["value"]
         if not isinstance(key, str) or not key or key in keys:
             return "INVALID_RECORD_KEY"
-        numeric = isinstance(value, (int, float)) and not isinstance(value, bool)
+        numeric = isinstance(value, int | float) and not isinstance(value, bool)
         if not numeric or not math.isfinite(value):
             return "INVALID_RECORD_VALUE"
         keys.add(key)

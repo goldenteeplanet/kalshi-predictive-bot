@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.mock_restart_executor import (
     MockRestartExecutorError,
     execute_mock_restart,

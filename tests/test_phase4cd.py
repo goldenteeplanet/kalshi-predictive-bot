@@ -4,8 +4,6 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from sqlalchemy import func, select
-
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.schema import (
@@ -32,6 +30,7 @@ from kalshi_predictor.phase4cd.shadow import (
     reconcile_shadow_settlements,
 )
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import func, select
 
 
 def test_no_lookahead_rejects_future_inputs_and_early_settlement() -> None:

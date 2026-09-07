@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.recovery_timeout_propagation import (
     RecoveryTimeoutPropagationError,
     make_recovery_timeout_step,

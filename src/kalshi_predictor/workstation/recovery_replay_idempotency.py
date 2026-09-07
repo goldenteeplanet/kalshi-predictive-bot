@@ -58,7 +58,7 @@ def verify_recovery_replay_idempotency(
 ) -> ReplayIdempotencyDecision:
     if isinstance(max_cases, bool) or not isinstance(max_cases, int) or max_cases <= 0:
         raise RecoveryReplayIdempotencyError("REPLAY_IDEMPOTENCY_BOUND_INVALID")
-    if isinstance(cases, (str, bytes)) or len(cases) > max_cases:
+    if isinstance(cases, str | bytes) or len(cases) > max_cases:
         raise RecoveryReplayIdempotencyError("REPLAY_IDEMPOTENCY_CASE_BOUND_EXCEEDED")
     records = sorted(
         (_validated_case(item) for item in cases), key=lambda item: item.scenario_id_hash

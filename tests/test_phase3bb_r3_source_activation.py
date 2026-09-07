@@ -1,13 +1,12 @@
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.phase3bb_r3_activation import (
     build_phase3bb_r3_source_evidence_activation,
     write_phase3bb_r3_source_evidence_activation_report,
 )
+from typer.testing import CliRunner
 
 
 def test_phase3bb_r3_source_activation_blocks_unapproved_sources(tmp_path) -> None:

@@ -59,9 +59,9 @@ def audit_attempts(
         ids.add(attempt_id)
         if row["status"] not in {"PASSED", "FAILED", "ABANDONED"}:
             row_errors.append("STATUS_INVALID")
-        if not isinstance(row["p_value"], (int, float)) or not 0 <= row["p_value"] <= 1:
+        if not isinstance(row["p_value"], int | float) or not 0 <= row["p_value"] <= 1:
             row_errors.append("P_VALUE_INVALID")
-        if not isinstance(row["standard_error"], (int, float)) or row["standard_error"] <= 0:
+        if not isinstance(row["standard_error"], int | float) or row["standard_error"] <= 0:
             row_errors.append("STANDARD_ERROR_INVALID")
         identity = _digest(
             {

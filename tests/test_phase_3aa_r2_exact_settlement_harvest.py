@@ -4,8 +4,6 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import upsert_market, upsert_settlement
@@ -19,6 +17,7 @@ from kalshi_predictor.phase3aa_r2 import (
     write_phase3aa_r2_exact_settlement_harvest_report,
 )
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_phase3aa_r2_writes_only_exact_ticker_settlement(tmp_path) -> None:

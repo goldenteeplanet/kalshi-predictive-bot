@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.disk_exhaustion_classifier import (
     DiskExhaustionClassifierError,
     classify_disk_exhaustion,

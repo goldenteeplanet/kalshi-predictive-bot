@@ -1,8 +1,6 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -11,6 +9,7 @@ from kalshi_predictor.system_readiness.remediation import (
     system_remediation_card,
 )
 from kalshi_predictor.ui.app import create_app
+from typer.testing import CliRunner
 
 
 def test_system_remediation_is_paper_only_and_writes_report(tmp_path) -> None:

@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.scheduler_journal_evidence_capture import (
     SchedulerJournalEvidenceCaptureError,
     capture_scheduler_journal_evidence,

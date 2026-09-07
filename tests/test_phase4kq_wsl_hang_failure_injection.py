@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.wsl_hang_failure_injection import (
     WslHangFailureInjectionError,
     evaluate_wsl_hang_failure_injection,

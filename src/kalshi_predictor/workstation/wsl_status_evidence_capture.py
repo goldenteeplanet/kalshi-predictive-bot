@@ -62,7 +62,7 @@ def capture_wsl_status_evidence(
     for value in (captured_at_epoch_seconds, max_distributions):
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise WslStatusEvidenceCaptureError("WSL_STATUS_BOUND_INVALID")
-    if isinstance(distributions, (str, bytes)) or len(distributions) > max_distributions:
+    if isinstance(distributions, str | bytes) or len(distributions) > max_distributions:
         raise WslStatusEvidenceCaptureError("WSL_DISTRIBUTION_BOUND_EXCEEDED")
     records = [_validated_evidence(item) for item in distributions]
     records.sort(key=lambda item: item.distribution_id_hash)

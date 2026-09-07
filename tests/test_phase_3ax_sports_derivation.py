@@ -2,9 +2,6 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
-from sqlalchemy import func, select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -20,6 +17,8 @@ from kalshi_predictor.phase3ax import (
     write_phase3ax_gap_analysis_report,
 )
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import func, select
+from typer.testing import CliRunner
 
 
 def test_phase3ax_writes_heartbeat_and_commits_in_chunks(tmp_path) -> None:

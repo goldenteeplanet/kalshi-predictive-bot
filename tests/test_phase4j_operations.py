@@ -2,9 +2,6 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import Session
-
 from kalshi_predictor.data.schema import (
     Base,
     Market,
@@ -30,6 +27,8 @@ from kalshi_predictor.phase4cd.operations import (
     run_capture_scheduler,
     run_latest_handoff,
 )
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session
 
 
 def _sessions() -> tuple[Session, Session]:

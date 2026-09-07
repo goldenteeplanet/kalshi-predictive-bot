@@ -61,7 +61,7 @@ def evaluate_partial_evidence_refusal(
 ) -> FailureEvidenceEnvelopeDecision:
     if isinstance(max_records, bool) or not isinstance(max_records, int) or max_records <= 0:
         raise PartialEvidenceRefusalError("EVIDENCE_BOUND_INVALID")
-    if isinstance(references, (str, bytes)) or len(references) > max_records:
+    if isinstance(references, str | bytes) or len(references) > max_records:
         raise PartialEvidenceRefusalError("EVIDENCE_RECORD_BOUND_EXCEEDED")
     records = [_validated_reference(item) for item in references]
     types = [item.evidence_type for item in records]

@@ -37,7 +37,7 @@ def _component_status(component: Any) -> str:
         if not isinstance(record, dict) or set(record) != {"key", "value"}:
             return "INVALID"
         key, value = record["key"], record["value"]
-        numeric = isinstance(value, (int, float)) and not isinstance(value, bool)
+        numeric = isinstance(value, int | float) and not isinstance(value, bool)
         if not isinstance(key, str) or not key or key in keys or not numeric:
             return "INVALID"
         if not math.isfinite(value):

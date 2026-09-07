@@ -53,7 +53,7 @@ def bootstrap_latency_replay(
     censored = 0
     for index, row in enumerate(observations):
         if not isinstance(row, dict) or any(
-            not isinstance(row.get(key), (int, float)) for key in COMPONENTS
+            not isinstance(row.get(key), int | float) for key in COMPONENTS
         ):
             errors.append(f"OBSERVATION_{index}_INVALID")
             continue

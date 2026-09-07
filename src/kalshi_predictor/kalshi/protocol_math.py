@@ -33,7 +33,7 @@ def reciprocal_price(price: Any) -> Decimal | None:
 def price_ranges_from_market(market: Mapping[str, Any]) -> tuple[PriceRange, ...]:
     raw_ranges = market.get("price_ranges")
     parsed: list[PriceRange] = []
-    if isinstance(raw_ranges, Sequence) and not isinstance(raw_ranges, (str, bytes)):
+    if isinstance(raw_ranges, Sequence) and not isinstance(raw_ranges, str | bytes):
         for item in raw_ranges:
             if not isinstance(item, Mapping):
                 continue

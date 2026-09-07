@@ -2203,7 +2203,7 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 
 
 def _csv_value(value: Any) -> Any:
-    if isinstance(value, (dict, list, tuple, set)):
+    if isinstance(value, dict | list | tuple | set):
         return json.dumps(value, sort_keys=True, default=str)
     return value
 

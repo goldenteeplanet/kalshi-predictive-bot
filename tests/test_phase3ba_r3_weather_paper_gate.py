@@ -6,11 +6,10 @@ from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
-from typer.testing import CliRunner
-
 from kalshi_predictor import phase3ba_r3
 from kalshi_predictor.cli import app
 from kalshi_predictor.opportunities.market_identity import BUILT_FROM_EXACT_CATALOG, VERIFIED
+from typer.testing import CliRunner
 
 
 def _base_row() -> dict:

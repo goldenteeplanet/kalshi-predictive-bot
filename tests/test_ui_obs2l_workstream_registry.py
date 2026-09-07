@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.ui.progress import build_progress_dashboard
 from kalshi_predictor.ui.workstream_registry import (
     load_workstream_registry,

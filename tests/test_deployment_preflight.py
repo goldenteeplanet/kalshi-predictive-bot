@@ -5,7 +5,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.roadmap.deployment_preflight import build_deployment_preflight
 
 

@@ -4,8 +4,6 @@ import json
 import tracemalloc
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.ui.progress import (
     _PROGRESS_CACHE,
@@ -13,6 +11,7 @@ from kalshi_predictor.ui.progress import (
     build_progress_dashboard,
 )
 from kalshi_predictor.ui.progress_history import MAX_HISTORY_BYTES, load_progress_timeline
+from typer.testing import CliRunner
 
 
 def _snapshot(path: Path) -> None:

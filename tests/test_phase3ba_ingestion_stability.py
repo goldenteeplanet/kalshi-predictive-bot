@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typer.testing import CliRunner
-
 from kalshi_predictor import phase3ba_ingestion_stability as report
 from kalshi_predictor.cli import app
+from typer.testing import CliRunner
 
 
 def test_positive_ev_pace_projects_slow_conversion() -> None:

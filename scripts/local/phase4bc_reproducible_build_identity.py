@@ -54,7 +54,7 @@ def build(
     build_options: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     if not isinstance(build_options, dict) or any(
-        not isinstance(key, str) or not isinstance(value, (str, int, bool))
+        not isinstance(key, str) or not isinstance(value, str | int | bool)
         for key, value in build_options.items()
     ):
         raise ValueError("PHASE4BC_BUILD_OPTIONS_INVALID")

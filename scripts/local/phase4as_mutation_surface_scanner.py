@@ -115,7 +115,7 @@ def _python_findings(root: Path, path: Path) -> list[dict[str, Any]]:
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             lowered = " ".join(node.value.lower().split())
             sql_evidence_context = isinstance(
-                parents.get(node), (ast.Assign, ast.AnnAssign, ast.Call)
+                parents.get(node), ast.Assign | ast.AnnAssign | ast.Call
             )
             for prefix, capability in (
                 ("update settlements", "SETTLEMENT_UPDATE_SQL"),

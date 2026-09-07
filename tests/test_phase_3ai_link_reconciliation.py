@@ -2,8 +2,6 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -16,6 +14,7 @@ from kalshi_predictor.sports.repository import (
     upsert_sports_team,
 )
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_phase3ai_separates_partial_legs_markets_and_link_rows(tmp_path) -> None:

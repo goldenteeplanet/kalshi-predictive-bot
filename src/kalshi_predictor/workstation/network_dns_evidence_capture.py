@@ -68,7 +68,7 @@ def capture_network_dns_evidence(
             raise NetworkDnsEvidenceCaptureError("NETWORK_CAPTURE_BOUND_INVALID")
     if window_start_epoch_seconds > window_end_epoch_seconds or max_probes == 0:
         raise NetworkDnsEvidenceCaptureError("NETWORK_CAPTURE_BOUND_INVALID")
-    if isinstance(probes, (str, bytes)) or len(probes) > max_probes:
+    if isinstance(probes, str | bytes) or len(probes) > max_probes:
         raise NetworkDnsEvidenceCaptureError("NETWORK_PROBE_BOUND_EXCEEDED")
     records = [_validated_probe(item) for item in probes]
     records.sort(key=lambda item: (item.observed_at_epoch_seconds, item.probe_id_hash))

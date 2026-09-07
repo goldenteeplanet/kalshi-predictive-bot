@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.provenance.export_adapter import (
     SCHEMA_NORMALIZED_V3,
     SCHEMA_PROV2_ENVELOPE_V1,

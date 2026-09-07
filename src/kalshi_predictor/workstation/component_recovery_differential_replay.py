@@ -58,7 +58,7 @@ def evaluate_component_recovery_differential_replay(
 ) -> ComponentRecoveryReplayDecision:
     if isinstance(max_cases, bool) or not isinstance(max_cases, int) or max_cases <= 0:
         raise ComponentRecoveryDifferentialReplayError("REPLAY_BOUND_INVALID")
-    if isinstance(cases, (str, bytes)) or len(cases) > max_cases:
+    if isinstance(cases, str | bytes) or len(cases) > max_cases:
         raise ComponentRecoveryDifferentialReplayError("REPLAY_CASE_BOUND_EXCEEDED")
     records = [_validated_case(item) for item in cases]
     records.sort(key=lambda item: item.scenario_id_hash)

@@ -75,7 +75,7 @@ def capture_scheduler_journal_evidence(
         or max_total_bytes == 0
     ):
         raise SchedulerJournalEvidenceCaptureError("JOURNAL_BOUND_INVALID")
-    if isinstance(entries, (str, bytes)) or len(entries) > max_entries:
+    if isinstance(entries, str | bytes) or len(entries) > max_entries:
         raise SchedulerJournalEvidenceCaptureError("JOURNAL_ENTRY_BOUND_EXCEEDED")
     records = [_validated_entry(item) for item in entries]
     records.sort(key=lambda item: (item.occurred_at_epoch_seconds, item.cursor_hash))

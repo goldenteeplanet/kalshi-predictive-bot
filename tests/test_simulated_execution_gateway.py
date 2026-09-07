@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.roadmap.execution_gateway import (
     ApprovedOrderIntent,
     SimulatedExecutionGateway,

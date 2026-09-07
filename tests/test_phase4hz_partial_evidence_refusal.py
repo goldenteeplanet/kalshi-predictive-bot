@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.partial_evidence_refusal import (
     REQUIRED_EVIDENCE_TYPES,
     PartialEvidenceRefusalError,

@@ -500,7 +500,7 @@ def _requested_series(raw: Any) -> list[str]:
         return list(DEFAULT_SERIES_TICKERS)
     if isinstance(raw, str):
         series = [part.strip().upper() for part in raw.split(",")]
-    elif isinstance(raw, (list, tuple, set)):
+    elif isinstance(raw, list | tuple | set):
         series = [str(part).strip().upper() for part in raw]
     else:
         series = []
@@ -583,7 +583,7 @@ def _requested_symbols(raw: Any) -> list[str]:
         return list(DEFAULT_SYMBOLS)
     if isinstance(raw, str):
         symbols = [part.strip().upper() for part in raw.split(",")]
-    elif isinstance(raw, (list, tuple, set)):
+    elif isinstance(raw, list | tuple | set):
         symbols = [str(part).strip().upper() for part in raw]
     else:
         symbols = []

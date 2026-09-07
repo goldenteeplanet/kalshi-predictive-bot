@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.phase4cd.evidence_cache_memory_bounds import (
     evaluate_evidence_cache_memory_bounds,
     make_cache_entry_descriptor,

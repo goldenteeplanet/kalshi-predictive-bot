@@ -2,7 +2,6 @@ import json
 from decimal import Decimal
 
 import pytest
-
 from kalshi_predictor.benchmarking.sensitivity import (
     build_sensitivity_grid,
     write_sensitivity_grid,

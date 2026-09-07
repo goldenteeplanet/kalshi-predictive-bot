@@ -291,7 +291,7 @@ def _depth(levels: list[Any]) -> Decimal | None:
                 or level.get("size")
                 or level.get("contracts")
             )
-        elif isinstance(level, (list, tuple)) and len(level) > 1:
+        elif isinstance(level, list | tuple) and len(level) > 1:
             quantity = level[1]
         amount = to_decimal(quantity)
         if amount is not None:

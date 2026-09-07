@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.phase4cd.read_model_consumer import (
     ReadModelConsumerContract,
     ReadModelContractError,

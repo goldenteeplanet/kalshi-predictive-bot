@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.ui.app import create_app

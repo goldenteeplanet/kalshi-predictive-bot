@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-
 from kalshi_predictor.phase4cd.read_model_chain import ReadModelChainResult
 from kalshi_predictor.phase4cd.read_model_compatibility import CompatibilityResult
 from kalshi_predictor.phase4cd.read_model_consumer import ReadModelView

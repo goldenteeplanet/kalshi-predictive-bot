@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.failed_post_boot_automation_disablement import (
     FailedPostBootAutomationDisablementError,
     evaluate_failed_post_boot_automation_disablement,

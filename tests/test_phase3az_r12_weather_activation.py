@@ -4,9 +4,6 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
-from sqlalchemy import func, select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.schema import (
@@ -26,6 +23,8 @@ from kalshi_predictor.weather.repository import (
     insert_weather_features,
     insert_weather_market_link,
 )
+from sqlalchemy import func, select
+from typer.testing import CliRunner
 
 
 def test_phase3az_r12_weather_preview_finds_safe_stale_relink(tmp_path) -> None:

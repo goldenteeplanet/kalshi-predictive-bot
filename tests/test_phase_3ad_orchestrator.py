@@ -2,8 +2,6 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor import phase3ad
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
@@ -13,6 +11,7 @@ from kalshi_predictor.data.schema import MarketRanking, PaperOrder
 from kalshi_predictor.paper.models import ORDER_FILLED
 from kalshi_predictor.phase3ad import build_phase_orchestrator, write_phase_orchestrator_report
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_phase3ad_builds_paper_only_self_improvement_roadmap(tmp_path, monkeypatch) -> None:

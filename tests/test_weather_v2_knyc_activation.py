@@ -4,8 +4,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import httpx
-from sqlalchemy import func, select
-
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import decode_json, insert_market_snapshot
@@ -20,6 +18,7 @@ from kalshi_predictor.weather.repository import (
     insert_weather_forecast,
     insert_weather_market_link,
 )
+from sqlalchemy import func, select
 
 TICKER = "KXTEMPNYCH-26JUL1523-T80.99"
 TARGET = datetime(2026, 7, 16, 3, tzinfo=UTC)

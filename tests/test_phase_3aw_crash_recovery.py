@@ -3,8 +3,6 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -21,6 +19,7 @@ from kalshi_predictor.phase3aw import (
 )
 from kalshi_predictor.ui.service import _paper_trade_blocker_status_from_phase3aw
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def _monitor_payload(

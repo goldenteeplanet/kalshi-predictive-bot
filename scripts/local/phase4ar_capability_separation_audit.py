@@ -109,7 +109,7 @@ def inspect_source(role: str, path: Path) -> dict[str, Any]:
                     else "DATABASE_OPEN_WRITABLE",
                     node.lineno,
                 )
-        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+        elif isinstance(node, ast.Assign | ast.AnnAssign | ast.AugAssign):
             rendered = ast.unparse(node)
             if "os.environ[" in rendered:
                 add("ENVIRONMENT_SETTING_MUTATION", node.lineno)

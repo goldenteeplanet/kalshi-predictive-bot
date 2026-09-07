@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.critical_dependency_allowlist import (
     evaluate_critical_dependency,
     make_dependency_observation,

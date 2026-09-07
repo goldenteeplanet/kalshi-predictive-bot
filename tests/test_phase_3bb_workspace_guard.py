@@ -1,13 +1,12 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.workspace_guard import build_workspace_consistency_guard
+from typer.testing import CliRunner
 
 
 def test_phase3bb_guard_blocks_missing_current_phase_command(tmp_path) -> None:

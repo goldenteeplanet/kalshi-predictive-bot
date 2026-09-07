@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.clock_skew_classifier import (
     ClockSkewClassifierError,
     classify_clock_skew,

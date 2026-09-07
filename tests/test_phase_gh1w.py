@@ -1,10 +1,9 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import Session
-
 from kalshi_predictor.data.schema import Base, WeatherFeature
 from kalshi_predictor.weather.repository import get_latest_weather_features
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session
 
 
 def _feature(target: datetime, generated: datetime, value: str) -> WeatherFeature:

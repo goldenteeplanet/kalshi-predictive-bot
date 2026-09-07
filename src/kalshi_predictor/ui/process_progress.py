@@ -83,7 +83,7 @@ def normalize_process_progress(
     derived_percent = round(completed / total * 100, 2) if units_valid else None
     if (
         derived_percent is not None
-        and isinstance(reported_percent, (int, float))
+        and isinstance(reported_percent, int | float)
         and abs(float(reported_percent) - derived_percent) > 1
     ):
         diagnostics.append("PROCESS_PROGRESS_CONTRADICTION")
@@ -93,7 +93,7 @@ def normalize_process_progress(
         if derived_percent is not None
         else (
             round(float(reported_percent), 2)
-            if isinstance(reported_percent, (int, float)) and 0 <= float(reported_percent) <= 100
+            if isinstance(reported_percent, int | float) and 0 <= float(reported_percent) <= 100
             else None
         )
     )

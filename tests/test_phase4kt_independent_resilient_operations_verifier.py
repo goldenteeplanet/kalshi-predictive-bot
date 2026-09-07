@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.independent_resilient_operations_verifier import (
     REQUIRED_PHASES,
     IndependentResilientOperationsVerifierError,

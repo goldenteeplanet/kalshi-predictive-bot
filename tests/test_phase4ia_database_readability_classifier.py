@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.database_readability_classifier import (
     DatabaseReadabilityClassifierError,
     classify_database_readability,

@@ -696,7 +696,7 @@ def _numeric_features(value: Any, prefix: str = "") -> dict[str, Decimal | None]
     if isinstance(value, dict):
         for key, item in value.items():
             output.update(_numeric_features(item, f"{prefix}.{key}" if prefix else str(key)))
-    elif isinstance(value, (int, float, Decimal, str)) and not isinstance(value, bool):
+    elif isinstance(value, int | float | Decimal | str) and not isinstance(value, bool):
         output[prefix or "value"] = _decimal(value)
     elif value is None:
         output[prefix or "value"] = None

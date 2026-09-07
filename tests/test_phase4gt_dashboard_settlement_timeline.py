@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.ui.dashboard_settlement_timeline import (
     DashboardSettlementTimelineError,
     build_dashboard_settlement_timeline,

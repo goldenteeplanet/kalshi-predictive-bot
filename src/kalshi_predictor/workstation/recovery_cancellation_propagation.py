@@ -67,7 +67,7 @@ def propagate_recovery_cancellation(
         raise RecoveryCancellationPropagationError("CANCELLATION_PARENT_HASH_INVALID")
     if isinstance(max_children, bool) or not isinstance(max_children, int) or max_children <= 0:
         raise RecoveryCancellationPropagationError("CANCELLATION_BOUND_INVALID")
-    if isinstance(children, (str, bytes)) or len(children) > max_children:
+    if isinstance(children, str | bytes) or len(children) > max_children:
         raise RecoveryCancellationPropagationError("CANCELLATION_CHILD_BOUND_EXCEEDED")
     records = [_validated_child(item) for item in children]
     records.sort(key=lambda item: item.child_plan_hash)

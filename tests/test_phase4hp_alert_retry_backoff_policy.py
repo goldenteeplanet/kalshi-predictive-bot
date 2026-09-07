@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.alert_retry_backoff_policy import (
     AlertRetryBackoffPolicyError,
     evaluate_alert_retry_backoff,

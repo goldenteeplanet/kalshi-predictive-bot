@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from kalshi_predictor.phase4cd.reconciliation_audit import canonical_hash
 
 SCRIPT = Path(__file__).parents[1] / "scripts/local/phase4ey_residual_execution_risk_review.py"

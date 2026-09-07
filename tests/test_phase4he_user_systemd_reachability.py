@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.user_systemd_reachability import (
     UserSystemdReachabilityError,
     make_user_systemd_probe_observation,

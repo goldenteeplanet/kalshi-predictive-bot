@@ -69,7 +69,7 @@ def evaluate_recovery_safety_simulation_gate(
 ) -> RecoverySafetySimulationDecision:
     if isinstance(max_records, bool) or not isinstance(max_records, int) or max_records <= 0:
         raise RecoverySafetySimulationGateError("RECOVERY_SIMULATION_GATE_BOUND_INVALID")
-    if isinstance(evidence, (str, bytes)) or len(evidence) > max_records:
+    if isinstance(evidence, str | bytes) or len(evidence) > max_records:
         raise RecoverySafetySimulationGateError("RECOVERY_SIMULATION_GATE_RECORD_BOUND_EXCEEDED")
     records = [_validated_evidence(item) for item in evidence]
     names = [item.component for item in records]

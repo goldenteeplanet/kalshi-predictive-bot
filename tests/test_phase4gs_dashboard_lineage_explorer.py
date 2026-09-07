@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.ui.dashboard_lineage_explorer import (
     DashboardLineageExplorerError,
     build_dashboard_lineage_explorer,

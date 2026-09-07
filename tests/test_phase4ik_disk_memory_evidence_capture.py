@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.disk_memory_evidence_capture import (
     DiskMemoryEvidenceCaptureError,
     capture_disk_memory_evidence,

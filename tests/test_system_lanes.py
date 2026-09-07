@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.schema import Base
 from kalshi_predictor.system_lanes import (
@@ -13,6 +11,7 @@ from kalshi_predictor.system_lanes import (
     command_owner,
     table_owner,
 )
+from typer.testing import CliRunner
 
 
 def test_every_table_has_exactly_one_canonical_lane() -> None:

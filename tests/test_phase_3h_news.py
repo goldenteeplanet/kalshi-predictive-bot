@@ -3,8 +3,6 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
-
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_market_snapshot
@@ -27,6 +25,7 @@ from kalshi_predictor.signals.attribution import extract_active_signals
 from kalshi_predictor.signals.signal_types import NEWS_SIGNAL
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import func, select
 
 
 def test_manual_json_and_csv_news_ingestion(tmp_path) -> None:

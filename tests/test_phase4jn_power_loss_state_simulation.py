@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.power_loss_state_simulation import (
     EXPECTED_STATES,
     PowerLossStateSimulationError,

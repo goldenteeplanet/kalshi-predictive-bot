@@ -3,9 +3,6 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from sqlalchemy import func, select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -27,6 +24,8 @@ from kalshi_predictor.feature_discovery.grammar import (
     candidate_from_expression,
 )
 from kalshi_predictor.scheduler import scheduler_plan
+from sqlalchemy import func, select
+from typer.testing import CliRunner
 
 
 def test_dataset_excludes_future_features_and_future_labels(tmp_path) -> None:

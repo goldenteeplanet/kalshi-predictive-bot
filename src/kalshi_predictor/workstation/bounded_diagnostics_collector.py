@@ -77,7 +77,7 @@ def collect_bounded_diagnostics(
         or min(max_records, max_total_bytes, max_total_lines) == 0
     ):
         raise BoundedDiagnosticsCollectorError("DIAGNOSTIC_BOUND_INVALID")
-    if isinstance(samples, (str, bytes)) or len(samples) > max_records:
+    if isinstance(samples, str | bytes) or len(samples) > max_records:
         raise BoundedDiagnosticsCollectorError("DIAGNOSTIC_RECORD_BOUND_EXCEEDED")
     records = [_validated_sample(item) for item in samples]
     records.sort(

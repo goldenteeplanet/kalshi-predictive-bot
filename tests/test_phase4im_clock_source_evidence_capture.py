@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.clock_source_evidence_capture import (
     ClockSourceEvidenceCaptureError,
     capture_clock_source_evidence,

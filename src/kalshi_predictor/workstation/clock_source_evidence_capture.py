@@ -65,7 +65,7 @@ def capture_clock_source_evidence(
     for value in (captured_at_epoch_seconds, max_sources, maximum_absolute_offset_milliseconds):
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise ClockSourceEvidenceCaptureError("CLOCK_SOURCE_BOUND_INVALID")
-    if isinstance(sources, (str, bytes)) or len(sources) > max_sources:
+    if isinstance(sources, str | bytes) or len(sources) > max_sources:
         raise ClockSourceEvidenceCaptureError("CLOCK_SOURCE_COUNT_BOUND_EXCEEDED")
     records = [_validated_source(item) for item in sources]
     records.sort(key=lambda item: (item.source_type, item.source_id_hash))

@@ -150,7 +150,7 @@ def _load_json(path: Path) -> dict[str, Any] | list[Any] | None:
     if not path.exists():
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
-    return payload if isinstance(payload, (dict, list)) else None
+    return payload if isinstance(payload, dict | list) else None
 
 
 def _r2_rows(inputs: dict[str, dict[str, Any] | list[Any] | None]) -> list[dict[str, Any]]:

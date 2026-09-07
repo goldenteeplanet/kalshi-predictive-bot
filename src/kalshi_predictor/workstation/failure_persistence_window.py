@@ -60,7 +60,7 @@ def evaluate_failure_persistence_window(
     ):
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             raise FailurePersistenceWindowError("PERSISTENCE_BOUND_INVALID")
-    if isinstance(decisions, (str, bytes)) or len(decisions) > max_records:
+    if isinstance(decisions, str | bytes) or len(decisions) > max_records:
         raise FailurePersistenceWindowError("PERSISTENCE_RECORD_BOUND_EXCEEDED")
     records: list[FailureQuorumDecision] = []
     for item in decisions:

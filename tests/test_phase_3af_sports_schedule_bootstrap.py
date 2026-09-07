@@ -2,9 +2,6 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import func, select
-from typer.testing import CliRunner
-
 from kalshi_predictor import phase3af
 from kalshi_predictor.cli import app
 from kalshi_predictor.data.db import get_session_factory, init_db
@@ -22,6 +19,8 @@ from kalshi_predictor.sports.repository import (
     upsert_sports_team,
 )
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import func, select
+from typer.testing import CliRunner
 
 
 class _Response:

@@ -1,10 +1,9 @@
 from types import SimpleNamespace
 
-from click import unstyle
-from typer.testing import CliRunner
-
 import kalshi_predictor.cli as cli_module
+from click import unstyle
 from kalshi_predictor.cli import app
+from typer.testing import CliRunner
 
 
 def test_cli_help() -> None:

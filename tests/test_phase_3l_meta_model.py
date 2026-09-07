@@ -3,9 +3,6 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings
 from kalshi_predictor.crypto.repository import insert_crypto_features, insert_crypto_market_link
@@ -33,6 +30,8 @@ from kalshi_predictor.research.assistant import research_opportunity
 from kalshi_predictor.scheduler import scheduler_plan
 from kalshi_predictor.ui.app import create_app
 from kalshi_predictor.utils.time import utc_now
+from sqlalchemy import select
+from typer.testing import CliRunner
 
 
 def test_meta_feature_builder_handles_missing_specialized_features(tmp_path) -> None:

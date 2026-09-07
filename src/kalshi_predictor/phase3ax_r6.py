@@ -235,7 +235,7 @@ def _load_json(path: Path) -> dict[str, Any] | list[Any] | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return None
-    return payload if isinstance(payload, (dict, list)) else None
+    return payload if isinstance(payload, dict | list) else None
 
 
 def _input_summary(inputs: dict[str, dict[str, Any] | None]) -> dict[str, Any]:

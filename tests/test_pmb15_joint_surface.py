@@ -2,7 +2,6 @@ import json
 from decimal import Decimal
 
 import pytest
-
 from kalshi_predictor.benchmarking.joint_surface import (
     build_joint_robust_decision_surface,
     write_joint_robust_decision_surface,

@@ -1,7 +1,6 @@
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.installation_rollback_package import (
     REQUIRED_OPERATIONS,
     InstallationRollbackPackageError,

@@ -1,9 +1,6 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import SQLAlchemyError
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import (
     PHASE_3G_EXPECTED_COMMANDS,
     _alembic_config,
@@ -30,6 +27,8 @@ from kalshi_predictor.data.maintenance import (
 )
 from kalshi_predictor.tonight.control import build_tonight_check
 from kalshi_predictor.ui.app import create_app
+from sqlalchemy.exc import SQLAlchemyError
+from typer.testing import CliRunner
 
 
 def test_backend_detection_and_database_url_from_settings() -> None:

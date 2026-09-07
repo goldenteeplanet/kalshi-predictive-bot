@@ -1,13 +1,12 @@
 import sqlite3
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.exc import OperationalError
-
 from kalshi_predictor.candidate_funnel_audit import (
     build_candidate_funnel_audit,
     make_candidate_funnel_read_only_engine,
 )
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 
 def test_candidate_funnel_preserves_source_gate_and_fee_diagnostic() -> None:

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-
 from kalshi_predictor.workstation.recovery_cancellation_command import (
     RecoveryCancellationCommandError,
     evaluate_recovery_cancellation_command,

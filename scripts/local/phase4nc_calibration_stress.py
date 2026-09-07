@@ -37,7 +37,7 @@ def calibration_report(
             continue
         probability, outcome = row.get("probability"), row.get("outcome")
         if (
-            not isinstance(probability, (int, float))
+            not isinstance(probability, int | float)
             or not 0 <= probability <= 1
             or outcome not in {0, 1}
         ):

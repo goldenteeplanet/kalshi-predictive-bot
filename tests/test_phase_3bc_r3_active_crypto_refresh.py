@@ -4,8 +4,6 @@ from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
-from typer.testing import CliRunner
-
 from kalshi_predictor import phase3bc_r3 as r3
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
@@ -17,6 +15,7 @@ from kalshi_predictor.phase3bc_r3 import (
     _select_near_money_candidates,
 )
 from kalshi_predictor.scheduler import scheduler_plan
+from typer.testing import CliRunner
 
 
 def test_crypto_watch_scheduler_runs_phase3bc_r5_every_15_minutes() -> None:

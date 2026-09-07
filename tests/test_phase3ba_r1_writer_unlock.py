@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor import phase3ba_r1
 from kalshi_predictor.cli import app
+from typer.testing import CliRunner
 
 
 def _metadata() -> dict:

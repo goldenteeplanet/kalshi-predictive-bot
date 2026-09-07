@@ -4,9 +4,6 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import Session
-
 from kalshi_predictor.data.schema import (
     Base,
     CryptoFeature,
@@ -35,6 +32,8 @@ from kalshi_predictor.phase4cd.prospective import (
     watch_canonical_settlements,
 )
 from kalshi_predictor.phase4cd.range_comparator import audit_range_comparator
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session
 
 
 def test_event_round_robin_is_deterministic_and_outcome_blind() -> None:

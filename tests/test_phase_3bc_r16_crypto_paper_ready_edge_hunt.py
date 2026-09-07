@@ -4,13 +4,12 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.paper.models import BUY_YES
 from kalshi_predictor.phase3bc_r16 import build_phase3bc_r16_payload
 from kalshi_predictor.utils.time import utc_now
+from typer.testing import CliRunner
 
 
 def test_phase3bc_r16_requires_pure_crypto_rows() -> None:

@@ -6,14 +6,13 @@ from pathlib import Path
 
 import pytest
 import typer
-from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError
-from typer.testing import CliRunner
-
 from kalshi_predictor.cli import app, link_coverage_command
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.db import init_db, make_sqlite_read_only_engine
 from kalshi_predictor.market_legs import write_link_coverage_snapshot
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
+from typer.testing import CliRunner
 
 
 def test_link_coverage_cli_help_exposes_database_read_only_mode() -> None:

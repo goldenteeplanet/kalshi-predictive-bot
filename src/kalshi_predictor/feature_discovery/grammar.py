@@ -148,7 +148,7 @@ def _reject_forbidden(text: str) -> None:
 def _flatten_text(value: Any) -> str:
     if isinstance(value, Mapping):
         return " ".join(f"{key} {_flatten_text(item)}" for key, item in value.items())
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, list | tuple | set):
         return " ".join(_flatten_text(item) for item in value)
     return str(value)
 
