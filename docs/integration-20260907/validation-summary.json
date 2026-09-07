@@ -1,0 +1,76 @@
+{
+  "tested_code_commit": "990af10b39f0f185aec6e40340bb393af5e643ee",
+  "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+  "package_versions": {
+    "pytest": "9.1.1",
+    "ruff": "0.16.6",
+    "SQLAlchemy": "2.0.52",
+    "fastapi": "0.141.1",
+    "typer": "0.26.8"
+  },
+  "test_runs": {
+    "integration_regressions": {
+      "summary": "41 passed, 2 warnings in 124.44s (0:02:04)",
+      "counts": {
+        "passed": 41
+      }
+    },
+    "core_regressions": {
+      "summary": "70 passed in 162.83s (0:02:42)",
+      "counts": {
+        "passed": 70
+      }
+    },
+    "phase4_initial_run": {
+      "summary": "7 failed, 4604 passed, 2 skipped, 2262 deselected, 2 warnings in 577.00s (0:09:36)",
+      "counts": {
+        "failed": 7,
+        "passed": 4604,
+        "skipped": 2,
+        "deselected": 2262
+      }
+    },
+    "runtime_and_platform_retest": {
+      "summary": "3 failed, 71 passed in 51.30s",
+      "counts": {
+        "failed": 3,
+        "passed": 71
+      }
+    },
+    "certification_final_retest": {
+      "summary": "13 passed in 283.08s (0:04:43)",
+      "counts": {
+        "passed": 13
+      }
+    },
+    "final_collection": {
+      "summary": "6884 tests collected in 44.44s",
+      "counts": {
+        "tests collected": 6884
+      }
+    }
+  },
+  "all_seven_initial_phase4_failures_fixed_and_retested": true,
+  "full_suite_execution": "Interrupted by WSL environment failure; no final full-suite pass claimed.",
+  "python_compilation": "PASS",
+  "credential_scan": "PASS",
+  "dependency_check": "PASS",
+  "lint": {
+    "status": "FAIL",
+    "count": 1701,
+    "by_code": {
+      "I001": 97,
+      "E501": 1448,
+      "UP035": 31,
+      "UP017": 29,
+      "F401": 27,
+      "UP041": 1,
+      "F841": 1,
+      "F541": 1,
+      "UP034": 4,
+      "E402": 7,
+      "E702": 39,
+      "E701": 16
+    }
+  }
+}
