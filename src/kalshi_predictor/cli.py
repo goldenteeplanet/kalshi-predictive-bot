@@ -20455,6 +20455,163 @@ def candidate_funnel_audit_command(
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
+@app.command("no-opportunity-root-cause-audit")
+def no_opportunity_root_cause_audit_command(
+    runtime_worktree: Annotated[
+        Path,
+        typer.Option(help="Authoritative runtime checkout whose branch and SHA are fingerprinted."),
+    ],
+    runtime_reports_dir: Annotated[
+        Path,
+        typer.Option(help="Authoritative runtime reports directory."),
+    ],
+    env_path: Annotated[
+        Path,
+        typer.Option(help="Authoritative runtime .env containing the canonical database URL."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Prompt 1 Phase 0-3 read-only diagnostic output directory."),
+    ] = Path("reports/no_opportunity_root_cause"),
+    recent_limit: Annotated[
+        int,
+        typer.Option(help="Bounded recent snapshot, forecast, and ranking rows to inspect."),
+    ] = 5000,
+    allow_noncanonical: Annotated[
+        bool,
+        typer.Option(
+            help="Label an intentionally isolated empty/missing-env database noncanonical."
+        ),
+    ] = False,
+) -> None:
+    """Audit no-opportunity root causes; query-only and incapable of populating the database."""
+    from kalshi_predictor.no_opportunity_audit import (
+        write_no_opportunity_root_cause_audit,
+    )
+
+    if recent_limit < 100:
+        raise typer.BadParameter("recent-limit must be at least 100")
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: PAPER ONLY / SQLITE QUERY ONLY")
+    console.print("This audit does not fetch markets, books, forecasts, or rankings.")
+    artifacts = write_no_opportunity_root_cause_audit(
+        database_url=database_url,
+        output_dir=output_dir,
+        runtime_worktree=runtime_worktree,
+        runtime_reports_dir=runtime_reports_dir,
+        env_path=env_path,
+        recent_limit=recent_limit,
+        allow_noncanonical=allow_noncanonical,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote verdict: {artifacts.verdict_markdown}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
+@app.command("alpha-recovery-audit")
+def alpha_recovery_audit_command(
+    prompt1_dir: Annotated[
+        Path,
+        typer.Option(help="Completed no-opportunity Prompt 1 artifact directory."),
+    ] = Path("reports/no_opportunity_root_cause"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Prompt 2 shadow-only alpha-recovery output directory."),
+    ] = Path("reports/alpha_recovery"),
+    ranking_limit: Annotated[
+        int,
+        typer.Option(help="Maximum recent crypto rankings considered for replay."),
+    ] = 30000,
+    replay_limit: Annotated[
+        int,
+        typer.Option(help="Maximum isolated shadow decisions emitted."),
+    ] = 10000,
+    activation_approved: Annotated[
+        bool,
+        typer.Option(
+            help="Record explicit user approval; activation remains blocked until all gates pass."
+        ),
+    ] = False,
+) -> None:
+    """Run settlement replay and coverage/model experiments without guarded writes."""
+    from kalshi_predictor.alpha_recovery import write_alpha_recovery_reports
+
+    if ranking_limit < 100 or replay_limit < 100:
+        raise typer.BadParameter("ranking-limit and replay-limit must be at least 100")
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: SHADOW ONLY / SQLITE QUERY ONLY")
+    console.print(f"Explicit activation approval recorded: {activation_approved}")
+    console.print("Paper-order creation remains fail-closed until every readiness gate passes.")
+    artifacts = write_alpha_recovery_reports(
+        database_url=database_url,
+        prompt1_dir=prompt1_dir,
+        output_dir=output_dir,
+        ranking_limit=ranking_limit,
+        replay_limit=replay_limit,
+        activation_approved=activation_approved,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote paper readiness: {artifacts.paper_readiness}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
+@app.command("independent-domain-experiment")
+def independent_domain_experiment_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Phase 7 read-only domain selection and shadow report directory."),
+    ] = Path("reports/independent_domain_experiment"),
+) -> None:
+    """Rank independent domains and settlement-score the selected domain read-only."""
+    from kalshi_predictor.independent_domain_experiment import (
+        write_independent_domain_experiment,
+    )
+
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: PHASE 7 / SHADOW ONLY / SQLITE QUERY ONLY")
+    console.print("Paper/live/demo/autopilot and paper-order creation remain blocked.")
+    artifacts = write_independent_domain_experiment(
+        database_url=database_url,
+        output_dir=output_dir,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote domain ranking: {artifacts.domain_ranking}")
+    console.print(f"Wrote readiness: {artifacts.readiness}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
+@app.command("weather-alpha-validation")
+def weather_alpha_validation_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Weather settlement-lineage and shadow-validation reports."),
+    ] = Path("reports/weather_alpha_validation"),
+) -> None:
+    """Audit weather settlement gaps and walk-forward evidence query-only."""
+    from kalshi_predictor.weather_alpha_validation import write_weather_alpha_validation
+
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: WEATHER SHADOW VALIDATION / SQLITE QUERY ONLY")
+    console.print("Settlement writes are delegated to the existing serialized sync-settlements job.")
+    console.print("Paper/live/demo/autopilot and paper-order creation remain blocked.")
+    artifacts = write_weather_alpha_validation(
+        database_url=database_url,
+        output_dir=output_dir,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote settlement gap audit: {artifacts.gap_audit}")
+    console.print(f"Wrote readiness: {artifacts.readiness}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
 @app.command("candidate-coverage-audit")
 def candidate_coverage_audit_command(
     gh1_manifest_path: Annotated[
