@@ -40,6 +40,7 @@ def test_phase3ad_builds_paper_only_self_improvement_roadmap(tmp_path, monkeypat
     assert "rl-evaluate" in payload["expected_commands"]
     assert "feature-discovery-run" in payload["expected_commands"]
     assert "phase3ag-sports-link-repair-pass" in payload["expected_commands"]
+    assert "phase3ae-fast-market-harvester" in payload["expected_commands"]
     assert "phase3ah-round-placeholder-resolution" in payload["expected_commands"]
     assert "phase3ah-sports-placeholder-watch" in payload["expected_commands"]
     assert "phase3ah-roster-participant-verification" in payload["expected_commands"]
@@ -274,6 +275,7 @@ def test_phase3ad_writes_markdown_json_and_next_prompt(tmp_path, monkeypatch) ->
     assert "Automation Guardrails" in markdown
     assert "Build: Phase 3AE" in prompt
     assert "phase3ag-sports-link-repair-pass" in prompt
+    assert "phase3ae-fast-market-harvester" in prompt
     assert "phase3ah-round-placeholder-resolution" in prompt
     assert "phase3ah-sports-placeholder-watch" in prompt
     assert "phase3ah-roster-participant-verification" in prompt
@@ -287,6 +289,31 @@ def test_phase3ad_cli_help() -> None:
 
     assert result.exit_code == 0
     assert "Usage" in result.output
+
+
+def test_phase3ad_recognizes_existing_fast_market_harvest_report(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(phase3ad, "build_market_coverage_doctor", _coverage_stub)
+    _write_json(
+        Path("reports/phase3ae_fast_market/phase3ae_fast_market_harvester.json"),
+        {
+            "summary": {
+                "ranked_fast_settlement_candidates": 0,
+                "open_0_24h_markets_stale_or_missing_ranking": 3,
+            },
+            "recommended_next_action": "Refresh rankings and rerun the harvester.",
+        },
+    )
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        payload = build_phase_orchestrator(session, settings=Settings(), scan_limit=50)
+
+    assert payload["evidence"]["phase3ae_fast_market_harvester"]["available"] is True
+    assert payload["next_phase"]["title"] == "Fast Market Harvest Refresh"
+    assert "3 open 0-24h market(s)" in payload["next_phase"]["primary_reason"]
 
 
 def _session_factory(tmp_path):

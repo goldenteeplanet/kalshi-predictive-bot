@@ -28,6 +28,7 @@ def _base_row() -> dict:
         "has_current_forecast": True,
         "has_current_ranking": True,
         "raw_ev": "0.05",
+        "fee_adjusted_ev": "0.03",
         "executable_ev": "0.03",
         "no_book_reason": None,
         "executable_book": True,
@@ -49,7 +50,10 @@ def test_phase3ba_r3_first_weather_paper_blocker_order() -> None:
         ({"has_current_forecast": False}, "FORECAST_MISSING"),
         ({"has_current_ranking": False}, "RANKING_MISSING"),
         ({"raw_ev": "0"}, "EV_NOT_POSITIVE"),
-        ({"executable_ev": "0"}, "EXECUTABLE_EV_NOT_POSITIVE"),
+        (
+            {"fee_adjusted_ev": "0", "executable_ev": "0"},
+            "EXECUTABLE_EV_NOT_POSITIVE",
+        ),
         ({"executable_book": False, "no_book_reason": "INSUFFICIENT_DEPTH"}, "LIQUIDITY_TOO_LOW"),
         (
             {"executable_book": False, "no_book_reason": "INSUFFICIENT_BUY_SIDE_SIZE"},
@@ -67,6 +71,35 @@ def test_phase3ba_r3_first_weather_paper_blocker_order() -> None:
         row = _base_row()
         row.update(patch)
         assert phase3ba_r3._first_weather_paper_blocker(row) == expected
+
+
+def test_executable_ev_requires_an_executable_book() -> None:
+    fee_adjusted_ev = Decimal("0.03")
+
+    assert (
+        phase3ba_r3._executable_ev(
+            fee_adjusted_ev=fee_adjusted_ev,
+            executable_book=False,
+        )
+        is None
+    )
+    assert phase3ba_r3._executable_ev(
+        fee_adjusted_ev=fee_adjusted_ev,
+        executable_book=True,
+    ) == Decimal("0.03")
+
+
+def test_missing_book_keeps_existing_blocker_order_with_null_executable_ev() -> None:
+    row = _base_row()
+    row.update(
+        {
+            "executable_book": False,
+            "executable_ev": None,
+            "no_book_reason": "INSUFFICIENT_DEPTH",
+        }
+    )
+
+    assert phase3ba_r3._first_weather_paper_blocker(row) == "LIQUIDITY_TOO_LOW"
 
 
 def test_phase3ba_r3_summary_counts_ready_and_blockers() -> None:
