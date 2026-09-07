@@ -7,13 +7,26 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.ticker_windows import crypto_ticker_close_time_utc
-from kalshi_predictor.data.repositories import decode_json
-from kalshi_predictor.data.schema import AdvancedRiskDecisionLog
+from kalshi_predictor.current_research_common import (
+    crypto_candidate_sort_key as _diagnostic_sort_key,
+)
+from kalshi_predictor.current_research_common import decode_list
+from kalshi_predictor.current_research_common import (
+    format_cents as _cents,
+)
+from kalshi_predictor.current_research_common import (
+    latest_risk_decisions_by_ticker as _latest_risk_decisions_by_ticker,
+)
+from kalshi_predictor.current_research_common import (
+    markdown_cell as _cell,
+)
+from kalshi_predictor.current_research_common import (
+    read_json as _read_json,
+)
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3bc import write_phase3bc_crypto_clean_opportunity_report
@@ -23,6 +36,8 @@ from kalshi_predictor.utils.time import parse_datetime, utc_now
 PHASE3BC_R4_VERSION = "phase3bc_r4_crypto_ev_risk_readiness_diagnostics"
 MODEL_NAME = "crypto_v2"
 CURRENT_WINDOW_DIAGNOSTIC_EXPORT_LIMIT = 5000
+
+_decode_list = decode_list
 
 FRESHNESS_OK = "FRESH"
 RANKING_MISSING = "RANKING_MISSING"
@@ -581,40 +596,6 @@ def _what_would_make_ready(
     return _unique(actions)
 
 
-def _latest_risk_decisions_by_ticker(
-    session: Session,
-    tickers: list[str],
-) -> dict[str, dict[str, Any]]:
-    if not tickers:
-        return {}
-    seen: dict[str, dict[str, Any]] = {}
-    rows = session.scalars(
-        select(AdvancedRiskDecisionLog)
-        .where(AdvancedRiskDecisionLog.ticker.in_(tickers))
-        .order_by(
-            desc(AdvancedRiskDecisionLog.decision_timestamp),
-            desc(AdvancedRiskDecisionLog.id),
-        )
-    )
-    for row in rows:
-        if row.ticker in seen:
-            continue
-        seen[row.ticker] = {
-            "id": row.id,
-            "decision_timestamp": row.decision_timestamp.isoformat(),
-            "mode": row.mode,
-            "action": row.action,
-            "phase_3m_tier": row.phase_3m_tier,
-            "phase_3m_proposed_contracts": row.phase_3m_proposed_contracts,
-            "live_candidate_contracts": row.live_candidate_contracts,
-            "executed_contracts": row.executed_contracts,
-            "reason_codes": _decode_list(row.reason_codes_json),
-            "hard_blocks": _decode_list(row.hard_blocks_json),
-            "limiting_factors": _decode_list(row.limiting_factors_json),
-        }
-    return seen
-
-
 def _expected_value(row: dict[str, Any]) -> Decimal | None:
     value = to_decimal(row.get("expected_value"))
     if value is not None:
@@ -650,24 +631,10 @@ def _price_improvement_needed(
     return decimal_to_str((needed * Decimal("100")).quantize(Decimal("0.1")))
 
 
-def _cents(value: Decimal | None) -> str | None:
-    if value is None:
-        return None
-    return decimal_to_str((value * Decimal("100")).quantize(Decimal("0.1")))
-
-
 def _age_minutes(value: Any, *, now: Any) -> str | None:
     if value is None:
         return None
     return decimal_to_str(Decimal(str((now - value).total_seconds() / 60)).quantize(Decimal("0.1")))
-
-
-def _diagnostic_sort_key(row: dict[str, Any]) -> tuple[Decimal, Decimal, Decimal]:
-    return (
-        to_decimal(row.get("expected_value")) or Decimal("-999"),
-        to_decimal(row.get("opportunity_score")) or Decimal("0"),
-        to_decimal(row.get("estimated_edge")) or Decimal("0"),
-    )
 
 
 def _primary_gap(
@@ -870,21 +837,6 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _read_json(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _decode_list(value: str | None) -> list[Any]:
-    decoded = decode_json(value)
-    if isinstance(decoded, list):
-        return decoded
-    if decoded in (None, ""):
-        return []
-    return [decoded]
-
-
 def _unique(values: list[str]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
@@ -894,7 +846,3 @@ def _unique(values: list[str]) -> list[str]:
         seen.add(value)
         result.append(value)
     return result
-
-
-def _cell(value: Any) -> str:
-    return str(value or "").replace("|", "\\|").replace("\n", " ")

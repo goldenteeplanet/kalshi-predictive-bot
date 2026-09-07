@@ -4,11 +4,9 @@ import hashlib
 import json
 import uuid
 from dataclasses import asdict, dataclass
-from datetime import datetime
-from decimal import Decimal
 from typing import Any
 
-from kalshi_predictor.utils.decimals import decimal_to_str
+from kalshi_predictor.gh2_soak_common import json_safe as _json_safe
 
 READINESS_DECISION_SCHEMA_VERSION = "phase-3v-readiness-decision-v1"
 EVIDENCE_MANIFEST_SCHEMA_VERSION = "phase-3v-evidence-manifest-v1"
@@ -133,16 +131,3 @@ def stable_id(prefix: str, *parts: Any) -> str:
 def parse_required_roles(value: str | None) -> tuple[str, ...]:
     roles = [item.strip() for item in (value or "").split(",") if item.strip()]
     return tuple(roles or ["owner", "risk", "operator"])
-
-
-def _json_safe(value: Any) -> Any:
-    if isinstance(value, Decimal):
-        return decimal_to_str(value)
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, dict):
-        return {str(key): _json_safe(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [_json_safe(item) for item in value]
-    return value
-

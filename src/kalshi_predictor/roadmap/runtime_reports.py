@@ -30,6 +30,7 @@ from kalshi_predictor.data.schema import (
     SportsMarketLink,
     WeatherMarketLink,
 )
+from kalshi_predictor.gh2_soak_common import as_utc as _as_utc
 from kalshi_predictor.roadmap.artifacts import write_signed_artifact
 from kalshi_predictor.roadmap.category_census import build_category_ingestion_census
 from kalshi_predictor.roadmap.category_contract import CATEGORY_NAMES
@@ -599,10 +600,6 @@ def _paper_next_actions(
             }
         )
     return actions
-
-
-def _as_utc(value: datetime) -> datetime:
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 def _age_hours(now: datetime, created_at: datetime) -> float:

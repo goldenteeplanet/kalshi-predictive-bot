@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from kalshi_predictor.historical_replay_common import markdown_cell_none as _md
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.utils.time import utc_now
 
@@ -624,9 +625,3 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         lines.append(f"- `{command}`")
     lines.extend(["", "## Recommended Next Action", "", payload["recommended_next_action"], ""])
     return "\n".join(lines)
-
-
-def _md(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).replace("|", "\\|").replace("\n", " ")

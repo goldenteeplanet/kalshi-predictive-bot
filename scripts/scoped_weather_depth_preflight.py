@@ -20,11 +20,11 @@ from kalshi_predictor.data.schema import (
     PositionSizingDecisionLog,
     Settlement,
 )
+from kalshi_predictor.forecasting.registry import run_forecast_models
 from kalshi_predictor.kalshi.client import KalshiClient
 from kalshi_predictor.kalshi.orderbook import usable_bid_ask_book
-from kalshi_predictor.forecasting.registry import run_forecast_models
-from kalshi_predictor.opportunities.scanner import scan_opportunities
 from kalshi_predictor.learning.config import learning_paper_settings
+from kalshi_predictor.opportunities.scanner import scan_opportunities
 from kalshi_predictor.paper.models import PaperDecision
 from kalshi_predictor.position_sizing.service import (
     ensure_paper_decision_sized,
@@ -32,6 +32,17 @@ from kalshi_predictor.position_sizing.service import (
 )
 from kalshi_predictor.utils.decimals import to_decimal
 from kalshi_predictor.utils.time import utc_now
+
+
+def evaluate_paper_decision_without_persisting(session, decision, *, settings):
+    """Run Phase 3M/3N for telemetry while rolling back their decision logs."""
+    savepoint = session.begin_nested()
+    try:
+        sized = ensure_paper_decision_sized(session, decision, settings=settings)
+        session.flush()
+        return copy.deepcopy(sized.raw_decision_json)
+    finally:
+        savepoint.rollback()
 
 
 def select_scoped_gate_rows(payload, requested_tickers):
@@ -72,6 +83,7 @@ def _eligible_for_scoped_sizing(row):
             },
         )
     )
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -221,13 +233,14 @@ def main() -> None:
                 price = to_decimal(ranking.best_price)
                 if not book.usable or book.ask_price != price:
                     raise RuntimeError(
-                        f"{ticker}: fresh executable ask {book.ask_price} does not match ranking {price}"
+                        f"{ticker}: fresh executable ask {book.ask_price} "
+                        f"does not match ranking {price}"
                     )
                 depth = book.ask_depth
                 depth_cap = int(depth.to_integral_value(rounding=ROUND_FLOOR)) if depth else 0
                 if depth_cap < 1:
                     raise RuntimeError(f"{ticker}: exact-level depth cap is zero")
-                sized = ensure_paper_decision_sized(
+                raw = evaluate_paper_decision_without_persisting(
                     session,
                     PaperDecision(
                         ticker=ticker,
@@ -265,7 +278,6 @@ def main() -> None:
                     ),
                     settings=settings,
                 )
-                raw = sized.raw_decision_json
                 sizing = raw["position_sizing_decision"]
                 risk = raw["advanced_risk_decision"]
                 proposed = int(sizing["proposed_contracts"])
@@ -283,12 +295,14 @@ def main() -> None:
                         "fresh_snapshot_id": snapshot.id,
                         "fresh_snapshot_at": captured_at.isoformat(),
                         "depth_cap_contracts": depth_cap,
-                        "phase3m_decision_id": raw["position_sizing_decision_id"],
+                        "phase3m_decision_id": None,
+                        "phase3m_evaluation_id": raw["position_sizing_decision_id"],
                         "phase3m_tier": sizing["tier"],
                         "phase3m_proposed_contracts": proposed,
                         "phase3m_live_candidate_contracts": sizing["live_candidate_contracts"],
                         "phase3m_limiting_factors": sizing["limiting_factors"],
-                        "phase3n_decision_id": raw["advanced_risk_decision_id"],
+                        "phase3n_decision_id": None,
+                        "phase3n_evaluation_id": raw["advanced_risk_decision_id"],
                         "phase3n_action": risk["action"],
                         "phase3n_live_candidate_contracts": risk["live_candidate_contracts"],
                         "phase3n_hard_blocks": risk["hard_blocks"],
@@ -416,6 +430,7 @@ def refresh_unchanged_historical_cache(
         ),
     }
     return refreshed
+
 
 def _read_state(path: Path | None) -> dict:
     if path is None or not path.exists():

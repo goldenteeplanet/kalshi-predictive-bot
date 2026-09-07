@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 import csv
 import hashlib
+import json
 import subprocess
 import sys
 import time
@@ -24,16 +24,30 @@ from kalshi_predictor.active_universe import (
 )
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.repository import get_latest_crypto_features
-from kalshi_predictor.data.backend import database_url_from_settings, redact_database_url
-from kalshi_predictor.data.db import describe_db_location
-from kalshi_predictor.data.locks import db_writer_monitor
 from kalshi_predictor.crypto.semantics import (
     EXACT_LINK,
     CryptoMarketTerms,
     select_compatible_crypto_feature,
     terms_from_link_payload,
 )
-from kalshi_predictor.data.repositories import decode_json, encode_json, insert_market_snapshot, upsert_market
+from kalshi_predictor.current_research_common import (
+    int_from_float_or_none as _history_int,
+)
+from kalshi_predictor.current_research_common import (
+    latest_crypto_v2_forecast as _latest_forecast,
+)
+from kalshi_predictor.current_research_common import (
+    latest_market_snapshot as _latest_snapshot,
+)
+from kalshi_predictor.data.backend import database_url_from_settings, redact_database_url
+from kalshi_predictor.data.db import describe_db_location
+from kalshi_predictor.data.locks import db_writer_monitor
+from kalshi_predictor.data.repositories import (
+    decode_json,
+    encode_json,
+    insert_market_snapshot,
+    upsert_market,
+)
 from kalshi_predictor.data.schema import (
     CryptoFeature,
     CryptoMarketLink,
@@ -1720,15 +1734,6 @@ def _summary(
     }
 
 
-def _latest_snapshot(session: Session, ticker: str) -> MarketSnapshot | None:
-    return session.scalar(
-        select(MarketSnapshot)
-        .where(MarketSnapshot.ticker == ticker)
-        .order_by(desc(MarketSnapshot.captured_at), desc(MarketSnapshot.id))
-        .limit(1)
-    )
-
-
 def _unique_tickers(tickers: list[str]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
@@ -1739,15 +1744,6 @@ def _unique_tickers(tickers: list[str]) -> list[str]:
         seen.add(value)
         result.append(value)
     return result
-
-
-def _latest_forecast(session: Session, ticker: str) -> Forecast | None:
-    return session.scalar(
-        select(Forecast)
-        .where(Forecast.ticker == ticker, Forecast.model_name == "crypto_v2")
-        .order_by(desc(Forecast.forecasted_at), desc(Forecast.id))
-        .limit(1)
-    )
 
 
 def _latest_skip(session: Session, ticker: str) -> ForecastSkipLog | None:
@@ -1787,15 +1783,6 @@ def _history_minutes(feature: CryptoFeature | None) -> int | None:
     raw = decode_json(feature.raw_json)
     value = raw.get("history_minutes")
     return _history_int(value)
-
-
-def _history_int(value: Any) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(float(value))
-    except (TypeError, ValueError):
-        return None
 
 
 def _skip_reason_counts(session: Session) -> dict[str, int]:

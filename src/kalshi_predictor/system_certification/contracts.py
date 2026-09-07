@@ -6,13 +6,11 @@ import hashlib
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
-from decimal import Decimal
 from typing import Any
 
+from kalshi_predictor.gh2_soak_common import json_safe as _json_safe
 from kalshi_predictor.system_certification.connection_registry import legacy_connections
 from kalshi_predictor.system_certification.phase_registry import legacy_phases
-from kalshi_predictor.utils.decimals import decimal_to_str
 
 SCHEMA_VERSION = "1.1.0"
 REGISTRY_VERSION = "phase_3w_r_authoritative_phase_registry_v1"
@@ -412,15 +410,3 @@ def sha256_json(value: Any) -> str:
 def stable_id(prefix: str, *parts: Any) -> str:
     text = "|".join(str(part) for part in parts)
     return f"{prefix}_{uuid.uuid5(uuid.NAMESPACE_URL, f'kalshi_predictor:phase_3w:{text}')}"
-
-
-def _json_safe(value: Any) -> Any:
-    if isinstance(value, Decimal):
-        return decimal_to_str(value)
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, dict):
-        return {str(key): _json_safe(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [_json_safe(item) for item in value]
-    return value

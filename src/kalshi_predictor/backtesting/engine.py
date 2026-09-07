@@ -17,6 +17,7 @@ from kalshi_predictor.data.schema import (
     MarketSnapshot,
     Settlement,
 )
+from kalshi_predictor.historical_replay_common import settlement_to_y_true as _settlement_to_y_true
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES
 from kalshi_predictor.utils.decimals import decimal_to_str
 from kalshi_predictor.utils.time import utc_now
@@ -195,14 +196,3 @@ def _trade_from_decision(
         "yes_probability": float(decision.yes_probability),
         "y_true": y_true,
     }
-
-
-def _settlement_to_y_true(result: str | None) -> int | None:
-    if result is None:
-        return None
-    normalized = result.strip().lower()
-    if normalized in {"yes", "y", "1", "true"}:
-        return 1
-    if normalized in {"no", "n", "0", "false"}:
-        return 0
-    return None

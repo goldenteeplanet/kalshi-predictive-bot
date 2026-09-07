@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from kalshi_predictor.current_research_common import int_or_none as _int_value
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
 R5_PRIMARY_EV_NOT_POSITIVE = "EV_NOT_POSITIVE"
@@ -161,15 +162,6 @@ def _age_minutes(generated_at: Any, now: Any) -> float | None:
     if generated_at is None:
         return None
     return max(0.0, (now - generated_at).total_seconds() / 60)
-
-
-def _int_value(value: Any) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _read_json(path: Path) -> dict[str, Any]:

@@ -10,6 +10,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.data.schema import PaperOrder, PaperPnl, PaperPosition, Settlement
+from kalshi_predictor.historical_replay_common import normalize_result as _normalize_result
 from kalshi_predictor.paper.models import ORDER_FILLED
 from kalshi_predictor.paper.settlement_reconciliation import (
     PAPER_ONLY_SAFETY,
@@ -232,17 +233,6 @@ def _normalized_settlement_result(settlement: Settlement | None) -> str | None:
     if value is not None:
         return normalized or "scalar"
     return normalized
-
-
-def _normalize_result(value: object) -> str | None:
-    if value is None:
-        return None
-    normalized = str(value).strip().lower()
-    if normalized in {"yes", "y", "1", "true"}:
-        return "yes"
-    if normalized in {"no", "n", "0", "false"}:
-        return "no"
-    return normalized or None
 
 
 def _decimal_or_none(value: object) -> Decimal | None:

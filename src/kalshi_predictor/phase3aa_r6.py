@@ -11,6 +11,24 @@ from sqlalchemy.orm import Session
 
 from kalshi_predictor.data.repositories import decode_json, upsert_market, upsert_settlement
 from kalshi_predictor.data.schema import Market, Settlement
+from kalshi_predictor.historical_replay_common import (
+    has_usable_outcome as _has_usable_outcome,
+)
+from kalshi_predictor.historical_replay_common import (
+    is_local_derived_composite_ticker as _is_local_derived_composite_ticker,
+)
+from kalshi_predictor.historical_replay_common import (
+    markdown_cell_empty as _md,
+)
+from kalshi_predictor.historical_replay_common import (
+    normalize_result as _normalize_result,
+)
+from kalshi_predictor.historical_replay_common import (
+    source_is_closed_without_outcome as _source_is_closed_without_outcome,
+)
+from kalshi_predictor.historical_replay_common import (
+    source_is_settled as _source_is_settled,
+)
 from kalshi_predictor.kalshi.client import KalshiClient, KalshiClientError
 from kalshi_predictor.paper.models import ORDER_FILLED
 from kalshi_predictor.paper.settlement_reconciliation import (
@@ -457,29 +475,6 @@ def _source_fields(payload: Mapping[str, Any], source_ticker: str) -> dict[str, 
     }
 
 
-def _has_usable_outcome(payload: Mapping[str, Any]) -> bool:
-    result = payload.get("result")
-    if result is not None and str(result).strip():
-        return True
-    return (
-        payload.get("settlement_value_dollars") is not None
-        or payload.get("settlement_value") is not None
-        or payload.get("yes_settlement_value") is not None
-    )
-
-
-def _source_is_closed_without_outcome(payload: Mapping[str, Any]) -> bool:
-    status = str(payload.get("status") or "").strip().lower()
-    return status in SOURCE_CLOSED_STATUSES and not _has_usable_outcome(payload)
-
-
-def _source_is_settled(payload: Mapping[str, Any]) -> bool:
-    status = str(payload.get("status") or "").strip().lower()
-    return status in SOURCE_SETTLED_STATUSES or bool(
-        payload.get("settlement_ts") or payload.get("settled_time") or payload.get("settled_at")
-    )
-
-
 def _extract_mve_components(payload: dict[str, Any]) -> list[dict[str, Any]]:
     selected_legs = payload.get("mve_selected_legs")
     if not isinstance(selected_legs, list):
@@ -639,17 +634,6 @@ def _selected_side_won(selected_side: str, yes_value: Decimal | None) -> bool | 
     if selected_side == "no":
         return yes_value == Decimal("0")
     return None
-
-
-def _normalize_result(value: object) -> str | None:
-    if value is None:
-        return None
-    normalized = str(value).strip().lower()
-    if normalized in {"yes", "y", "1", "true"}:
-        return "yes"
-    if normalized in {"no", "n", "0", "false"}:
-        return "no"
-    return normalized or None
 
 
 def _normalize_side(value: object) -> str | None:
@@ -855,13 +839,3 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         lines.append(f"| ... | {len(payload['rows']) - 50} more |  |  |  |  |")
     lines.extend(["", "## Next Action", "", payload["recommended_next_action"]])
     return "\n".join(lines) + "\n"
-
-
-def _md(value: Any) -> str:
-    if value is None or value == "":
-        return ""
-    return str(value).replace("|", "\\|").replace("\n", " ")
-
-
-def _is_local_derived_composite_ticker(ticker: str) -> bool:
-    return ticker.startswith(LOCAL_DERIVED_TICKER_PREFIXES)
