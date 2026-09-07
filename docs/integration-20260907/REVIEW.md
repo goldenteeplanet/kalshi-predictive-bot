@@ -171,6 +171,17 @@ does not establish readiness to start a paper-trading service.
 
 ## Follow-up boundaries
 
+PR follow-up: [pull request #57](https://github.com/goldenteeplanet/kalshi-predictive-bot/pull/57)
+contains the hosted validation. Its first cumulative-safety run exposed three
+recovery-certification failures because the checkout omitted historical commits.
+The cumulative and full-suite jobs now fetch full history, retaining the existing
+ancestry and blob checks. The local workflow and recovery-certification retest
+passed all 24 cases. The PR's current checks are authoritative for its latest SHA.
+
+A [bounded paper-readiness rehearsal](PAPER_REHEARSAL.md) is prepared with fresh
+public-market evidence and an empty, unsynced database. It has not been started
+and does not authorize paper or exchange order creation.
+
 - Reconcile later work from concurrently running tasks as a separate, explicit input.
 - Open the integration pull request and require hosted CI to pass before merging.
 - Prepare a bounded paper-only readiness rehearsal before starting any service.
