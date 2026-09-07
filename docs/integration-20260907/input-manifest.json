@@ -1,7 +1,7 @@
 {
   "created_at": "2026-09-07T19:29:37.820091+00:00",
   "integration_branch": "integration/all-code-20260907",
-  "reviewed_commit": "990af10b39f0f185aec6e40340bb393af5e643ee",
+  "reviewed_commit": "f476c12740caa15f5014a74f6ce2b982da181ff9",
   "origin_main": "1d28ddcf1487d16daaf9c4d7f487859a83fe657c",
   "branches": [
     {
@@ -1877,5 +1877,7 @@
       "destination": "archive/workspace-reference/tmp/repair_cli_phase3ax_r6.py"
     }
   ],
-  "scope": "The original branch inventory and named immutable worktree snapshots. Concurrent work after those snapshots is not included."
+  "scope": "The original branch inventory and named immutable worktree snapshots. Concurrent work after those snapshots is not included.",
+  "cleanup_start_commit": "508d081",
+  "cleanup_scope": "Existing integration only; no later active-task changes fetched or merged."
 }

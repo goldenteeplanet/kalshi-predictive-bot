@@ -1,76 +1,341 @@
 {
-  "tested_code_commit": "990af10b39f0f185aec6e40340bb393af5e643ee",
-  "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
-  "package_versions": {
-    "pytest": "9.1.1",
-    "ruff": "0.16.6",
-    "SQLAlchemy": "2.0.52",
-    "fastapi": "0.141.1",
-    "typer": "0.26.8"
+  "tested_code_commit": "f476c12740caa15f5014a74f6ce2b982da181ff9",
+  "environment": {
+    "python": "3.11.9",
+    "image": "python:3.11.9-slim",
+    "image_digest": "sha256:8fb099199b9f2d70342674bd9dbccd3ed03a258f26bbd1d556822c6dfc60c317",
+    "os": "Debian 12 Linux container; CI uses Ubuntu 24.04",
+    "dependencies": [
+      "alembic==1.13.0",
+      "annotated-doc==0.0.5",
+      "annotated-types==0.8.0",
+      "anyio==4.15.1",
+      "certifi==2026.7.22",
+      "cffi==2.1.1",
+      "click==8.5.0",
+      "cryptography==42.0.0",
+      "fastapi==0.115.0",
+      "greenlet==3.5.5",
+      "h11==0.16.0",
+      "httpcore==1.0.9",
+      "httpx==0.27.0",
+      "idna==3.19",
+      "iniconfig==2.3.0",
+      "Jinja2==3.1.0",
+      "-e git+file:///tmp/integration-cleanup.bundle@c1c735c05bcb9d9ca20b11ca8f4a2b754ce18e03#egg=kalshi_predictive_bot",
+      "Mako==1.4.1",
+      "markdown-it-py==4.2.0",
+      "MarkupSafe==3.0.3",
+      "mdurl==0.1.2",
+      "mypy==1.10.0",
+      "mypy_extensions==1.1.0",
+      "numpy==1.26.0",
+      "packaging==26.3",
+      "pandas==2.2.0",
+      "pandas-stubs==2.2.2.240603",
+      "pluggy==1.6.0",
+      "psycopg==3.1.4",
+      "psycopg-binary==3.1.4",
+      "pycparser==3.0",
+      "pydantic==2.13.5",
+      "pydantic-settings==2.2.0",
+      "pydantic_core==2.46.5",
+      "Pygments==2.21.0",
+      "pytest==8.2.0",
+      "python-dateutil==2.9.0.post0",
+      "python-dotenv==1.2.3",
+      "pytz==2026.3.post1",
+      "rich==13.8.0",
+      "ruff==0.5.0",
+      "shellingham==1.5.4",
+      "six==1.17.0",
+      "sniffio==1.3.1",
+      "SQLAlchemy==2.0.0",
+      "starlette==0.38.6",
+      "typer==0.26.0",
+      "types-pytz==2026.3.1.20260727",
+      "typing-inspection==0.4.4",
+      "typing_extensions==4.16.0",
+      "tzdata==2026.3",
+      "uvicorn==0.30.0",
+      "websockets==15.0"
+    ],
+    "isolation": "Four independent clean checkouts, separate pytest temporary directories, no host credentials or databases mounted."
   },
-  "test_runs": {
-    "integration_regressions": {
-      "summary": "41 passed, 2 warnings in 124.44s (0:02:04)",
-      "counts": {
-        "passed": 41
-      }
+  "full_suite": {
+    "code_commit": "c1c735c",
+    "collected": 6884,
+    "complete_unique_coverage": true,
+    "duplicate_executions": 13,
+    "unique_outcomes": {
+      "passed": 6873,
+      "failure": 10,
+      "skipped": 1
     },
-    "core_regressions": {
-      "summary": "70 passed in 162.83s (0:02:42)",
-      "counts": {
-        "passed": 70
-      }
+    "coverage_note": "Set-derived parameter ordering differed across processes. Thirteen missing cases passed in a supplemental batch; future runs sort node IDs before partitioning.",
+    "test_ids_sha256": "d4d16cba9b8f36021807b863ee0c863adfc8a415b5b4b84195456a841c08deea",
+    "totals": {
+      "tests": 6897,
+      "passed": 6886,
+      "errors": 0,
+      "failures": 10,
+      "skipped": 1
     },
-    "phase4_initial_run": {
-      "summary": "7 failed, 4604 passed, 2 skipped, 2262 deselected, 2 warnings in 577.00s (0:09:36)",
-      "counts": {
-        "failed": 7,
-        "passed": 4604,
-        "skipped": 2,
-        "deselected": 2262
+    "workers": [
+      {
+        "worker": 0,
+        "tests": 1721,
+        "errors": 0,
+        "failures": 3,
+        "skipped": 0,
+        "seconds": 6391.35,
+        "passed": 1718,
+        "issues": [
+          {
+            "test": "tests.test_phase4aj_independent_proposal_review::test_missing_history_link_fails_closed",
+            "outcome": "failure",
+            "message": "AssertionError: Regex pattern did not match.\n Regex: 'HISTORY_INVALID'\n Input: 'PHASE4AJ_LINEAGE_FAILURE_AC'",
+            "detail": "tests/test_phase4aj_independent_proposal_review.py:170: in test_missing_history_link_fails_closed\n    _build(f)\ntests/test_phase4aj_independent_proposal_review.py:56: in _build\n    return f[\"module\"].build(\nscripts/local/phase4aj_independent_proposal_review.py:242: in build\n    _validate_lineage(\nscripts/local/phase4aj_independent_proposal_review.py:143: in _validate_lineage\n    raise ValueError(f\"PHASE4AJ_LINEAGE_FAILURE_{failed[0]}\")\nE   ValueError: PHASE4AJ_LINEAGE_FAILURE_AC\n\nDuring handling of the above exception, another exception occurred:\ntests/test_phase4aj_independent_proposal_review.py:169: in test_missing_history_link_fails_closed\n    with pytest.raises(ValueError, match=\"HISTORY_INVALID\"):\nE   AssertionError: Regex pattern did not match.\nE    Regex: 'HISTORY_INVALID'\nE    Input: 'PHASE4AJ_LINEAGE_FAILURE_AC'"
+          },
+          {
+            "test": "tests.test_supported_weather_snapshot_forecast::test_exact_tickers_are_deduplicated_and_bounded",
+            "outcome": "failure",
+            "message": "AssertionError: assert ['A', 'B'] == ['B', 'A']\n  \n  At index 0 diff: 'A' != 'B'\n  \n  Full diff:\n    [\n  +     'A',\n        'B',\n  -     'A',\n    ]",
+            "detail": "tests/test_supported_weather_snapshot_forecast.py:16: in test_exact_tickers_are_deduplicated_and_bounded\n    assert _MODULE._exact_tickers(payload, 2) == [\"B\", \"A\"]\nE   AssertionError: assert ['A', 'B'] == ['B', 'A']\nE     \nE     At index 0 diff: 'A' != 'B'\nE     \nE     Full diff:\nE       [\nE     +     'A',\nE           'B',\nE     -     'A',\nE       ]"
+          },
+          {
+            "test": "tests.test_ui_obs3e_security_hardening::test_untrusted_host_is_rejected",
+            "outcome": "failure",
+            "message": "FileNotFoundError: /validation/shard-0/data/kalshi_phase1.db",
+            "detail": "tests/test_ui_obs3e_security_hardening.py:41: in test_untrusted_host_is_rejected\n    with TestClient(create_app()) as client:\nsrc/kalshi_predictor/ui/app.py:110: in create_app\n    create_router(\nsrc/kalshi_predictor/ui/routes.py:500: in create_router\n    engine = make_sqlite_read_only_engine() if resolved_settings.ui_read_only else init_db()\nsrc/kalshi_predictor/data/db.py:56: in make_sqlite_read_only_engine\n    raise FileNotFoundError(path)\nE   FileNotFoundError: /validation/shard-0/data/kalshi_phase1.db"
+          }
+        ]
+      },
+      {
+        "worker": 1,
+        "tests": 1721,
+        "errors": 0,
+        "failures": 3,
+        "skipped": 1,
+        "seconds": 6260.294,
+        "passed": 1717,
+        "issues": [
+          {
+            "test": "tests.test_kalshi_sdk_conformance::test_sdk_and_local_orderbook_snapshot_and_delta_are_conformant",
+            "outcome": "skipped",
+            "message": "could not import 'kalshi': No module named 'kalshi'",
+            "detail": "/validation/shard-1/tests/test_kalshi_sdk_conformance.py:91: could not import 'kalshi': No module named 'kalshi'"
+          },
+          {
+            "test": "tests.test_phase4ak_readiness_envelope::test_missing_history_link_fails_closed",
+            "outcome": "failure",
+            "message": "AssertionError: Regex pattern did not match.\n Regex: 'HISTORY_INVALID'\n Input: 'PHASE4AK_LINEAGE_FAILURE_AJ_AC'",
+            "detail": "tests/test_phase4ak_readiness_envelope.py:177: in test_missing_history_link_fails_closed\n    _build(f)\ntests/test_phase4ak_readiness_envelope.py:58: in _build\n    return f[\"ak\"].build(\nscripts/local/phase4ak_readiness_envelope.py:222: in build\n    _validate_lineage(\nscripts/local/phase4ak_readiness_envelope.py:185: in _validate_lineage\n    raise ValueError(f\"PHASE4AK_LINEAGE_FAILURE_{failed[0]}\")\nE   ValueError: PHASE4AK_LINEAGE_FAILURE_AJ_AC\n\nDuring handling of the above exception, another exception occurred:\ntests/test_phase4ak_readiness_envelope.py:176: in test_missing_history_link_fails_closed\n    with pytest.raises(ValueError, match=\"HISTORY_INVALID\"):\nE   AssertionError: Regex pattern did not match.\nE    Regex: 'HISTORY_INVALID'\nE    Input: 'PHASE4AK_LINEAGE_FAILURE_AJ_AC'"
+          },
+          {
+            "test": "tests.test_phase_prov14b_r3::test_exact_diagnosis_separates_closed_stale_current_and_mismatch",
+            "outcome": "failure",
+            "message": "AssertionError: assert set() == {'WX-MISMATCH', 'WX-STALE', 'WX-CURRENT'}\n  \n  Extra items in the right set:\n  'WX-MISMATCH'\n  'WX-STALE'\n  'WX-CURRENT'\n  \n  Full diff:\n  + set()\n  - {\n  -     'WX-CURRENT',\n  -     'WX-MISMATCH',\n  -     'WX-STALE',\n  - }",
+            "detail": "tests/test_phase_prov14b_r3.py:57: in test_exact_diagnosis_separates_closed_stale_current_and_mismatch\n    assert {row.ticker for row in selector_rows} == {\"WX-CURRENT\", \"WX-MISMATCH\", \"WX-STALE\"}\nE   AssertionError: assert set() == {'WX-MISMATCH', 'WX-STALE', 'WX-CURRENT'}\nE     \nE     Extra items in the right set:\nE     'WX-MISMATCH'\nE     'WX-STALE'\nE     'WX-CURRENT'\nE     \nE     Full diff:\nE     + set()\nE     - {\nE     -     'WX-CURRENT',\nE     -     'WX-MISMATCH',\nE     -     'WX-STALE',\nE     - }"
+          },
+          {
+            "test": "tests.test_ui_obs3e_security_hardening::test_security_headers_and_no_store",
+            "outcome": "failure",
+            "message": "FileNotFoundError: /validation/shard-1/data/kalshi_phase1.db",
+            "detail": "tests/test_ui_obs3e_security_hardening.py:8: in test_security_headers_and_no_store\n    with TestClient(create_app()) as client:\nsrc/kalshi_predictor/ui/app.py:110: in create_app\n    create_router(\nsrc/kalshi_predictor/ui/routes.py:500: in create_router\n    engine = make_sqlite_read_only_engine() if resolved_settings.ui_read_only else init_db()\nsrc/kalshi_predictor/data/db.py:56: in make_sqlite_read_only_engine\n    raise FileNotFoundError(path)\nE   FileNotFoundError: /validation/shard-1/data/kalshi_phase1.db"
+          }
+        ]
+      },
+      {
+        "worker": 2,
+        "tests": 1721,
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "seconds": 5841.952,
+        "passed": 1719,
+        "issues": [
+          {
+            "test": "tests.test_phase_prov14b_r4::test_partial_snapshot_preserves_existing_exact_close_time",
+            "outcome": "failure",
+            "message": "AssertionError: assert [] == ['WX-PRESERVE']\n  \n  Right contains one more item: 'WX-PRESERVE'\n  \n  Full diff:\n  + []\n  - [\n  -     'WX-PRESERVE',\n  - ]",
+            "detail": "tests/test_phase_prov14b_r4.py:31: in test_partial_snapshot_preserves_existing_exact_close_time\n    assert [row.ticker for row in rows] == [\"WX-PRESERVE\"]\nE   AssertionError: assert [] == ['WX-PRESERVE']\nE     \nE     Right contains one more item: 'WX-PRESERVE'\nE     \nE     Full diff:\nE     + []\nE     - [\nE     -     'WX-PRESERVE',\nE     - ]"
+          },
+          {
+            "test": "tests.test_ui_obs3e_security_hardening::test_audit_log_excludes_query_and_sensitive_value",
+            "outcome": "failure",
+            "message": "FileNotFoundError: /validation/shard-2/data/kalshi_phase1.db",
+            "detail": "tests/test_ui_obs3e_security_hardening.py:20: in test_audit_log_excludes_query_and_sensitive_value\n    with TestClient(create_app()) as client:\nsrc/kalshi_predictor/ui/app.py:110: in create_app\n    create_router(\nsrc/kalshi_predictor/ui/routes.py:500: in create_router\n    engine = make_sqlite_read_only_engine() if resolved_settings.ui_read_only else init_db()\nsrc/kalshi_predictor/data/db.py:56: in make_sqlite_read_only_engine\n    raise FileNotFoundError(path)\nE   FileNotFoundError: /validation/shard-2/data/kalshi_phase1.db"
+          }
+        ]
+      },
+      {
+        "worker": 3,
+        "tests": 1721,
+        "errors": 0,
+        "failures": 2,
+        "skipped": 0,
+        "seconds": 5847.843,
+        "passed": 1719,
+        "issues": [
+          {
+            "test": "tests.test_historical_replay_common::test_historical_replay_scan_has_no_exact_duplicates",
+            "outcome": "failure",
+            "message": "AssertionError: assert [{'fingerprint': 'd20be03141ee', 'members': [{'module': 'workstation/component_recovery_differential_replay.py', 'function': '_hash', 'line': 187}, {'module': 'workstation/recovery_replay_idempotency.py', 'function': '_hash', 'line': 196}], 'disposition': 'review_before_merge'}, {'fingerprint': 'e5b8d59f953c', 'members': [{'module': 'phase4cd/read_model_differential_replay.py', 'function': '_hash', 'line': 109}, {'module': 'ui/dashboard_settlement_timeline.py', 'function': '_hash', 'line': 277}], 'disposition': 'review_before_merge'}] == []\n  \n  Left contains 2 more items, first extra item: {'disposition': 'review_before_merge', 'fingerprint': 'd20be03141ee', 'members': [{'function': '_hash', 'line': 187, '..._differential_replay.py'}, {'function': '_hash', 'line': 196, 'module': 'workstation/recovery_replay_idempotency.py'}]}\n  \n  Full diff:\n  - []\n  + [\n  +     {\n  +         'disposition': 'review_before_merge',\n  +         'fingerprint': 'd20be03141ee',\n  +         'members': [\n  +             {\n  +                 'function': '_hash',\n  +                 'line': 187,\n  +                 'module': 'workstation/component_recovery_differential_replay.py',\n  +             },\n  +             {\n  +                 'function': '_hash',\n  +                 'line': 196,\n  +                 'module': 'workstation/recovery_replay_idempotency.py',\n  +             },\n  +         ],\n  +     },\n  +     {\n  +         'disposition': 'review_before_merge',\n  +         'fingerprint': 'e5b8d59f953c',\n  +         'members': [\n  +             {\n  +                 'function': '_hash',\n  +                 'line': 109,\n  +                 'module': 'phase4cd/read_model_differential_replay.py',\n  +             },\n  +             {\n  +                 'function': '_hash',\n  +                 'line': 277,\n  +                 'module': 'ui/dashboard_settlement_timeline.py',\n  +             },\n  +         ],\n  +     },\n  + ]",
+            "detail": "tests/test_historical_replay_common.py:90: in test_historical_replay_scan_has_no_exact_duplicates\n    assert payload[\"historical_replay_duplicate_helpers\"] == []\nE   AssertionError: assert [{'fingerprint': 'd20be03141ee', 'members': [{'module': 'workstation/component_recovery_differential_replay.py', 'function': '_hash', 'line': 187}, {'module': 'workstation/recovery_replay_idempotency.py', 'function': '_hash', 'line': 196}], 'disposition': 'review_before_merge'}, {'fingerprint': 'e5b8d59f953c', 'members': [{'module': 'phase4cd/read_model_differential_replay.py', 'function': '_hash', 'line': 109}, {'module': 'ui/dashboard_settlement_timeline.py', 'function': '_hash', 'line': 277}], 'disposition': 'review_before_merge'}] == []\nE     \nE     Left contains 2 more items, first extra item: {'disposition': 'review_before_merge', 'fingerprint': 'd20be03141ee', 'members': [{'function': '_hash', 'line': 187, '..._differential_replay.py'}, {'function': '_hash', 'line': 196, 'module': 'workstation/recovery_replay_idempotency.py'}]}\nE     \nE     Full diff:\nE     - []\nE     + [\nE     +     {\nE     +         'disposition': 'review_before_merge',\nE     +         'fingerprint': 'd20be03141ee',\nE     +         'members': [\nE     +             {\nE     +                 'function': '_hash',\nE     +                 'line': 187,\nE     +                 'module': 'workstation/component_recovery_differential_replay.py',\nE     +             },\nE     +             {\nE     +                 'function': '_hash',\nE     +                 'line': 196,\nE     +                 'module': 'workstation/recovery_replay_idempotency.py',\nE     +             },\nE     +         ],\nE     +     },\nE     +     {\nE     +         'disposition': 'review_before_merge',\nE     +         'fingerprint': 'e5b8d59f953c',\nE     +         'members': [\nE     +             {\nE     +                 'function': '_hash',\nE     +                 'line': 109,\nE     +                 'module': 'phase4cd/read_model_differential_replay.py',\nE     +             },\nE     +             {\nE     +                 'function': '_hash',\nE     +                 'line': 277,\nE     +                 'module': 'ui/dashboard_settlement_timeline.py',\nE     +             },\nE     +         ],\nE     +     },\nE     + ]"
+          },
+          {
+            "test": "tests.test_phase_prov14a::test_prov14a_weather_selector_excludes_closed_and_stale_status_rows",
+            "outcome": "failure",
+            "message": "AssertionError: assert [] == ['WX-CURRENT']\n  \n  Right contains one more item: 'WX-CURRENT'\n  \n  Full diff:\n  + []\n  - [\n  -     'WX-CURRENT',\n  - ]",
+            "detail": "tests/test_phase_prov14a.py:23: in test_prov14a_weather_selector_excludes_closed_and_stale_status_rows\n    assert [row.ticker for row in rows] == [\"WX-CURRENT\"]\nE   AssertionError: assert [] == ['WX-CURRENT']\nE     \nE     Right contains one more item: 'WX-CURRENT'\nE     \nE     Full diff:\nE     + []\nE     - [\nE     -     'WX-CURRENT',\nE     - ]"
+          }
+        ]
+      },
+      {
+        "worker": 4,
+        "tests": 13,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "seconds": 6.14,
+        "passed": 13,
+        "issues": []
       }
-    },
-    "runtime_and_platform_retest": {
-      "summary": "3 failed, 71 passed in 51.30s",
-      "counts": {
-        "failed": 3,
-        "passed": 71
-      }
-    },
-    "certification_final_retest": {
-      "summary": "13 passed in 283.08s (0:04:43)",
-      "counts": {
-        "passed": 13
-      }
-    },
-    "final_collection": {
-      "summary": "6884 tests collected in 44.44s",
-      "counts": {
-        "tests collected": 6884
-      }
-    }
+    ]
   },
-  "all_seven_initial_phase4_failures_fixed_and_retested": true,
-  "full_suite_execution": "Interrupted by WSL environment failure; no final full-suite pass claimed.",
-  "python_compilation": "PASS",
-  "credential_scan": "PASS",
-  "dependency_check": "PASS",
+  "final_regression": {
+    "commit": "5de6bbc7b30df0d5d81d2fd840bca72b7ef10ee2",
+    "passed": 100,
+    "seconds": 175.404,
+    "history_and_digest_failures_retested_successfully": true,
+    "new_regression_cases": 6
+  },
+  "weather_regression": {
+    "commit": "0e5bc91ae165f010826c32969d04c5982d4a482f",
+    "passed": 18,
+    "scope": "All three weather provenance test modules and model-scoped snapshot tests.",
+    "all_weather_failures_retested_successfully": true
+  },
+  "security_regression": {
+    "commit": "34270a44576e8d4eb5a5371282bb211b833acd85",
+    "passed": 19,
+    "scope": "Security hardening, progress dashboard, and UI end-to-end regression modules.",
+    "all_security_failures_retested_successfully": true
+  },
+  "ticker_regression": {
+    "commit": "f476c12740caa15f5014a74f6ce2b982da181ff9",
+    "passed": 4,
+    "new_regression_cases": 1,
+    "scope": "Deduplication, per-series ordering, fair-share limits, preparation scope, and launcher stage ordering."
+  },
+  "final_collection": {
+    "count": 6891,
+    "status": "PASS"
+  },
+  "sdk_conformance": {
+    "python": "3.12.14",
+    "os": "Windows",
+    "sdk_version": "10.0.0",
+    "passed": 6,
+    "live_requests": false,
+    "credentials_used": false,
+    "environment": "Dedicated integration-review-venv, separate from production and other worktrees."
+  },
+  "combined_case_coverage": {
+    "count": 6891,
+    "outcomes": {
+      "passed": 6891
+    },
+    "all_final_collected_cases_accounted_for": true,
+    "basis": "Complete suite at c1c735c plus 100 passing regressions at 5de6bbc, weather regressions at 0e5bc91, security and progress UI regressions at 34270a4, ticker regressions at f476c12, and six passing SDK conformance cases on Python 3.12. The entire suite was not rerun after the isolated fixes.",
+    "node_ids_sha256": "66c46f37ca4444b8c5d36812c033f35bf7675c275e57b6d4aeaac88eb3a5cae5"
+  },
   "lint": {
-    "status": "FAIL",
-    "count": 1701,
-    "by_code": {
-      "I001": 97,
-      "E501": 1448,
-      "UP035": 31,
-      "UP017": 29,
-      "F401": 27,
-      "UP041": 1,
-      "F841": 1,
-      "F541": 1,
-      "UP034": 4,
-      "E402": 7,
-      "E702": 39,
-      "E701": 16
+    "initial_findings": 1701,
+    "ruff_0_5_0": 0,
+    "ruff_0_16_6": 0,
+    "new_suppressions": 0
+  },
+  "compilation": "PASS",
+  "repository_secret_scan": "PASS",
+  "dependency_consistency": "PASS",
+  "operator_shell_syntax": "PASS",
+  "pr_readiness": "Ready for pull request review; hosted CI matrix remains to be run.",
+  "previous_integration_validation": {
+    "tested_code_commit": "990af10b39f0f185aec6e40340bb393af5e643ee",
+    "python": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+    "package_versions": {
+      "pytest": "9.1.1",
+      "ruff": "0.16.6",
+      "SQLAlchemy": "2.0.52",
+      "fastapi": "0.141.1",
+      "typer": "0.26.8"
+    },
+    "test_runs": {
+      "integration_regressions": {
+        "summary": "41 passed, 2 warnings in 124.44s (0:02:04)",
+        "counts": {
+          "passed": 41
+        }
+      },
+      "core_regressions": {
+        "summary": "70 passed in 162.83s (0:02:42)",
+        "counts": {
+          "passed": 70
+        }
+      },
+      "phase4_initial_run": {
+        "summary": "7 failed, 4604 passed, 2 skipped, 2262 deselected, 2 warnings in 577.00s (0:09:36)",
+        "counts": {
+          "failed": 7,
+          "passed": 4604,
+          "skipped": 2,
+          "deselected": 2262
+        }
+      },
+      "runtime_and_platform_retest": {
+        "summary": "3 failed, 71 passed in 51.30s",
+        "counts": {
+          "failed": 3,
+          "passed": 71
+        }
+      },
+      "certification_final_retest": {
+        "summary": "13 passed in 283.08s (0:04:43)",
+        "counts": {
+          "passed": 13
+        }
+      },
+      "final_collection": {
+        "summary": "6884 tests collected in 44.44s",
+        "counts": {
+          "tests collected": 6884
+        }
+      }
+    },
+    "all_seven_initial_phase4_failures_fixed_and_retested": true,
+    "full_suite_execution": "Interrupted by WSL environment failure; no final full-suite pass claimed.",
+    "python_compilation": "PASS",
+    "credential_scan": "PASS",
+    "dependency_check": "PASS",
+    "lint": {
+      "status": "FAIL",
+      "count": 1701,
+      "by_code": {
+        "I001": 97,
+        "E501": 1448,
+        "UP035": 31,
+        "UP017": 29,
+        "F401": 27,
+        "UP041": 1,
+        "F841": 1,
+        "F541": 1,
+        "UP034": 4,
+        "E402": 7,
+        "E702": 39,
+        "E701": 16
+      }
     }
   }
 }
