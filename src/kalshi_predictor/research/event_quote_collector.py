@@ -236,6 +236,15 @@ def refresh_targeted_event_forecasts(
     }
 
 
+def capture_request_budget_reason(
+    candidate: EventCandidate, *, bucket_request_budget: int
+) -> str | None:
+    """Reject a coherent capture before fan-out when its API budget cannot fit."""
+    if len(candidate.markets) > max(0, bucket_request_budget):
+        return "CAPTURE_REQUEST_BUDGET_EXCEEDED"
+    return None
+
+
 def _capture_immediate_polytope(
     session: Session,
     client: PublicKalshiClient,
@@ -333,18 +342,26 @@ def select_candidates_with_fresh_forecasts(
 ) -> list[EventCandidate]:
     if not candidates:
         return []
-    events = [candidate.event_ticker for candidate in candidates]
+    event_by_ticker = {
+        str(market.get("ticker")): candidate.event_ticker
+        for candidate in candidates
+        for market in candidate.markets
+        if market.get("ticker")
+    }
     rows = session.execute(
-        select(Market.event_ticker, func.max(Forecast.forecasted_at))
-        .join(Forecast, Forecast.ticker == Market.ticker)
+        select(Forecast.ticker, func.max(Forecast.forecasted_at))
         .where(
-            Market.event_ticker.in_(events),
+            Forecast.ticker.in_(event_by_ticker),
             Forecast.model_name == model_name,
             Forecast.forecasted_at <= now,
         )
-        .group_by(Market.event_ticker)
+        .group_by(Forecast.ticker)
     ).all()
-    latest = {str(event): captured for event, captured in rows if event and captured}
+    latest: dict[str, datetime] = {}
+    for ticker, captured in rows:
+        event = event_by_ticker.get(str(ticker))
+        if event and captured and (event not in latest or captured > latest[event]):
+            latest[event] = captured
     selected = []
     for candidate in candidates:
         forecasted_at = latest.get(candidate.event_ticker)
@@ -534,16 +551,28 @@ def backfill_registry(
     effective_watermark = source_watermark
     if latest_snapshot is not None:
         effective_watermark = max(source_watermark, latest_snapshot - timedelta(minutes=15))
-    seed_rows = session.execute(
-        select(Market.event_ticker)
-        .join(MarketSnapshot, MarketSnapshot.ticker == Market.ticker)
-        .where(
-            MarketSnapshot.captured_at >= effective_watermark,
-            Market.event_ticker.is_not(None),
-            Market.close_time >= utc_now(),
+    # Keep SQLite on the selective captured_at index. A direct markets-to-snapshots
+    # join is commonly reordered to scan the full historical market catalog first.
+    recent_tickers = list(
+        session.scalars(
+            select(MarketSnapshot.ticker)
+            .where(MarketSnapshot.captured_at >= effective_watermark)
+            .distinct()
         )
-        .distinct()
-    ).all()
+    )
+    seed_rows = (
+        session.execute(
+            select(Market.event_ticker)
+            .where(
+                Market.ticker.in_(recent_tickers),
+                Market.event_ticker.is_not(None),
+                Market.close_time >= utc_now(),
+            )
+            .distinct()
+        ).all()
+        if recent_tickers
+        else []
+    )
     events = sorted({str(event) for (event,) in seed_rows if event})
     updated = 0
     rejected: dict[str, list[str]] = {}

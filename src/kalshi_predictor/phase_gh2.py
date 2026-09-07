@@ -26,6 +26,7 @@ from kalshi_predictor.data.schema import (
     MarketRanking,
     MarketSnapshot,
     PaperOrder,
+    WeatherFeature,
     WeatherMarketLink,
 )
 from kalshi_predictor.forecasting.registry import run_forecast_models
@@ -289,6 +290,7 @@ def run_gh2_single_writer_decision_refresh(
     active_link_limit: int = 250,
     forecast_limit: int = 250,
     opportunity_limit: int = 100,
+    weather_decision_limit: int = WEATHER_DECISION_LIMIT,
     freshness_minutes: int = 15,
     soak_cycles_required: int = 24,
     refresh_weather_gate: bool = True,
@@ -446,7 +448,7 @@ def run_gh2_single_writer_decision_refresh(
             session,
             sticky_weather + ranked_weather + weather_link_tickers,
             prefixes=WEATHER_TICKER_PREFIXES,
-            limit=WEATHER_DECISION_LIMIT,
+            limit=weather_decision_limit,
         )
 
         mark_stage("refresh_crypto_decisions")
@@ -520,9 +522,9 @@ def run_gh2_single_writer_decision_refresh(
             # Ranking maintenance must cover the same full active window as
             # exact snapshot refreshes.  The opportunity output limit is only
             # 100 and can otherwise leave a transient ranking backlog.
-            ranking_repair_limit=250,
+            ranking_repair_limit=forecast_limit,
             exact_snapshot_refresh=True,
-            exact_snapshot_refresh_limit=250,
+            exact_snapshot_refresh_limit=forecast_limit,
             near_money_only=False,
             skip_phase3bc_r3_refresh=True,
         )
@@ -993,6 +995,24 @@ def _weather_feature_owner_evidence(
             .limit(max_locations)
         )
     )[:max_locations]
+    latest_rows = session.execute(
+        select(WeatherFeature.location_key, func.max(WeatherFeature.generated_at))
+        .where(WeatherFeature.location_key.in_(locations))
+        .group_by(WeatherFeature.location_key)
+    ).all()
+    latest_by_location = {
+        str(location): generated_at
+        for location, generated_at in latest_rows
+        if location and generated_at
+    }
+    freshness_minutes = 15
+    freshness_cutoff = utc_now() - timedelta(minutes=freshness_minutes)
+    fresh_locations = [
+        location
+        for location, generated_at in latest_by_location.items()
+        if _aware(generated_at) >= freshness_cutoff
+    ]
+    timestamps = [_aware(value) for value in latest_by_location.values()]
     return [
         {
             "mode": "DEDICATED_RUNTIME_OWNER_REUSE",
@@ -1001,6 +1021,12 @@ def _weather_feature_owner_evidence(
             "location_count": len(locations),
             "locations": locations,
             "features_built_in_gh2": 0,
+            "features_reused": len(latest_by_location),
+            "fresh_location_count": len(fresh_locations),
+            "fresh_locations": sorted(fresh_locations),
+            "freshness_minutes": freshness_minutes,
+            "latest_feature_at": max(timestamps).isoformat() if timestamps else None,
+            "oldest_latest_feature_at": min(timestamps).isoformat() if timestamps else None,
         }
     ]
 

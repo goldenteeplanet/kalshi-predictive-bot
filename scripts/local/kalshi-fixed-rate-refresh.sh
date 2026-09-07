@@ -17,6 +17,7 @@ export PAPER_ORDER_CREATION_ENABLED=false
 export PAPER_ORDER_KILL_SWITCH=true
 
 readonly INTERVAL_SECONDS="${KALSHI_REFRESH_INTERVAL_SECONDS:-900}"
+readonly MIN_POST_CYCLE_COOLDOWN_SECONDS="${KALSHI_MIN_POST_CYCLE_COOLDOWN_SECONDS:-60}"
 readonly WRITER_LOCK="${KALSHI_WRITER_LOCK:-/home/james/kalshi-local-runtime/kalshi-writer.lock}"
 readonly LOOP_LOCK="${KALSHI_REFRESH_LOOP_LOCK:-/home/james/kalshi-local-runtime/kalshi-refresh-loop.lock}"
 readonly DATABASE_PATH="${KALSHI_DATABASE_PATH:-/home/james/kalshi-predictive-bot-data/kalshi_phase1.db}"
@@ -109,11 +110,19 @@ while true; do
       --forecast-limit 1000 --opportunity-limit 150 --phase3bc-limit 1000 \
       --forecast-current-windows-only --near-money-only \
       --near-money-per-symbol-limit 8 --near-money-window-limit 4 \
-      --snapshot-fetch-concurrency 4 --skip-opportunity-report --cycles 1
+      --snapshot-fetch-concurrency 4 --skip-opportunity-report \
+      --defer-phase3bc-router --cycles 1
+
+  # The router is report-only but can take several minutes over retained links.
+  # Keep it outside the snapshot/forecast writer transaction so its cost has an
+  # independent deadline and cannot obscure current-market freshness.
+  run_health_stage active_crypto_router 210 timeout 210s flock -w 45 "$WRITER_LOCK" \
+    .venv/bin/kalshi-bot phase3bc-crypto-clean-opportunity-router \
+      --output-dir reports/phase3bc --limit 1000
 
   # Stage B performs the bounded current-window ranking write after the fresh
   # snapshot/forecast transaction has committed.
-  run_health_stage active_crypto_ranking_finalize 120 timeout 120s flock -w 45 "$WRITER_LOCK" \
+  run_health_stage active_crypto_ranking_finalize 240 timeout 240s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/kalshi-bot phase3bc-r7-crypto-ranking-coverage-repair \
       --output-dir reports/phase3bc_r7 --limit 1000 \
       --freshness-minutes 15 --repair-rankings --repair-limit 150
@@ -124,7 +133,7 @@ while true; do
 
   # Publish the global UI freshness strip as soon as the critical market stage
   # is complete. A second refresh after settlement keeps end-of-cycle truth.
-  run_health_stage ui_shell_status_refresh_early 30 timeout 30s \
+  run_health_stage ui_shell_status_refresh_early 60 timeout 60s \
     .venv/bin/kalshi-bot ui-shell-status-refresh \
       --output-path reports/ui/shell_status_snapshot.json
 
@@ -154,11 +163,11 @@ while true; do
       --historical-calibration reports/phase_gh2/cliaus_historical_monthly_harvest.json \
       --minimum-calibration-samples 12
 
-  run_health_stage supported_weather_snapshot_forecast 120 timeout 120s flock -w 45 "$WRITER_LOCK" \
+  run_health_stage supported_weather_snapshot_forecast 240 timeout 240s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/supported_weather_snapshot_forecast.py \
       --preparation reports/phase_gh2/supported_weather_prepare.json \
       --output reports/phase_gh2/supported_weather_snapshot_forecast.json \
-      --limit 300
+      --limit 8 --fetch-workers 4
 
   run_health_stage coinbase_stage 45 timeout 45s \
     .venv/bin/kalshi-bot gh2-stage-crypto-quotes \
@@ -174,14 +183,17 @@ while true; do
       --gh1-staging-dir /home/james/kalshi-local-runtime/gh1-staging \
       --candidate-manifest-path /home/james/kalshi-local-runtime/watch/actionable_tickers.json \
       --candidate-limit 40 --active-link-limit 24 --forecast-limit 24 \
-      --opportunity-limit 20 --freshness-minutes 15 --soak-cycles-required 24 \
+      --opportunity-limit 20 --weather-decision-limit 8 \
+      --freshness-minutes 15 --soak-cycles-required 24 \
       --defer-weather-gate --guard-active-writer
 
-  run_health_stage weather_gate_diagnostics 120 timeout 120s \
+  # Keep the current-weather diagnostic inside a short API budget. The coherent
+  # preflight below owns exact BUY-side depth for the two guarded candidates.
+  run_health_stage weather_gate_diagnostics 75 timeout 75s \
     .venv/bin/kalshi-bot phase3ba-r3-weather-paper-gate \
       --output-dir reports/phase3ba_r3 --reports-dir reports \
-      --limit 24 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
-      --deadline-seconds 105 --batch-size 4
+      --limit 8 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
+      --deadline-seconds 50 --batch-size 2
 
   # Phase 3M's historical scan is deliberately separated from the fresh-quote
   # transaction. A valid six-hour cache is reused; refreshes remain no-lookahead.
@@ -194,18 +206,18 @@ while true; do
 
   # Capture exact books, forecast, rank, size, and risk-check in one bounded
   # writer stage. Execution and paper-order creation remain disabled above.
-  run_health_stage weather_fast_coherent_preflight 60 timeout 60s flock -w 45 "$WRITER_LOCK" \
+  run_health_stage weather_fast_coherent_preflight 90 timeout 90s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/scoped_weather_depth_preflight.py \
       --gate reports/phase3ba_r3/weather_paper_gate.json \
       --cache reports/phase3ba_r3/phase3m_historical_evidence_cache.json \
       --state reports/phase3ba_r3/scoped_weather_preflight_pair_state.json \
       --output reports/phase3ba_r3/scoped_weather_depth_preflight.json || true
 
-  run_health_stage weather_gate_post_preflight 120 timeout 120s \
+  run_health_stage weather_gate_post_preflight 75 timeout 75s \
     .venv/bin/kalshi-bot phase3ba-r3-weather-paper-gate \
       --output-dir reports/phase3ba_r3 --reports-dir reports \
-      --limit 24 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
-      --deadline-seconds 105 --batch-size 4
+      --limit 8 --current-window-lookback-hours 3 --match-tolerance-hours 3 \
+      --deadline-seconds 50 --batch-size 2
 
   .venv/bin/python scripts/weather_fast_preflight_soak.py \
     --cycle-id "$cycle_started_epoch" \
@@ -220,18 +232,31 @@ while true; do
     --database "$DATABASE_PATH" \
     --output reports/crypto_event_vectors/liquidity_window_diagnosis.json || true
 
-  run_health_stage targeted_crypto_capture 180 timeout 180s flock -w 45 "$WRITER_LOCK" \
+  # Shard capture by family and reduce concurrency to avoid Kalshi HTTP 429
+  # bursts. Each shard has an independent deadline and publishes partial
+  # progress, so one slow family cannot consume the whole collection budget.
+  # Alternate one small targeted-capture shard per cycle. Each shard is capped
+  # at two candidate events, so collector research cannot consume two full
+  # stage budgets or overlap the next intended cadence.
+  if (( cycle_started_epoch % 2 == 0 )); then
+    targeted_capture_stage="targeted_crypto_capture_major"
+    targeted_capture_series="KXBTC,KXETH"
+  else
+    targeted_capture_stage="targeted_crypto_capture_alt"
+    targeted_capture_series="KXSOLE,KXXRP,KXDOGE"
+  fi
+  run_health_stage "$targeted_capture_stage" 180 timeout 180s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/crypto_event_quote_collector.py \
       --output reports/crypto_event_vectors/status.json \
       --backfill-report reports/phase3bc_r3/phase3bc_r3_active_crypto_refresh.json \
-      --series KXBTC,KXETH,KXSOLE,KXXRP,KXDOGE \
-      --coherence-ms 2500 --max-workers 16 \
-      --max-new-events 25 --max-events-attempted 50 \
+      --series "$targeted_capture_series" \
+      --coherence-ms 2500 --max-workers 2 \
+      --max-new-events 1 --max-events-attempted 2 \
       --liquidity-window-report reports/crypto_event_vectors/liquidity_window_diagnosis.json \
       --max-forecast-lag-minutes 30 \
-      --targeted-forecast-events 5 \
+      --targeted-forecast-events 1 \
       --targeted-capture-latency-seconds 30 \
-      --targeted-capture-max-buckets 150 \
+      --targeted-capture-max-buckets 25 \
       --canary-required 5 --target 100
   .venv/bin/python scripts/crypto_forecast_polytope_alignment.py \
     --database "$DATABASE_PATH" \
@@ -293,7 +318,8 @@ while true; do
 
   next_start_epoch="$((cycle_started_epoch + INTERVAL_SECONDS))"
   now_epoch="$(date +%s)"
-  if (( next_start_epoch <= now_epoch )); then
-    next_start_epoch="$now_epoch"
+  cooldown_start_epoch="$((now_epoch + MIN_POST_CYCLE_COOLDOWN_SECONDS))"
+  if (( next_start_epoch < cooldown_start_epoch )); then
+    next_start_epoch="$cooldown_start_epoch"
   fi
 done

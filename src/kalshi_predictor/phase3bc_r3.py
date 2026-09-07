@@ -47,7 +47,10 @@ from kalshi_predictor.opportunities.reports import generate_opportunities_report
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3ar import write_phase3ar_report
 from kalshi_predictor.phase3at import CURRENT_PAPER_SCAN, current_crypto_opportunity_scope
-from kalshi_predictor.phase3bc import write_phase3bc_crypto_clean_opportunity_report
+from kalshi_predictor.phase3bc import (
+    Phase3BCArtifactSet,
+    write_phase3bc_crypto_clean_opportunity_report,
+)
 from kalshi_predictor.runtime_stage_heartbeat import AtomicStageHeartbeat
 from kalshi_predictor.utils.decimals import to_decimal
 from kalshi_predictor.utils.time import parse_datetime, utc_now
@@ -96,6 +99,7 @@ def write_phase3bc_r3_active_crypto_refresh_report(
     cadence_minutes: int = DEFAULT_CRYPTO_REFRESH_CADENCE_MINUTES,
     forecast_current_windows_only: bool = False,
     generate_opportunity_report: bool = True,
+    refresh_phase3bc_router: bool = True,
     near_money_only: bool = False,
     near_money_per_symbol_limit: int = DEFAULT_NEAR_MONEY_PER_SYMBOL_LIMIT,
     near_money_window_limit: int = DEFAULT_NEAR_MONEY_WINDOW_LIMIT,
@@ -231,12 +235,20 @@ def write_phase3bc_r3_active_crypto_refresh_report(
             encoding="utf-8",
         )
     stage_timer.mark("phase3bc_router")
-    phase3bc_artifacts = write_phase3bc_crypto_clean_opportunity_report(
-        session,
-        output_dir=phase3bc_output_dir,
-        settings=resolved,
-        limit=phase3bc_limit,
-    )
+    if refresh_phase3bc_router:
+        phase3bc_artifacts = write_phase3bc_crypto_clean_opportunity_report(
+            session,
+            output_dir=phase3bc_output_dir,
+            settings=resolved,
+            limit=phase3bc_limit,
+        )
+    else:
+        phase3bc_artifacts = Phase3BCArtifactSet(
+            phase3bc_output_dir,
+            phase3bc_output_dir / "phase3bc_crypto_clean_opportunity_router.json",
+            phase3bc_output_dir / "phase3bc_crypto_clean_opportunity_router.md",
+            phase3bc_output_dir / "phase3bc_crypto_clean_opportunity_rows.csv",
+        )
 
     stage_timer.mark("build_report_payload")
     phase3ar_payload = _read_json(phase3ar_artifacts.json_path)

@@ -2,10 +2,11 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import kalshi_predictor.research.event_quote_collector as collector
-from kalshi_predictor.data.schema import CryptoCurrentEvent
+from kalshi_predictor.data.schema import CryptoCurrentEvent, WeatherFeature
 from kalshi_predictor.research.event_quote_collector import (
     EventCandidate,
     bucket_interval,
+    capture_request_budget_reason,
     select_candidates_for_liquidity_window,
     select_candidates_with_fresh_forecasts,
     validate_topology,
@@ -65,6 +66,18 @@ def test_current_event_registry_has_required_composite_indexes():
     )
 
 
+def test_weather_feature_latest_lookup_has_composite_index():
+    indexes = {
+        index.name: tuple(column.name for column in index.columns)
+        for index in WeatherFeature.__table__.indexes
+    }
+    assert indexes["ix_weather_features_location_generated_id"] == (
+        "location_key",
+        "generated_at",
+        "id",
+    )
+
+
 def test_family_yield_score_prioritizes_coverage_and_narrower_events():
     strong = family_yield_score(
         average_coverage=0.90,
@@ -108,14 +121,14 @@ def test_liquidity_window_selects_in_window_and_falls_back():
 
 def test_capture_candidates_require_fresh_point_in_time_forecast():
     now = datetime.now(UTC)
-    fresh = EventCandidate("FRESH", "KXETH", "ETH", ())
-    stale = EventCandidate("STALE", "KXETH", "ETH", ())
+    fresh = EventCandidate("FRESH", "KXETH", "ETH", ({"ticker": "FRESH-T"},))
+    stale = EventCandidate("STALE", "KXETH", "ETH", ({"ticker": "STALE-T"},))
 
     class _Rows:
         def all(self):
             return [
-                ("FRESH", now - timedelta(minutes=10)),
-                ("STALE", now - timedelta(minutes=31)),
+                    ("FRESH-T", now - timedelta(minutes=10)),
+                    ("STALE-T", now - timedelta(minutes=31)),
             ]
 
     class _Session:
@@ -280,3 +293,16 @@ def test_targeted_forecast_defers_before_forecast_when_capture_budget_is_exhaust
     assert result["rows"][0]["reasons"] == [
         "CAPTURE_REQUEST_BUDGET_EXCEEDED_BEFORE_FORECAST"
     ]
+
+
+def test_coherent_capture_rejects_fanout_larger_than_request_budget():
+    candidate = EventCandidate(
+        "EVENT",
+        "KXETH",
+        "ETH",
+        tuple(_market(f"B{index}", "between", floor=index, cap=index + 1) for index in range(26)),
+    )
+    assert capture_request_budget_reason(candidate, bucket_request_budget=25) == (
+        "CAPTURE_REQUEST_BUDGET_EXCEEDED"
+    )
+    assert capture_request_budget_reason(candidate, bucket_request_budget=26) is None

@@ -304,10 +304,10 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "            risk_preflight=False," not in implementation
     assert "exact_snapshot_refresh=True" in implementation
     assert "exact_snapshot_refresh=False" not in implementation
-    assert "exact_snapshot_refresh_limit=250" in implementation
+    assert "exact_snapshot_refresh_limit=forecast_limit" in implementation
+    assert "ranking_repair_limit=forecast_limit" in implementation
     assert "ranking_repair=True" in implementation
     assert "ranking_repair=False" not in implementation
-    assert "ranking_repair_limit=250" in implementation
     assert implementation.index('mark_stage("commit_single_writer")') < implementation.index(
         "_write_candidate_manifest(candidate_manifest_path, manifest_candidates)"
     )
@@ -330,7 +330,7 @@ def test_fixed_rate_scheduler_splits_weather_gate_from_decision_publication() ->
     assert "--active-link-limit 24 --forecast-limit 24" in script
     assert "--opportunity-limit 20" in script
     assert "--defer-weather-gate" in script
-    assert "weather_gate_diagnostics 120 timeout 120s" in script
+    assert "weather_gate_diagnostics 75 timeout 75s" in script
     assert "phase3ba-r3-weather-paper-gate" in script
     assert script.index("--defer-weather-gate") < script.index(
         "phase3ba-r3-weather-paper-gate"
@@ -375,10 +375,21 @@ def test_stage_telemetry_records_per_stage_durations(tmp_path: Path) -> None:
     ]
 
 
-def test_weather_feature_refresh_is_owned_by_dedicated_runtime() -> None:
+def test_weather_feature_refresh_is_owned_by_dedicated_runtime(monkeypatch) -> None:
+    generated_at = utc_now()
+
     class FakeSession:
         def scalars(self, statement):
             return iter(("new_york", "chicago", "miami"))
+
+        def execute(self, statement):
+            class Rows:
+                def all(self):
+                    return [("new_york", generated_at), ("chicago", generated_at)]
+
+            return Rows()
+
+    monkeypatch.setattr(phase_gh2, "utc_now", lambda: generated_at)
 
     summaries = phase_gh2._weather_feature_owner_evidence(
         FakeSession(),
@@ -394,6 +405,12 @@ def test_weather_feature_refresh_is_owned_by_dedicated_runtime() -> None:
             "location_count": 2,
             "locations": ["new_york", "chicago"],
             "features_built_in_gh2": 0,
+            "features_reused": 2,
+            "fresh_location_count": 2,
+            "fresh_locations": ["chicago", "new_york"],
+            "freshness_minutes": 15,
+            "latest_feature_at": generated_at.isoformat(),
+            "oldest_latest_feature_at": generated_at.isoformat(),
         }
     ]
 

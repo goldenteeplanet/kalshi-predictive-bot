@@ -147,11 +147,16 @@ def _noaa_state(
     cycle_started_at: str | None,
 ) -> dict[str, Any]:
     decision = report.get("decision_refresh", {})
-    features = sum(
-        int(row.get("features_inserted") or 0)
+    feature_rows = [
+        row
         for row in decision.get("weather_features", [])
         if isinstance(row, dict)
+    ]
+    features = sum(
+        int(row.get("features_inserted") or row.get("fresh_location_count") or 0)
+        for row in feature_rows
     )
+    expected_locations = sum(int(row.get("location_count") or 0) for row in feature_rows)
     forecasts = int(decision.get("weather_forecasts", {}).get("forecasts_inserted") or 0)
     report_generated_at = _parse_datetime(report.get("generated_at"))
     cycle_started = _parse_datetime(cycle_started_at)
@@ -170,12 +175,18 @@ def _noaa_state(
         status = "STALE_OR_NOT_PUBLISHED"
         reason = "GH2_REPORT_NOT_UPDATED_IN_CURRENT_CYCLE"
     else:
-        status = "HEALTHY" if features > 0 and forecasts > 0 else "NO_CURRENT_OUTPUT"
+        all_locations_fresh = expected_locations > 0 and features >= expected_locations
+        status = (
+            "HEALTHY"
+            if all_locations_fresh and forecasts > 0
+            else "NO_CURRENT_OUTPUT"
+        )
         reason = None if status == "HEALTHY" else "NOAA_PRODUCED_NO_CURRENT_OUTPUT"
     return {
         "status": status,
         "features": features,
         "forecasts": forecasts,
+        "expected_locations": expected_locations,
         "reason": reason,
         "report_generated_at": report.get("generated_at"),
     }

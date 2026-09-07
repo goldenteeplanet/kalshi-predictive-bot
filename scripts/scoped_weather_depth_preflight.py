@@ -96,7 +96,25 @@ def main() -> None:
     args = parser.parse_args()
 
     payload = json.loads(args.gate.read_text(encoding="utf-8"))
-    rows = select_scoped_gate_rows(payload, args.ticker)
+    try:
+        rows = select_scoped_gate_rows(payload, args.ticker)
+    except RuntimeError:
+        if args.ticker:
+            raise
+        skipped = {
+            "generated_at": utc_now().isoformat(),
+            "status": "SKIPPED_NO_ELIGIBLE_SCOPED_TICKERS",
+            "paper_order_creation_enabled": False,
+            "ineligible_tickers": {
+                row["ticker"]: str(row.get("first_blocker") or "NOT_ELIGIBLE")
+                for row in payload.get("weather_rows", payload.get("rows", []))
+                if row.get("ticker")
+            },
+            "results": [],
+        }
+        _write_atomic(args.output, skipped)
+        print(json.dumps(skipped, indent=2, sort_keys=True))
+        return
     tickers = set(rows)
 
     base = get_settings()

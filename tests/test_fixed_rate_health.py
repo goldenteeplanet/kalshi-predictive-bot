@@ -82,3 +82,34 @@ def test_noaa_success_rejects_a_report_from_before_the_cycle() -> None:
         payload["sources"]["noaa"]["reason"]
         == "GH2_REPORT_NOT_UPDATED_IN_CURRENT_CYCLE"
     )
+
+
+def test_noaa_accepts_current_reused_feature_evidence_for_every_location() -> None:
+    started = "2026-08-20T12:00:00+00:00"
+    payload = update_health({}, action="start", cycle_id="125", cycle_started_at=started)
+    payload = update_health(
+        payload,
+        action="stage",
+        stage="gh2_decision_refresh",
+        stage_started_at=started,
+        exit_code=0,
+        timeout_seconds=300,
+        gh2_report={
+            "generated_at": "2026-08-20T12:02:00+00:00",
+            "decision_refresh": {
+                "weather_features": [
+                    {
+                        "mode": "DEDICATED_RUNTIME_OWNER_REUSE",
+                        "location_count": 2,
+                        "features_reused": 2,
+                        "fresh_location_count": 2,
+                    }
+                ],
+                "weather_forecasts": {"forecasts_inserted": 4},
+            },
+        },
+    )
+    assert payload["sources"]["noaa"]["status"] == "HEALTHY"
+    assert payload["sources"]["noaa"]["features"] == 2
+    assert payload["sources"]["noaa"]["expected_locations"] == 2
+    assert payload["sources"]["noaa"]["forecasts"] == 4

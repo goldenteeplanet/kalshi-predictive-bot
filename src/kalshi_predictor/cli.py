@@ -13140,6 +13140,13 @@ def phase3bc_r3_active_crypto_refresh_command(
             help="Generate the slower opportunity report during R3.",
         ),
     ] = True,
+    refresh_phase3bc_router: Annotated[
+        bool,
+        typer.Option(
+            "--refresh-phase3bc-router/--defer-phase3bc-router",
+            help="Refresh the slower Phase 3BC router inside this transaction.",
+        ),
+    ] = True,
     near_money_only: Annotated[
         bool,
         typer.Option(
@@ -13199,6 +13206,7 @@ def phase3bc_r3_active_crypto_refresh_command(
                 repair_snapshots=repair_snapshots,
                 forecast_current_windows_only=forecast_current_windows_only,
                 generate_opportunity_report=generate_opportunity_report,
+                refresh_phase3bc_router=refresh_phase3bc_router,
                 market_limit=market_limit,
                 market_max_pages=market_max_pages,
                 crypto_market_scan_limit=crypto_market_scan_limit,
@@ -19906,6 +19914,10 @@ def gh2_single_writer_decision_refresh_command(
         int,
         typer.Option(help="Maximum rankings/opportunities written per category."),
     ] = 100,
+    weather_decision_limit: Annotated[
+        int,
+        typer.Option(help="Maximum current weather tickers refreshed in the GH-2 writer."),
+    ] = 14,
     freshness_minutes: Annotated[
         int,
         typer.Option(help="Maximum snapshot/ranking age for fresh decision truth."),
@@ -19938,6 +19950,7 @@ def gh2_single_writer_decision_refresh_command(
         active_link_limit,
         forecast_limit,
         opportunity_limit,
+        weather_decision_limit,
         freshness_minutes,
         soak_cycles_required,
     )
@@ -19975,6 +19988,7 @@ def gh2_single_writer_decision_refresh_command(
         active_link_limit=active_link_limit,
         forecast_limit=forecast_limit,
         opportunity_limit=opportunity_limit,
+        weather_decision_limit=weather_decision_limit,
         freshness_minutes=freshness_minutes,
         soak_cycles_required=soak_cycles_required,
         refresh_weather_gate=refresh_weather_gate,
