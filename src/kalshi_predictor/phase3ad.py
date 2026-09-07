@@ -58,6 +58,9 @@ PHASE3AH_PLACEHOLDER_WATCH_PATH = Path(
 PHASE3AA_R5_REPORT_PATH = Path(
     "reports/phase3aa_r5/phase3aa_r5_closed_market_outcome_capture.json"
 )
+PHASE3AE_FAST_MARKET_REPORT_PATH = Path(
+    "reports/phase3ae_fast_market/phase3ae_fast_market_harvester.json"
+)
 PHASE3AZ_GAP_ANALYSIS_PATH = Path("reports/phase3az/phase3az_gap_analysis.json")
 MARKET_COVERAGE_REPORT_PATH = Path("reports/market_coverage/market_coverage_doctor.json")
 
@@ -72,6 +75,7 @@ PHASE_MODULES = (
     ("3AC", "kalshi_predictor.phase3ac"),
     ("3AD", "kalshi_predictor.phase3ad"),
     ("3AE", "kalshi_predictor.phase3ae"),
+    ("3AE-FAST", "kalshi_predictor.phase3ae_fast_market"),
     ("3AF", "kalshi_predictor.phase3af"),
     ("3AG", "kalshi_predictor.phase3ag"),
     ("3AH", "kalshi_predictor.phase3ah"),
@@ -101,6 +105,7 @@ PHASE_COMMANDS = (
     "phase3aa-r5-closed-market-outcome-capture",
     "phase3ab-learning-governor",
     "phase3ac-sports-provenance-repair",
+    "phase3ae-fast-market-harvester",
     "phase3ae-verified-sports-connector",
     "phase3af-sports-schedule-bootstrap",
     "phase3ag-sports-ambiguity-coverage",
@@ -206,6 +211,9 @@ def build_phase_orchestrator(
         ),
         "phase3ah_placeholder_watch": _report_summary(PHASE3AH_PLACEHOLDER_WATCH_PATH),
         "phase3aa_r5_closed_market_capture": _report_summary(PHASE3AA_R5_REPORT_PATH),
+        "phase3ae_fast_market_harvester": _report_summary(
+            PHASE3AE_FAST_MARKET_REPORT_PATH
+        ),
         "phase3az_gap_analysis": _report_summary(PHASE3AZ_GAP_ANALYSIS_PATH),
         "self_improvement": _self_improvement_status(session),
         "phase_status": _phase_status(),
@@ -1271,13 +1279,32 @@ def _choose_next_phase(
             ),
         }
     if "NO_FAST_LEARNING_CANDIDATES" in codes:
+        harvester = evidence.get("phase3ae_fast_market_harvester", {})
+        harvester_summary = harvester.get("summary", {})
+        missing_rankings = int(
+            harvester_summary.get("open_0_24h_markets_stale_or_missing_ranking") or 0
+        )
+        report_available = bool(harvester.get("available"))
         return {
             "phase": "3AE",
-            "title": "Fast Market Harvester",
-            "objective": (
-                "Collect, rank, and route more 0-24h markets before creating new paper trades."
+            "title": (
+                "Fast Market Harvest Refresh"
+                if report_available
+                else "Fast Market Harvester"
             ),
-            "primary_reason": "Learning needs more fast-settlement candidates.",
+            "objective": (
+                "Refresh forecasts and rankings for harvested 0-24h markets, then route "
+                "them through the paper-only learning governor."
+                if report_available and missing_rankings
+                else "Run the read-only harvester to collect, rank, and route more 0-24h "
+                "markets before creating new paper trades."
+            ),
+            "primary_reason": (
+                f"The latest Phase 3AE report found {missing_rankings} open 0-24h "
+                "market(s) with stale or missing rankings."
+                if report_available and missing_rankings
+                else "Learning needs more fast-settlement candidates."
+            ),
         }
     if "DUE_OR_OVERDUE_SETTLEMENTS" in codes:
         r5_summary = evidence.get("phase3aa_r5_closed_market_capture", {}).get("summary", {})
@@ -1430,6 +1457,7 @@ kalshi-bot phase3az-gap-analysis --output-dir reports/phase3az
 kalshi-bot phase3aa-r2-exact-settlement-harvest --output-dir reports/phase3aa_r2
 kalshi-bot phase3ab-learning-governor
 kalshi-bot phase3ac-sports-provenance-repair
+kalshi-bot phase3ae-fast-market-harvester --output-dir reports/phase3ae_fast_market
 kalshi-bot phase3af-sports-schedule-bootstrap --leagues MLB,WNBA,SOCCER --days-ahead 14 --ingest
 kalshi-bot phase3ag-sports-ambiguity-coverage --output-dir reports/phase3ag
 kalshi-bot phase3ag-sports-link-repair-pass --output-dir reports/phase3ag
@@ -1481,6 +1509,7 @@ def _recommended_loop(next_phase: dict[str, Any]) -> list[str]:
         "kalshi-bot phase3aa-r2-exact-settlement-harvest --output-dir reports/phase3aa_r2",
         "kalshi-bot phase3ab-learning-governor",
         "kalshi-bot phase3ac-sports-provenance-repair",
+        "kalshi-bot phase3ae-fast-market-harvester --output-dir reports/phase3ae_fast_market",
         (
             "kalshi-bot phase3af-sports-schedule-bootstrap "
             "--leagues MLB,WNBA,SOCCER --days-ahead 14 --ingest"
