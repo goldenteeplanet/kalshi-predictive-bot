@@ -32,8 +32,14 @@ from kalshi_predictor.utils.time import parse_datetime
 class CryptoV2Forecaster:
     model_name = "crypto_v2"
 
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        *,
+        future_skew_seconds: int = DEFAULT_FUTURE_SKEW_SECONDS,
+    ) -> None:
         self.settings = settings or get_settings()
+        self.future_skew_seconds = future_skew_seconds
         self._feature_rows_by_symbol: dict[str, list[CryptoFeature]] | None = None
 
     def begin_forecast_run(self) -> None:
@@ -93,6 +99,7 @@ class CryptoV2Forecaster:
             terms=terms,
             snapshot=snapshot,
             feature_rows_by_symbol=self._feature_rows_by_symbol,
+            future_skew_seconds=self.future_skew_seconds,
         )
         missing = [item["symbol"] for item in component_rows if item["features"] is None]
         if missing:
@@ -372,6 +379,7 @@ def _component_feature_rows(
     terms: CryptoMarketTerms,
     snapshot: MarketSnapshot,
     feature_rows_by_symbol: dict[str, list[CryptoFeature]] | None = None,
+    future_skew_seconds: int = DEFAULT_FUTURE_SKEW_SECONDS,
 ) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     seen: set[str] = set()
@@ -386,6 +394,7 @@ def _component_feature_rows(
                 symbol=symbol,
                 terms=terms,
                 forecast_cutoff=snapshot.captured_at,
+                future_skew_seconds=future_skew_seconds,
             )
         else:
             if symbol not in feature_rows_by_symbol:
@@ -394,6 +403,7 @@ def _component_feature_rows(
                 feature_rows_by_symbol[symbol],
                 terms=terms,
                 forecast_cutoff=snapshot.captured_at,
+                future_skew_seconds=future_skew_seconds,
             )
         rows.append(
             {

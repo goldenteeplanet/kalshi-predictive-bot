@@ -1,0 +1,3 @@
+# Phase 4FJ — Final Time-to-Trade Readiness Audit
+
+The final comparison keeps measured improvements separate from proposed CI/integration gains. Workstreams I–IV provide deterministic measured evidence for market-to-forecast, forecast-to-ranking, ranking-to-risk, risk-to-paper-eligibility, settlement-to-evaluation, and operator-review paths. CI feedback and aggregate connected-runtime improvements remain proposals until hosted CI or production-like evidence exists; they are not counted as gains. Any measured regression blocks readiness. This audit consumes supplied hash-protected measurements and performs no live timing, database write, service control, or exchange request.

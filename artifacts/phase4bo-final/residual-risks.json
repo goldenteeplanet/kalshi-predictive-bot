@@ -1,0 +1,1 @@
+{"artifact_hash":"7fb439ac5cb832aa4d25f3169f09025a756f8d28ab15c2572fd6684308959ea1","execution_authorized":false,"high_risk_count":0,"phase":"4BO","risks":[{"id":"EXTERNAL_REVIEWER_IDENTITY_TRUST","mitigation":"require separately trusted identity infrastructure before any scope expansion","severity":"MEDIUM"}],"schema":"phase4bo.residual-risk-manifest.v1"}

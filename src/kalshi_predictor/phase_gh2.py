@@ -474,6 +474,7 @@ def run_gh2_single_writer_decision_refresh(
             phase3bc_limit=forecast_limit,
             freshness_minutes=freshness_minutes,
             risk_preflight=True,
+            persist_risk_preflight=False,
             ranking_repair=True,
             # Ranking maintenance must cover the same full active window as
             # exact snapshot refreshes.  The opportunity output limit is only

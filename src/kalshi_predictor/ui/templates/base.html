@@ -2,7 +2,7 @@
 {% set shell = shell_context if shell_context is defined else default_shell_context %}
 {% set build_guard = shell.workspace_guard if shell.workspace_guard is defined else default_shell_context.workspace_guard %}
 {% set current_path = request.url.path if request is defined else '/' %}
-{% set asset_version = 'status-artifact-refresh-20260821a' %}
+{% set asset_version = 'evidence-observability-20260827a' %}
 <html lang="en" data-theme="{{ shell.theme }}" data-density="{{ shell.density }}">
   <head>
     <meta charset="utf-8">
@@ -107,6 +107,7 @@
           Search
         </button>
         {% endif %}
+        <a class="button" href="/evidence">Acceleration</a>
         <a class="button" href="/system">System</a>
       </div>
     </header>
@@ -124,6 +125,7 @@
         </nav>
         <details class="side-report-links">
           <summary>Reports</summary>
+          <a href="/evidence">Acceleration &amp; training evidence</a>
           <a href="/system/evidence">Certification evidence</a>
           <a href="/opportunities/best-payouts">Best payouts</a>
           <a href="/reports/research_report.md">Research report</a>

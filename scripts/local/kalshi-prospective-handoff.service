@@ -1,0 +1,19 @@
+[Unit]
+Description=Kalshi read-only snapshot metadata and prospective research handoff
+After=kalshi-fixed-rate-refresh.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/james/kalshi-runtime-src
+Environment=UI_READ_ONLY=true
+Environment=EXECUTION_ENABLED=false
+Environment=PAPER_ORDER_CREATION_ENABLED=false
+ExecStart=/home/james/kalshi-runtime-src/.venv/bin/python scripts/local/phase4m_snapshot_artifact.py --source-db /home/james/kalshi-predictive-bot-data/kalshi_phase1.db --output /home/james/kalshi-local-runtime/research/snapshot-cycle.json
+ExecStart=/home/james/kalshi-runtime-src/.venv/bin/python scripts/local/phase4m_research_handoff.py --research-db /home/james/kalshi-research-data/phase4e.db --source-db /home/james/kalshi-predictive-bot-data/kalshi_phase1.db --artifact /home/james/kalshi-local-runtime/research/snapshot-cycle.json --owner-id phase4m-systemd --batch-limit 50
+ExecStart=/home/james/kalshi-runtime-src/.venv/bin/python scripts/local/phase4y_settlement_hint_artifact.py --research-db /home/james/kalshi-research-data/phase4e.db --output /home/james/kalshi-local-runtime/research/settlement-hints.json
+ExecStart=/home/james/kalshi-runtime-src/.venv/bin/python scripts/local/phase4q_settlement_watch.py --research-db /home/james/kalshi-research-data/phase4e.db --source-db /home/james/kalshi-predictive-bot-data/kalshi_phase1.db --limit 5000
+TimeoutStartSec=240
+Nice=10
+
+[Install]
+WantedBy=default.target

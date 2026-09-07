@@ -256,7 +256,8 @@ while true; do
 
   run_health_stage settlement_refresh 600 timeout 600s flock -w 45 "$WRITER_LOCK" bash -lc '
     set -euo pipefail
-    .venv/bin/kalshi-bot sync-settlements \
+    .venv/bin/python scripts/local/phase4y_sync_settlements.py \
+      --hint-artifact /home/james/kalshi-local-runtime/research/settlement-hints.json \
       --lookback-days 90 --limit 200 --max-pages 10
     .venv/bin/kalshi-bot paper-pnl --skip-signal-refresh
     .venv/bin/kalshi-bot phase3aa-realize \
