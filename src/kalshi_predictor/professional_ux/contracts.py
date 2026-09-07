@@ -29,6 +29,7 @@ NAV_ITEMS: tuple[dict[str, str], ...] = (
 
 COMMAND_ITEMS: tuple[dict[str, str], ...] = NAV_ITEMS + (
     {"label": "System health", "href": "/system/health", "family": "system"},
+    {"label": "Refresh & readiness", "href": "/system/refresh-readiness", "family": "system"},
     {
         "label": "System certification",
         "href": "/system/certification",

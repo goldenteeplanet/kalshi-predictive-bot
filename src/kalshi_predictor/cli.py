@@ -17216,6 +17216,10 @@ def gh1_websocket_orderbook_watch_command(
     status_path: Annotated[
         Path, typer.Option(help="Filesystem heartbeat/status artifact.")
     ] = Path("reports/phase_gh1/watch/status.json"),
+    active_market_catalog_path: Annotated[
+        Path | None,
+        typer.Option(help="Filesystem-only bounded active-market rollover catalog."),
+    ] = None,
     preferred_tickers_path: Annotated[
         Path | None,
         typer.Option(help="Optional GH-2 actionable-ticker manifest."),
@@ -17260,6 +17264,7 @@ def gh1_websocket_orderbook_watch_command(
             reconnect_max_seconds=reconnect_max_seconds,
             persist_every_deltas=persist_every_deltas,
             status_path=status_path,
+            active_market_catalog_path=active_market_catalog_path,
             preferred_tickers_path=preferred_tickers_path,
             max_preferred_tickers=max_preferred_tickers,
             max_cycles=max_cycles or None,
@@ -19879,6 +19884,10 @@ def gh2_single_writer_decision_refresh_command(
         Path,
         typer.Option(help="Manifest consumed by the reconnecting GH-1 watch."),
     ] = Path("reports/phase_gh1/watch/actionable_tickers.json"),
+    active_market_catalog_path: Annotated[
+        Path | None,
+        typer.Option(help="GH-1 staged active-market catalog used for bounded rollover."),
+    ] = None,
     candidate_limit: Annotated[
         int,
         typer.Option(help="Maximum ranked tickers published to GH-1."),
@@ -19958,6 +19967,7 @@ def gh2_single_writer_decision_refresh_command(
         crypto_staging_dir=crypto_staging_dir,
         gh1_staging_dir=gh1_staging_dir,
         candidate_manifest_path=candidate_manifest_path,
+        active_market_catalog_path=active_market_catalog_path,
         settings=settings,
         candidate_limit=candidate_limit,
         active_link_limit=active_link_limit,
@@ -21244,8 +21254,8 @@ def exact_slice_compare_command(
     console.print(json.dumps(payload, indent=2))
 
 
-@app.command("runtime-origin")
-def runtime_origin_command(
+@app.command("runtime-deployment-origin")
+def runtime_deployment_origin_command(
     manifest: Annotated[
         Path | None,
         typer.Option(help="Optional deployment manifest path."),

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import base64
 import asyncio
+import base64
 import json
 import re
 import time
@@ -17,6 +17,7 @@ from kalshi_predictor.data.locks import db_writer_monitor
 from kalshi_predictor.data.repositories import insert_market_snapshot
 from kalshi_predictor.kalshi.client import KalshiClient
 from kalshi_predictor.kalshi.orderbook import LocalOrderbook, OrderbookSequenceGap
+from kalshi_predictor.opportunities.market_identity import kalshi_api_market_url
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
 DEFAULT_WS_URL = "wss://external-api-ws.demo.kalshi.co/trade-api/ws/v2"
@@ -165,7 +166,10 @@ class ReadOnlyOrderbookWebSocketAdapter:
         )
 
     def _stage(self, ticker: str, *, reason: str) -> Path:
-        market = self.rest_client.get_market(ticker)
+        market = dict(self.rest_client.get_market(ticker))
+        market["source"] = "kalshi_rest_market_snapshot"
+        market["source_observed_at"] = utc_now().isoformat()
+        market["kalshi_api_url"] = kalshi_api_market_url(ticker)
         book = self.books[ticker]
         payload = {
             "category": "websocket_orderbook_snapshot",

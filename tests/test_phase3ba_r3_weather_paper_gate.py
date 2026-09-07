@@ -19,6 +19,7 @@ def _base_row() -> dict:
         "terminal_weather_horizon_complete": True,
         "verified_kalshi_url": True,
         "kalshi_url_status": VERIFIED,
+        "source_identity_ready": True,
         "has_snapshot": True,
         "snapshot_fresh": True,
         "has_weather_source_forecast": True,
@@ -45,8 +46,13 @@ def test_phase3ba_r3_first_weather_paper_blocker_order() -> None:
         ({"current_window_eligible": False}, "MARKET_WINDOW_INELIGIBLE"),
         ({"terminal_weather_horizon_complete": False}, "RAIN_HORIZON_INCOMPLETE"),
         ({"verified_kalshi_url": False}, "LINK_UNVERIFIED"),
+        ({"source_identity_ready": False}, "MARKET_SOURCE_MISSING"),
         ({"has_snapshot": False}, "SNAPSHOT_MISSING"),
         ({"snapshot_fresh": False}, "SNAPSHOT_STALE"),
+        ({"has_weather_source_forecast": False}, "SOURCE_MISSING"),
+        ({"weather_source_forecast_fresh": False}, "SOURCE_MISSING"),
+        ({"has_weather_feature": False}, "SOURCE_MISSING"),
+        ({"weather_feature_fresh": False}, "SOURCE_MISSING"),
         ({"has_current_forecast": False}, "FORECAST_MISSING"),
         ({"has_current_ranking": False}, "RANKING_MISSING"),
         ({"raw_ev": "0"}, "EV_NOT_POSITIVE"),
@@ -100,6 +106,48 @@ def test_missing_book_keeps_existing_blocker_order_with_null_executable_ev() -> 
     )
 
     assert phase3ba_r3._first_weather_paper_blocker(row) == "LIQUIDITY_TOO_LOW"
+
+
+def test_phase3ba_r3_reports_every_failed_gate() -> None:
+    row = _base_row()
+    row.update(
+        {
+            "verified_kalshi_url": False,
+            "snapshot_fresh": False,
+            "raw_ev": "0",
+            "fee_adjusted_ev": "0",
+            "executable_ev": "0",
+            "phase3n_approved": False,
+        }
+    )
+
+    blockers = phase3ba_r3._weather_paper_blockers(row)
+
+    assert blockers == [
+        "LINK_UNVERIFIED",
+        "SNAPSHOT_STALE",
+        "EV_NOT_POSITIVE",
+        "EXECUTABLE_EV_NOT_POSITIVE",
+        "PHASE_3N_RISK_BLOCK",
+    ]
+
+
+def test_phase3ba_r3_accepts_exact_catalog_api_identity_without_promoting_ui_url() -> None:
+    identity = {
+        "market_ticker": "KXTEMPNYCH-TEST",
+        "api_url": (
+            "https://external-api.kalshi.com/trade-api/v2/markets/"
+            "KXTEMPNYCH-TEST"
+        ),
+        "kalshi_url_status": "BUILT_FROM_EXACT_CATALOG",
+        "kalshi_url_verified": False,
+    }
+
+    assert phase3ba_r3._weather_source_identity_ready(
+        identity,
+        ticker="KXTEMPNYCH-TEST",
+    ) is True
+    assert identity["kalshi_url_verified"] is False
 
 
 def test_phase3ba_r3_summary_counts_ready_and_blockers() -> None:

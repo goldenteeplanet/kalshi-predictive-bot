@@ -67,4 +67,4 @@ jobs:
         with:
           python-version: "3.11.9"
       - run: python -m pip install --disable-pip-version-check -c requirements-ci.lock -e ".[dev]"
-      - run: python -m pytest -q tests/test_phase4cd_reconciliation_audit.py tests/test_phase4fa_github_integration_inventory.py tests/test_phase4fb_github_recommendations.py
+      - run: python -m pytest -q tests/test_phase4ad_reconciliation_attribution.py tests/test_phase4ae_reconciliation_plan.py tests/test_phase4fa_github_integration_inventory.py tests/test_phase4fb_github_recommendations.py
