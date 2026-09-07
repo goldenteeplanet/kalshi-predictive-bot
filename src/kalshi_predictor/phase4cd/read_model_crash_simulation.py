@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -78,8 +79,25 @@ def simulate_publication(
         return inspect_workspace(root, max_artifact_bytes=max_artifact_bytes)
     if crash_point != "AFTER_REPLACE":
         raise CrashSimulationError("CRASH_POINT_INVALID")
-    os.replace(temporary, current)
+    _replace_atomically(temporary, current)
     return inspect_workspace(root, max_artifact_bytes=max_artifact_bytes)
+
+
+def _replace_atomically(temporary: Path, current: Path) -> None:
+    """Keep the old artifact intact while Windows readers release their handles."""
+    deadline = time.monotonic() + 5.0
+    while True:
+        try:
+            os.replace(temporary, current)
+            return
+        except PermissionError as exc:
+            if (
+                os.name != "nt"
+                or getattr(exc, "winerror", None) not in {5, 32}
+                or time.monotonic() >= deadline
+            ):
+                raise
+            time.sleep(0.01)
 
 
 def inspect_workspace(root: Path, *, max_artifact_bytes: int) -> RecoveryState:

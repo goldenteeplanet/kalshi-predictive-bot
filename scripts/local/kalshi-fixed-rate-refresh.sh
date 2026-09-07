@@ -85,6 +85,7 @@ mkdir -p \
   /home/james/kalshi-local-runtime/watch
 
 next_start_epoch="$(date +%s)"
+targeted_capture_sequence=0
 while true; do
   now_epoch="$(date +%s)"
   if (( now_epoch < next_start_epoch )); then
@@ -238,13 +239,14 @@ while true; do
   # Alternate one small targeted-capture shard per cycle. Each shard is capped
   # at two candidate events, so collector research cannot consume two full
   # stage budgets or overlap the next intended cadence.
-  if (( cycle_started_epoch % 2 == 0 )); then
+  if (( targeted_capture_sequence % 2 == 0 )); then
     targeted_capture_stage="targeted_crypto_capture_major"
     targeted_capture_series="KXBTC,KXETH"
   else
     targeted_capture_stage="targeted_crypto_capture_alt"
     targeted_capture_series="KXSOLE,KXXRP,KXDOGE"
   fi
+  targeted_capture_sequence=$((targeted_capture_sequence + 1))
   run_health_stage "$targeted_capture_stage" 180 timeout 180s flock -w 45 "$WRITER_LOCK" \
     .venv/bin/python scripts/crypto_event_quote_collector.py \
       --output reports/crypto_event_vectors/status.json \
