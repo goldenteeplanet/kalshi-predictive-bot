@@ -2,8 +2,9 @@
 
 Branch: `integration/all-code-20260907`.
 
-This is a local integration branch for review. It has not been pushed, merged into
-main, deployed, or used to run a trading service.
+PR #57 merged this integration into main at `4b69da8` on 2026-09-08, after all
+13 hosted checks passed. It has not been deployed or used to run a trading service.
+The sections below retain the original integration and validation history.
 
 ## Included work
 

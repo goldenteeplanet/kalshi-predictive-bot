@@ -1,6 +1,6 @@
 # Bounded paper-readiness rehearsal
 
-Status: **prepared, not started**. This rehearsal observes fresh public data and
+Status at preparation: **prepared, not started**. This rehearsal observes fresh public data and
 evaluates readiness with execution disabled. It creates no paper, demo, or live
 orders. Starting an order-producing paper run requires a later explicit scope.
 
@@ -100,3 +100,32 @@ worktree. After confirming the failed process is gone, make a new run directory
 from the verified empty baseline for a future attempt; never overwrite the failed
 database or delete its ledger evidence. No shared runtime rollback is needed because
 this procedure never changes the shared runtime.
+
+## Implemented runner
+
+`scripts/local/observation_rehearsal.py` implements these limits. Its normal entry
+point supervises a child process with a 600-second watchdog; public requests run
+in separate children with a maximum 15-second deadline. There is no retry path.
+It clears inherited runtime settings before importing the application and refuses
+a dirty code checkout. It checks the baseline hash and exact application DDL,
+then copies the baseline into a new timestamped, unsynced run directory.
+
+The importer deliberately bypasses the shared snapshot repository function,
+which also emits memory events. SQLite's authorizer permits only inserts/updates
+to `markets` and `market_snapshots`. All other application tables must remain
+empty. Missing book sides remain null; market summary quotes are not substituted.
+Existing book-quality and GH-4 gates run without fabricated liquidity scores,
+forecast lineage, source-health evidence, or soak history.
+
+Run only after the runner revision's hosted checks pass. From a clean checkout,
+using the dedicated Python environment with project dependencies installed:
+
+```text
+python -I scripts/local/observation_rehearsal.py --baseline C:/Users/user1/AppData/Local/CodexPaperRehearsals/20260907T232421Z/paper.empty-baseline.db --baseline-sha256 3d26fbf80aa40123d78a4366f7d2be92a2ad3b90891981386388864a4633fc8d
+```
+
+This Windows invocation uses `LOCALAPPDATA/CodexPaperRehearsals` for outputs.
+Exit 0 means the bounded observation completed; exit 2 means it stopped blocked.
+Inspect `result.json`, `progress.json`, `requests.json`, raw response files, and
+per-cycle GH-4 evidence. Trading readiness remains a separate blocked verdict.
+The prepared 2026-09-07 sample tickers are never inputs to the runner.
