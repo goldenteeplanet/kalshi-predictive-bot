@@ -10,6 +10,7 @@ from contextlib import closing
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
@@ -19,7 +20,7 @@ from kalshi_predictor.overnight_paper.watcher import verified_paper_marker
 
 
 def snapshot(path: Path | None) -> dict:
-    result = {
+    result: dict[str, Any] = {
         "label": "LOCAL PAPER — NO REAL MONEY",
         "paper_mode": "NOT_ACTIVE",
         "live_exchange": "DISABLED",
