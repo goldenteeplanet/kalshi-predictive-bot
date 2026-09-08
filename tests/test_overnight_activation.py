@@ -18,7 +18,11 @@ from kalshi_predictor.advanced_risk.repository import insert_advanced_risk_decis
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.schema import Base, Forecast, Market, MarketSnapshot
 from kalshi_predictor.overnight_paper import activation
-from kalshi_predictor.overnight_paper.boundary import ExecutionMode, LocalPaperAuthorization
+from kalshi_predictor.overnight_paper.boundary import (
+    ExecutionMode,
+    LocalPaperAuthorization,
+    authorization_fingerprint,
+)
 from kalshi_predictor.overnight_paper.qualification import (
     COLLECTOR_GATES,
     EvidenceReference,
@@ -69,6 +73,33 @@ def prepared(tmp_path, baseline_template, monkeypatch):
         paper_order_kill_switch=False,
         learning_mode=False,
     )
+    objective = b"synthetic local-paper authorization"
+    authorization = LocalPaperAuthorization(
+        now,
+        now + timedelta(days=1),
+        hashlib.sha256(objective).hexdigest(),
+        isolated_database_path=str(path.resolve()),
+        database_id="fixture-database-identity-0001",
+    )
+    authorization_sha = authorization_fingerprint(authorization)
+    marker = dict(
+        kind="LOCAL_PAPER_AUTHORIZATION_BASELINE_V1",
+        database_id=authorization.database_id,
+        database_path=str(path.resolve()),
+        objective_sha256=authorization.objective_sha256,
+        authorization_sha256=authorization_sha,
+        baseline_paper_orders=0,
+        baseline_paper_fills=0,
+    )
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO overnight_sprint_cycles VALUES(:id,:at,:payload)"),
+            {
+                "id": "authorization-baseline:" + authorization.database_id,
+                "at": now.isoformat(),
+                "payload": json.dumps(marker),
+            },
+        )
     size = DynamicPositionSizer(PositionSizingConfig()).decide(
         PositionSizingInput(
             confidence_score=0.55,
@@ -151,6 +182,7 @@ def prepared(tmp_path, baseline_template, monkeypatch):
             ticker="BTC-TEST",
             category="crypto",
             code_sha="a" * 40,
+            authorization_sha256=authorization_sha,
             side=BUY_YES,
             executable_price="0.21",
             latest_settlement_at=(now + timedelta(hours=2)).isoformat(),
@@ -254,9 +286,7 @@ def prepared(tmp_path, baseline_template, monkeypatch):
     result = dict(
         session_factory=factory,
         database_path=path,
-        authorization=LocalPaperAuthorization(
-            now, now + timedelta(days=1), hashlib.sha256(objective).hexdigest()
-        ),
+        authorization=authorization,
         objective_bytes=objective,
         release=Mock(spec=activation.ExactReleaseEvidence),
         qualification_args=args,
@@ -427,3 +457,56 @@ def test_caller_supplied_historical_cache_cannot_bless_engine_revalidation(prepa
 def test_release_rejects_artifacts_for_another_checkout(tmp_path):
     with pytest.raises(ValueError, match="NOT_RUNNING_CHECKOUT"):
         activation._verify_import_origins(tmp_path)
+
+
+def test_authorization_cannot_be_reused_against_another_database(prepared, tmp_path):
+    other = tmp_path / "another-paper.db"
+    shutil.copyfile(prepared["database_path"], other)
+    prepared["database_path"] = other
+    with pytest.raises(ValueError, match="AUTHORIZATION_DATABASE_PATH_MISMATCH"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+def test_missing_authorization_marker_never_recreated_by_activation(prepared):
+    with prepared["session_factory"]() as session:
+        session.execute(
+            text("DELETE FROM overnight_sprint_cycles WHERE id LIKE 'authorization-baseline:%'")
+        )
+        session.commit()
+    with pytest.raises(ValueError, match="IMMUTABLE_AUTHORIZATION_BASELINE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    with prepared["session_factory"]() as session:
+        assert (
+            session.execute(
+                text(
+                    "SELECT count(*) FROM overnight_sprint_cycles "
+                    "WHERE id LIKE 'authorization-baseline:%'"
+                )
+            ).scalar_one()
+            == 0
+        )
+    assert count(prepared) == 0
+
+
+def test_marker_database_id_change_invalidates_authorization(prepared):
+    with prepared["session_factory"]() as session:
+        raw = session.execute(
+            text(
+                "SELECT payload FROM overnight_sprint_cycles "
+                "WHERE id LIKE 'authorization-baseline:%'"
+            )
+        ).scalar_one()
+        marker = json.loads(raw)
+        marker["database_id"] = "other-database-identity"
+        session.execute(
+            text(
+                "UPDATE overnight_sprint_cycles SET payload=:raw "
+                "WHERE id LIKE 'authorization-baseline:%'"
+            ),
+            {"raw": json.dumps(marker)},
+        )
+        session.commit()
+    with pytest.raises(ValueError, match="IMMUTABLE_AUTHORIZATION_BASELINE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0

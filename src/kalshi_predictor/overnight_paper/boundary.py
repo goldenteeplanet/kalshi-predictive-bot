@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
+from pathlib import Path
 
 
 class ExecutionMode(StrEnum):
@@ -26,6 +29,36 @@ class LocalPaperAuthorization:
     max_open_positions: int = 3
     max_positions_per_event: int = 1
     hard_horizon_hours: int = 72
+    isolated_database_path: str | None = None
+    database_id: str | None = None
+
+
+def authorization_fingerprint(authorization: LocalPaperAuthorization) -> str:
+    """Bind the complete goal authorization, including the one allowed database.
+
+    Does not create a marker or mutate a database. The initial marker must already
+    exist before activation and must never be reset during the active goal.
+    """
+    payload = {
+        "created_at": authorization.created_at.isoformat(),
+        "expires_at": authorization.expires_at.isoformat(),
+        "objective_sha256": authorization.objective_sha256,
+        "mode": authorization.mode.value,
+        "max_contracts_per_position": authorization.max_contracts_per_position,
+        "max_new_positions": authorization.max_new_positions,
+        "max_open_positions": authorization.max_open_positions,
+        "max_positions_per_event": authorization.max_positions_per_event,
+        "hard_horizon_hours": authorization.hard_horizon_hours,
+        "isolated_database_path": (
+            str(Path(authorization.isolated_database_path).resolve())
+            if authorization.isolated_database_path
+            else None
+        ),
+        "database_id": authorization.database_id,
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
 
 
 def require_local_mode(mode: ExecutionMode) -> None:

@@ -36,6 +36,8 @@ def snapshot(path: Path | None) -> dict:
         "last_capture_at": None,
         "weather_source_state": "UNVERIFIED",
         "weather_provider_updated_at": None,
+        "reported_final_examples": 0,
+        "independent_final_reproductions": 0,
         "next_expected_settlement": None,
         "positions": [],
         "blockers": [],
@@ -159,6 +161,9 @@ def snapshot(path: Path | None) -> dict:
                         }
                         result["weather_source_state"] = ", ".join(sorted(states)) or "UNVERIFIED"
                         result["blockers"].append("WEATHER_METHODOLOGY_AND_CUTOVER_UNCERTIFIED")
+                elif evidence.get("kind") == "CRYPTO_FINAL_DIAGNOSTIC":
+                    result["reported_final_examples"] = len(evidence["examples"])
+                    result["blockers"].append("INDEPENDENT_CF_SOURCE_REPRODUCTION_MISSING")
                 elif evidence.get("mode") == "OBSERVATION_ONLY" and "result" in evidence:
                     if result["last_capture_at"] is None:
                         result["last_capture_at"] = record["captured_at"]
@@ -184,6 +189,8 @@ def snapshot(path: Path | None) -> dict:
             "historical_evaluated_events",
             "shadow_settled_events",
             "local_paper_settled_events",
+            "reported_final_examples",
+            "independent_final_reproductions",
         ):
             result[key] = None
         result["blockers"] = ["PAPER_DASHBOARD_EVIDENCE_INVALID"]
@@ -210,6 +217,8 @@ def render(payload: dict) -> str:
             "last_capture_at",
             "weather_source_state",
             "weather_provider_updated_at",
+            "reported_final_examples",
+            "independent_final_reproductions",
             "historical_evaluated_events",
             "shadow_settled_events",
             "local_paper_settled_events",
@@ -227,6 +236,11 @@ def render(payload: dict) -> str:
         f"{escape(json.dumps(row['lifecycle'], indent=2))}</pre></details></article>"
         for row in payload["positions"]
     )
+    empty = (
+        "Position evidence unavailable."
+        if payload["paper_mode"] == "UNVERIFIED"
+        else "No local paper positions created."
+    )
     return (
         "<!doctype html><html lang='en'><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
@@ -241,7 +255,7 @@ def render(payload: dict) -> str:
         "<p><a href='/system/progress'>System progress</a></p>"
         f"<section>{metrics}</section><h2>Readiness blockers</h2>"
         f"<p>{escape(', '.join(payload['blockers']))}</p>"
-        f"<h2>Paper positions</h2>{cards or '<p>No local paper positions created.</p>'}"
+        f"<h2>Paper positions</h2>{cards or '<p>' + empty + '</p>'}"
         "</main></html>"
     )
 

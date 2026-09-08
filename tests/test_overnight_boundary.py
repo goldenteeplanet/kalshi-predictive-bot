@@ -164,3 +164,12 @@ def test_existing_fill_simulator_has_only_local_ledger_calls():
         }
         for node in ast.walk(fill)
     )
+
+
+def test_authorization_hash_includes_database_identity(tmp_path):
+    from kalshi_predictor.overnight_paper.boundary import authorization_fingerprint
+
+    first = replace(AUTH, isolated_database_path=str(tmp_path / "one.db"), database_id="one")
+    second = replace(first, isolated_database_path=str(tmp_path / "two.db"))
+    third = replace(first, database_id="another")
+    assert len({authorization_fingerprint(item) for item in (first, second, third)}) == 3

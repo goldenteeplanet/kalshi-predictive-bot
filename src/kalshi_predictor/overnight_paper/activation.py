@@ -33,6 +33,7 @@ from kalshi_predictor.data.schema import (
 )
 from kalshi_predictor.overnight_paper.boundary import (
     LocalPaperAuthorization,
+    authorization_fingerprint,
     validate_authorization,
 )
 from kalshi_predictor.overnight_paper.qualification import (
@@ -332,10 +333,9 @@ def _revalidate_engines(
         decision_timestamp=now,
     )
     risk = AdvancedRiskEngine(AdvancedRiskConfig.from_settings(settings)).decide(request)
-    if (
-        decision_fingerprint(sized.as_dict()) != decision_fingerprint(args["phase3m"].as_dict())
-        or decision_fingerprint(risk.as_dict()) != decision_fingerprint(args["phase3n"].as_dict())
-    ):
+    if decision_fingerprint(sized.as_dict()) != decision_fingerprint(
+        args["phase3m"].as_dict()
+    ) or decision_fingerprint(risk.as_dict()) != decision_fingerprint(args["phase3n"].as_dict()):
         raise ValueError("ENGINE_REVALIDATION_REQUIRES_NEW_SHADOW")
 
 
@@ -378,7 +378,14 @@ def activate_local_paper(
         for item in (database_path, *database_path.parents)
     ):
         raise ValueError("ISOLATED_UNLINKED_DATABASE_REQUIRED")
+    if not authorization.isolated_database_path or not authorization.database_id:
+        raise ValueError("AUTHORIZATION_DATABASE_BINDING_REQUIRED")
+    if Path(authorization.isolated_database_path).resolve() != path:
+        raise ValueError("AUTHORIZATION_DATABASE_PATH_MISMATCH")
+    expected_authorization = authorization_fingerprint(authorization)
     args = dict(qualification_args)
+    if args.get("decision_inputs", {}).get("authorization_sha256") != expected_authorization:
+        raise ValueError("QUALIFIED_AUTHORIZATION_BINDING_MISMATCH")
     if args.get("decision_inputs", {}).get("code_sha") != release.sha:
         raise ValueError("QUALIFIED_CODE_SHA_MISMATCH")
     for item in args.get("evidence", ()):
@@ -410,6 +417,21 @@ def activate_local_paper(
                 raise ValueError("DATABASE_PATH_MISMATCH")
             if session.execute(text("PRAGMA integrity_check")).scalar() != "ok":
                 raise ValueError("DATABASE_INTEGRITY_FAILED")
+            marker = session.execute(
+                text("SELECT payload FROM overnight_sprint_cycles WHERE id=:id"),
+                {"id": "authorization-baseline:" + authorization.database_id},
+            ).scalar_one_or_none()
+            expected_marker = {
+                "kind": "LOCAL_PAPER_AUTHORIZATION_BASELINE_V1",
+                "database_id": authorization.database_id,
+                "database_path": str(path),
+                "objective_sha256": authorization.objective_sha256,
+                "authorization_sha256": expected_authorization,
+                "baseline_paper_orders": 0,
+                "baseline_paper_fills": 0,
+            }
+            if marker is None or json.loads(marker) != expected_marker:
+                raise ValueError("IMMUTABLE_AUTHORIZATION_BASELINE_REQUIRED")
             row = session.execute(
                 text("SELECT payload,paper_order_id FROM overnight_shadow WHERE id=:key"),
                 {"key": shadow_id},
