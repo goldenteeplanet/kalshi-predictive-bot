@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from datetime import UTC, datetime
 from html import escape
@@ -21,6 +22,7 @@ from kalshi_predictor.data_sources.contracts import (
     assess_source,
 )
 from kalshi_predictor.data_sources.registry import PROVIDERS, credential_metadata
+from kalshi_predictor.overnight_paper.dashboard import snapshot as paper_snapshot
 from kalshi_predictor.ui.provider_research import _read
 from kalshi_predictor.ui.provider_research import snapshot as capture_snapshot
 
@@ -34,9 +36,36 @@ _CAPTURE_NAMES = {
 
 
 def source_snapshot(
-    report_directory: Path | None = None, capture_directory: Path | None = None
+    report_directory: Path | None = None,
+    capture_directory: Path | None = None,
+    paper_database_path: Path | None = None,
 ) -> dict[str, Any]:
     now = datetime.now(UTC)
+    # Same read-only verifier as /paper-live. Never decode ledger truth here.
+    paper = paper_snapshot(paper_database_path)
+    weather = {
+        key: paper.get(key)
+        for key in (
+            "weather_evidence_at",
+            "weather_evidence_kind",
+            "weather_evidence_ticker",
+            "weather_evidence_state",
+            "weather_source_state",
+            "weather_provider_updated_at",
+            "weather_provider_generated_at",
+            "weather_last_attempt_blockers",
+            "weather_preparation_state",
+            "weather_actual_forecast_count",
+            "last_capture_at",
+            "capture_state",
+        )
+    }
+    weather["verification_error"] = (
+        "PAPER_DASHBOARD_EVIDENCE_INVALID"
+        if paper.get("first_blocker") == "PAPER_DASHBOARD_EVIDENCE_INVALID"
+        else None
+    )
+    weather["scope"] = "LATEST_SAME_LEDGER_WEATHER_ATTEMPT_NOT_SERVICE_STATUS"
     directory = (
         report_directory or Path(__file__).resolve().parents[3] / "reports" / "api_tournament"
     )
@@ -118,6 +147,14 @@ def source_snapshot(
                 "payment_recommendation": "DO_NOT_PAY_YET",
             }
         )
+        if name == "NWS":
+            rows[-1]["weather_attempt"] = weather
+            rows[-1]["forecast_count"] = weather["weather_actual_forecast_count"]
+            if weather["weather_evidence_at"] is not None:
+                rows[-1]["capture_status"] = weather["weather_evidence_state"]
+                if weather["weather_source_state"] == "STALE":
+                    rows[-1]["health_status"] = "STALE"
+                    rows[-1]["reason"] = "VERIFIED_WEATHER_PROVIDER_CLOCK_STALE"
     return {
         "viewed_at": now.isoformat(),
         "inventory_status": inventory_status,
@@ -125,10 +162,39 @@ def source_snapshot(
         "research_only": True,
         "evaluation_status": "NO_PAIRED_REAL_EVENT_EVIDENCE",
         "providers": rows,
+        "weather_attempt": weather,
     }
 
 
 def render_sources(payload: dict[str, Any]) -> str:
+    weather = payload["weather_attempt"]
+    labels = (
+        ("Recorded attempt", "weather_evidence_at"),
+        ("Ticker", "weather_evidence_ticker"),
+        ("Preparation state", "weather_preparation_state"),
+        ("Provider clock state", "weather_source_state"),
+        ("NWS updateTime", "weather_provider_updated_at"),
+        ("NWS generatedAt", "weather_provider_generated_at"),
+        ("Latest receipt", "last_capture_at"),
+        ("Attempt recency", "weather_evidence_state"),
+        ("Actual forecasts in this attempt", "weather_actual_forecast_count"),
+        ("Verification error", "verification_error"),
+    )
+    weather_html = (
+        "<section><h2>Latest same-ledger weather attempt</h2><dl>"
+        + "".join(
+            "<dt>"
+            + escape(label)
+            + "</dt><dd>"
+            + escape(str(weather[key]) if weather[key] is not None else "Unknown")
+            + "</dd>"
+            for label, key in labels
+        )
+        + "</dl><p>Exact refusal reasons: "
+        + escape(", ".join(weather["weather_last_attempt_blockers"] or []) or "None recorded")
+        + "</p><p>This is a recorded attempt, not evidence of a running service. "
+        "A refusal produces no source-value metrics or paper readiness.</p></section>"
+    )
     rows = []
     for item in payload["providers"]:
         cells = [
@@ -159,12 +225,11 @@ def render_sources(payload: dict[str, Any]) -> str:
         "improvement, cost and value scores remain unknown. Do not pay or upgrade yet.</p>"
         "<p><a href='/research/providers'>View captured samples and timestamps</a> · "
         "<a href='/paper-live'>Paper readiness</a></p>"
-        "<table><thead><tr><th>Provider</th><th>Credential</th><th>Health</th>"
+        + weather_html
+        + "<table><thead><tr><th>Provider</th><th>Credential</th><th>Health</th>"
         "<th>Exact reason</th><th>Capture</th><th>Research families</th>"
         "<th>Independent N</th><th>Improvement</th><th>Cost</th><th>Recommendation</th>"
-        "</tr></thead><tbody>"
-        + "".join(rows)
-        + "</tbody></table></main></body></html>"
+        "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></main></body></html>"
     )
 
 
@@ -173,12 +238,16 @@ def create_router(
 ) -> APIRouter:
     router = APIRouter()
 
+    def current() -> dict[str, Any]:
+        raw = os.environ.get("OVERNIGHT_PAPER_DB")
+        return source_snapshot(report_directory, capture_directory, Path(raw) if raw else None)
+
     @router.get("/api/data-sources")
     def api() -> dict[str, Any]:
-        return source_snapshot(report_directory, capture_directory)
+        return current()
 
     @router.get("/data-sources", response_class=HTMLResponse)
     def page() -> str:
-        return render_sources(source_snapshot(report_directory, capture_directory))
+        return render_sources(current())
 
     return router

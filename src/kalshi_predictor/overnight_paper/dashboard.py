@@ -126,6 +126,7 @@ def _weather_snapshot(db: sqlite3.Connection, path: Path, now: datetime) -> dict
     captured, key, record = max(records, key=lambda item: (item[0], item[1]))
     if captured > now:
         raise ValueError("WEATHER_JOURNAL_FUTURE_CLOCK")
+    prepared: dict[str, Any] | None = None
 
     def preparation_record(value: dict[str, Any], identity: str) -> str:
         request = value["request"]
@@ -141,6 +142,7 @@ def _weather_snapshot(db: sqlite3.Connection, path: Path, now: datetime) -> dict
         return str(request["ticker"])
 
     if record["kind"] == "PAPER_RELEASE_PREPARATION":
+        prepared = record
         ticker = preparation_record(record, key)
         if aware(record["finished_at"]) != captured:
             raise ValueError("WEATHER_PREPARATION_CAPTURE_MISMATCH")
@@ -207,6 +209,8 @@ def _weather_snapshot(db: sqlite3.Connection, path: Path, now: datetime) -> dict
     if len(hourly) > 1:
         raise ValueError("WEATHER_JOURNAL_FORECAST_AMBIGUOUS")
     values: dict[str, Any] = dict(
+        weather_preparation_state=None,
+        weather_actual_forecast_count=None,
         weather_evidence_at=captured.isoformat(),
         weather_evidence_kind=record["kind"],
         weather_evidence_ticker=ticker,
@@ -224,6 +228,40 @@ def _weather_snapshot(db: sqlite3.Connection, path: Path, now: datetime) -> dict
         weather_provider_updated_at=None,
         weather_provider_generated_at=None,
     )
+    if prepared is not None:
+        state, computed = prepared["state"], prepared["records"]
+        if not isinstance(state, str) or not state or not isinstance(computed, dict):
+            raise ValueError("WEATHER_PREPARATION_RESULT_INVALID")
+        forecast, forecast_id = computed.get("forecast"), computed.get("forecast_id")
+        if forecast is None and forecast_id is None:
+            count = 0
+        else:
+            if not isinstance(forecast, dict) or type(forecast_id) is not int:
+                raise ValueError("WEATHER_PREPARATION_FORECAST_INVALID")
+            actual = db.execute(
+                "SELECT ticker,forecasted_at,model_name,yes_probability FROM forecasts WHERE id=?",
+                (forecast_id,),
+            ).fetchone()
+            if actual is None:
+                raise ValueError("WEATHER_PREPARATION_FORECAST_MISSING")
+            stored_at = datetime.fromisoformat(actual["forecasted_at"])
+            if stored_at.tzinfo is None:
+                stored_at = stored_at.replace(tzinfo=UTC)
+            if (
+                actual["ticker"] != ticker
+                or forecast["ticker"] != ticker
+                or actual["model_name"] != forecast["model_name"]
+                or Decimal(actual["yes_probability"]) != Decimal(str(forecast["yes_probability"]))
+                or stored_at != aware(forecast["forecasted_at"])
+                or aware(forecast["forecasted_at"]) != aware(computed["forecast_generated_at"])
+                or not aware(prepared["started_at"])
+                <= stored_at
+                <= aware(computed["forecast_available_at"])
+                <= aware(prepared["finished_at"])
+            ):
+                raise ValueError("WEATHER_PREPARATION_FORECAST_BINDING_MISMATCH")
+            count = 1
+        values.update(weather_preparation_state=state, weather_actual_forecast_count=count)
     if hourly:
         url, body = hourly[0]
         points = [
@@ -278,6 +316,8 @@ def snapshot(path: Path | None) -> dict:
         "weather_evidence_kind": None,
         "weather_evidence_ticker": None,
         "weather_evidence_state": "UNVERIFIED",
+        "weather_preparation_state": None,
+        "weather_actual_forecast_count": None,
         "weather_last_attempt_blockers": [],
         "capture_state": "UNVERIFIED",
         "historical_diagnostics": [],
@@ -469,7 +509,15 @@ def snapshot(path: Path | None) -> dict:
                 if all(t is None or aware(runtime_blocker["at"]) >= aware(t) for t in other_times):
                     result["first_blocker"] = next(iter(runtime_blocker["blockers"]), None)
                 result["blockers"].extend(runtime_blocker["blockers"])
-    except (sqlite3.DatabaseError, ValueError, KeyError, TypeError, OSError, AttributeError):
+    except (
+        sqlite3.DatabaseError,
+        ValueError,
+        KeyError,
+        TypeError,
+        OSError,
+        AttributeError,
+        ArithmeticError,
+    ):
         result = snapshot(None)
         result["paper_mode"] = "UNVERIFIED"
         for key in (
@@ -518,6 +566,8 @@ def render(payload: dict) -> str:
             "weather_provider_generated_at",
             "weather_evidence_at",
             "weather_evidence_state",
+            "weather_preparation_state",
+            "weather_actual_forecast_count",
             "capture_state",
             "reported_final_examples",
             "independent_final_reproductions",
@@ -566,6 +616,8 @@ def render(payload: dict) -> str:
         "<p>LIVE MARKET DATA | LOCAL PAPER ONLY | NO REAL MONEY</p>"
         "<p>Process liveness and last reported health are shown separately. "
         "A saved health event does not establish current monitoring or entry eligibility.</p>"
+        "<p>Weather preparation state and forecast count describe only the latest verified "
+        "attempt, not lifetime activity or eligibility.</p>"
         "<p><a href='/system/progress'>System progress</a></p>"
         f"<section>{metrics}</section><h2>Readiness blockers</h2>"
         f"<p>{escape(', '.join(payload['blockers']))}</p>"

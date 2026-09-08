@@ -52,6 +52,7 @@ def evidence(tmp_path):
         started_at=now.isoformat(),
         finished_at=now.isoformat(),
         state="REJECTED",
+        records={},
         blockers=["PROVIDER_CLOCK_STALE"],
         original_sources=sources,
     )
@@ -96,6 +97,8 @@ def test_new_blocked_preparation_overrides_old_diagnostics_without_writes(eviden
     before = hashlib.sha256(path.read_bytes()).hexdigest()
     view = snapshot(path)
     assert view["first_blocker"] == "PROVIDER_CLOCK_STALE"
+    assert view["weather_preparation_state"] == "REJECTED"
+    assert view["weather_actual_forecast_count"] == 0
     assert view["weather_provider_updated_at"] == (now - timedelta(hours=3)).isoformat()
     assert view["weather_source_state"] == "STALE"
     assert view["last_capture_at"] == now.isoformat()
@@ -136,6 +139,7 @@ def test_malformed_newest_originals_fail_closed_without_fallback(evidence, mutat
     view = snapshot(path)
     assert view["first_blocker"] == "PAPER_DASHBOARD_EVIDENCE_INVALID"
     assert view["weather_provider_updated_at"] is None and view["paper_mode"] == "UNVERIFIED"
+    assert view["weather_actual_forecast_count"] is None
     assert path.read_bytes() == before
 
 
@@ -200,13 +204,62 @@ def test_new_driver_binds_same_ledger_preparation_and_blocker(evidence):
         )
     view = snapshot(path)
     assert view["weather_evidence_kind"] == "PAPER_WEATHER_DRIVER_V1"
+    assert view["weather_actual_forecast_count"] == 0
     assert view["first_blocker"] == "PROVIDER_CLOCK_STALE"
+    driver["preparation_checkpoint"] = None
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "UPDATE overnight_sprint_cycles SET payload=? WHERE id='weather-driver:test'",
+            (json.dumps(driver),),
+        )
+    unlinked = snapshot(path)
+    assert unlinked["weather_actual_forecast_count"] is None
+    assert unlinked["weather_preparation_state"] is None
     driver["database_id"] = "other"
     with sqlite3.connect(path) as db:
         db.execute(
             "UPDATE overnight_sprint_cycles SET payload=? WHERE id='weather-driver:test'",
             (json.dumps(driver),),
         )
+    assert snapshot(path)["first_blocker"] == "PAPER_DASHBOARD_EVIDENCE_INVALID"
+
+
+def test_forecast_count_is_bound_to_latest_preparation_and_actual_row(evidence):
+    path, now, preparation = evidence
+    forecast = dict(
+        ticker=preparation["request"]["ticker"],
+        model_name="weather_v2",
+        forecasted_at=now.isoformat(),
+        yes_probability="0.6",
+    )
+    preparation.update(
+        state="BLOCKED",
+        records=dict(
+            forecast=forecast,
+            forecast_id=7,
+            forecast_generated_at=now.isoformat(),
+            forecast_available_at=now.isoformat(),
+        ),
+    )
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE forecasts(id,ticker,forecasted_at,model_name,yes_probability)")
+        db.execute(
+            "INSERT INTO forecasts VALUES(7,?,?,?,?)",
+            (forecast["ticker"], now.replace(tzinfo=None).isoformat(), "weather_v2", "0.6"),
+        )
+        db.execute(
+            "UPDATE overnight_sprint_cycles SET payload=? WHERE id='weather-preparation:test'",
+            (json.dumps(preparation),),
+        )
+    before = path.read_bytes()
+    view = snapshot(path)
+    assert view["weather_actual_forecast_count"] == 1
+    assert view["weather_preparation_state"] == "BLOCKED"
+    assert view["first_blocker"] == "PROVIDER_CLOCK_STALE"
+    assert path.read_bytes() == before
+    with sqlite3.connect(path) as db:
+        db.execute("UPDATE forecasts SET ticker='WRONG' WHERE id=7")
+    assert snapshot(path)["weather_actual_forecast_count"] is None
     assert snapshot(path)["first_blocker"] == "PAPER_DASHBOARD_EVIDENCE_INVALID"
 
 
