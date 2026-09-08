@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import os
@@ -17,7 +18,7 @@ from fastapi.responses import HTMLResponse
 
 from kalshi_predictor.overnight_paper.qualification import GATE_NAMES, decision_fingerprint
 from kalshi_predictor.overnight_paper.runtime_liveness import inspect_process
-from kalshi_predictor.overnight_paper.source_health import aware, classify_source
+from kalshi_predictor.overnight_paper.source_health import MAX_FORECAST_AGE_SECONDS, aware
 from kalshi_predictor.overnight_paper.watcher import verified_paper_marker
 
 
@@ -31,7 +32,7 @@ def _runtime_snapshot(db: sqlite3.Connection, path: Path) -> dict[str, Any]:
     event = json.loads(latest["payload"])
     generation = event["generation"]
     rows = db.execute(
-        "SELECT id,payload FROM overnight_sprint_cycles WHERE id LIKE ? ORDER BY id",
+        "SELECT id,captured_at,payload FROM overnight_sprint_cycles WHERE id LIKE ? ORDER BY id",
         ("runtime-health:" + generation + ":%",),
     ).fetchall()
     if not 1 <= len(rows) <= 500:
@@ -42,25 +43,47 @@ def _runtime_snapshot(db: sqlite3.Connection, path: Path) -> dict[str, Any]:
     if len(baseline_rows) != 1:
         raise ValueError("RUNTIME_HEALTH_BASELINE_REQUIRED")
     baseline = json.loads(baseline_rows[0][0])
-    if (baseline.get("kind") != "LOCAL_PAPER_AUTHORIZATION_BASELINE_V1"
-            or Path(baseline["database_path"]).resolve() != path.resolve()):
+    if (
+        baseline.get("kind") != "LOCAL_PAPER_AUTHORIZATION_BASELINE_V1"
+        or Path(baseline["database_path"]).resolve() != path.resolve()
+    ):
         raise ValueError("RUNTIME_HEALTH_BASELINE_IDENTITY_INVALID")
     info = path.stat()
     watcher_status = None
     previous_at = None
+    blocker_event = None
     for sequence, row in enumerate(rows):
         item = json.loads(row["payload"])
         captured = aware(item["captured_at"])
-        if (item["kind"] != "PAPER_RUNTIME_HEALTH_V1"
-                or item["generation"] != generation or item["sequence"] != sequence
-                or row["id"] != f"runtime-health:{generation}:{sequence:06d}"
-                or Path(item["database_path"]).resolve() != path.resolve()
-                or item["database_id"] != baseline["database_id"]
-                or item["database_file_identity"] != [info.st_dev, info.st_ino]
-                or (previous_at is not None and captured < previous_at)):
+        if (
+            item["kind"] != "PAPER_RUNTIME_HEALTH_V1"
+            or item["generation"] != generation
+            or item["sequence"] != sequence
+            or aware(row["captured_at"]) != captured
+            or row["id"] != f"runtime-health:{generation}:{sequence:06d}"
+            or Path(item["database_path"]).resolve() != path.resolve()
+            or item["database_id"] != baseline["database_id"]
+            or item["database_file_identity"] != [info.st_dev, info.st_ino]
+            or (previous_at is not None and captured < previous_at)
+        ):
             raise ValueError("RUNTIME_HEALTH_IDENTITY_INVALID")
         if item.get("watcher_status") is not None:
             watcher_status = item["watcher_status"]
+        blockers = item.get("blockers", [])
+        if not isinstance(blockers, list) or any(not isinstance(b, str) for b in blockers):
+            raise ValueError("RUNTIME_HEALTH_BLOCKERS_INVALID")
+        if item["state"] in {"BLOCKED", "DEGRADED", "ENTRY_DISABLED"} and not blockers:
+            reason = item.get("reason")
+            if reason is not None:
+                if not isinstance(reason, str):
+                    raise ValueError("RUNTIME_HEALTH_REASON_INVALID")
+                blockers = [reason]
+        if "blockers" in item or blockers:
+            blocker_event = {
+                "at": item["captured_at"],
+                "state": item["state"],
+                "blockers": blockers,
+            }
         previous_at = captured
     event = json.loads(rows[-1]["payload"])
     if type(event["pid"]) is not int or type(event["entries_enabled"]) is not bool:
@@ -82,8 +105,155 @@ def _runtime_snapshot(db: sqlite3.Connection, path: Path) -> dict[str, Any]:
         "runtime_generation": generation,
         "runtime_entries_reported": event["entries_enabled"],
         "runtime_watcher_last_status": watcher_status,
+        "runtime_blocker_event": blocker_event,
         "runtime_current_monitor_verified": False,
     }
+
+
+def _weather_snapshot(db: sqlite3.Connection, path: Path, now: datetime) -> dict[str, Any]:
+    """Inspect the newest attempt, never promote an older diagnostic over a refusal."""
+    records = []
+    for row in db.execute("SELECT id,captured_at,payload FROM overnight_sprint_cycles"):
+        record = json.loads(row["payload"])
+        if str(row["id"]).startswith(("weather-preparation:", "weather-driver:")) and record.get(
+            "kind"
+        ) not in {"PAPER_RELEASE_PREPARATION", "PAPER_WEATHER_DRIVER_V1"}:
+            raise ValueError("WEATHER_JOURNAL_KIND_INVALID")
+        if record.get("kind") in {"PAPER_RELEASE_PREPARATION", "PAPER_WEATHER_DRIVER_V1"}:
+            records.append((aware(row["captured_at"]), row["id"], record))
+    if not records:
+        return {}
+    captured, key, record = max(records, key=lambda item: (item[0], item[1]))
+    if captured > now:
+        raise ValueError("WEATHER_JOURNAL_FUTURE_CLOCK")
+
+    def preparation_record(value: dict[str, Any], identity: str) -> str:
+        request = value["request"]
+        if (
+            value["kind"] != "PAPER_RELEASE_PREPARATION"
+            or not identity.startswith("weather-preparation:")
+            or value["request_id"] != decision_fingerprint(request)
+            or request["source_hashes"] != [s["sha256"] for s in value["original_sources"]]
+            or aware(value["started_at"]) > aware(value["finished_at"])
+            or aware(value["finished_at"]) > captured
+        ):
+            raise ValueError("WEATHER_PREPARATION_JOURNAL_INVALID")
+        return str(request["ticker"])
+
+    if record["kind"] == "PAPER_RELEASE_PREPARATION":
+        ticker = preparation_record(record, key)
+        if aware(record["finished_at"]) != captured:
+            raise ValueError("WEATHER_PREPARATION_CAPTURE_MISMATCH")
+        blockers = record["blockers"]
+    else:
+        ticker = record["ticker"]
+        if key != "weather-driver:" + record["generation"]:
+            raise ValueError("WEATHER_DRIVER_GENERATION_MISMATCH")
+        baselines = db.execute(
+            "SELECT id,payload FROM overnight_sprint_cycles "
+            "WHERE id LIKE 'authorization-baseline:%'"
+        ).fetchall()
+        if len(baselines) != 1:
+            raise ValueError("WEATHER_DRIVER_BASELINE_REQUIRED")
+        baseline = json.loads(baselines[0]["payload"])
+        if (
+            baseline.get("kind") != "LOCAL_PAPER_AUTHORIZATION_BASELINE_V1"
+            or baselines[0]["id"] != "authorization-baseline:" + record["database_id"]
+            or baseline["database_id"] != record["database_id"]
+            or Path(baseline["database_path"]).resolve() != path.resolve()
+            or Path(record["database_path"]).resolve() != path.resolve()
+        ):
+            raise ValueError("WEATHER_DRIVER_DATABASE_IDENTITY_MISMATCH")
+        linked = record["preparation_checkpoint"]
+        if linked is not None:
+            prior = db.execute(
+                "SELECT payload FROM overnight_sprint_cycles WHERE id=?", (linked,)
+            ).fetchone()
+            if prior is None or linked != "weather-preparation:" + record["generation"]:
+                raise ValueError("WEATHER_DRIVER_PREPARATION_REQUIRED")
+            prepared = json.loads(prior[0])
+            if (
+                preparation_record(prepared, linked) != ticker
+                or prepared["original_sources"] != record["original_sources"]
+                or prepared["state"] != record["preparation_state"]
+            ):
+                raise ValueError("WEATHER_DRIVER_PREPARATION_MISMATCH")
+        blockers = record["assembly_blockers"]
+    if not isinstance(blockers, list) or any(not isinstance(b, str) for b in blockers):
+        raise ValueError("WEATHER_JOURNAL_BLOCKERS_INVALID")
+    originals = record["original_sources"]
+    if not isinstance(originals, list) or len(originals) > 12:
+        raise ValueError("WEATHER_JOURNAL_ORIGINALS_INVALID")
+    envelopes: dict[str, dict[str, Any]] = {}
+    receipts = []
+    for source in originals:
+        raw = source["original_utf8"].encode("utf-8")
+        if len(raw) > 20_000_000 or hashlib.sha256(raw).hexdigest() != source["sha256"]:
+            raise ValueError("WEATHER_JOURNAL_ORIGINAL_HASH_MISMATCH")
+        envelope = json.loads(raw)
+        url = envelope["url"]
+        if not isinstance(url, str) or url in envelopes or not isinstance(envelope["body"], dict):
+            raise ValueError("WEATHER_JOURNAL_SOURCE_IDENTITY_INVALID")
+        receipt = aware(envelope["received_at"])
+        if receipt > captured:
+            raise ValueError("WEATHER_JOURNAL_RECEIPT_IN_FUTURE")
+        envelopes[url] = envelope["body"]
+        receipts.append(receipt)
+    base = "https://external-api.kalshi.com/trade-api/v2"
+    market = envelopes.get(base + "/markets/" + ticker, {}).get("market")
+    if originals and (not isinstance(market, dict) or market.get("ticker") != ticker):
+        raise ValueError("WEATHER_JOURNAL_MARKET_IDENTITY_MISMATCH")
+    hourly = [(url, body) for url, body in envelopes.items() if url.endswith("/forecast/hourly")]
+    if len(hourly) > 1:
+        raise ValueError("WEATHER_JOURNAL_FORECAST_AMBIGUOUS")
+    values: dict[str, Any] = dict(
+        weather_evidence_at=captured.isoformat(),
+        weather_evidence_kind=record["kind"],
+        weather_evidence_ticker=ticker,
+        weather_last_attempt_blockers=blockers,
+        weather_evidence_state="RECENT_ATTEMPT"
+        if (now - captured).total_seconds() <= 60
+        else "HISTORICAL",
+        last_capture_at=max(receipts).isoformat() if receipts else None,
+        capture_state="CURRENT_CAPTURE"
+        if receipts and (now - max(receipts)).total_seconds() <= 60
+        else "HISTORICAL"
+        if receipts
+        else "UNVERIFIED",
+        weather_source_state="UNVERIFIED",
+        weather_provider_updated_at=None,
+        weather_provider_generated_at=None,
+    )
+    if hourly:
+        url, body = hourly[0]
+        points = [
+            body
+            for address, body in envelopes.items()
+            if address.startswith("https://api.weather.gov/points/")
+        ]
+        station = envelopes.get("https://api.weather.gov/stations/KNYC", {})
+        if (
+            not url.startswith("https://api.weather.gov/gridpoints/OKX/")
+            or len(points) != 1
+            or points[0].get("properties", {}).get("forecastHourly") != url
+            or station.get("properties", {}).get("stationIdentifier") != "KNYC"
+        ):
+            raise ValueError("WEATHER_JOURNAL_FORECAST_IDENTITY_MISMATCH")
+        props = body["properties"]
+        values.update(
+            weather_provider_updated_at=props.get("updateTime"),
+            weather_provider_generated_at=props.get("generatedAt"),
+        )
+        if props.get("updateTime") and props.get("generatedAt"):
+            ages = [(now - aware(props[k])).total_seconds() for k in ("updateTime", "generatedAt")]
+            values["weather_source_state"] = (
+                "SOURCE_ERROR"
+                if min(ages) < 0
+                else "STALE"
+                if max(ages) > MAX_FORECAST_AGE_SECONDS
+                else "PROVIDER_CLOCKS_FRESH_REVALIDATION_REQUIRED"
+            )
+    return values
 
 
 def snapshot(path: Path | None) -> dict:
@@ -103,13 +273,22 @@ def snapshot(path: Path | None) -> dict:
         "last_capture_at": None,
         "weather_source_state": "UNVERIFIED",
         "weather_provider_updated_at": None,
-        "reported_final_examples": 0,
-        "independent_final_reproductions": 0,
+        "weather_provider_generated_at": None,
+        "weather_evidence_at": None,
+        "weather_evidence_kind": None,
+        "weather_evidence_ticker": None,
+        "weather_evidence_state": "UNVERIFIED",
+        "weather_last_attempt_blockers": [],
+        "capture_state": "UNVERIFIED",
+        "historical_diagnostics": [],
+        "reported_final_examples": None,
+        "independent_final_reproductions": None,
         "next_expected_settlement": None,
         "positions": [],
         "shadow_candidates": 0,
         "last_decision_at": None,
         "last_qualification_status": None,
+        "last_qualification_recorded_at": None,
         "qualification_gates": [],
         "qualification_current": False,
         "first_blocker": None,
@@ -124,6 +303,7 @@ def snapshot(path: Path | None) -> dict:
         "runtime_generation": None,
         "runtime_entries_reported": None,
         "runtime_watcher_last_status": None,
+        "runtime_blocker_event": None,
         "runtime_current_monitor_verified": False,
     }
     if path is None or not path.is_file():
@@ -241,6 +421,7 @@ def snapshot(path: Path | None) -> dict:
                         result.update(
                             last_decision_at=inputs.get("decision_at"),
                             last_qualification_status=qualification["status"],
+                            last_qualification_recorded_at=record["captured_at"],
                             qualification_gates=gates,
                             first_blocker=next(iter(qualification["blockers"]), None),
                             rule_version=inputs.get("rule_version"),
@@ -249,44 +430,45 @@ def snapshot(path: Path | None) -> dict:
                         # A recorded result does not re-run source, rule, book,
                         # model or release verification and never enables entry.
                         result["blockers"].append("RECORDED_QUALIFICATION_REQUIRES_REVALIDATION")
-                elif evidence.get("kind") == "WEATHER_DIAGNOSTIC":
-                    if result["weather_provider_updated_at"] is None:
-                        weather = evidence["result"]
-                        result["weather_provider_updated_at"] = weather.get("forecast_updated_at")
-                        states = {
-                            classify_source(
-                                generated_at=weather.get("forecast_generated_at"),
-                                updated_at=weather.get("forecast_updated_at"),
-                                valid_from=f["period"]["startTime"],
-                                valid_to=f["period"]["endTime"],
-                                target_start=f["period"]["startTime"],
-                                target_end=f["period"]["endTime"],
-                                now=datetime.now(UTC),
-                                payload_hash=evidence["sha256"],
-                                previous_hash=evidence["sha256"],
-                                reused=True,
-                            ).state
-                            for f in weather.get("forecasts", [])
+                elif evidence.get("kind") in {"WEATHER_DIAGNOSTIC", "CRYPTO_FINAL_DIAGNOSTIC"}:
+                    result["historical_diagnostics"].append(
+                        {
+                            "kind": evidence["kind"],
+                            "captured_at": record["captured_at"],
+                            "status": "HISTORICAL_DIAGNOSTIC_NOT_RUNTIME_CERTIFICATION",
+                            "original_diagnostic": evidence,
+                            "reported_final_examples": len(evidence.get("examples", [])),
+                            "weather_provider_updated_at": evidence.get("result", {}).get(
+                                "forecast_updated_at"
+                            ),
                         }
-                        result["weather_source_state"] = ", ".join(sorted(states)) or "UNVERIFIED"
-                        result["blockers"].append("WEATHER_METHODOLOGY_AND_CUTOVER_UNCERTIFIED")
-                elif evidence.get("kind") == "CRYPTO_FINAL_DIAGNOSTIC":
-                    result["reported_final_examples"] = len(evidence["examples"])
-                    result["blockers"].append("INDEPENDENT_CF_SOURCE_REPRODUCTION_MISSING")
+                    )
                 elif evidence.get("mode") == "OBSERVATION_ONLY" and "result" in evidence:
                     if result["last_capture_at"] is None:
                         result["last_capture_at"] = record["captured_at"]
-                        captured = datetime.fromisoformat(record["captured_at"])
-                        age = (datetime.now(UTC) - captured).total_seconds()
-                        candidates = evidence["result"].get("eligible_candidates", [])
-                        # A stored capture is historical evidence once quotes have aged.
-                        result["fast_candidates_available"] = (
-                            len(candidates) if 0 <= age <= 30 else None
-                        )
-                        if not candidates:
-                            result["blockers"].append("NO_CERTIFIED_POSITIVE_NET_EV_CANDIDATE")
-                        if age > 30:
-                            result["blockers"].append("CAPTURE_IS_HISTORICAL_REFRESH_REQUIRED")
+                        result["capture_state"] = "HISTORICAL_DIAGNOSTIC"
+            weather = _weather_snapshot(db, path, datetime.now(UTC))
+            if weather:
+                result.update(weather)
+                qualified_at = result["last_qualification_recorded_at"]
+                if qualified_at is None or aware(weather["weather_evidence_at"]) >= aware(
+                    qualified_at
+                ):
+                    result["first_blocker"] = next(
+                        iter(weather["weather_last_attempt_blockers"]), None
+                    )
+                result["blockers"].extend(weather["weather_last_attempt_blockers"])
+                if weather["capture_state"] != "CURRENT_CAPTURE":
+                    result["blockers"].append("CAPTURE_IS_HISTORICAL_REFRESH_REQUIRED")
+            runtime_blocker = result["runtime_blocker_event"]
+            if runtime_blocker:
+                other_times = [
+                    result["last_qualification_recorded_at"],
+                    result["weather_evidence_at"],
+                ]
+                if all(t is None or aware(runtime_blocker["at"]) >= aware(t) for t in other_times):
+                    result["first_blocker"] = next(iter(runtime_blocker["blockers"]), None)
+                result["blockers"].extend(runtime_blocker["blockers"])
     except (sqlite3.DatabaseError, ValueError, KeyError, TypeError, OSError, AttributeError):
         result = snapshot(None)
         result["paper_mode"] = "UNVERIFIED"
@@ -304,6 +486,7 @@ def snapshot(path: Path | None) -> dict:
         ):
             result[key] = None
         result["blockers"] = ["PAPER_DASHBOARD_EVIDENCE_INVALID"]
+        result["first_blocker"] = "PAPER_DASHBOARD_EVIDENCE_INVALID"
     return result
 
 
@@ -332,6 +515,10 @@ def render(payload: dict) -> str:
             "last_capture_at",
             "weather_source_state",
             "weather_provider_updated_at",
+            "weather_provider_generated_at",
+            "weather_evidence_at",
+            "weather_evidence_state",
+            "capture_state",
             "reported_final_examples",
             "independent_final_reproductions",
             "historical_evaluated_events",
@@ -385,6 +572,9 @@ def render(payload: dict) -> str:
         "<h2>Last recorded qualification</h2>"
         "<p>Historical decision evidence; current eligibility requires revalidation.</p>"
         f"<ul>{gates}</ul>"
+        "<h2>Historical diagnostics</h2><p>These archived records do not establish current "
+        "source freshness or the presence or absence of externally archived evidence.</p>"
+        f"<pre>{escape(json.dumps(payload['historical_diagnostics'], indent=2))}</pre>"
         f"<h2>Paper positions</h2>{cards or '<p>' + empty + '</p>'}"
         "</main></html>"
     )
