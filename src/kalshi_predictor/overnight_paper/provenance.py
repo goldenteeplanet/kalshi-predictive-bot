@@ -400,7 +400,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "4f08a822106e0faf6f7fd6cec05baebe56eea27a5bdbd31928269a3b261d4522"
     ),
     "kalshi_predictor.overnight_paper.watcher": (
-        "351d223e10bf319b97992d82561ae94a916d93c97a08d9e4e0d0f254f7b45f04"
+        "9a99656ded4c276037d5e2f834b4da250772ad353ac60c8ad859ab6cb35fbaf6"
     ),
     "kalshi_predictor.paper.ledger": (
         "3364db4a75ab625b6f6101c103e00ab099784eea1985e381edec058074243509"
