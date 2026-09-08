@@ -278,10 +278,10 @@ def run_discovery(
                 row["first_blocker"] = "MARKET_CLOSED_DURING_SCAN"
                 continue
             event_data = public.get("/events/" + quote(row["event"], safe=""))
-            event = event_data.get("event", {})
-            series_ticker = event.get("series_ticker")
+            verified_event = event_data.get("event", {})
+            series_ticker = verified_event.get("series_ticker")
             row["identity_verified"] = bool(
-                event.get("event_ticker") == row["event"]
+                verified_event.get("event_ticker") == row["event"]
                 and series_ticker == row["series"]
                 and series_ticker in catalog
             )

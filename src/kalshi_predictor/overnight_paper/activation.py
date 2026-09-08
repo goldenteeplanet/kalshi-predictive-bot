@@ -332,9 +332,11 @@ def _revalidate_engines(
         decision_timestamp=now,
     )
     risk = AdvancedRiskEngine(AdvancedRiskConfig.from_settings(settings)).decide(request)
-    for fresh, expected in ((sized, args["phase3m"]), (risk, args["phase3n"])):
-        if decision_fingerprint(fresh.as_dict()) != decision_fingerprint(expected.as_dict()):
-            raise ValueError("ENGINE_REVALIDATION_REQUIRES_NEW_SHADOW")
+    if (
+        decision_fingerprint(sized.as_dict()) != decision_fingerprint(args["phase3m"].as_dict())
+        or decision_fingerprint(risk.as_dict()) != decision_fingerprint(args["phase3n"].as_dict())
+    ):
+        raise ValueError("ENGINE_REVALIDATION_REQUIRES_NEW_SHADOW")
 
 
 def _open_position_count(session: Session, *, now: datetime) -> int:
