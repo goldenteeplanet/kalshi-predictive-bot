@@ -174,6 +174,8 @@ def _weather_snapshot(db: sqlite3.Connection, path: Path, now: datetime) -> dict
             if prior is None or linked != "weather-preparation:" + record["generation"]:
                 raise ValueError("WEATHER_DRIVER_PREPARATION_REQUIRED")
             prepared = json.loads(prior[0])
+            if not isinstance(prepared, dict):
+                raise ValueError("WEATHER_DRIVER_PREPARATION_MISMATCH")
             if (
                 preparation_record(prepared, linked) != ticker
                 or prepared["original_sources"] != record["original_sources"]
