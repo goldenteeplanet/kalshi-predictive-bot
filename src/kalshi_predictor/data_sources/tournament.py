@@ -144,7 +144,12 @@ def _decode(artifact: Artifact, hashes: set[str]) -> dict[str, Any]:
 
 def _policy(row: dict[str, Any]) -> None:
     if (
-        row["kind"] not in {"paired-source-policy-v1", "weather-paired-source-policy-v1"}
+        row["kind"]
+        not in {
+            "paired-source-policy-v1",
+            "weather-paired-source-policy-v1",
+            "lagged-cpi-paired-policy-v1",
+        }
         or not isinstance(row["source_id"], str)
         or not row["source_id"]
     ):
@@ -152,6 +157,9 @@ def _policy(row: dict[str, Any]) -> None:
     if row["kind"] == "weather-paired-source-policy-v1":
         if row["source_id"] != "NWS" or not row["procedure_sha256"]:
             raise ValueError("TOURNAMENT_WEATHER_POLICY_REQUIRED")
+    elif row["kind"] == "lagged-cpi-paired-policy-v1":
+        if row["source_id"] != "FRED" or not row["procedure_sha256"]:
+            raise ValueError("TOURNAMENT_ECONOMIC_POLICY_REQUIRED")
     elif any(key in row for key in ("procedure_sha256", "execution_receipt_sha256")):
         raise ValueError("TOURNAMENT_EXPLICIT_WEATHER_POLICY_REQUIRED")
     if not aware(row["committed_at"]) < aware(row["holdout_start"]) < aware(row["holdout_end"]):
@@ -631,7 +639,12 @@ def _pair(
         or any(features[sha]["source_id"] != policy["source_id"] for sha in added)
     ):
         raise ValueError("TOURNAMENT_SOURCE_ABLATION_INVALID")
-    _weather_receipt(pair, anchor, snapshot, model, contexts, features, policy, at)
+    if policy["kind"] == "lagged-cpi-paired-policy-v1":
+        from kalshi_predictor.data_sources.economic_pair import validate_economic_receipt
+
+        validate_economic_receipt(pair, anchor, snapshot, model, contexts, policy, at)
+    else:
+        _weather_receipt(pair, anchor, snapshot, model, contexts, features, policy, at)
     result: dict[str, Any] = dict(
         anchor=anchor, decision_id=decision_id, probabilities=probabilities, outcome=None
     )
@@ -801,11 +814,15 @@ def evaluate_tournament(
             evidence_scope=(
                 "RECORDED_WEATHER_EXECUTION_HASH_BINDING_NOT_ATTESTATION"
                 if frozen["kind"] == "weather-paired-source-policy-v1"
+                else "RECORDED_ECONOMIC_EXECUTION_HASH_BINDING_NOT_ATTESTATION"
+                if frozen["kind"] == "lagged-cpi-paired-policy-v1"
                 else "HASH_BOUND_DECLARATIONS_ONLY"
             ),
             contrast_type=(
                 "MARKET_BASELINE_VS_WEATHER_V2"
                 if frozen["kind"] == "weather-paired-source-policy-v1"
+                else "MARKET_BASELINE_VS_LAGGED_SA_CPI_MOMENTUM_ECONOMIC_V1"
+                if frozen["kind"] == "lagged-cpi-paired-policy-v1"
                 else "DECLARED_SOURCE_COMPARISON"
             ),
             verified_hashes=tuple(sorted(hashes)),
