@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 source = Path("reports/phase_ui_obs5f_retry/ui_obs5f_retry2_live_parity_certification.json")
 parity = json.loads(source.read_text(encoding="utf-8"))
 report = {

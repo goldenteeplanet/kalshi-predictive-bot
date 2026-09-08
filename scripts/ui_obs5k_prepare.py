@@ -12,7 +12,6 @@ from kalshi_predictor.config import Settings
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.ui.app import create_app
 
-
 OUTPUT = Path("reports/phase_ui_obs5k")
 SNAPSHOT = OUTPUT / "ui_obs5k_20_phase_snapshot.json"
 HTML = OUTPUT / "ui_obs5k_20_phase_dashboard.html"
@@ -109,7 +108,9 @@ def main() -> None:
     SNAPSHOT.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.environ["KALSHI_PROGRESS_SNAPSHOT_PATH"] = str(SNAPSHOT.resolve())
     engine = init_db(f"sqlite:///{(OUTPUT / 'ui_obs5k_render.db').resolve()}")
-    client = TestClient(create_app(session_factory=get_session_factory(engine), settings=Settings()))
+    client = TestClient(
+        create_app(session_factory=get_session_factory(engine), settings=Settings())
+    )
     response = client.get("/system/progress")
     response.raise_for_status()
     HTML.write_text(response.text, encoding="utf-8")

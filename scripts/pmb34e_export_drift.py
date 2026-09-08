@@ -5,7 +5,6 @@ from pathlib import Path
 
 from kalshi_predictor.benchmarking.export_drift import write_export_drift_preview
 
-
 parser = argparse.ArgumentParser(description="Run local PMB-34E export drift certification")
 parser.add_argument(
     "--comparison", type=Path,

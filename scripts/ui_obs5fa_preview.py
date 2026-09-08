@@ -5,7 +5,6 @@ from pathlib import Path
 
 from kalshi_predictor.ui.collector_invocation_preview import certify_invocation_preview
 
-
 preview = Path("deploy/systemd/kalshi-ui-status-collector.service.ui-obs5fa.preview")
 report = certify_invocation_preview(preview)
 output = Path("reports/phase_ui_obs5fa/ui_obs5fa_exact_collector_invocation_preview.json")

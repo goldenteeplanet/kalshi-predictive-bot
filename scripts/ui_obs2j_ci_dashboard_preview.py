@@ -6,8 +6,9 @@ from pathlib import Path
 
 from kalshi_predictor.ui.certification_status import build_ci_certification_status
 
-
-parser = argparse.ArgumentParser(description="Generate the read-only UI-OBS-2J certification dashboard preview")
+parser = argparse.ArgumentParser(
+    description="Generate the read-only UI-OBS-2J certification dashboard preview"
+)
 parser.add_argument("--reports-root", type=Path, default=Path("reports"))
 parser.add_argument("--output-dir", type=Path, default=Path("reports/ui_obs2j"))
 args = parser.parse_args()

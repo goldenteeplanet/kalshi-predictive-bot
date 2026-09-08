@@ -170,7 +170,7 @@ def parse_crypto_market_terms(
         component = CryptoComponentTerms(
             symbol=event_symbol,
             side=None,
-            comparator=_text_comparator(text),
+            comparator=_market_comparator(text, raw),
             threshold_value=(_first_target_price_from_text(text) or unsupported_prices[0]),
             reference_price_source=source,
             source_event=market.event_ticker or market.series_ticker,
@@ -206,7 +206,7 @@ def parse_crypto_market_terms(
         component = CryptoComponentTerms(
             symbol=symbol,
             side=None,
-            comparator=_text_comparator(text),
+            comparator=_market_comparator(text, raw),
             threshold_value=_first_target_price_from_text(text),
             reference_price_source=source,
             source_event=market.event_ticker,
@@ -407,6 +407,13 @@ def validate_crypto_feature(
                 "source_latest_observed_at": latest_source.isoformat(),
                 "cutoff": cutoff.isoformat(),
             },
+        )
+    if terms.reference_price_source == "cf_benchmarks" and feature.source != "cf_benchmarks":
+        return FeatureCompatibility(
+            False,
+            "incompatible_reference_price_source",
+            feature=feature,
+            details={"required_source": "cf_benchmarks", "feature_source": feature.source},
         )
     if terms.reference_price_source == "coinbase" and feature.source not in {
         "coinbase",
@@ -619,6 +626,18 @@ def _leg_comparator(leg: MarketLeg | None, *, side: str | None) -> str:
     return "UNKNOWN"
 
 
+def _market_comparator(text: str, raw: dict[str, Any]) -> str:
+    # Exact API strike semantics outrank direction words in a marketing title.
+    structured = {
+        "greater_or_equal": "AT_OR_ABOVE",
+        "less_or_equal": "AT_OR_BELOW",
+        "greater": "ABOVE",
+        "less": "BELOW",
+        "between": "RANGE",
+    }.get(str(raw.get("strike_type") or "").lower())
+    return structured or _text_comparator(text)
+
+
 def _text_comparator(text: str) -> str:
     normalized = text.lower()
     if re.search(r"\b(above|greater than|exceed|at or above|over)\b", normalized):
@@ -654,6 +673,13 @@ def _first_target_price_from_text(text: str) -> str | None:
 
 
 def _reference_price_source(text: str, raw: dict[str, Any]) -> str:
+    # Market disclaimers mention analytical alternatives such as Coinbase; the
+    # named primary settlement benchmark must not be replaced by that mention.
+    primary = " ".join(
+        str(raw.get(key) or "") for key in ("rules_primary", "settlement_source", "price_source")
+    ).lower()
+    if "cf benchmarks" in primary or "cf benchmark" in primary:
+        return "cf_benchmarks"
     raw_text = " ".join(
         str(raw.get(key) or "")
         for key in ("rules_primary", "rules_secondary", "settlement_source", "price_source")

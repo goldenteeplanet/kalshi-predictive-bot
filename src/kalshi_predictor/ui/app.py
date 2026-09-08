@@ -13,6 +13,7 @@ from sqlalchemy.exc import OperationalError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from kalshi_predictor.config import Settings, get_settings
+from kalshi_predictor.overnight_paper.dashboard import create_router as create_paper_live_router
 from kalshi_predictor.ui.routes import create_router
 
 logger = logging.getLogger("kalshi_predictor.ui.audit")
@@ -112,6 +113,7 @@ def create_app(
             settings=settings or get_settings(),
         )
     )
+    app.include_router(create_paper_live_router())
     # Starlette otherwise assembles this lazily inside the first request.
     # Finalize it here so concurrent cold readers all see the same route stack.
     app.middleware_stack = app.build_middleware_stack()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -50,7 +50,7 @@ def main() -> None:
         consumed.add(source_key)
 
     state["consumed_source_reports"] = sorted(consumed)
-    state["last_run_at"] = datetime.now(timezone.utc).isoformat()
+    state["last_run_at"] = datetime.now(UTC).isoformat()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
     print(write_nyc_w8_report(reports_dir=args.reports_dir, output_dir=args.output_dir))
@@ -60,7 +60,7 @@ def _load_or_start(path: Path) -> dict[str, object]:
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
     return {
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": datetime.now(UTC).isoformat(),
         "consumed_source_reports": [],
         "mode": "READ_ONLY_DISABLED_FEATURE_FLAG",
     }

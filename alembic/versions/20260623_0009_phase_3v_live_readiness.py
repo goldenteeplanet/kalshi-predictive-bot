@@ -1,6 +1,7 @@
 """Phase 3V live trading readiness review tables."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260623_0009"

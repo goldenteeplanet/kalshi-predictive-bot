@@ -1,6 +1,7 @@
 """Phase 3P self-evaluation journal tables."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260623_0004"

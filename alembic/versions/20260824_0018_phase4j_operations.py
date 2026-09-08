@@ -1,6 +1,7 @@
 """Phase 4J prospective capture operations."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260824_0018"

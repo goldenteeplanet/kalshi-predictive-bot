@@ -21526,6 +21526,9 @@ def phase4cd_report_command(
         console.print(f"Wrote {path}")
 
 
+from kalshi_predictor.overnight_paper.cli import register_commands as register_overnight_commands
+
+register_overnight_commands(app)
 _install_friendly_cli_error_handlers()
 
 

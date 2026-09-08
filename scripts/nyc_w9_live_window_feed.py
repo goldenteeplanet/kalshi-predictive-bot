@@ -5,7 +5,6 @@ from pathlib import Path
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.phase_nyc_w9 import run_nyc_w9_cycle
 
-
 settings = get_settings()
 print(run_nyc_w9_cycle(
     reports_dir=Path("reports"), output_dir=Path("reports/phase_nyc_w9"),
