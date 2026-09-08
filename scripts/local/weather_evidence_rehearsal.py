@@ -94,6 +94,20 @@ def forecast_status(issued: str, valid: str, reference: datetime) -> str:
     return "ANALYTICAL_ONLY"
 
 
+def provider_status(generated: str, updated: str, valid: str, reference: datetime) -> str:
+    """A newly generated response cannot conceal stale underlying forecast data."""
+    states = [forecast_status(value, valid, reference) for value in (generated, updated)]
+    for blocked in (
+        "TIMESTAMP_INVALID",
+        "FUTURE_ISSUE_TIME",
+        "FORECAST_STALE",
+        "VALID_PERIOD_EXPIRED",
+    ):
+        if blocked in states:
+            return blocked
+    return "ANALYTICAL_ONLY"
+
+
 def lineage(market: dict, event: dict, series: dict) -> dict:
     exact = (
         event.get("event_ticker") == market.get("event_ticker")
@@ -223,12 +237,14 @@ def run(root: Path) -> dict:
         forecast = get(points["properties"]["forecastHourly"])
         source_id = requests[-1]["id"]
         properties = forecast["properties"]
-        issued = properties.get("generatedAt") or properties.get("updateTime")
+        issued = properties.get("generatedAt")
         periods = properties.get("periods", [])[:24]
         if not periods:
             blockers.append("FORECAST_PERIODS_MISSING")
         for period in periods:
-            status = forecast_status(issued, period.get("startTime"), now())
+            status = provider_status(
+                issued, properties.get("updateTime"), period.get("startTime"), now()
+            )
             payload = {
                 "provider": "NOAA/NWS",
                 "station_context": "KNYC",
@@ -248,11 +264,8 @@ def run(root: Path) -> dict:
         db.commit()
     except Exception as exc:
         blockers.append(str(exc))
-    else:
-        try:
-            get("https://weather.com/kalshi", raw=True)
-        except Exception:
-            blockers.append("PUBLIC_SETTLEMENT_PAGE_UNAVAILABLE")
+    # Final settlement values require a separately verified provider response.
+    # A generic HTTP-200 landing page cannot establish station, timestamp or finality.
     blockers.extend(
         [
             "FINAL_SETTLEMENT_VALUE_UNVERIFIED",

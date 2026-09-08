@@ -101,3 +101,22 @@ def test_isolated_run_retains_failure_and_never_creates_trading_tables(tmp_path,
 def test_redirect_denied():
     with pytest.raises(RuntimeError, match="REDIRECT_REFUSED"):
         evidence.NoRedirect().redirect_request(None)
+
+
+@pytest.mark.parametrize(
+    ("generated", "updated", "expected"),
+    [
+        ("2026-09-08T01:59:00Z", "2026-09-08T01:00:00Z", "FORECAST_STALE"),
+        (None, "2026-09-08T01:59:00Z", "TIMESTAMP_INVALID"),
+        ("2026-09-08T01:59:00Z", None, "TIMESTAMP_INVALID"),
+        ("2026-09-08T01:59:00Z", "2026-09-08T02:01:00Z", "FUTURE_ISSUE_TIME"),
+        ("2026-09-08T01:59:00Z", "2026-09-08T01:30:00Z", "ANALYTICAL_ONLY"),
+    ],
+)
+def test_provider_freshness_requires_both_clocks(generated, updated, expected):
+    assert (
+        evidence.provider_status(
+            generated, updated, "2026-09-08T02:00:00Z", datetime(2026, 9, 8, 2, tzinfo=UTC)
+        )
+        == expected
+    )
