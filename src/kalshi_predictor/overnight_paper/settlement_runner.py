@@ -24,10 +24,12 @@ from kalshi_predictor.overnight_paper.watcher import (
     MAX_PAYLOAD_BYTES,
     PublicMarketObservation,
     WatcherReport,
+    pending_dataset_tickers,
     reconcile_public_settlements,
 )
 
 PUBLIC_BASE = "https://external-api.kalshi.com/trade-api/v2/markets/"
+MAX_PENDING_SHADOW_MARKETS = 10_000
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,11 @@ class SettlementRunReport:
     cycles_completed: int
     reports: tuple[WatcherReport, ...]
     deferred_shadow_count: int = 0
+
+    @property
+    def deferred_nonpaper_market_count(self) -> int:
+        """Includes dataset-only observations; old field retained for compatibility."""
+        return self.deferred_shadow_count
 
 
 def _now() -> datetime:
@@ -67,19 +74,21 @@ def _tracked(session_factory: sessionmaker[Session], path: Path) -> tuple[tuple[
             "AND NOT EXISTS (SELECT 1 FROM overnight_shadow AS linked "
             "WHERE linked.ticker=shadow.ticker AND linked.paper_order_id IS NOT NULL)"
         )
-        pending_count = session.execute(
-            text("SELECT count(DISTINCT shadow.ticker) " + pending_query)
-        ).scalar_one()
-        pending = tuple(
+        shadow_pending = set(
             session.execute(
                 text(
                     "SELECT DISTINCT shadow.ticker "
                     + pending_query
                     + " ORDER BY shadow.ticker LIMIT :limit"
                 ),
-                {"limit": MAX_MARKETS - len(paper)},
+                {"limit": MAX_PENDING_SHADOW_MARKETS + 1},
             ).scalars()
         )
+        if len(shadow_pending) > MAX_PENDING_SHADOW_MARKETS:
+            raise ValueError("WATCHER_PENDING_VALIDATION_BUDGET_EXCEEDED")
+        all_pending = (shadow_pending | set(pending_dataset_tickers(session))) - set(paper)
+        pending_count = len(all_pending)
+        pending = tuple(sorted(all_pending)[: MAX_MARKETS - len(paper)])
     tickers = paper + pending
     if any(not isinstance(ticker, str) or not ticker for ticker in tickers):
         raise ValueError("WATCHER_TRACKED_TICKER_INVALID")
@@ -131,7 +140,8 @@ def run_settlement_cycles(
     This is a bounded foreground worker, not proof of a running background
     service or paper activation. Linked paper tickers always take priority and
     remain tracked after evaluation to detect corrections. Only unevaluated
-    shadow-only tickers fill remaining capacity; deferred counts are explicit.
+    shadow-only and dataset-only tickers fill remaining capacity; deferred counts
+    include both categories and are explicit.
     """
     if (
         type(cycles) is not int
@@ -169,7 +179,8 @@ def run_settlement_cycles(
             )
             reports.append(report)
             if deferred == 0 and all(
-                row["state"] in {"PAPER_EVALUATED", "SHADOW_EVALUATED"} for row in report.rows
+                row["state"] in {"PAPER_EVALUATED", "SHADOW_EVALUATED", "DATASET_OUTCOME_RECORDED"}
+                for row in report.rows
             ):
                 return SettlementRunReport(
                     "TRACKED_SETTLEMENTS_EVALUATED", len(reports), tuple(reports)

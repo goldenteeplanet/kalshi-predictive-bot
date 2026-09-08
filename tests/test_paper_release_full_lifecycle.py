@@ -45,7 +45,7 @@ def _run_lifecycle(repository, database):
     )
     from kalshi_predictor.overnight_paper.candidate_assembly import assemble_weather_candidate
     from kalshi_predictor.overnight_paper.coordinator import admit_prepared_candidate
-    from kalshi_predictor.overnight_paper.dataset_store import persist_dataset_record
+    from kalshi_predictor.overnight_paper.dataset_store import load_dataset, persist_dataset_record
     from kalshi_predictor.overnight_paper.evaluation_dataset import build_policy, join_outcome
     from kalshi_predictor.overnight_paper.provenance import canonical_hash
     from kalshi_predictor.overnight_paper.qualification import EvidenceReference, qualify_candidate
@@ -311,6 +311,17 @@ def _run_lifecycle(repository, database):
                 for table in ("paper_orders", "paper_fills", "paper_pnl", "settlements")
             }
             assert counts == dict(paper_orders=1, paper_fills=1, paper_pnl=1, settlements=1)
+            final_records = [
+                item.decode()["record"] for item in load_dataset(session, dataset="paper-release")
+            ]
+            decision_outcomes = [
+                item
+                for item in final_records
+                if item.get("kind") == "outcome-v1"
+                and item["decision_id"] == canonical_hash(inputs)
+            ]
+            assert len(decision_outcomes) == 1
+            assert decision_outcomes[0]["outcome"]["result"] == "yes"
     engine.dispose()
     print(json.dumps(dict(synthetic_only=True, all12=True, lifecycle=counts)))
 

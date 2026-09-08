@@ -29,6 +29,13 @@ from kalshi_predictor.data.schema import (
     PaperPosition,
     Settlement,
 )
+from kalshi_predictor.overnight_paper.dataset_store import load_dataset, persist_dataset_record
+from kalshi_predictor.overnight_paper.evaluation_dataset import (
+    _validate_stored_observation,
+    join_outcome,
+    read_records,
+)
+from kalshi_predictor.overnight_paper.provenance import Artifact, canonical_hash
 from kalshi_predictor.overnight_paper.settlement import market_lifecycle
 from kalshi_predictor.overnight_paper.store import (
     aware,
@@ -47,6 +54,100 @@ MAX_SHADOWS_PER_BATCH = 1000
 PUBLIC_HOSTS = frozenset({"external-api.kalshi.com", "api.elections.kalshi.com"})
 FINAL_MARKER = "OVERNIGHT_PUBLIC_FINAL_V1"
 PAPER_MARKER = "OVERNIGHT_PAPER_EVALUATION_V1"
+MAX_DATASET_RECORDS = 10_000
+MAX_DATASET_BYTES = 64 * 1024 * 1024
+
+
+def _artifact(row: dict[str, Any]) -> Artifact:
+    return Artifact(canonical_hash(row), encode(row).encode("utf-8"))
+
+
+def _dataset_records(session: Session) -> tuple[dict[str, Artifact], dict[str, Artifact]]:
+    count, size = session.execute(
+        text(
+            "SELECT count(*),coalesce(sum(length(CAST(payload AS BLOB))),0) "
+            "FROM overnight_sprint_cycles WHERE id LIKE 'release-dataset:paper-release:%'"
+        )
+    ).one()
+    if count > MAX_DATASET_RECORDS or size > MAX_DATASET_BYTES:
+        raise ValueError("WATCHER_DATASET_VALIDATION_BUDGET_EXCEEDED")
+    observations: dict[str, Artifact] = {}
+    outcomes: dict[str, Artifact] = {}
+    decision_ids: set[str] = set()
+    for entry in read_records(load_dataset(session, dataset="paper-release")):
+        row = entry["record"]
+        record = _artifact(row)
+        if row.get("kind") == "observation-v1":
+            _validate_stored_observation(row)
+            if (
+                not 0
+                <= (
+                    aware(entry["recorded_at"]) - aware(row["decision"]["decision_at"])
+                ).total_seconds()
+                <= 60
+            ):
+                raise ValueError("DATASET_OBSERVATION_NOT_PROSPECTIVE")
+            if record.sha256 in observations or row["decision_id"] in decision_ids:
+                raise ValueError("DATASET_DUPLICATE_OBSERVATION")
+            decision_ids.add(row["decision_id"])
+            observations[record.sha256] = record
+        elif row.get("kind") == "outcome-v1":
+            key = row["observation_sha256"]
+            if key not in observations or key in outcomes:
+                raise ValueError("DATASET_OUTCOME_JOIN_CONFLICT")
+            joined = join_outcome(
+                observation=observations[key], outcome_artifact=_artifact(row["outcome"])
+            )
+            if joined.sha256 != record.sha256 or aware(entry["recorded_at"]) < aware(
+                row["outcome"]["available_at"]
+            ):
+                raise ValueError("DATASET_OUTCOME_JOIN_CONFLICT")
+            outcomes[key] = record
+        elif row.get("kind") != "policy-v1":
+            raise ValueError("DATASET_UNKNOWN_RECORD_KIND")
+    return observations, outcomes
+
+
+def pending_dataset_tickers(session: Session) -> frozenset[str]:
+    observations, outcomes = _dataset_records(session)
+    return frozenset(
+        row.decode()["identity"]["ticker"]
+        for key, row in observations.items()
+        if key not in outcomes
+    )
+
+
+def _join_dataset_final(session: Session, observation: Artifact, now: datetime) -> None:
+    row = observation.decode()
+    marker = _cycle(session, "settlement-final:" + row["identity"]["ticker"])
+    if marker is None:
+        raise ValueError("DATASET_FINAL_MARKER_REQUIRED")
+    final = verified_final_marker(marker, now=now)
+    source = _source(marker["source"])
+    market = source.market(now=now, enforce_fresh=False)
+    if (
+        market.get("event_ticker") != row["identity"]["event_id"]
+        or market.get("series_ticker", row["identity"]["series"]) != row["identity"]["series"]
+        or aware(market["close_time"]) != aware(row["decision"]["close_time"])
+    ):
+        raise ValueError("DATASET_FINAL_IDENTITY_MISMATCH")
+    outcome = _artifact(
+        dict(
+            **row["identity"],
+            result=final["result"],
+            status="final",
+            final_at=final["settled_at"],
+            available_at=source.captured_at.isoformat(),
+            source_url=source.source_url,
+            provider_payload=json.loads(source.payload),
+            provider_payload_sha256=canonical_hash(json.loads(source.payload)),
+        )
+    )
+    joined = join_outcome(observation=observation, outcome_artifact=outcome)
+    _, prior = _dataset_records(session)
+    if observation.sha256 in prior and prior[observation.sha256].sha256 != joined.sha256:
+        raise ValueError("DATASET_FINAL_OUTCOME_CONFLICT")
+    persist_dataset_record(session, dataset="paper-release", record=joined, recorded_at=now)
 
 
 @dataclass(frozen=True)
@@ -460,7 +561,13 @@ def reconcile_public_settlements(
             raw_db = session.connection().connection.driver_connection
             if not isinstance(raw_db, sqlite3.Connection):
                 raise ValueError("SQLITE_SINGLE_WRITER_REQUIRED")
+            dataset_observations, _ = _dataset_records(session)
             for observation, market in parsed:
+                originals = [
+                    item
+                    for item in dataset_observations.values()
+                    if item.decode()["identity"]["ticker"] == observation.ticker
+                ]
                 shadows = session.execute(
                     text(
                         "SELECT id,payload,paper_order_id,evaluation_json FROM overnight_shadow "
@@ -468,12 +575,42 @@ def reconcile_public_settlements(
                     ),
                     {"ticker": observation.ticker, "limit": MAX_SHADOWS_PER_BATCH + 1},
                 ).all()
-                if not shadows or len(shadows) > MAX_SHADOWS_PER_BATCH:
+                if (not shadows and not originals) or len(shadows) + len(
+                    originals
+                ) > MAX_SHADOWS_PER_BATCH:
                     raise ValueError("WATCHER_TRACKED_SHADOW_BATCH_REQUIRED")
                 state = market_lifecycle(observation.ticker, market, now=observation.captured_at)
                 local_market = session.get(Market, observation.ticker)
                 if local_market is None:
                     raise ValueError("LOCAL_MARKET_IDENTITY_REQUIRED")
+                for original in originals:
+                    decision = original.decode()["decision"]
+                    if (
+                        decision["event_id"] != local_market.event_ticker
+                        or decision["series"] != local_market.series_ticker
+                        or market.get("event_ticker") != decision["event_id"]
+                        or market.get("series_ticker", decision["series"]) != decision["series"]
+                        or aware(market["close_time"]) != aware(decision["close_time"])
+                    ):
+                        raise ValueError("EXACT_SETTLEMENT_CONTRACT_IDENTITY_REQUIRED")
+                if state["final"] is not None and originals:
+                    _persist_final(session, observation, market, state["final"], now)
+                    for original in originals:
+                        _join_dataset_final(session, original, now)
+                if not shadows:
+                    if (
+                        state["final"] is None
+                        and _cycle(session, "settlement-final:" + observation.ticker) is not None
+                    ):
+                        raise ValueError("FINAL_LIFECYCLE_REGRESSION_REQUIRES_REVIEW")
+                    output.append(
+                        {
+                            "ticker": observation.ticker,
+                            "state": "DATASET_OUTCOME_RECORDED"
+                            if state["final"] is not None
+                            else state["state"],
+                        }
+                    )
                 for shadow_id, raw_payload, order_id, prior_evaluation in shadows:
                     payload = json.loads(raw_payload)
                     if digest(payload) != shadow_id:
@@ -529,7 +666,11 @@ def reconcile_public_settlements(
                 observation_ids.append(receipt_id)
             session.commit()
             return WatcherReport(
-                len(observations), shadow_count, paper_count, realized_total, tuple(output),
+                len(observations),
+                shadow_count,
+                paper_count,
+                realized_total,
+                tuple(output),
                 tuple(observation_ids),
             )
         except Exception:
