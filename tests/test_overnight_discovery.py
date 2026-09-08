@@ -2,6 +2,7 @@ import hashlib
 import json
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 
 from kalshi_predictor.overnight_paper.discovery import (
@@ -50,6 +51,60 @@ def test_public_boundary_rejects_account_paths(tmp_path, path):
 def test_existing_archive_never_overwritten(tmp_path):
     with pytest.raises(FileExistsError):
         PublicArchive(tmp_path)
+
+
+def test_rate_limit_stops_capture_without_endpoint_fallback(tmp_path, monkeypatch):
+    from kalshi_predictor.overnight_paper import discovery
+
+    calls = []
+    original_client = httpx.Client
+
+    def respond(request):
+        calls.append(request)
+        return httpx.Response(429, json={"error": "rate limit"}, headers={"Retry-After": "60"})
+
+    monkeypatch.setattr(
+        discovery.httpx,
+        "Client",
+        lambda **kwargs: original_client(transport=httpx.MockTransport(respond), **kwargs),
+    )
+    public = PublicArchive(tmp_path / "new")
+    with pytest.raises(httpx.HTTPStatusError):
+        public.get("/markets")
+    for path in ("/markets/TICKER/orderbook", "/products/BTC-USD/candles"):
+        with pytest.raises(RuntimeError, match="PUBLIC_RATE_LIMITED_CAPTURE_STOPPED"):
+            public.get(path)
+    assert len(calls) == 1
+    assert public.receipts[0]["retry_after"] == "60"
+    assert json.loads((public.root / "requests.json").read_text())[0]["status"] == 429
+
+
+def test_public_requests_are_paced_and_deadline_prevents_next_call(tmp_path, monkeypatch):
+    from kalshi_predictor.overnight_paper import discovery
+
+    clock = [100.0]
+    calls = []
+    original_client = httpx.Client
+    monkeypatch.setattr(discovery.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(
+        discovery.time, "sleep", lambda delay: clock.__setitem__(0, clock[0] + delay)
+    )
+
+    def respond(request):
+        calls.append(clock[0])
+        return httpx.Response(200, json={"markets": []})
+
+    monkeypatch.setattr(
+        discovery.httpx,
+        "Client",
+        lambda **kwargs: original_client(transport=httpx.MockTransport(respond), **kwargs),
+    )
+    public = PublicArchive(tmp_path / "new", seconds=1)
+    public.get("/markets")
+    public.get("/markets")
+    with pytest.raises(RuntimeError, match="PUBLIC_REQUEST_BUDGET_EXHAUSTED"):
+        public.get("/markets")
+    assert calls == [100.0, 100.5]
 
 
 def test_discovery_candidate_never_claims_ready_from_market_text():

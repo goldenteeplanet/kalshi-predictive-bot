@@ -50,8 +50,12 @@ class PublicArchive:
         self.max_requests = max_requests
         self.deadline = time.monotonic() + seconds
         self.receipts: list[dict[str, Any]] = []
+        self.rate_limited = False
+        self.next_request_at = 0.0
 
     def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        if self.rate_limited:
+            raise RuntimeError("PUBLIC_RATE_LIMITED_CAPTURE_STOPPED")
         if len(self.receipts) >= self.max_requests or time.monotonic() >= self.deadline:
             raise RuntimeError("PUBLIC_REQUEST_BUDGET_EXHAUSTED")
         kalshi = bool(
@@ -70,6 +74,15 @@ class PublicArchive:
         )
         if not kalshi and not coinbase:
             raise ValueError("Endpoint is not an allowed public evidence GET")
+        # Pace acquisition, and never work around a 429 by trying another endpoint.
+        delay = max(0.0, self.next_request_at - time.monotonic())
+        if time.monotonic() + delay >= self.deadline:
+            raise RuntimeError("PUBLIC_REQUEST_BUDGET_EXHAUSTED")
+        if delay:
+            time.sleep(delay)
+        if time.monotonic() >= self.deadline:
+            raise RuntimeError("PUBLIC_REQUEST_BUDGET_EXHAUSTED")
+        self.next_request_at = time.monotonic() + 0.5
         url = (BASE if kalshi else COINBASE) + path
         receipt: dict[str, Any] = {"url": url, "params": params or {}, "method": "GET"}
         self.receipts.append(receipt)
@@ -79,6 +92,9 @@ class PublicArchive:
                 trust_env=False, follow_redirects=False, timeout=min(15, remaining)
             ) as client:
                 with client.stream("GET", url, params=params) as response:
+                    if response.status_code == 429:
+                        self.rate_limited = True
+                        receipt["retry_after"] = response.headers.get("Retry-After")
                     data = bytearray()
                     for chunk in response.iter_bytes():
                         if time.monotonic() > self.deadline:

@@ -10,6 +10,38 @@ import typer
 
 
 def register_commands(app: typer.Typer) -> None:
+    @app.command("paper-settlement-cycles")
+    def paper_settlement_cycles(
+        database: Annotated[Path, typer.Option(help="Existing isolated sprint database.")],
+        cycles: Annotated[int, typer.Option(min=1, max=60)] = 1,
+        interval_seconds: Annotated[int, typer.Option(min=60, max=60)] = 60,
+    ) -> None:
+        """Monitor public results and reconcile existing local paper/shadow positions."""
+        import sqlite3
+        from dataclasses import asdict
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from kalshi_predictor.overnight_paper.settlement_runner import run_settlement_cycles
+
+        path = database.absolute()
+        # mode=rw cannot silently create a fresh ledger on a mistyped path.
+        engine = create_engine(
+            "sqlite://",
+            creator=lambda: sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=0),
+        )
+        try:
+            result = run_settlement_cycles(
+                session_factory=sessionmaker(engine),
+                database_path=path,
+                cycles=cycles,
+                interval_seconds=interval_seconds,
+            )
+            typer.echo(json.dumps(asdict(result), indent=2, default=str))
+        finally:
+            engine.dispose()
+
     @app.command("fast-paper-candidates")
     def fast_paper_candidates(
         archive_root: Annotated[Path, typer.Option(help="New isolated raw-evidence directory.")],
