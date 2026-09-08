@@ -14,6 +14,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from kalshi_predictor.overnight_paper.source_health import classify_source
 from kalshi_predictor.overnight_paper.watcher import verified_paper_marker
 
 
@@ -140,7 +141,21 @@ def snapshot(path: Path | None) -> dict:
                     if result["weather_provider_updated_at"] is None:
                         weather = evidence["result"]
                         result["weather_provider_updated_at"] = weather.get("forecast_updated_at")
-                        states = {f["health"]["state"] for f in weather.get("forecasts", [])}
+                        states = {
+                            classify_source(
+                                generated_at=weather.get("forecast_generated_at"),
+                                updated_at=weather.get("forecast_updated_at"),
+                                valid_from=f["period"]["startTime"],
+                                valid_to=f["period"]["endTime"],
+                                target_start=f["period"]["startTime"],
+                                target_end=f["period"]["endTime"],
+                                now=datetime.now(UTC),
+                                payload_hash=evidence["sha256"],
+                                previous_hash=evidence["sha256"],
+                                reused=True,
+                            ).state
+                            for f in weather.get("forecasts", [])
+                        }
                         result["weather_source_state"] = ", ".join(sorted(states)) or "UNVERIFIED"
                         result["blockers"].append("WEATHER_METHODOLOGY_AND_CUTOVER_UNCERTIFIED")
                 elif evidence.get("mode") == "OBSERVATION_ONLY" and "result" in evidence:
