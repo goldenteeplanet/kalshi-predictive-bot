@@ -1,12 +1,15 @@
 """Synthetic paired originals exercise actual scoring and leakage/cohort checks."""
 
 import hashlib
+from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from test_overnight_activation import baseline_template  # noqa: F401
 from test_overnight_provenance import artifact
+from test_paper_release_preparation_runner import cycle, real_model_bundle  # noqa: F401
 
 from kalshi_predictor.data_sources.tournament import (
     CONSERVATIVE_FEE_MODEL,
@@ -21,6 +24,106 @@ from kalshi_predictor.overnight_paper.qualification import PUBLIC_BASE
 
 def at(day, hour=1):
     return datetime(2026, 9, day, hour, tzinfo=UTC)
+
+
+@pytest.fixture
+def strict_weather(cycle, real_model_bundle):  # noqa: F811
+    # Imported after collection: adapter tests import the generic helpers below.
+    from test_weather_pair import prepared
+
+    from kalshi_predictor.data_sources.weather_pair import build_weather_pair
+
+    arguments = prepared.__wrapped__(cycle, real_model_bundle)
+    return build_weather_pair(**arguments), arguments
+
+
+def test_weather_receipt_replay_checks_rehashed_semantic_mutations(strict_weather):
+    original, arguments = strict_weather
+    frozen = arguments["policy"]
+    now = arguments["recorded_at"]
+
+    def assess(value, policy_artifact=frozen):
+        return evaluate_tournament(policy=policy_artifact, pairs=(value,), as_of=now)
+
+    initial = assess(original)
+    assert initial.status == "NOT_ENOUGH_DATA"
+    assert initial.evidence_scope == "RECORDED_WEATHER_EXECUTION_HASH_BINDING_NOT_ATTESTATION"
+    assert initial.contrast_type == "MARKET_BASELINE_VS_WEATHER_V2"
+    assert initial.actual_paper_pnl is None and initial.metrics is None
+    anchor = original.anchor.decode()
+    receipt_artifact = next(
+        x for x in original.context_originals if x.sha256 == anchor["execution_receipt_sha256"]
+    )
+    receipt = receipt_artifact.decode()
+    changes = [
+        {"source_off_probability": "0.01"},
+        {"source_on_probability": "0.01"},
+        {"snapshot_id": "substituted"},
+        {"original_book_sha256": "0" * 64},
+        {"source_envelope_hashes": []},
+        {"dependencies_after": {}},
+        {"dependencies_before": {}},
+        {"settings_original": {}},
+        {"model_code_sha256": "0" * 64},
+        {"variant_methods": {"off": "weather_v2", "on": "same_book_midpoint"}},
+        {"receipt_generated_at": (now + timedelta(seconds=1)).isoformat()},
+        {"source_off_generated_at": (now + timedelta(seconds=1)).isoformat()},
+        {"atomic_filesystem_immutability": True},
+        {"runtime_certified": True},
+    ]
+    for change in changes:
+        replacement = artifact(deepcopy(receipt) | change)
+        mutated = rebind(
+            original,
+            {"execution_receipt_sha256": replacement.sha256},
+            ((receipt_artifact, replacement),),
+        )
+        assert assess(mutated).status == "INVALID_EVIDENCE", change
+    for field in ("source_off", "source_on"):
+        row = getattr(original, field).decode()
+        mutated = replace(original, **{field: artifact(row | {"probability": "0.01"})})
+        assert assess(mutated).status == "INVALID_EVIDENCE", field
+    old_rule = next(x for x in original.context_originals if x.sha256 == anchor["rule_sha256"])
+    for key, section, field in (
+        ("market_original_sha256", "market", "volume_fp"),
+        ("series_original_sha256", "series", "title"),
+    ):
+        rule = old_rule.decode()
+        old_wrapper = next(x for x in original.context_originals if x.sha256 == rule[key])
+        wrapper = old_wrapper.decode()
+        wrapper["provider_payload"][section][field] = "999999"
+        wrapper["provider_payload_sha256"] = canonical_hash(wrapper["provider_payload"])
+        new_wrapper = artifact(wrapper)
+        new_rule = artifact(rule | {key: new_wrapper.sha256})
+        mutated = rebind(
+            original,
+            {"rule_sha256": new_rule.sha256},
+            ((old_wrapper, new_wrapper), (old_rule, new_rule)),
+        )
+        assert assess(mutated).status == "INVALID_EVIDENCE", key
+    generic = artifact(frozen.decode() | {"kind": "paired-source-policy-v1"})
+    assert assess(original, generic).status == "INVALID_EVIDENCE"
+    old_execution = arguments["execution_policy"]
+    new_execution = artifact(old_execution.decode() | {"side": "BUY_NO"})
+    changed = rebind(
+        original,
+        {"execution_policy_sha256": new_execution.sha256},
+        ((old_execution, new_execution),),
+    )
+    changed_policy = artifact(frozen.decode() | {"execution_policy_sha256": new_execution.sha256})
+    assert assess(changed, changed_policy).status == "INVALID_EVIDENCE"
+
+
+def test_generic_pairs_cannot_claim_weather_verification():
+    original = pair(3)
+    result = evaluate_tournament(policy=policy(), pairs=(original,), as_of=at(8))
+    assert result.evidence_scope == "HASH_BOUND_DECLARATIONS_ONLY"
+    assert result.contrast_type == "DECLARED_SOURCE_COMPARISON"
+    changed = rebind(original, {"execution_receipt_sha256": "0" * 64})
+    assert (
+        evaluate_tournament(policy=policy(), pairs=(changed,), as_of=at(8)).status
+        == "INVALID_EVIDENCE"
+    )
 
 
 def model():
@@ -502,7 +605,11 @@ def rebind(original, changes, replacements=()):
         anchor=anchor,
         source_off=artifact(original.source_off.decode() | fields),
         source_on=artifact(original.source_on.decode() | fields),
-        outcome=artifact(original.outcome.decode() | dict(decision_id=fields["decision_id"])),
+        outcome=(
+            None
+            if original.outcome is None
+            else artifact(original.outcome.decode() | dict(decision_id=fields["decision_id"]))
+        ),
         context_originals=tuple(contexts.values()),
     )
 

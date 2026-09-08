@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -22,12 +23,14 @@ from kalshi_predictor.overnight_paper.coordinator import (
     _verify_database,
     assert_public_only_settings,
 )
+from kalshi_predictor.overnight_paper.provenance import Artifact, canonical_hash
 from kalshi_predictor.overnight_paper.qualification import EvidenceReference
 from kalshi_predictor.overnight_paper.runtime_owner import (
     RuntimeOwner,
     acquire_runtime_owner,
     validate_runtime_owner,
 )
+from kalshi_predictor.overnight_paper.source_health import aware
 from kalshi_predictor.overnight_paper.store import digest, encode
 from kalshi_predictor.utils.time import utc_now
 
@@ -59,6 +62,157 @@ class PreparationCycle:
     live_result: preparation.WeatherPreparationResult | None
 
 
+@dataclass(frozen=True)
+class FrozenWeatherExecution:
+    """Original precommitted research procedure and existing model definition."""
+
+    procedure: Artifact
+    model: Artifact
+    model_code: bytes
+    repository: Path
+
+
+_WEATHER_ENTRYPOINT = "kalshi_predictor.forecasting.weather_v2:WeatherV2Forecaster.forecast"
+_VARIANTS = {"off": "same_book_midpoint", "on": _WEATHER_ENTRYPOINT}
+
+
+def _verify_frozen_execution(
+    frozen: FrozenWeatherExecution,
+    settings: Settings,
+    at: datetime,
+) -> dict[str, str]:
+    # Local import avoids adding an initialization cycle to existing preparation.
+    from kalshi_predictor.overnight_paper.candidate_assembly import weather_model_code_bundle
+
+    if type(frozen) is not FrozenWeatherExecution:
+        raise ValueError("FROZEN_WEATHER_EXECUTION_REQUIRED")
+    procedure, model = frozen.procedure.decode(), frozen.model.decode()
+    config = settings.model_dump(mode="json")
+    if (
+        procedure.get("kind") != "weather-paired-procedure-v1"
+        or procedure.get("variant_methods") != _VARIANTS
+        or procedure.get("contrast_type") != "MARKET_BASELINE_VS_WEATHER_V2"
+        or procedure.get("source_id") != "NWS"
+        or procedure.get("model_artifact_sha256") != frozen.model.sha256
+        or procedure.get("settings_sha256") != canonical_hash(config)
+        or settings.weather_v2_knyc_observation_enabled
+        or model.get("name") != "weather_v2"
+        or model.get("model_kind") != "fixed_heuristic"
+        or model.get("training_cutoff") is not None
+        or model.get("training_dataset_hashes") != []
+        or model.get("parameters") != config
+        or model.get("parameters_sha256") != canonical_hash(config)
+        or model.get("model_entrypoint") != _WEATHER_ENTRYPOINT
+        or model.get("code_sha256") != hashlib.sha256(frozen.model_code).hexdigest()
+    ):
+        raise ValueError("FROZEN_WEATHER_PROCEDURE_OR_MODEL_MISMATCH")
+    for item in (model, procedure):
+        if (
+            not isinstance(item.get("name"), str)
+            or not item["name"].strip()
+            or not isinstance(item.get("version"), str)
+            or not item["version"].strip()
+            or not aware(item["created_at"])
+            <= aware(item["frozen_at"])
+            <= aware(item["available_at"])
+            <= at
+        ):
+            raise ValueError("FROZEN_WEATHER_VISIBILITY_INVALID")
+    if aware(model["available_at"]) > aware(procedure["frozen_at"]):
+        raise ValueError("MODEL_NOT_AVAILABLE_AT_PROCEDURE_FREEZE")
+    dependencies, current_code = weather_model_code_bundle(frozen.repository)
+    if current_code != frozen.model_code or dependencies != model.get("code_dependencies"):
+        raise ValueError("FROZEN_WEATHER_CODE_CHANGED")
+    # Check actual loaded module origins; this is not atomic filesystem locking
+    # or an assertion that all possible runtime monkeypatches were excluded.
+    bundle = json.loads(current_code)
+    root = frozen.repository.resolve(strict=True)
+    for source in bundle["sources"]:
+        module = sys.modules.get(source["module"])
+        if module is not None:
+            origin = getattr(module, "__file__", None)
+            if origin is None or Path(origin).resolve(strict=True) != (
+                root / source["path"]
+            ).resolve(strict=True):
+                raise ValueError("FROZEN_WEATHER_IMPORTED_ORIGIN_MISMATCH")
+    module = sys.modules.get("kalshi_predictor.forecasting.weather_v2")
+    if module is None or preparation.WeatherV2Forecaster is not getattr(
+        module, "WeatherV2Forecaster", None
+    ):
+        raise ValueError("FROZEN_WEATHER_ENTRYPOINT_IMPORT_MISMATCH")
+    return dependencies
+
+
+def _execution_receipt(
+    frozen: FrozenWeatherExecution,
+    result: preparation.WeatherPreparationResult,
+    settings: Settings,
+    started: datetime,
+    finished: datetime,
+    dependencies: dict[str, str],
+) -> dict[str, Any] | None:
+    if result.forecast_output is None:
+        return None
+    records = result.records
+    forecast = _journal_value(asdict(result.forecast_output))
+    if forecast != _journal_value(records["forecast"]):
+        raise ValueError("FROZEN_WEATHER_FORECAST_ORIGINAL_MISMATCH")
+    generated, available = (
+        aware(records["forecast_generated_at"]),
+        aware(records["forecast_available_at"]),
+    )
+    if (
+        not started <= generated <= available <= finished
+        or aware(forecast["forecasted_at"]) != generated
+    ):
+        raise ValueError("FROZEN_WEATHER_EXECUTION_CLOCK_INVALID")
+    originals = [json.loads(s.payload) for s in result.source_envelopes]
+    book_url = f"https://external-api.kalshi.com/trade-api/v2/markets/{result.ticker}/orderbook"
+    books = [s for s in originals if s["url"] == book_url]
+    if len(books) != 1 or books[0]["body"] != records["book"]:
+        raise ValueError("FROZEN_WEATHER_BOOK_ORIGINAL_MISMATCH")
+    yes = records["book_qualification"]["sides"]["YES"]
+    bid, ask = Decimal(str(yes["bid"])), Decimal(str(yes["ask"]))
+    midpoint = (bid + ask) / 2
+    baseline_generated = utc_now()
+    if not 0 <= bid <= ask <= 1 or midpoint != Decimal(forecast["market_mid_probability"]):
+        raise ValueError("FROZEN_WEATHER_MIDPOINT_MISMATCH")
+    return dict(
+        kind="weather-preparation-execution-v1",
+        procedure_sha256=frozen.procedure.sha256,
+        model_artifact_sha256=frozen.model.sha256,
+        model_code_sha256=hashlib.sha256(frozen.model_code).hexdigest(),
+        settings_sha256=canonical_hash(settings.model_dump(mode="json")),
+        code_dependencies=dependencies,
+        dependencies_before=dependencies,
+        dependencies_after=dependencies,
+        settings_original=settings.model_dump(mode="json"),
+        variant_methods=_VARIANTS,
+        contrast_type="MARKET_BASELINE_VS_WEATHER_V2",
+        source_envelope_hashes=[s.sha256 for s in result.source_envelopes],
+        snapshot_id=records["snapshot_id"],
+        ticker=result.ticker,
+        original_book_sha256=canonical_hash(books[0]["body"]),
+        book_envelope_sha256=next(
+            s.sha256 for s in result.source_envelopes if json.loads(s.payload)["url"] == book_url
+        ),
+        source_off_probability=str(midpoint),
+        source_off_generated_at=baseline_generated.isoformat(),
+        source_on_probability=forecast["yes_probability"],
+        forecast_original=forecast,
+        forecast_sha256=canonical_hash(forecast),
+        preparation_started_at=started.isoformat(),
+        preparation_finished_at=finished.isoformat(),
+        forecast_generated_at=generated.isoformat(),
+        forecast_available_at=available.isoformat(),
+        receipt_generated_at=utc_now().isoformat(),
+        verification_scope="FILESYSTEM_BUNDLE_AND_IMPORTED_ORIGINS_BEFORE_AFTER_PREPARATION",
+        atomic_filesystem_immutability=False,
+        research_only=True,
+        runtime_certified=False,
+    )
+
+
 def _run_weather_preparation_live_cycle(
     *,
     session_factory: sessionmaker[Session],
@@ -69,6 +223,7 @@ def _run_weather_preparation_live_cycle(
     settings: Settings,
     slippage_allowance: Decimal,
     uncertainty_buffer: Decimal,
+    frozen_execution: FrozenWeatherExecution | None = None,
 ) -> PreparationCycle:
     """Compute once and preserve rejection or computation on the same ledger.
 
@@ -99,6 +254,12 @@ def _run_weather_preparation_live_cycle(
             Path(preparation.__file__).read_bytes()
         ).hexdigest(),
     }
+    if frozen_execution is not None:
+        request["frozen_execution"] = {
+            "procedure_sha256": frozen_execution.procedure.sha256,
+            "model_sha256": frozen_execution.model.sha256,
+            "model_code_sha256": hashlib.sha256(frozen_execution.model_code).hexdigest(),
+        }
     request_id = digest(request)
     key = "weather-preparation:" + cycle_id
     with factory() as session:
@@ -114,6 +275,10 @@ def _run_weather_preparation_live_cycle(
             session.rollback()
             return PreparationCycle(record, None)
         started = utc_now()
+        dependencies = None
+        if frozen_execution is not None:
+            dependencies = _verify_frozen_execution(frozen_execution, settings, started)
+        execution_started = utc_now()
         result = preparation.prepare_weather_candidate(
             session,
             ticker=ticker,
@@ -122,6 +287,20 @@ def _run_weather_preparation_live_cycle(
             slippage_allowance=slippage_allowance,
             uncertainty_buffer=uncertainty_buffer,
         )
+        execution_finished = utc_now()
+        execution_receipt = None
+        if frozen_execution is not None:
+            after = _verify_frozen_execution(frozen_execution, settings, utc_now())
+            if dependencies != after:
+                raise ValueError("FROZEN_WEATHER_DEPENDENCIES_CHANGED_DURING_PREPARATION")
+            execution_receipt = _execution_receipt(
+                frozen_execution,
+                result,
+                settings,
+                execution_started,
+                execution_finished,
+                after,
+            )
         record = _journal_value(
             {
                 "kind": "PAPER_RELEASE_PREPARATION",
@@ -145,6 +324,13 @@ def _run_weather_preparation_live_cycle(
                 "current_eligibility": False,
             }
         )
+        if frozen_execution is not None:
+            record["frozen_procedure_original"] = frozen_execution.procedure.decode()
+            record["frozen_model_original"] = frozen_execution.model.decode()
+            record["execution_receipt"] = execution_receipt
+            record["execution_receipt_sha256"] = (
+                None if execution_receipt is None else canonical_hash(execution_receipt)
+            )
         session.execute(
             text("INSERT INTO overnight_sprint_cycles(id,captured_at,payload) VALUES(:id,:at,:p)"),
             {"id": key, "at": record["finished_at"], "p": encode(record)},
@@ -164,6 +350,7 @@ def run_weather_preparation_live_cycle(
     slippage_allowance: Decimal,
     uncertainty_buffer: Decimal,
     runtime_owner: RuntimeOwner | None = None,
+    frozen_execution: FrozenWeatherExecution | None = None,
 ) -> PreparationCycle:
     """Own the ledger or validate an already-held same-process driver owner."""
     assert_public_only_settings(settings)
@@ -185,6 +372,7 @@ def run_weather_preparation_live_cycle(
             settings=settings,
             slippage_allowance=slippage_allowance,
             uncertainty_buffer=uncertainty_buffer,
+            frozen_execution=frozen_execution,
         )
 
 
@@ -199,6 +387,7 @@ def run_weather_preparation_cycle(
     slippage_allowance: Decimal,
     uncertainty_buffer: Decimal,
     runtime_owner: RuntimeOwner | None = None,
+    frozen_execution: FrozenWeatherExecution | None = None,
 ) -> dict[str, Any]:
     """Historical journal API; replay never reconstructs current engine objects."""
     return run_weather_preparation_live_cycle(
@@ -211,4 +400,5 @@ def run_weather_preparation_cycle(
         slippage_allowance=slippage_allowance,
         uncertainty_buffer=uncertainty_buffer,
         runtime_owner=runtime_owner,
+        frozen_execution=frozen_execution,
     ).record

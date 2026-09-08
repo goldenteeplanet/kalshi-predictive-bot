@@ -14,8 +14,10 @@ from datetime import datetime
 from decimal import ROUND_CEILING, Decimal
 from typing import Any
 
+from kalshi_predictor.config import Settings
 from kalshi_predictor.evaluation.calibration import calibration_bins
 from kalshi_predictor.evaluation.metrics import brier_score, log_loss
+from kalshi_predictor.kalshi.orderbook import parse_orderbook
 from kalshi_predictor.kalshi.protocol_math import DEFAULT_TAKER_RATE
 from kalshi_predictor.opportunities.scoring import score_liquidity
 from kalshi_predictor.overnight_paper.books import qualify_book
@@ -117,6 +119,8 @@ class TournamentEvaluation:
     actual_shadow_pnl: None = None
     actual_paper_pnl: None = None
     verified_hashes: tuple[str, ...] = ()
+    evidence_scope: str = "HASH_BOUND_DECLARATIONS_ONLY"
+    contrast_type: str = "DECLARED_SOURCE_COMPARISON"
 
 
 def _number(value: Any, *, maximum: float | None = None) -> float:
@@ -140,11 +144,16 @@ def _decode(artifact: Artifact, hashes: set[str]) -> dict[str, Any]:
 
 def _policy(row: dict[str, Any]) -> None:
     if (
-        row["kind"] != "paired-source-policy-v1"
+        row["kind"] not in {"paired-source-policy-v1", "weather-paired-source-policy-v1"}
         or not isinstance(row["source_id"], str)
         or not row["source_id"]
     ):
         raise ValueError("TOURNAMENT_POLICY_INVALID")
+    if row["kind"] == "weather-paired-source-policy-v1":
+        if row["source_id"] != "NWS" or not row["procedure_sha256"]:
+            raise ValueError("TOURNAMENT_WEATHER_POLICY_REQUIRED")
+    elif any(key in row for key in ("procedure_sha256", "execution_receipt_sha256")):
+        raise ValueError("TOURNAMENT_EXPLICIT_WEATHER_POLICY_REQUIRED")
     if not aware(row["committed_at"]) < aware(row["holdout_start"]) < aware(row["holdout_end"]):
         raise ValueError("TOURNAMENT_POLICY_NOT_PRECOMMITTED")
     for key in ("minimum_independent_events", "calibration_bin_count"):
@@ -289,6 +298,219 @@ def _execution_context(
         raise ValueError("TOURNAMENT_EXECUTABLE_COST_BINDING_INVALID")
 
 
+_WEATHER_METHODS = {
+    "off": "same_book_midpoint",
+    "on": "kalshi_predictor.forecasting.weather_v2:WeatherV2Forecaster.forecast",
+}
+
+
+def _weather_receipt(
+    pair: PairedForecast,
+    anchor: dict[str, Any],
+    snapshot: dict[str, Any],
+    model: dict[str, Any],
+    contexts: dict[str, dict[str, Any]],
+    features: dict[str, dict[str, Any]],
+    policy: dict[str, Any],
+    at: datetime,
+) -> None:
+    """Replay recorded evidence, not execution attestation or trading authority."""
+    rows = (pair.source_off.decode(), pair.source_on.decode())
+    keys = ("procedure_sha256", "execution_receipt_sha256")
+    if policy["kind"] != "weather-paired-source-policy-v1":
+        if any(key in row for row in (anchor, *rows) for key in keys):
+            raise ValueError("TOURNAMENT_EXPLICIT_WEATHER_POLICY_REQUIRED")
+        return
+    if anchor["procedure_sha256"] != policy["procedure_sha256"] or any(
+        row[key] != anchor[key] for row in rows for key in keys
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_RECEIPT_BINDING_INVALID")
+    if contexts[anchor["execution_policy_sha256"]]["side"] != anchor["side"]:
+        raise ValueError("TOURNAMENT_WEATHER_FROZEN_SIDE_INVALID")
+    procedure = contexts[anchor["procedure_sha256"]]
+    receipt = contexts[anchor["execution_receipt_sha256"]]
+    if (
+        procedure["kind"] != "weather-paired-procedure-v1"
+        or not procedure["name"]
+        or not procedure["version"]
+        or procedure["source_id"] != "NWS"
+        or procedure["variant_methods"] != _WEATHER_METHODS
+        or procedure["contrast_type"] != "MARKET_BASELINE_VS_WEATHER_V2"
+        or receipt["kind"] != "weather-preparation-execution-v1"
+        or receipt["procedure_sha256"] != anchor["procedure_sha256"]
+        or receipt["model_artifact_sha256"] != anchor["model_artifact_sha256"]
+        or procedure["model_artifact_sha256"] != anchor["model_artifact_sha256"]
+        or receipt["variant_methods"] != _WEATHER_METHODS
+        or receipt["contrast_type"] != procedure["contrast_type"]
+        or receipt["verification_scope"]
+        != "FILESYSTEM_BUNDLE_AND_IMPORTED_ORIGINS_BEFORE_AFTER_PREPARATION"
+        or receipt["atomic_filesystem_immutability"] is not False
+        or receipt["research_only"] is not True
+        or receipt["runtime_certified"] is not False
+        or receipt["ticker"] != anchor["ticker"]
+        or receipt["snapshot_id"] != anchor["snapshot_id"]
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_PROCEDURE_INVALID")
+    if not (
+        aware(model["created_at"])
+        <= aware(model["frozen_at"])
+        <= aware(model["available_at"])
+        <= aware(procedure["created_at"])
+        <= aware(procedure["frozen_at"])
+        <= aware(procedure["available_at"])
+        <= aware(policy["committed_at"])
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_FREEZE_INVALID")
+    settings = receipt["settings_original"]
+    if (
+        not isinstance(settings, dict)
+        or set(settings) != set(Settings.model_fields)
+        or canonical_hash(settings) != receipt["settings_sha256"]
+        or receipt["settings_sha256"] != procedure["settings_sha256"]
+        or model["parameters"] != settings
+        or model["parameters_sha256"] != canonical_hash(settings)
+        or model["model_kind"] != "fixed_heuristic"
+        or model["name"] != "weather_v2"
+        or model["training_cutoff"] is not None
+        or model["training_dataset_hashes"] != []
+        or model.get("training_artifacts", []) != []
+        or settings["weather_v2_knyc_observation_enabled"] is not False
+        or any(
+            settings[key]
+            for key in (
+                "kalshi_api_key_id",
+                "kalshi_private_key_path",
+                "postgres_password",
+                "execution_confirmation_token",
+            )
+        )
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_SETTINGS_INVALID")
+    dependencies = model["code_dependencies"]
+    bundle = contexts[model["code_sha256"]]
+    if (
+        not isinstance(dependencies, dict)
+        or not dependencies
+        or model["model_entrypoint"] != _WEATHER_METHODS["on"]
+        or receipt["model_code_sha256"] != model["code_sha256"]
+        or any(
+            receipt[key] != dependencies
+            for key in ("code_dependencies", "dependencies_before", "dependencies_after")
+        )
+        or bundle["schema"] != "weather-model-source-bundle-v1"
+        or bundle["entrypoint"] != model["model_entrypoint"]
+        or not isinstance(bundle["sources"], list)
+        or len(bundle["sources"]) != len(dependencies)
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_CODE_INVALID")
+    seen = set()
+    for source in bundle["sources"]:
+        path = source["path"]
+        if (
+            not isinstance(path, str)
+            or not path.startswith("src/")
+            or not path.endswith(".py")
+            or any(part in {"", ".", ".."} for part in path.split("/"))
+            or "\\" in path
+            or ":" in path
+            or path in seen
+            or source["sha256"] != dependencies[path]
+            or hashlib.sha256(source["source"].encode("utf-8")).hexdigest() != source["sha256"]
+        ):
+            raise ValueError("TOURNAMENT_WEATHER_CODE_SOURCE_INVALID")
+        seen.add(path)
+    if seen != set(dependencies):
+        raise ValueError("TOURNAMENT_WEATHER_CODE_CLOSURE_INVALID")
+    started = aware(receipt["preparation_started_at"])
+    generated = aware(receipt["forecast_generated_at"])
+    available = aware(receipt["forecast_available_at"])
+    finished = aware(receipt["preparation_finished_at"])
+    baseline_at = aware(receipt["source_off_generated_at"])
+    receipt_at = aware(receipt["receipt_generated_at"])
+    if not started <= generated <= available <= finished <= baseline_at <= receipt_at <= at:
+        raise ValueError("TOURNAMENT_WEATHER_EXECUTION_CLOCK_INVALID")
+    envelope_hashes = receipt["source_envelope_hashes"]
+    if (
+        not isinstance(envelope_hashes, list)
+        or not envelope_hashes
+        or len(set(envelope_hashes)) != len(envelope_hashes)
+        or any(sha not in contexts for sha in envelope_hashes)
+        or receipt["book_envelope_sha256"] not in envelope_hashes
+        or snapshot["capture_envelope_sha256"] != receipt["book_envelope_sha256"]
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_CAPTURE_MANIFEST_INVALID")
+    envelopes = [contexts[sha] for sha in envelope_hashes]
+    if len({original["url"] for original in envelopes}) != len(envelopes) or any(
+        not aware(original["received_at"]) <= started for original in envelopes
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_CAPTURE_CLOCK_INVALID")
+    rule = contexts[anchor["rule_sha256"]]
+    for key in ("market_original_sha256", "series_original_sha256"):
+        wrapper = contexts[rule[key]]
+        capture_hash = wrapper["capture_envelope_sha256"]
+        capture = contexts[capture_hash]
+        if (
+            capture_hash not in envelope_hashes
+            or capture["body"] != wrapper["provider_payload"]
+            or capture["url"] != wrapper["request_url"]
+            or aware(capture["received_at"]) != aware(wrapper["received_at"])
+            or aware(capture["received_at"]) != aware(wrapper["available_at"])
+        ):
+            raise ValueError("TOURNAMENT_WEATHER_MARKET_SERIES_CAPTURE_INVALID")
+    book_original = contexts[receipt["book_envelope_sha256"]]
+    if (
+        book_original["body"] != snapshot["provider_payload"]
+        or book_original["url"] != snapshot["request_url"]
+        or aware(book_original["received_at"]) != aware(snapshot["captured_at"])
+        or receipt["original_book_sha256"] != canonical_hash(book_original["body"])
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_ORIGINAL_BOOK_INVALID")
+    book = parse_orderbook(book_original["body"])
+    if book.best_yes_bid is None or book.best_yes_ask is None:
+        raise ValueError("TOURNAMENT_WEATHER_MIDPOINT_REQUIRED")
+    midpoint = (book.best_yes_bid + book.best_yes_ask) / 2
+    forecast = receipt["forecast_original"]
+    if (
+        canonical_hash(forecast) != receipt["forecast_sha256"]
+        or forecast["ticker"] != anchor["ticker"]
+        or forecast["model_name"] != model["name"]
+        or aware(forecast["forecasted_at"]) != generated
+        or _decimal(forecast["market_mid_probability"]) != midpoint
+        or _decimal(forecast["best_yes_bid"]) != book.best_yes_bid
+        or _decimal(forecast["best_yes_ask"]) != book.best_yes_ask
+        or _decimal(receipt["source_off_probability"]) != midpoint
+        or _decimal(rows[0]["probability"]) != midpoint
+        or _decimal(rows[1]["probability"]) != _decimal(forecast["yes_probability"])
+        or _decimal(receipt["source_on_probability"]) != _decimal(forecast["yes_probability"])
+        or aware(rows[0]["generated_at"]) != baseline_at
+        or aware(rows[1]["generated_at"]) != generated
+        or rows[0]["feature_hashes"] != []
+        or len(features) != 1
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_FORECAST_BINDING_INVALID")
+    feature = next(iter(features.values()))
+    original = contexts[feature["source_original_sha256"]]
+    capture_sha = original["capture_envelope_sha256"]
+    capture = contexts[capture_sha]
+    if (
+        capture_sha not in envelope_hashes
+        or not capture["url"].startswith("https://api.weather.gov/")
+        or not capture["url"].endswith("/forecast/hourly")
+        or original["provider_payload"] != capture["body"]
+        or aware(original["received_at"]) != aware(capture["received_at"])
+        or aware(original["available_at"]) != aware(capture["received_at"])
+        or feature["value"] != forecast["feature_json"]
+        or aware(feature["observed_at"]) != aware(capture["body"]["properties"]["updateTime"])
+        or any(
+            not 0 <= (at - aware(capture["body"]["properties"][key])).total_seconds() <= 1800
+            or aware(capture["body"]["properties"][key]) > generated
+            for key in ("generatedAt", "updateTime")
+        )
+        or not aware(feature["available_at"]) <= generated
+    ):
+        raise ValueError("TOURNAMENT_WEATHER_SOURCE_FEATURE_INVALID")
+
+
 def _pair(
     pair: PairedForecast, policy: dict[str, Any], hashes: set[str], now: datetime
 ) -> dict[str, Any]:
@@ -397,6 +619,7 @@ def _pair(
         or any(features[sha]["source_id"] != policy["source_id"] for sha in added)
     ):
         raise ValueError("TOURNAMENT_SOURCE_ABLATION_INVALID")
+    _weather_receipt(pair, anchor, snapshot, model, contexts, features, policy, at)
     result: dict[str, Any] = dict(
         anchor=anchor, decision_id=decision_id, probabilities=probabilities, outcome=None
     )
@@ -563,6 +786,16 @@ def evaluate_tournament(
             purged_decision_ids=tuple(purged),
             selected_decision_ids=tuple(row["decision_id"] for row in selected),
             measurements=measured,
+            evidence_scope=(
+                "RECORDED_WEATHER_EXECUTION_HASH_BINDING_NOT_ATTESTATION"
+                if frozen["kind"] == "weather-paired-source-policy-v1"
+                else "HASH_BOUND_DECLARATIONS_ONLY"
+            ),
+            contrast_type=(
+                "MARKET_BASELINE_VS_WEATHER_V2"
+                if frozen["kind"] == "weather-paired-source-policy-v1"
+                else "DECLARED_SOURCE_COMPARISON"
+            ),
             verified_hashes=tuple(sorted(hashes)),
         )
         if reasons:
