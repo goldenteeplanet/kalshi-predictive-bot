@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.backend import database_url_from_settings
 from kalshi_predictor.data.schema import Base

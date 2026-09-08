@@ -1,6 +1,7 @@
 """Phase 3O.5 learning diagnostics tables."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260623_0003"

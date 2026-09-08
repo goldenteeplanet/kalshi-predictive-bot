@@ -4,7 +4,6 @@ from alembic import op
 
 from kalshi_predictor.data.schema import Base
 
-
 revision = "20260716_0012"
 down_revision = "20260624_0011"
 branch_labels = None

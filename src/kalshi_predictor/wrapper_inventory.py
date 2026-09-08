@@ -512,7 +512,7 @@ def _duplicate_helper_groups(files: set[Path], root: Path) -> list[dict[str, Any
             digest = hashlib.sha256(material.encode("utf-8")).hexdigest()[:12]
             fingerprints[digest].append(
                 {
-                    "module": str(path.relative_to(root)),
+                    "module": path.relative_to(root).as_posix(),
                     "function": node.name,
                     "line": node.lineno,
                 }

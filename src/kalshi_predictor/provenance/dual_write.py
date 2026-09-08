@@ -25,9 +25,8 @@ def capture_forecast_provenance(
 ) -> RuntimeProvenanceEvent | None:
     if not enabled:
         return None
-    feature = (
-        payload.get("feature_json") if isinstance(payload.get("feature_json"), Mapping) else {}
-    )
+    raw_feature = payload.get("feature_json")
+    feature = raw_feature if isinstance(raw_feature, Mapping) else {}
     table, feature_id = _feature_reference(forecast.model_name, feature)
     observation = _observation_reference(feature)
     return _append_event(

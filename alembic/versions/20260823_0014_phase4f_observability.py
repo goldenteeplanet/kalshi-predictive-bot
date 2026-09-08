@@ -1,8 +1,8 @@
 """Phase 4F replay dispositions and calibration-only evidence."""
 
 import sqlalchemy as sa
-
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260823_0014"

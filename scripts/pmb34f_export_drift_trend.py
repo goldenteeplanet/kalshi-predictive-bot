@@ -5,7 +5,6 @@ from pathlib import Path
 
 from kalshi_predictor.benchmarking.export_drift_trend import write_export_drift_trend_preview
 
-
 parser = argparse.ArgumentParser(description="Run local PMB-34F multi-bundle drift trend")
 parser.add_argument(
     "--manifest", type=Path,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, TypeVar
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
@@ -30,6 +30,7 @@ from kalshi_predictor.memory.contracts import (
 )
 
 logger = logging.getLogger(__name__)
+MemoryModel = TypeVar("MemoryModel", MarketMemory, ForecastMemory, TradeMemory)
 
 
 def memory_capture_enabled(settings: Settings | None = None) -> bool:
@@ -186,7 +187,7 @@ def _write(
     session: Session,
     *,
     store: str,
-    model: type,
+    model: type[MemoryModel],
     id_field: str,
     values: dict[str, Any],
 ) -> MemoryWriteReceipt:

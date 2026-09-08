@@ -1,6 +1,7 @@
 """Phase 3U personal AI trader recommendation memory."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260623_0008"

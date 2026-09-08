@@ -489,9 +489,9 @@ def _link_momentum_score(
 
 def _signed_momentum(momentum: Decimal, direction: str) -> Decimal:
     normalized = direction.upper()
-    if normalized == "BELOW":
+    if normalized in {"BELOW", "AT_OR_BELOW"}:
         return -momentum
-    if normalized == "ABOVE":
+    if normalized in {"ABOVE", "AT_OR_ABOVE"}:
         return momentum
     return Decimal("0")
 

@@ -1,6 +1,7 @@
 """Market leg parser and link coverage table."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260624_0011"
