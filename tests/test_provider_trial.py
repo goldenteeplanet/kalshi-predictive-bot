@@ -10,7 +10,7 @@ from kalshi_predictor.research.oddpool import OddpoolResearchClient
 
 
 def test_capture_archives_original_and_keeps_key_out_of_outputs(tmp_path, monkeypatch):
-    secret = "synthetic_trial_key_123456"
+    secret = "x" * 32  # Deliberately dummy credential, used only with MockTransport.
     key_file = tmp_path / "key.txt"
     key_file.write_text(secret)
     raw = b'[{"market_id":"EXAMPLE","exchange":"kalshi","status":"active","question":"Example?"}]'
