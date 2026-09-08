@@ -19,7 +19,7 @@ def market_lifecycle(ticker: str, market: dict[str, Any], *, now: datetime) -> d
     if market.get("ticker") != ticker:
         raise ValueError("SETTLEMENT_IDENTITY_MISMATCH")
     status = market.get("status")
-    result = {"ticker": ticker, "state": "AWAITING_SETTLEMENT", "final": None}
+    result: dict[str, Any] = {"ticker": ticker, "state": "AWAITING_SETTLEMENT", "final": None}
     if status == "finalized":
         if market.get("is_provisional") is True or market.get("result") not in {"yes", "no"}:
             raise ValueError("FINAL_BINARY_RESULT_REQUIRED")
