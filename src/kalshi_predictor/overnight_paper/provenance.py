@@ -349,7 +349,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "7e8647e9cf73874dbcc9df4c7b324b86fbaaca21a4f9981c3c71b9a85227e6e8"
     ),
     "kalshi_predictor.overnight_paper.boundary_gate": (
-        "1c520096a4102aafc8a650822e2075c7277e73aa4b93dbdde032bb8fed25206b"
+        "82186a95cf59e4acf8884883e416553229cf295ade716a7074bd04f56627b1bc"
     ),
     "kalshi_predictor.overnight_paper.coordinator": (
         "450dc2991b62e48f26afc9a775e9e0455a23819cd5907d01a7f687a73d795a3a"

@@ -128,7 +128,7 @@ def audit_local_call_path(
         definitions[module] = {}
         node: ast.AST
         for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
                 definitions[module][node.name] = node
         # Function-local imports are resolved too. Conflicting aliases fail closed.
         for imported_node in ast.walk(tree):
@@ -234,7 +234,7 @@ def audit_local_call_path(
     def scan(
         module: str, node: ast.AST, parameters: set[str], follow_references: bool = True
     ) -> None:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
             # Nested functions become reachable only through actual named calls;
             # their bodies are conservatively scanned when the enclosing callable
             # is reachable, including callbacks supplied to trusted libraries.
@@ -323,11 +323,11 @@ def audit_local_call_path(
                 continue
             if symbol == "<module>":
                 for node in trees[module].body:
-                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
                         # Definitions execute decorators/default expressions, not bodies.
                         for decorator in node.decorator_list:
                             scan(module, decorator, set())
-                        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                             for default in (*node.args.defaults, *node.args.kw_defaults):
                                 if default is not None:
                                     scan(module, default, set(), False)
@@ -337,7 +337,7 @@ def audit_local_call_path(
                             for keyword in node.keywords:
                                 scan(module, keyword.value, set())
                             for item in node.body:
-                                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                                if isinstance(item, ast.FunctionDef | ast.AsyncFunctionDef):
                                     for decorator in item.decorator_list:
                                         scan(module, decorator, set())
                                     for default in (*item.args.defaults, *item.args.kw_defaults):
