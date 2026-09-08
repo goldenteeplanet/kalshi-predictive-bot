@@ -10,6 +10,28 @@ import typer
 
 
 def register_commands(app: typer.Typer) -> None:
+    @app.command("qualified-candidate-scan")
+    def qualified_candidate_scan(
+        archive_root: Annotated[Path, typer.Option(help="New isolated scan evidence directory.")],
+        max_candidates: Annotated[int, typer.Option(min=1, max=20)] = 10,
+    ) -> None:
+        """Report certified-policy readiness; incomplete preparation remains blocked."""
+        from kalshi_predictor.overnight_paper.qualified_scan import run_qualified_scan
+
+        if archive_root.exists():
+            raise typer.BadParameter("Use a new archive directory; existing evidence is immutable.")
+        # No serialized PASS/context injection. The preparation pipeline supplies
+        # original contexts through run_qualified_scan's typed in-process API.
+        # Until that pipeline is connected, the CLI truthfully reports missing
+        # preparation (or an empty certified registry), rather than fetching books.
+        result = run_qualified_scan(archive_root, max_candidates=max_candidates)
+        if not archive_root.exists():
+            archive_root.mkdir(parents=True, exist_ok=False)
+            (archive_root / "qualified_scan.json").write_text(
+                json.dumps(result, indent=2), encoding="utf-8"
+            )
+        typer.echo(json.dumps(result, indent=2))
+
     @app.command("paper-settlement-cycles")
     def paper_settlement_cycles(
         database: Annotated[Path, typer.Option(help="Existing isolated sprint database.")],
@@ -23,6 +45,7 @@ def register_commands(app: typer.Typer) -> None:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
+        from kalshi_predictor.overnight_paper.runtime_owner import acquire_runtime_owner
         from kalshi_predictor.overnight_paper.settlement_runner import run_settlement_cycles
 
         path = database.absolute()
@@ -32,12 +55,13 @@ def register_commands(app: typer.Typer) -> None:
             creator=lambda: sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, timeout=0),
         )
         try:
-            result = run_settlement_cycles(
-                session_factory=sessionmaker(engine),
-                database_path=path,
-                cycles=cycles,
-                interval_seconds=interval_seconds,
-            )
+            with acquire_runtime_owner(path):
+                result = run_settlement_cycles(
+                    session_factory=sessionmaker(engine),
+                    database_path=path,
+                    cycles=cycles,
+                    interval_seconds=interval_seconds,
+                )
             typer.echo(json.dumps(asdict(result), indent=2, default=str))
         finally:
             engine.dispose()

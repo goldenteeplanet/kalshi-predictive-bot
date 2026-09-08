@@ -375,7 +375,7 @@ class AdvancedRiskEngine:
         return 5
 
     def decide(self, request: AdvancedRiskRequest) -> AdvancedRiskDecision:
-        self._last_trade_metrics = {}
+        self._last_trade_metrics: dict[str, Decimal | None] = {}
         reasons: list[str] = []
         hard_blocks: list[str] = []
         raw_caps: dict[str, int] = {}
@@ -1052,7 +1052,7 @@ class AdvancedRiskEngine:
         ev -= (Decimal("1") - conservative_probability) * avg_loss
         ev -= tail_charge
         ev_to_risk = ev / risk_per_contract
-        metrics = {
+        metrics: dict[str, Decimal | None] = {
             "adjusted_win_probability": adjusted,
             "risk_adjusted_ev_per_contract": ev,
             "risk_adjusted_ev_to_risk": ev_to_risk,

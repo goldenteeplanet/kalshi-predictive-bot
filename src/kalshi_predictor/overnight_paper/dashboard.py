@@ -15,8 +15,75 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-from kalshi_predictor.overnight_paper.source_health import classify_source
+from kalshi_predictor.overnight_paper.qualification import GATE_NAMES, decision_fingerprint
+from kalshi_predictor.overnight_paper.runtime_liveness import inspect_process
+from kalshi_predictor.overnight_paper.source_health import aware, classify_source
 from kalshi_predictor.overnight_paper.watcher import verified_paper_marker
+
+
+def _runtime_snapshot(db: sqlite3.Connection, path: Path) -> dict[str, Any]:
+    latest = db.execute(
+        "SELECT id,payload FROM overnight_sprint_cycles "
+        "WHERE id LIKE 'runtime-health:%' ORDER BY captured_at DESC,id DESC LIMIT 1"
+    ).fetchone()
+    if latest is None:
+        return {}
+    event = json.loads(latest["payload"])
+    generation = event["generation"]
+    rows = db.execute(
+        "SELECT id,payload FROM overnight_sprint_cycles WHERE id LIKE ? ORDER BY id",
+        ("runtime-health:" + generation + ":%",),
+    ).fetchall()
+    if not 1 <= len(rows) <= 500:
+        raise ValueError("RUNTIME_HEALTH_GENERATION_INVALID")
+    baseline_rows = db.execute(
+        "SELECT payload FROM overnight_sprint_cycles WHERE id LIKE 'authorization-baseline:%'"
+    ).fetchall()
+    if len(baseline_rows) != 1:
+        raise ValueError("RUNTIME_HEALTH_BASELINE_REQUIRED")
+    baseline = json.loads(baseline_rows[0][0])
+    if (baseline.get("kind") != "LOCAL_PAPER_AUTHORIZATION_BASELINE_V1"
+            or Path(baseline["database_path"]).resolve() != path.resolve()):
+        raise ValueError("RUNTIME_HEALTH_BASELINE_IDENTITY_INVALID")
+    info = path.stat()
+    watcher_status = None
+    previous_at = None
+    for sequence, row in enumerate(rows):
+        item = json.loads(row["payload"])
+        captured = aware(item["captured_at"])
+        if (item["kind"] != "PAPER_RUNTIME_HEALTH_V1"
+                or item["generation"] != generation or item["sequence"] != sequence
+                or row["id"] != f"runtime-health:{generation}:{sequence:06d}"
+                or Path(item["database_path"]).resolve() != path.resolve()
+                or item["database_id"] != baseline["database_id"]
+                or item["database_file_identity"] != [info.st_dev, info.st_ino]
+                or (previous_at is not None and captured < previous_at)):
+            raise ValueError("RUNTIME_HEALTH_IDENTITY_INVALID")
+        if item.get("watcher_status") is not None:
+            watcher_status = item["watcher_status"]
+        previous_at = captured
+    event = json.loads(rows[-1]["payload"])
+    if type(event["pid"]) is not int or type(event["entries_enabled"]) is not bool:
+        raise ValueError("RUNTIME_HEALTH_FIELDS_INVALID")
+    process = inspect_process(event["pid"], event.get("process_start_identity"))
+    age = (datetime.now(UTC) - aware(event["captured_at"])).total_seconds()
+    # Process presence and recent records do not prove the supervisor still holds
+    # its owner lock or is progressing. Keep those observations separate.
+    state = "UNVERIFIED"
+    if event["state"] == "STOPPED" or process.state == "STOPPED":
+        state = "STOPPED"
+    elif not 0 <= age <= 90:
+        state = "DEGRADED"
+    return {
+        "runtime_state": state,
+        "runtime_process_state": process.state,
+        "runtime_last_reported_state": event["state"],
+        "runtime_last_cycle_at": event["captured_at"],
+        "runtime_generation": generation,
+        "runtime_entries_reported": event["entries_enabled"],
+        "runtime_watcher_last_status": watcher_status,
+        "runtime_current_monitor_verified": False,
+    }
 
 
 def snapshot(path: Path | None) -> dict:
@@ -40,8 +107,24 @@ def snapshot(path: Path | None) -> dict:
         "independent_final_reproductions": 0,
         "next_expected_settlement": None,
         "positions": [],
+        "shadow_candidates": 0,
+        "last_decision_at": None,
+        "last_qualification_status": None,
+        "qualification_gates": [],
+        "qualification_current": False,
+        "first_blocker": None,
+        "rule_version": None,
+        "book_captured_at": None,
         "blockers": [],
         "read_only": True,
+        "runtime_state": "UNVERIFIED",
+        "runtime_process_state": "UNVERIFIED",
+        "runtime_last_reported_state": None,
+        "runtime_last_cycle_at": None,
+        "runtime_generation": None,
+        "runtime_entries_reported": None,
+        "runtime_watcher_last_status": None,
+        "runtime_current_monitor_verified": False,
     }
     if path is None or not path.is_file():
         result["blockers"] = ["ISOLATED_PAPER_DATABASE_NOT_CONFIGURED"]
@@ -53,8 +136,12 @@ def snapshot(path: Path | None) -> dict:
             tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not {"overnight_shadow", "overnight_history", "paper_orders"}.issubset(tables):
                 raise ValueError("SPRINT_SCHEMA_MISSING")
+            result.update(_runtime_snapshot(db, path))
             result["historical_evaluated_events"] = db.execute(
                 "SELECT count(DISTINCT event_ticker) FROM overnight_history"
+            ).fetchone()[0]
+            result["shadow_candidates"] = db.execute(
+                "SELECT count(*) FROM overnight_shadow WHERE paper_order_id IS NULL"
             ).fetchone()[0]
             result["shadow_settled_events"] = db.execute(
                 "SELECT count(DISTINCT event_ticker) FROM overnight_shadow "
@@ -140,7 +227,29 @@ def snapshot(path: Path | None) -> dict:
                 "SELECT captured_at,payload FROM overnight_sprint_cycles ORDER BY captured_at DESC"
             ):
                 evidence = json.loads(record["payload"])
-                if evidence.get("kind") == "WEATHER_DIAGNOSTIC":
+                if evidence.get("kind") == "PAPER_RELEASE_QUALIFICATION":
+                    if result["last_qualification_status"] is None:
+                        inputs = evidence["decision_inputs"]
+                        qualification = evidence["qualification"]
+                        gates = qualification["gates"]
+                        if (
+                            qualification["decision_id"] != decision_fingerprint(inputs)
+                            or [item[0] for item in gates] != list(GATE_NAMES)
+                            or any(type(item[1]) is not bool for item in gates)
+                        ):
+                            raise ValueError("QUALIFICATION_JOURNAL_INVALID")
+                        result.update(
+                            last_decision_at=inputs.get("decision_at"),
+                            last_qualification_status=qualification["status"],
+                            qualification_gates=gates,
+                            first_blocker=next(iter(qualification["blockers"]), None),
+                            rule_version=inputs.get("rule_version"),
+                            book_captured_at=evidence["shadow_payload"].get("snapshot_at"),
+                        )
+                        # A recorded result does not re-run source, rule, book,
+                        # model or release verification and never enables entry.
+                        result["blockers"].append("RECORDED_QUALIFICATION_REQUIRES_REVALIDATION")
+                elif evidence.get("kind") == "WEATHER_DIAGNOSTIC":
                     if result["weather_provider_updated_at"] is None:
                         weather = evidence["result"]
                         result["weather_provider_updated_at"] = weather.get("forecast_updated_at")
@@ -178,7 +287,7 @@ def snapshot(path: Path | None) -> dict:
                             result["blockers"].append("NO_CERTIFIED_POSITIVE_NET_EV_CANDIDATE")
                         if age > 30:
                             result["blockers"].append("CAPTURE_IS_HISTORICAL_REFRESH_REQUIRED")
-    except (sqlite3.DatabaseError, ValueError, KeyError, TypeError):
+    except (sqlite3.DatabaseError, ValueError, KeyError, TypeError, OSError, AttributeError):
         result = snapshot(None)
         result["paper_mode"] = "UNVERIFIED"
         for key in (
@@ -191,6 +300,7 @@ def snapshot(path: Path | None) -> dict:
             "local_paper_settled_events",
             "reported_final_examples",
             "independent_final_reproductions",
+            "shadow_candidates",
         ):
             result[key] = None
         result["blockers"] = ["PAPER_DASHBOARD_EVIDENCE_INVALID"]
@@ -206,6 +316,11 @@ def render(payload: dict) -> str:
         f"<p>{escape(payload[key])}</p></article>"
         for key in (
             "paper_mode",
+            "runtime_state",
+            "runtime_process_state",
+            "runtime_last_reported_state",
+            "runtime_last_cycle_at",
+            "runtime_watcher_last_status",
             "live_exchange",
             "demo_exchange",
             "open_positions",
@@ -222,6 +337,12 @@ def render(payload: dict) -> str:
             "historical_evaluated_events",
             "shadow_settled_events",
             "local_paper_settled_events",
+            "shadow_candidates",
+            "last_decision_at",
+            "last_qualification_status",
+            "first_blocker",
+            "rule_version",
+            "book_captured_at",
         )
     )
     cards = "".join(
@@ -241,6 +362,10 @@ def render(payload: dict) -> str:
         if payload["paper_mode"] == "UNVERIFIED"
         else "No local paper positions created."
     )
+    gates = "".join(
+        f"<li>{escape(name)}: {escape('passed at decision time' if passed else 'blocked')}</li>"
+        for name, passed in payload["qualification_gates"]
+    )
     return (
         "<!doctype html><html lang='en'><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
@@ -251,10 +376,15 @@ def render(payload: dict) -> str:
         "border:1px solid #49617b;border-radius:8px}"
         "h2{font-size:1rem}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#7dd3fc}"
         "</style><main><h1>LOCAL PAPER — NO REAL MONEY</h1>"
-        "<p>Live market data + local simulation. No exchange execution controls.</p>"
+        "<p>LIVE MARKET DATA | LOCAL PAPER ONLY | NO REAL MONEY</p>"
+        "<p>Process liveness and last reported health are shown separately. "
+        "A saved health event does not establish current monitoring or entry eligibility.</p>"
         "<p><a href='/system/progress'>System progress</a></p>"
         f"<section>{metrics}</section><h2>Readiness blockers</h2>"
         f"<p>{escape(', '.join(payload['blockers']))}</p>"
+        "<h2>Last recorded qualification</h2>"
+        "<p>Historical decision evidence; current eligibility requires revalidation.</p>"
+        f"<ul>{gates}</ul>"
         f"<h2>Paper positions</h2>{cards or '<p>' + empty + '</p>'}"
         "</main></html>"
     )

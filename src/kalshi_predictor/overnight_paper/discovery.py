@@ -72,7 +72,14 @@ class PublicArchive:
                 path,
             )
         )
-        if not kalshi and not coinbase:
+        weather = bool(
+            re.fullmatch(
+                r"https://api\.weather\.gov/(?:stations/KNYC|points/-?\d+\.\d+,-?\d+\.\d+"
+                r"|gridpoints/OKX/\d+,\d+/forecast/hourly)",
+                path,
+            )
+        )
+        if not kalshi and not coinbase and not weather:
             raise ValueError("Endpoint is not an allowed public evidence GET")
         # Pace acquisition, and never work around a 429 by trying another endpoint.
         delay = max(0.0, self.next_request_at - time.monotonic())
@@ -83,7 +90,7 @@ class PublicArchive:
         if time.monotonic() >= self.deadline:
             raise RuntimeError("PUBLIC_REQUEST_BUDGET_EXHAUSTED")
         self.next_request_at = time.monotonic() + 0.5
-        url = (BASE if kalshi else COINBASE) + path
+        url = path if weather else (BASE if kalshi else COINBASE) + path
         receipt: dict[str, Any] = {"url": url, "params": params or {}, "method": "GET"}
         self.receipts.append(receipt)
         try:

@@ -106,6 +106,7 @@ class WatcherReport:
     paper_evaluations_created: int
     realized_paper_pnl: Decimal
     rows: tuple[dict[str, Any], ...]
+    observation_ids: tuple[str, ...] = ()
 
 
 def _utc(value: datetime) -> datetime:
@@ -442,6 +443,7 @@ def reconcile_public_settlements(
     shadow_count = paper_count = 0
     realized_total = Decimal("0")
     output: list[dict[str, Any]] = []
+    observation_ids: list[str] = []
     with session_factory() as session:
         try:
             session.execute(text("BEGIN IMMEDIATE"))
@@ -522,10 +524,13 @@ def reconcile_public_settlements(
                     "source": observation.as_dict(),
                     "lifecycle": state,
                 }
-                _put_cycle(session, "watcher-observation:" + digest(receipt), receipt, now)
+                receipt_id = "watcher-observation:" + digest(receipt)
+                _put_cycle(session, receipt_id, receipt, now)
+                observation_ids.append(receipt_id)
             session.commit()
             return WatcherReport(
-                len(observations), shadow_count, paper_count, realized_total, tuple(output)
+                len(observations), shadow_count, paper_count, realized_total, tuple(output),
+                tuple(observation_ids),
             )
         except Exception:
             session.rollback()

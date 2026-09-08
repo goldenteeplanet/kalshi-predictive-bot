@@ -242,6 +242,8 @@ def _guarded_knyc_temperature_probability(
     evidence["observation_provenance"] = guard.provenance
     if not guard.passed:
         return blocked(guard.blocker or "KNYC_OBSERVATION_NOT_VERIFIED")
+    if not isinstance(observation_evidence, dict):
+        return blocked("KNYC_EVIDENCE_MISSING")
 
     observation_temperature = to_decimal(observation_evidence.get("observation_temperature_f"))
     if observation_temperature is None:

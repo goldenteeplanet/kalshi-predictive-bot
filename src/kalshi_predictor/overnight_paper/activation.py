@@ -31,18 +31,24 @@ from kalshi_predictor.data.schema import (
     PaperFill,
     PositionSizingDecisionLog,
 )
+from kalshi_predictor.overnight_paper import rule_verifier
 from kalshi_predictor.overnight_paper.boundary import (
     LocalPaperAuthorization,
     authorization_fingerprint,
     validate_authorization,
 )
+from kalshi_predictor.overnight_paper.gate_context import QualificationContext
+from kalshi_predictor.overnight_paper.model_release import verify_model_release
+from kalshi_predictor.overnight_paper.monitoring import MonitoringPermit, verify_monitoring
 from kalshi_predictor.overnight_paper.qualification import (
     EvidenceReference,
     Readiness,
     decision_fingerprint,
     qualify_candidate,
 )
+from kalshi_predictor.overnight_paper.release_typing import verify_typing_evidence
 from kalshi_predictor.overnight_paper.store import aware, digest, encode
+from kalshi_predictor.overnight_paper.timing import verify_settlement_horizon
 from kalshi_predictor.overnight_paper.watcher import verified_settled_tickers
 from kalshi_predictor.paper.ledger import create_paper_order
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES, PaperDecision
@@ -131,13 +137,10 @@ class ExactReleaseEvidence:
         mypy_configured = (config.is_file() and "[tool.mypy]" in config.read_text()) or any(
             (self.repository / name).exists() for name in ("mypy.ini", ".mypy.ini")
         )
-        if mypy_configured and (
-            self.mypy_output is None
-            or not self.mypy_output.valid()
-            or "Success: no issues found" not in self.mypy_output.payload.decode()
-            or report.get("mypy_command") != "mypy src"
-        ):
-            raise ValueError("MYPY_EVIDENCE_REQUIRED")
+        if mypy_configured or self.mypy_output is not None:
+            if self.mypy_output is None or not self.mypy_output.valid():
+                raise ValueError("MYPY_EVIDENCE_REQUIRED")
+            verify_typing_evidence(self.repository, report, self.mypy_output.payload)
 
 
 @dataclass(frozen=True)
@@ -294,19 +297,29 @@ def _validate_shadow_inputs(
         or aware(shadow["snapshot_at"]) != _utc(snapshot.captured_at)
         or market.close_time is None
         or aware(shadow["close_time"]) != _utc(market.close_time)
+        or aware(inputs.get("market_close_time")) != _utc(market.close_time)
     ):
         raise ValueError("APPLICATION_CLOCK_MISMATCH")
     if json.loads(snapshot.raw_orderbook_json or "null") != shadow.get("snapshot"):
         raise ValueError("APPLICATION_BOOK_MISMATCH")
-    if market.expiration_time is None:
-        raise ValueError("VERIFIED_SETTLEMENT_LONGSTOP_REQUIRED")
-    longstop = _utc(market.expiration_time)
+    rule_evidence = [item for item in args.get("evidence", ()) if item.gate == 3]
+    if len(rule_evidence) != 1 or not isinstance(rule_evidence[0].context, QualificationContext):
+        raise ValueError("VERIFIED_SETTLEMENT_RULE_CONTEXT_REQUIRED")
+    verified_rule = rule_verifier.verify_settlement_rule(
+        decision=inputs,
+        documents=rule_evidence[0].context.rule_documents,
+        registry=rule_verifier.CERTIFIED_RULE_POLICIES,
+    )
+    timing = verify_settlement_horizon(decision=inputs, rule=verified_rule, now=now)
+    if not timing.passed or timing.settlement_deadline is None:
+        raise ValueError("VERIFIED_SETTLEMENT_TIMING_REQUIRED:" + ",".join(timing.blockers))
+    longstop = timing.settlement_deadline
     if not now < longstop <= now + timedelta(hours=min(hard_horizon_hours, 72)):
         raise ValueError("HARD_SETTLEMENT_LONGSTOP_EXCEEDED")
     if (
         aware(shadow["latest_settlement_at"]) != longstop
         or aware(inputs["latest_settlement_at"]) != longstop
-        or aware(shadow["expected_settlement_at"]) > longstop
+        or aware(shadow["expected_settlement_at"]) != timing.expected_settlement_time
     ):
         raise ValueError("SHADOW_SETTLEMENT_LONGSTOP_MISMATCH")
     if market.status not in {"open", "active"}:
@@ -360,6 +373,7 @@ def activate_local_paper(
     decision: PaperDecision,
     settings: Settings,
     now: datetime,
+    monitoring_permit: MonitoringPermit | None = None,
 ) -> ActivationResult:
     """Fail/rollback atomically. Caller never supplies a transport or gateway.
 
@@ -477,6 +491,18 @@ def activate_local_paper(
                 session, decision, args, settings, aware(shadow_payload["decision_at"])
             )
             _validate_engine_records(session, decision, args)
+            model_release = verify_model_release(session, args["decision_inputs"], now)
+            if not model_release.passed or not model_release.model_calibration_verified:
+                raise ValueError(
+                    "MODEL_RELEASE_REQUIRED:" + ",".join(model_release.blockers)
+                )
+            monitored = verify_monitoring(
+                session, monitoring_permit, database_path=path,
+                database_id=authorization.database_id, code_sha=release.sha,
+                shadow_id=shadow_id,
+            )
+            if not monitored.passed:
+                raise ValueError("OPERATIONAL_MONITOR_REQUIRED:" + ",".join(monitored.blockers))
             order = create_paper_order(session, decision, settings=settings)
             if order is None or order.quantity != 1:
                 raise ValueError("LOCAL_LEDGER_REJECTED_OR_CHANGED_QUANTITY")

@@ -45,8 +45,11 @@ COLLECTOR_GATES = frozenset((1, 2, 3, 4, 5, 9, 12))
 SEMANTIC_VERIFIERS = {
     1: "kalshi-public-market-v1",
     2: "kalshi-exact-catalog-identity-v1",
+    3: "pinned-contract-rule-and-timing-v1",
     4: "nws-hourly-both-clocks-v1",
     5: "kalshi-canonical-book-v1",
+    9: "original-artifact-full-provenance-v1",
+    12: "reviewed-local-coordinator-boundary-v1",
 }
 PUBLIC_BASE = "https://external-api.kalshi.com/trade-api/v2"
 
@@ -81,6 +84,7 @@ class GateEvidence:
     reference: EvidenceReference
     blockers: tuple[str, ...] = ()
     sources: tuple[EvidenceReference, ...] = ()
+    context: object | None = None
 
     def verified(
         self,
@@ -117,11 +121,22 @@ class GateEvidence:
     def _semantically_verified(self, report: dict, inputs: dict, as_of: datetime | None) -> bool:
         # Gates without an audited semantic implementation cannot be manufactured
         # by choosing a verifier name or filling an attestation with PASS strings.
-        # Rule/model/no-exchange certification remain unavailable in this release.
         if SEMANTIC_VERIFIERS.get(self.gate) != self.verifier:
             return False
         if decision_fingerprint(inputs) != self.decision_id:
             return False
+        if self.gate in {3, 9, 12}:
+            from kalshi_predictor.overnight_paper.gate_context import (
+                QualificationContext,
+                verify_context_gate,
+            )
+
+            at = aware(as_of) if as_of is not None else aware(inputs["decision_at"])
+            if not aware(report["validated_at"]) <= at < aware(report["valid_until"]):
+                return False
+            if not isinstance(self.context, QualificationContext):
+                return False
+            return verify_context_gate(self.gate, inputs=inputs, context=self.context, now=at)
         bound = inputs.get("source_hashes")
         if not isinstance(bound, list) or any(
             source.sha256 not in bound for source in self.sources

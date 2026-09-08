@@ -3,9 +3,10 @@
 import hashlib
 import json
 import shutil
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -17,12 +18,13 @@ from kalshi_predictor.advanced_risk.engine import AdvancedRiskEngine
 from kalshi_predictor.advanced_risk.repository import insert_advanced_risk_decision
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.schema import Base, Forecast, Market, MarketSnapshot
-from kalshi_predictor.overnight_paper import activation
+from kalshi_predictor.overnight_paper import activation, rule_verifier
 from kalshi_predictor.overnight_paper.boundary import (
     ExecutionMode,
     LocalPaperAuthorization,
     authorization_fingerprint,
 )
+from kalshi_predictor.overnight_paper.gate_context import QualificationContext
 from kalshi_predictor.overnight_paper.qualification import (
     COLLECTOR_GATES,
     EvidenceReference,
@@ -30,6 +32,7 @@ from kalshi_predictor.overnight_paper.qualification import (
     compute_net_ev,
     decision_fingerprint,
 )
+from kalshi_predictor.overnight_paper.rule_verifier import CertifiedRulePolicy, RuleDocument
 from kalshi_predictor.overnight_paper.store import initialize_store, record_shadow
 from kalshi_predictor.paper.models import BUY_YES, PaperDecision
 from kalshi_predictor.position_sizing.repository import insert_position_sizing_decision
@@ -63,6 +66,10 @@ def prepared(tmp_path, baseline_template, monkeypatch):
     now = datetime.now(UTC)
     settings = Settings(
         _env_file=None,
+        kalshi_api_key_id=None,
+        kalshi_private_key_path=None,
+        postgres_password="",
+        execution_confirmation_token="",
         execution_enabled=False,
         execution_dry_run=True,
         execution_kill_switch=True,
@@ -198,6 +205,43 @@ def prepared(tmp_path, baseline_template, monkeypatch):
             phase3n_hash=decision_fingerprint(risk.as_dict()),
         )
         session.commit()
+    rule_document = RuleDocument("https://assets.kalshi.com/synthetic-rule", b"test-only rule")
+    policy = CertifiedRulePolicy(
+        ticker="BTC-TEST",
+        event_id="E",
+        series="S",
+        provider="synthetic",
+        source_identity="synthetic-index",
+        observation_time=(now + timedelta(hours=1)).isoformat(),
+        selection="exact timestamp",
+        conversion="identity",
+        precision="original decimal",
+        rounding="none",
+        finality="explicit bounded finality",
+        effective_from=(now - timedelta(days=1)).isoformat(),
+        effective_to=(now + timedelta(days=1)).isoformat(),
+        documents=((rule_document.url, rule_document.sha256),),
+        amendments=(),
+        methodology="exact-timestamp-decimal-v1",
+        expected_settlement_seconds=3600,
+        final_settlement_seconds=3600,
+        review_extension_seconds=0,
+    )
+    inputs.update(
+        rule_version=policy.version,
+        settlement_rule={**asdict(policy), "amendments": []},
+        decision_at=now.isoformat(),
+        observation_time=policy.observation_time,
+        market_open_time=(now - timedelta(days=1)).isoformat(),
+        market_close_time=(now + timedelta(hours=1)).isoformat(),
+        expected_settlement_time=(now + timedelta(hours=2)).isoformat(),
+        settlement_deadline=(now + timedelta(hours=2)).isoformat(),
+        final_settlement_time=None,
+    )
+    monkeypatch.setattr(rule_verifier, "CERTIFIED_RULE_POLICIES", (policy,))
+    rule_context = QualificationContext(
+        repository=Path(__file__).resolve().parents[1], rule_documents=(rule_document,)
+    )
     key = decision_fingerprint(inputs)
     source = ref(
         "synthetic-fixture",
@@ -233,6 +277,7 @@ def prepared(tmp_path, baseline_template, monkeypatch):
                 "test-fixture-v1",
                 ref(f"gate-{gate}", json.dumps(report).encode()),
                 sources=(source,),
+                context=rule_context if gate == 3 else None,
             )
         )
     ev = compute_net_ev(
@@ -267,7 +312,7 @@ def prepared(tmp_path, baseline_template, monkeypatch):
         sizing=size.as_dict(),
         risk=risk.as_dict(),
         source_provenance={"fixture": source.sha256},
-        settlement_rule_version="fixture-v1",
+        settlement_rule_version=policy.version,
         decision_at=now.isoformat(),
         forecast_at=now.isoformat(),
         source_updated_at=now.isoformat(),
@@ -301,6 +346,13 @@ def prepared(tmp_path, baseline_template, monkeypatch):
     # Isolate transaction mechanics from the separately tested source/model engines.
     # Passing fixtures are synthetic and never release/activation evidence.
     monkeypatch.setattr(activation, "_revalidate_engines", lambda *args: None)
+    # Mechanics-only fixture; real same-ledger evaluation has separate tests.
+    monkeypatch.setattr(
+        activation, "verify_model_release",
+        lambda *args: Mock(passed=True, model_calibration_verified=True),
+    )
+    # This fixture isolates ledger mechanics, not operational monitoring evidence.
+    monkeypatch.setattr(activation, "verify_monitoring", lambda *a, **kw: Mock(passed=True))
     # Transaction fixture does not certify source/model gates. Semantic validators
     # are independently tested and intentionally block unsupported runtime evidence.
     monkeypatch.setattr(
@@ -414,27 +466,47 @@ def test_release_artifacts_require_success_at_exact_sha(tmp_path, monkeypatch):
         release.verify()
 
 
-def test_longstop_not_optimistic_eta_enforces_hard_72_hours(prepared):
-    from kalshi_predictor.data.schema import Market
-
+@pytest.mark.parametrize("expiration_hours", [None, 73])
+def test_expiration_does_not_substitute_for_rule_settlement_deadline(prepared, expiration_hours):
     with prepared["session_factory"]() as session:
         market = session.get(Market, "BTC-TEST")
-        market.expiration_time = prepared["now"] + timedelta(hours=73)
+        market.expiration_time = (
+            None
+            if expiration_hours is None
+            else prepared["now"] + timedelta(hours=expiration_hours)
+        )
         session.commit()
-    with pytest.raises(ValueError, match="HARD_SETTLEMENT_LONGSTOP_EXCEEDED"):
-        activation.activate_local_paper(**prepared)
+    assert activation.activate_local_paper(**prepared).fill_created
+    assert count(prepared) == 1
+
+
+def validate_shadow_timing(prepared):
+    with prepared["session_factory"]() as session:
+        activation._validate_shadow_inputs(
+            session,
+            prepared["decision"],
+            prepared["shadow_payload"],
+            prepared["qualification_args"],
+            prepared["now"],
+        )
+
+
+def test_missing_verified_deadline_blocks_even_with_short_expiration(prepared):
+    prepared["qualification_args"]["decision_inputs"].pop("settlement_deadline")
+    with pytest.raises(ValueError, match="EXPLICIT_RULE_SUPPORTED_SETTLEMENT_TIMES_REQUIRED"):
+        validate_shadow_timing(prepared)
     assert count(prepared) == 0
 
 
-def test_missing_verified_longstop_blocks_even_with_short_eta(prepared):
-    from kalshi_predictor.data.schema import Market
-
-    with prepared["session_factory"]() as session:
-        market = session.get(Market, "BTC-TEST")
-        market.expiration_time = None
-        session.commit()
-    with pytest.raises(ValueError, match="VERIFIED_SETTLEMENT_LONGSTOP_REQUIRED"):
-        activation.activate_local_paper(**prepared)
+def test_rule_deadline_beyond_72_hours_blocks_short_expiration(prepared, monkeypatch):
+    policy = replace(rule_verifier.CERTIFIED_RULE_POLICIES[0], final_settlement_seconds=72 * 3600)
+    monkeypatch.setattr(rule_verifier, "CERTIFIED_RULE_POLICIES", (policy,))
+    inputs = prepared["qualification_args"]["decision_inputs"]
+    inputs["rule_version"] = policy.version
+    inputs["settlement_deadline"] = (prepared["now"] + timedelta(hours=73)).isoformat()
+    prepared["shadow_payload"]["settlement_rule_version"] = policy.version
+    with pytest.raises(ValueError, match="SETTLEMENT_HORIZON_EXCEEDS_72H"):
+        validate_shadow_timing(prepared)
     assert count(prepared) == 0
 
 
@@ -510,3 +582,65 @@ def test_marker_database_id_change_invalidates_authorization(prepared):
     with pytest.raises(ValueError, match="IMMUTABLE_AUTHORIZATION_BASELINE_REQUIRED"):
         activation.activate_local_paper(**prepared)
     assert count(prepared) == 0
+
+@pytest.mark.parametrize(
+    "field,value,blocker",
+    [
+        ("final_settlement_time", "2026-09-08T01:00:00Z", "ACTUAL_SETTLEMENT_TIME_PRESENT"),
+        ("market_close_time", "2026-09-08T01:00:00Z", "APPLICATION_CLOCK_MISMATCH"),
+    ],
+)
+def test_activation_rejects_ambiguous_canonical_times(prepared, field, value, blocker):
+    prepared["qualification_args"]["decision_inputs"][field] = value
+    with pytest.raises(ValueError, match=blocker):
+        validate_shadow_timing(prepared)
+    assert count(prepared) == 0
+
+
+def test_activation_requires_pinned_rule_even_when_other_gates_mocked(prepared, monkeypatch):
+    monkeypatch.setattr(rule_verifier, "CERTIFIED_RULE_POLICIES", ())
+    with pytest.raises(ValueError, match="CERTIFIED_TIMING_RULE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+def test_real_model_release_guard_blocks_entry_without_evaluation(prepared, monkeypatch):
+    from kalshi_predictor.overnight_paper.model_release import verify_model_release
+
+    calls = []
+
+    def actual_guard(session, inputs, now):
+        assert session.in_transaction()
+        assert session.connection().connection.driver_connection.in_transaction
+        result = verify_model_release(session, inputs, now)
+        calls.append(result)
+        return result
+
+    monkeypatch.setattr(activation, "verify_model_release", actual_guard)
+    with pytest.raises(ValueError, match="MODEL_RELEASE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert len(calls) == 1
+    assert not calls[0].passed
+    assert count(prepared) == 0
+    with prepared["session_factory"]() as session:
+        assert session.execute(text("SELECT count(*) FROM paper_fills")).scalar_one() == 0
+        assert session.execute(text("SELECT count(*) FROM paper_positions")).scalar_one() == 0
+        assert (
+            session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
+            is None
+        )
+
+
+def test_actual_monitor_guard_rejects_absent_permit_before_order(prepared, monkeypatch):
+    from kalshi_predictor.overnight_paper.monitoring import verify_monitoring
+
+    monkeypatch.setattr(activation, "verify_monitoring", verify_monitoring)
+    with pytest.raises(ValueError, match="OPERATIONAL_MONITOR_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+    with prepared["session_factory"]() as session:
+        assert session.execute(text("SELECT count(*) FROM paper_fills")).scalar_one() == 0
+        assert (
+            session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
+            is None
+        )

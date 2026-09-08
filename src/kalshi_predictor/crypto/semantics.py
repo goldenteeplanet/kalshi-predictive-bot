@@ -155,11 +155,11 @@ def parse_crypto_market_terms(
             extra={"unsupported_target_prices": unsupported_prices, "supported_symbols": symbols},
         )
     if components:
-        symbols = tuple(sorted({component.symbol for component in components}))
+        component_symbols = tuple(sorted({component.symbol for component in components}))
         return _terms(
             market,
             status=EXACT_LINK,
-            symbol="+".join(symbols),
+            symbol="+".join(component_symbols),
             components=tuple(components),
             reason_codes=("structured_target_price_terms",),
             reference_price_source=source,
