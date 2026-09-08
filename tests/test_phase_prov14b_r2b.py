@@ -22,15 +22,18 @@ def _fixture(tmp_path: Path) -> dict:
     rollback = tmp_path / "rollback"
     rollback.mkdir()
     (rollback / "cycle.py").write_text("cycle", encoding="utf-8")
-    backup = _json(tmp_path / "backup.json", {
-        "path": "/mnt/backup/exact.db",
-        "size_bytes": 100,
-        "quick_check": "ok",
-        "sha256": "a" * 64,
-        "integrity_check": "ok",
-        "execution_enabled": False,
-        "finished_at": (AS_OF - timedelta(minutes=5)).isoformat(),
-    })
+    backup = _json(
+        tmp_path / "backup.json",
+        {
+            "path": "/mnt/backup/exact.db",
+            "size_bytes": 100,
+            "quick_check": "ok",
+            "sha256": "a" * 64,
+            "integrity_check": "ok",
+            "execution_enabled": False,
+            "finished_at": (AS_OF - timedelta(minutes=5)).isoformat(),
+        },
+    )
     writer = tmp_path / "writer.txt"
     writer.write_text(
         "DB writer monitor: CLEAR\nCurrent writer PID: none\n"
@@ -43,13 +46,16 @@ def _fixture(tmp_path: Path) -> dict:
         "Open DB holders: none visible\n",
         encoding="utf-8",
     )
-    services = _json(tmp_path / "services.json", {
-        "bounded_service": "inactive",
-        "bounded_timer": "inactive",
-        "legacy_watcher": "inactive",
-        "legacy_watcher_enabled": False,
-        "other_writer": "inactive",
-    })
+    services = _json(
+        tmp_path / "services.json",
+        {
+            "bounded_service": "inactive",
+            "bounded_timer": "inactive",
+            "legacy_watcher": "inactive",
+            "legacy_watcher_enabled": False,
+            "other_writer": "inactive",
+        },
+    )
     execution = tmp_path / "execution.txt"
     execution.write_text("EXECUTION_ENABLED=false\n", encoding="utf-8")
     cycle_value = {
@@ -76,18 +82,21 @@ def _fixture(tmp_path: Path) -> dict:
         }
         for event_id, model in ((11, "crypto_v2"), (12, "weather_v2"))
     ]
-    attribution = _json(tmp_path / "attribution.json", {
-        "phase": "PROV-14",
-        "boundary": {"after_event_id": 10},
-        "summary": {
-            "certification_passed": True,
-            "events_failed": 0,
-            "result_truncated": False,
-            "model_counts": {"crypto_v2": 1, "weather_v2": 1},
+    attribution = _json(
+        tmp_path / "attribution.json",
+        {
+            "phase": "PROV-14",
+            "boundary": {"after_event_id": 10},
+            "summary": {
+                "certification_passed": True,
+                "events_failed": 0,
+                "result_truncated": False,
+                "model_counts": {"crypto_v2": 1, "weather_v2": 1},
+            },
+            "rows": rows,
+            "guardrails": {"execution_enabled": False, "thresholds_changed": False},
         },
-        "rows": rows,
-        "guardrails": {"execution_enabled": False, "thresholds_changed": False},
-    })
+    )
     return {
         "backup_path": backup,
         "writer_monitor_path": writer,

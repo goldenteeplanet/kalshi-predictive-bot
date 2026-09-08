@@ -28,15 +28,9 @@ def generate_research_report(
 
 
 def _render_report(rows: list[dict[str, Any]], *, model_name: str) -> str:
-    top_risks = _unique(
-        risk
-        for row in rows
-        for risk in row["evidence"].get("risk_factors", [])
-    )
+    top_risks = _unique(risk for row in rows for risk in row["evidence"].get("risk_factors", []))
     missing_data = _unique(
-        missing
-        for row in rows
-        for missing in row["evidence"].get("missing_data", [])
+        missing for row in rows for missing in row["evidence"].get("missing_data", [])
     )
     model_drivers = _unique(
         str(row["narrative"].get("primary_driver"))
@@ -104,4 +98,3 @@ def _unique(values: Any) -> list[str]:
         seen.add(value)
         unique.append(value)
     return unique
-

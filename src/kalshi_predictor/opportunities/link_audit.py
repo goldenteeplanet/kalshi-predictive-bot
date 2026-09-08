@@ -86,7 +86,9 @@ def build_opportunity_link_audit(
             settings=resolved_settings,
         )
         identity_fields = market_identity_fields(identity)
-        malformed_url = _has_malformed_or_mismatched_url(market=market, identity_status=identity.url_verification_status)
+        malformed_url = _has_malformed_or_mismatched_url(
+            market=market, identity_status=identity.url_verification_status
+        )
         ui_contract = _ui_contract(identity.tradeable, identity.url_verified)
         row = {
             "ranking_id": ranking.id,
@@ -107,7 +109,11 @@ def build_opportunity_link_audit(
         if len(rows) >= limit:
             break
 
-    verified = sum(1 for row in rows if row["kalshi_url_verified"] and row["kalshi_url_status"] in CLICKABLE_STATUSES)
+    verified = sum(
+        1
+        for row in rows
+        if row["kalshi_url_verified"] and row["kalshi_url_status"] in CLICKABLE_STATUSES
+    )
     blocked_rows = [row for row in rows if row["diagnostic_only"]]
     ui_visible_missing = [
         row
@@ -175,7 +181,9 @@ def write_opportunity_link_audit(
     markdown_path = output_dir / "opportunity_link_audit.md"
     csv_path = output_dir / "broken_opportunity_links.csv"
     manifest_path = output_dir / "MANIFEST.sha256"
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
     _write_broken_csv(csv_path, payload["broken_or_blocked_rows"])
     _write_manifest(manifest_path, [json_path, markdown_path, csv_path])
@@ -214,7 +222,9 @@ def _has_malformed_or_mismatched_url(*, market: Market | None, identity_status: 
 def _top_blockers(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     counter: Counter[tuple[str, str]] = Counter()
     for row in rows:
-        counter[(str(row.get("kalshi_url_status") or ""), str(row.get("kalshi_url_reason") or ""))] += 1
+        counter[
+            (str(row.get("kalshi_url_status") or ""), str(row.get("kalshi_url_reason") or ""))
+        ] += 1
     return [
         {"status": status, "reason": reason, "count": count}
         for (status, reason), count in counter.most_common(12)
@@ -224,13 +234,19 @@ def _top_blockers(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _next_actions(summary: dict[str, Any], status_counts: dict[str, int]) -> list[str]:
     actions: list[str] = []
     if summary["ui_visible_opportunities_without_clickable_verified_url"]:
-        actions.append("Remove direct-review visibility for any row missing a verified exact Kalshi URL.")
+        actions.append(
+            "Remove direct-review visibility for any row missing a verified exact Kalshi URL."
+        )
     if summary["stale_catalog"]:
         actions.append("Refresh the Kalshi market catalog and rerun opportunity-link-audit.")
     if summary["unverified_missing_web_url_or_slug"]:
-        actions.append("Persist real Kalshi web URLs or official slug fields during market ingestion.")
+        actions.append(
+            "Persist real Kalshi web URLs or official slug fields during market ingestion."
+        )
     if summary["deterministic_catalog_url_proposals"]:
-        actions.append("Run Phase 3AR URL repair to persist official URLs for exact catalog proposals.")
+        actions.append(
+            "Run Phase 3AR URL repair to persist official URLs for exact catalog proposals."
+        )
     if summary["not_found_in_catalog"] or summary["missing_market_ticker"]:
         actions.append("Repair market_ticker lineage before ranking opportunities.")
     if (
@@ -239,13 +255,19 @@ def _next_actions(summary: dict[str, Any], status_counts: dict[str, int]) -> lis
         or summary["placeholder_blocked"]
         or summary["partial_provenance"]
     ):
-        actions.append("Keep synthetic, composite, placeholder, and partial-provenance rows diagnostic-only.")
+        actions.append(
+            "Keep synthetic, composite, placeholder, and partial-provenance rows diagnostic-only."
+        )
     if summary["general_source_not_safe"]:
-        actions.append("Complete source-readiness evidence before general-source rows can show trade links.")
+        actions.append(
+            "Complete source-readiness evidence before general-source rows can show trade links."
+        )
     if not actions and status_counts:
         actions.append("Contract holds; rerun after the next market catalog refresh.")
     if not actions:
-        actions.append("No opportunity rows found; run the opportunity scanner after market data is fresh.")
+        actions.append(
+            "No opportunity rows found; run the opportunity scanner after market data is fresh."
+        )
     return actions
 
 
@@ -290,7 +312,8 @@ def _render_markdown(payload: dict[str, Any]) -> str:
             "",
             "## Contract",
             "",
-            f"- Direct review missing verified URL: {summary['ui_visible_opportunities_without_clickable_verified_url']}",
+            "- Direct review missing verified URL: "
+            f"{summary['ui_visible_opportunities_without_clickable_verified_url']}",
             f"- Contract pass: {summary['passes_contract']}",
             "",
         ]

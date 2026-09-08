@@ -24,23 +24,27 @@ def build_robust_zone_policy_comparison() -> dict[str, Any]:
     baseline_rows = []
     robust_rows = []
     for index, scenario in enumerate(surface["grid"]["rows"]):
-        zone = zone_lookup[(
-            scenario["ticker"], scenario["spread"], scenario["top_five_depth"]
-        )]
+        zone = zone_lookup[(scenario["ticker"], scenario["spread"], scenario["top_five_depth"])]
         baseline_allocate = scenario["status"] == "ALLOCATED"
         robust_allocate = baseline_allocate and zone == "ROBUST_ALLOCATE"
         baseline_rows.append(_policy_row(index, scenario, zone, baseline_allocate, None))
-        robust_rows.append(_policy_row(
-            index, scenario, zone, robust_allocate,
-            None if robust_allocate else (
-                "ROBUST_ZONE_REQUIRED" if baseline_allocate else scenario["blocker"]
-            ),
-        ))
+        robust_rows.append(
+            _policy_row(
+                index,
+                scenario,
+                zone,
+                robust_allocate,
+                None
+                if robust_allocate
+                else ("ROBUST_ZONE_REQUIRED" if baseline_allocate else scenario["blocker"]),
+            )
+        )
     baseline = _policy_metrics("baseline", baseline_rows)
     robust = _policy_metrics("robust_zone_only", robust_rows)
     canonical = json.dumps(
         {"baseline": baseline, "robust": robust},
-        sort_keys=True, separators=(",", ":"),
+        sort_keys=True,
+        separators=(",", ":"),
     ).encode()
     return {
         "phase": "PMB-16",
@@ -74,8 +78,7 @@ def build_robust_zone_policy_comparison() -> dict[str, Any]:
                 row["attribution_complete"] for row in baseline_rows + robust_rows
             ),
             "robust_policy_allocates_only_robust_zones": all(
-                not row["allocated"] or row["zone"] == "ROBUST_ALLOCATE"
-                for row in robust_rows
+                not row["allocated"] or row["zone"] == "ROBUST_ALLOCATE" for row in robust_rows
             ),
             "deterministic_digest": hashlib.sha256(canonical).hexdigest(),
         },
@@ -93,14 +96,20 @@ def write_robust_zone_policy_comparison(output_dir: Path) -> Path:
 
 
 def _policy_row(
-    index: int, scenario: dict[str, Any], zone: str, allocated: bool,
+    index: int,
+    scenario: dict[str, Any],
+    zone: str,
+    allocated: bool,
     blocker: str | None,
 ) -> dict[str, Any]:
     filled = Decimal(scenario["filled_size"]) if allocated else Decimal("0")
     cost = Decimal(scenario["executed_value"]) if allocated else Decimal("0")
     pnl = (
-        filled - cost if allocated and SETTLEMENTS[scenario["ticker"]] == "yes"
-        else -cost if allocated else Decimal("0")
+        filled - cost
+        if allocated and SETTLEMENTS[scenario["ticker"]] == "yes"
+        else -cost
+        if allocated
+        else Decimal("0")
     )
     return {
         "scenario_index": index,
@@ -136,9 +145,7 @@ def _policy_metrics(name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         "name": name,
         "trade_count": sum(row["allocated"] for row in rows),
         "rejected_opportunities": sum(not row["allocated"] for row in rows),
-        "capital_usage": str(sum(
-            (Decimal(row["capital_used"]) for row in rows), Decimal("0")
-        )),
+        "capital_usage": str(sum((Decimal(row["capital_used"]) for row in rows), Decimal("0"))),
         "total_pnl": str(cumulative),
         "max_drawdown": str(max_drawdown),
         "rows": rows,

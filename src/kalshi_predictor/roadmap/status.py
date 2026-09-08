@@ -29,17 +29,14 @@ def build_roadmap_status(reports_root: Path = Path("reports")) -> dict[str, Any]
     risk = _read_evidence(reports_root / "roadmap/risk_operations_certification.json")
     demo = _read_evidence(reports_root / "roadmap/demo_gateway_certification.json")
     live = _read_json(reports_root / "live_readiness_decision.json")
-    system = _read_json(
-        reports_root / "system_certification/system_certification_report.json"
-    )
+    system = _read_json(reports_root / "system_certification/system_certification_report.json")
     categories = _category_certifications(reports_root / "roadmap/categories")
     soak = phase_gh2.get("soak") or {}
     phase_checks = {
         0: bool(phase_gh2),
         1: bool(soak.get("soak_complete")),
-        2: bool(categories) and all(
-            row.get("paper_pipeline_certified") for row in categories.values()
-        ),
+        2: bool(categories)
+        and all(row.get("paper_pipeline_certified") for row in categories.values()),
         3: bool(paper.get("passed")),
         4: bool(postgres.get("passed")),
         5: bool(model.get("passed")),
@@ -58,11 +55,7 @@ def build_roadmap_status(reports_root: Path = Path("reports")) -> dict[str, Any]
             "name": name,
             "status": "PASSED" if phase_checks[number] else "BLOCKED",
             "blocking_predecessor": next(
-                (
-                    prior
-                    for prior in range(number)
-                    if not phase_checks.get(prior, False)
-                ),
+                (prior for prior in range(number) if not phase_checks.get(prior, False)),
                 None,
             ),
         }

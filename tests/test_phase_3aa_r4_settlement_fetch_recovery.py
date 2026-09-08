@@ -69,9 +69,7 @@ def test_phase3aa_r4_writer_and_cli_help(tmp_path) -> None:
     assert artifacts.json_path.exists()
     assert artifacts.markdown_path.exists()
     assert artifacts.rows_path.exists()
-    assert "Exact Settlement Fetch Recovery" in artifacts.markdown_path.read_text(
-        encoding="utf-8"
-    )
+    assert "Exact Settlement Fetch Recovery" in artifacts.markdown_path.read_text(encoding="utf-8")
     assert result.exit_code == 0
     assert "phase3aa-r4-settlement-fetch-recovery" in result.output
 
@@ -151,9 +149,7 @@ def _write_reports(tmp_path: Path) -> Path:
         },
     )
     _write_json(
-        reports_dir
-        / "paper_settlement_reconciliation"
-        / "paper_settlement_reconciliation.json",
+        reports_dir / "paper_settlement_reconciliation" / "paper_settlement_reconciliation.json",
         {
             "generated_at": "2026-06-28T01:39:05+00:00",
             "summary": {

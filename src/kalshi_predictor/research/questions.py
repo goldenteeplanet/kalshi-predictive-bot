@@ -201,4 +201,3 @@ def _skip_answer(evidence: dict[str, Any]) -> str:
 
 def _normalize(question: str) -> str:
     return " ".join(question.strip().lower().split())
-

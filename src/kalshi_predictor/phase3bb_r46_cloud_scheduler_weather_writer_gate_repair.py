@@ -50,28 +50,30 @@ DEFAULT_PER_PROBE_TIMEOUT_SECONDS = 45
 RUN_JOB_BLOCK = "\n".join(
     [
         "run_job() {",
-        "  local job_id=\"$1\"",
-        "  local writer_capable=\"$2\"",
+        '  local job_id="$1"',
+        '  local writer_capable="$2"',
         "  shift 2",
-        "  if [[ \"${writer_capable}\" == \"true\" ]] && ! writer_clear; then",
-        "    echo \"[phase3bb-r35] Writer active; skip writer-gated job ${job_id}\"",
+        '  if [[ "${writer_capable}" == "true" ]] && ! writer_clear; then',
+        '    echo "[phase3bb-r35] Writer active; skip writer-gated job ${job_id}"',
         "    return 0",
         "  fi",
-        "  echo \"[phase3bb-r35] running ${job_id}\"",
+        '  echo "[phase3bb-r35] running ${job_id}"',
         "  local output status",
         "  set +e",
-        "  output=$(\"$@\" 2>&1)",
+        '  output=$("$@" 2>&1)',
         "  status=$?",
         "  set -e",
-        "  if [[ -n \"${output}\" ]]; then",
+        '  if [[ -n "${output}" ]]; then',
         "    printf '%s\\n' \"${output}\"",
         "  fi",
-        "  if [[ \"${status}\" -ne 0 ]]; then",
-        "    if [[ \"${writer_capable}\" == \"true\" ]] && printf '%s\\n' \"${output}\" | grep -Eq 'Status: BUSY_WRITER|Database is busy|safe_to_start_write[^A-Za-z0-9_:-]*false'; then",
-        "      echo \"[phase3bb-r35] Writer became active during ${job_id}; clean skip for retry\"",
+        '  if [[ "${status}" -ne 0 ]]; then',
+        '    if [[ "${writer_capable}" == "true" ]] && printf \'%s\\n\' "${output}" | grep '
+        "-Eq 'Status: BUSY_WRITER|Database is busy|safe_to_start_write[^A-Za-z0-9_:-]*fal"
+        "se'; then",
+        '      echo "[phase3bb-r35] Writer became active during ${job_id}; clean skip for retry"',
         "      return 0",
         "    fi",
-        "    return \"${status}\"",
+        '    return "${status}"',
         "  fi",
         "}",
     ]
@@ -156,7 +158,9 @@ def write_phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["repair_checks"])
     runner_patch_path.write_text(payload["patched_runner_script"], encoding="utf-8")
@@ -296,9 +300,13 @@ def build_phase3bb_r46_cloud_scheduler_weather_writer_gate_repair(
         "scheduler_weather_writer_gate_repair": True,
         "ssh_read_only_commands_executed": len(probes),
         "ssh_mutating_commands_executed": 1 if install_result["attempted"] else 0,
-        "systemctl_reset_failed_executed": bool(apply and reset_failed and install_result["attempted"]),
+        "systemctl_reset_failed_executed": bool(
+            apply and reset_failed and install_result["attempted"]
+        ),
         "systemctl_start_stop_restart_executed": 0,
-        "scheduler_runner_written_to_system": bool(install_result["attempted"] and install_result["ok"]),
+        "scheduler_runner_written_to_system": bool(
+            install_result["attempted"] and install_result["ok"]
+        ),
         "scheduler_timer_started": False,
         "scheduler_service_started": False,
         "scheduler_service_stopped": False,
@@ -341,11 +349,15 @@ def build_phase3bb_r46_cloud_scheduler_weather_writer_gate_repair(
     }
 
 
-def _build_remote_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) -> list[RemoteProbe]:
+def _build_remote_probes(
+    target: CloudBootstrapTarget, *, timeout_seconds: int
+) -> list[RemoteProbe]:
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
     runner_path = shlex.quote(_runner_path(target))
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     registry_loop = " ".join(
         shlex.quote(command)
         for command in (
@@ -357,24 +369,36 @@ def _build_remote_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) 
     )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
-        RemoteProbe("runner_script", f"test -x {runner_path} && sed -n '1,320p' {runner_path}", timeout_seconds),
+        RemoteProbe(
+            "runner_script",
+            f"test -x {runner_path} && sed -n '1,320p' {runner_path}",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "scheduler_service_systemd",
-            f"systemctl show {SCHEDULER_SERVICE_NAME} --property=LoadState,ActiveState,SubState,ExecMainPID,Result,NRestarts || true",
+            f"systemctl show {SCHEDULER_SERVICE_NAME} --proper"
+            f"ty=LoadState,ActiveState,SubState,ExecMainPID,Re"
+            f"sult,NRestarts || true",
             timeout_seconds,
         ),
         RemoteProbe(
             "scheduler_timer_systemd",
-            f"systemctl show {SCHEDULER_TIMER_NAME} --property=LoadState,ActiveState,SubState,UnitFileState,LastTriggerUSec,NextElapseUSecRealtime || true",
+            f"systemctl show {SCHEDULER_TIMER_NAME} --property"
+            f"=LoadState,ActiveState,SubState,UnitFileState,La"
+            f"stTriggerUSec,NextElapseUSecRealtime || true",
             timeout_seconds,
         ),
-        RemoteProbe("scheduler_journal_tail", f"journalctl -u {SCHEDULER_SERVICE_NAME} -n 160 --no-pager || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_journal_tail",
+            f"journalctl -u {SCHEDULER_SERVICE_NAME} -n 160 --no-pager || true",
+            timeout_seconds,
+        ),
         RemoteProbe("db_writer_monitor_raw", writer_cmd, timeout_seconds),
         RemoteProbe(
             "command_registry",
             (
                 f"cd {app} && for cmd in {registry_loop}; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -382,13 +406,21 @@ def _build_remote_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) 
     ]
 
 
-def _build_post_apply_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) -> list[RemoteProbe]:
+def _build_post_apply_probes(
+    target: CloudBootstrapTarget, *, timeout_seconds: int
+) -> list[RemoteProbe]:
     runner_path = shlex.quote(_runner_path(target))
     return [
-        RemoteProbe("runner_script", f"test -x {runner_path} && sed -n '1,320p' {runner_path}", timeout_seconds),
+        RemoteProbe(
+            "runner_script",
+            f"test -x {runner_path} && sed -n '1,320p' {runner_path}",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "scheduler_service_systemd",
-            f"systemctl show {SCHEDULER_SERVICE_NAME} --property=LoadState,ActiveState,SubState,ExecMainPID,Result,NRestarts || true",
+            f"systemctl show {SCHEDULER_SERVICE_NAME} --proper"
+            f"ty=LoadState,ActiveState,SubState,ExecMainPID,Re"
+            f"sult,NRestarts || true",
             timeout_seconds,
         ),
     ]
@@ -428,11 +460,14 @@ def _parse_probe_outputs(
         "writer_status": writer.get("status") or "UNKNOWN",
         "writer_safe_to_start_write": bool(writer.get("safe_to_start_write")) if writer else False,
         "writer_pid": writer.get("current_writer_pid"),
-        "journal_busy_writer_seen": "Status: BUSY_WRITER" in journal or "Database is busy" in journal,
+        "journal_busy_writer_seen": "Status: BUSY_WRITER" in journal
+        or "Database is busy" in journal,
         "journal_clean_midrun_skip_seen": "Writer became active during" in journal,
         "r45_status": r45_decision.get("status"),
         "r45_first_weather_blocker": r45_decision.get("first_weather_blocker"),
-        "command_registry_ok": bool(by_name.get("command_registry") and by_name["command_registry"].ok),
+        "command_registry_ok": bool(
+            by_name.get("command_registry") and by_name["command_registry"].ok
+        ),
     }
 
 
@@ -448,7 +483,7 @@ def _runner_has_midrun_writer_gate(runner_script: str) -> bool:
     return (
         "Writer became active during" in runner_script
         and "Status: BUSY_WRITER|Database is busy" in runner_script
-        and "output=$(\"$@\" 2>&1)" in runner_script
+        and 'output=$("$@" 2>&1)' in runner_script
     )
 
 
@@ -464,7 +499,11 @@ def _repair_checks(
         {fragment for fragment in FORBIDDEN_REPAIR_FRAGMENTS if fragment in patched_runner.lower()}
     )
     return [
-        _check("runner_script_found", bool(parsed.get("runner_exists")), f"runner={parsed.get('runner_path')}."),
+        _check(
+            "runner_script_found",
+            bool(parsed.get("runner_exists")),
+            f"runner={parsed.get('runner_path')}.",
+        ),
         _check(
             "runner_has_weather_catalog_hook",
             bool(parsed.get("runner_has_weather_catalog_hook")),
@@ -473,14 +512,21 @@ def _repair_checks(
         _check(
             "runner_patchable_or_already_repaired",
             bool(patched_runner.strip()) and _runner_has_midrun_writer_gate(patched_runner),
-            f"already_repaired={parsed.get('runner_has_midrun_writer_gate')} patch_required={parsed.get('runner_patch_required')}.",
+            f"already_repaired="
+            f"{parsed.get('runner_has_midrun_writer_gate')} pa"
+            f"tch_required="
+            f"{parsed.get('runner_patch_required')}.",
         ),
         _check(
             "scheduler_service_not_running_for_apply",
             (not apply) or service_state not in {"active", "activating"},
             f"scheduler_service={service_state}.",
         ),
-        _check("backup_first_for_apply", (not apply) or backup_first, f"apply={apply} backup_first={backup_first}."),
+        _check(
+            "backup_first_for_apply",
+            (not apply) or backup_first,
+            f"apply={apply} backup_first={backup_first}.",
+        ),
         _check(
             "no_forbidden_runner_fragments",
             not forbidden_hits,
@@ -516,7 +562,9 @@ def _decision(
         )
     elif parsed.get("runner_has_midrun_writer_gate") and not apply:
         status = "SCHEDULER_WRITER_GATE_ALREADY_REPAIRED"
-        reason = "The installed runner already treats mid-run writer-busy failures as clean retry skips."
+        reason = (
+            "The installed runner already treats mid-run writer-busy failures as clean retry skips."
+        )
         next_step = "Phase 3BB-R47 - Cloud Scheduler Writer-Gate Runtime Verification"
         command = (
             "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor "
@@ -524,7 +572,9 @@ def _decision(
         )
     elif not apply:
         status = "READY_TO_APPLY_SCHEDULER_WRITER_GATE_REPAIR"
-        reason = "The patched runner is ready; rerun R46 with --apply --backup-first --reset-failed."
+        reason = (
+            "The patched runner is ready; rerun R46 with --apply --backup-first --reset-failed."
+        )
         next_step = "Phase 3BB-R46 - Apply Scheduler Writer-Gate Repair"
         command = (
             "kalshi-bot phase3bb-r46-cloud-scheduler-weather-writer-gate-repair "
@@ -533,7 +583,10 @@ def _decision(
         )
     elif install_result.get("ok") and verify_after:
         status = "SCHEDULER_WRITER_GATE_REPAIR_INSTALLED"
-        reason = "The cloud runner was backed up and patched; writer-busy weather jobs now clean-skip for retry."
+        reason = (
+            "The cloud runner was backed up and patched; writer-busy weather jobs now "
+            "clean-skip for retry."
+        )
         next_step = "Phase 3BB-R47 - Cloud Scheduler Writer-Gate Runtime Verification"
         command = (
             "kalshi-bot phase3bb-r40-cloud-scheduler-runtime-monitor "
@@ -577,7 +630,9 @@ def _decision(
 
 
 def _can_apply(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> bool:
-    return all(row["passed"] for row in checks) and not bool(parsed.get("runner_has_midrun_writer_gate"))
+    return all(row["passed"] for row in checks) and not bool(
+        parsed.get("runner_has_midrun_writer_gate")
+    )
 
 
 def _build_install_probe(
@@ -599,7 +654,8 @@ import time
 
 runner = pathlib.Path({str(_runner_path(target))!r})
 tmp = runner.with_name(runner.name + ".phase3bb_r46.tmp")
-backup = runner.with_name(runner.name + ".phase3bb_r46_" + time.strftime("%Y%m%d%H%M%S") + ".bak")
+backup = runner.with_name(runner.name + ".phase3bb_r46_" + \
+time.strftime("%Y%m%d%H%M%S") + ".bak")
 tmp.write_text(base64.b64decode({encoded!r}).decode("utf-8"), encoding="utf-8")
 tmp.chmod(0o755)
 if {bool(backup_first)!r} and runner.exists():
@@ -657,7 +713,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             "",
             "## Repair",
             "",
-            "Writer-gated scheduler jobs now capture command output and convert mid-run SQLite writer contention into a clean retry skip:",
+            "Writer-gated scheduler jobs now capture command output and convert mid-run "
+            "SQLite writer contention into a clean retry skip:",
             "",
             "```bash",
             "Writer became active during ${job_id}; clean skip for retry",
@@ -765,7 +822,9 @@ def _parse_systemd_show(text: str) -> dict[str, str]:
     return parsed
 
 
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None) -> None:
+def _write_rows_csv(
+    path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None
+) -> None:
     if fieldnames is None:
         keys: list[str] = []
         for row in rows:

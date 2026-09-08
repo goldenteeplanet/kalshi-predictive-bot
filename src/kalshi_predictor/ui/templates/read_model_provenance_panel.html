@@ -1,0 +1,30 @@
+{% macro read_model_provenance_panel(model) %}
+<article class="card" aria-label="Read-model provenance">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Artifact-only observability</p>
+      <h2>Read-model provenance</h2>
+    </div>
+    <span class="status-pill {{ 'status-healthy' if model.status == 'HEALTHY' else 'status-incomplete' }}">
+      {{ model.status | replace('_', ' ') | title }}
+    </span>
+  </div>
+  <p><strong>Mode:</strong> {{ model.mode }}</p>
+  <p><strong>Action:</strong> {{ model.action }}</p>
+  <p class="muted">Execution authorization: {{ 'enabled' if model.execution_authorized else 'blocked' }}.</p>
+  {% if model.status == 'UNAVAILABLE' %}
+    <p>Required evidence is unavailable: {{ model.missing_components | join(', ') }}.</p>
+  {% else %}
+    <dl>
+      <dt>Watermark</dt><dd><code>{{ model.provenance.source_watermark }}</code></dd>
+      <dt>Source identity</dt><dd><code>{{ model.provenance.source_identity_hash }}</code></dd>
+      <dt>Schema decision</dt><dd>{{ model.compatibility.decision }}</dd>
+      <dt>Chain nodes</dt><dd>{{ model.chain.node_count }}</dd>
+      <dt>Chain head</dt><dd><code>{{ model.chain.head_hash }}</code></dd>
+      <dt>Snapshot age</dt><dd>{{ model.freshness.snapshot_age_seconds }} s</dd>
+      <dt>Progress age</dt><dd>{{ model.freshness.progress_age_seconds }} s</dd>
+    </dl>
+  {% endif %}
+  <p class="muted">Dashboard hash: <code>{{ model.dashboard_hash }}</code></p>
+</article>
+{% endmacro %}

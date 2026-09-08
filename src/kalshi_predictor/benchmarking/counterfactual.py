@@ -53,7 +53,8 @@ def build_counterfactual_model_comparison(
     changes = _decision_changes(baseline, candidate)
     canonical = json.dumps(
         {"baseline": baseline, "candidate": candidate, "changes": changes},
-        sort_keys=True, separators=(",", ":"),
+        sort_keys=True,
+        separators=(",", ":"),
     ).encode()
     return {
         "phase": "PMB-11",
@@ -107,9 +108,7 @@ def _run_variant(
 ) -> dict[str, Any]:
     episode, categories = _portfolio_episode()
     frames = replay_episode(episode)
-    correlation = {
-        "SYN-BTC": "macro", "SYN-NYC-WEATHER": "event_risk", "SYN-SPORTS": "event_risk"
-    }
+    correlation = {"SYN-BTC": "macro", "SYN-NYC-WEATHER": "event_risk", "SYN-SPORTS": "event_risk"}
     cash = limits.initial_cash
     positions: dict[str, Decimal] = {}
     costs: dict[str, Decimal] = {}
@@ -125,8 +124,13 @@ def _run_variant(
             edge = forecasts[frame.ticker] - ask if ask is not None else None
             requested = min(Decimal("10"), limits.max_ticker_exposure)
             blocker = _allocation_blocker(
-                ticker=frame.ticker, requested=requested, categories=categories,
-                correlation=correlation, costs=costs, limits=limits, cash=cash,
+                ticker=frame.ticker,
+                requested=requested,
+                categories=categories,
+                correlation=correlation,
+                costs=costs,
+                limits=limits,
+                cash=cash,
             )
             if edge is None or edge <= Decimal("0.02"):
                 blocker = blocker or "EDGE_NOT_POSITIVE"
@@ -144,25 +148,34 @@ def _run_variant(
                 else:
                     blocker = "INSUFFICIENT_LIQUIDITY"
             model = SYNTHETIC_ATTRIBUTION[frame.ticker]["model_name"]
-            decisions.append({
-                "timestamp": frame.timestamp.isoformat(), "ticker": frame.ticker,
-                "category": categories[frame.ticker], "status": status, "blocker": blocker,
-                "forecast_probability": str(forecasts[frame.ticker]),
-                "model_name": model, "model_version": versions[model],
-                "best_yes_ask": str(ask) if ask is not None else None,
-                "edge": str(edge) if edge is not None else None,
-                "requested_capital": str(requested), "allocated_capital": str(allocated),
-                "feature_ref": SYNTHETIC_ATTRIBUTION[frame.ticker]["feature_ref"],
-                "observation_ref": SYNTHETIC_ATTRIBUTION[frame.ticker]["observation_ref"],
-                "orderbook_ref": {
-                    **SYNTHETIC_ATTRIBUTION[frame.ticker]["orderbook_ref"],
-                    "captured_at": frame.timestamp.isoformat(),
-                },
-            })
-        curve.append({
-            "timestamp": frame.timestamp.isoformat(),
-            "equity": str(_marked_equity(cash, positions, books)),
-        })
+            decisions.append(
+                {
+                    "timestamp": frame.timestamp.isoformat(),
+                    "ticker": frame.ticker,
+                    "category": categories[frame.ticker],
+                    "status": status,
+                    "blocker": blocker,
+                    "forecast_probability": str(forecasts[frame.ticker]),
+                    "model_name": model,
+                    "model_version": versions[model],
+                    "best_yes_ask": str(ask) if ask is not None else None,
+                    "edge": str(edge) if edge is not None else None,
+                    "requested_capital": str(requested),
+                    "allocated_capital": str(allocated),
+                    "feature_ref": SYNTHETIC_ATTRIBUTION[frame.ticker]["feature_ref"],
+                    "observation_ref": SYNTHETIC_ATTRIBUTION[frame.ticker]["observation_ref"],
+                    "orderbook_ref": {
+                        **SYNTHETIC_ATTRIBUTION[frame.ticker]["orderbook_ref"],
+                        "captured_at": frame.timestamp.isoformat(),
+                    },
+                }
+            )
+        curve.append(
+            {
+                "timestamp": frame.timestamp.isoformat(),
+                "equity": str(_marked_equity(cash, positions, books)),
+            }
+        )
     final_cash = cash + sum(
         size for ticker, size in positions.items() if episode.settlements[ticker] == "yes"
     )
@@ -191,35 +204,48 @@ def _decision_changes(baseline: dict[str, Any], candidate: dict[str, Any]) -> li
     changes = []
     for key in sorted(set(base) | set(other)):
         left, right = base.get(key), other.get(key)
-        if left is None or right is None or (
-            left["status"], left["blocker"], left["allocated_capital"]
-        ) != (right["status"], right["blocker"], right["allocated_capital"]):
+        if (
+            left is None
+            or right is None
+            or (left["status"], left["blocker"], left["allocated_capital"])
+            != (right["status"], right["blocker"], right["allocated_capital"])
+        ):
             source = right or left
-            changes.append({
-                "ticker": key[0], "timestamp": key[1],
-                "baseline": left, "candidate": right,
-                "forecast_probability_delta": (
-                    str(
-                        Decimal(right["forecast_probability"])
-                        - Decimal(left["forecast_probability"])
-                    )
-                    if left and right else None
-                ),
-                "model_version_changed": bool(
-                    left and right and left["model_version"] != right["model_version"]
-                ),
-                "attribution_complete": all(source.get(field) for field in (
-                    "feature_ref", "observation_ref", "orderbook_ref", "model_version"
-                )),
-            })
+            changes.append(
+                {
+                    "ticker": key[0],
+                    "timestamp": key[1],
+                    "baseline": left,
+                    "candidate": right,
+                    "forecast_probability_delta": (
+                        str(
+                            Decimal(right["forecast_probability"])
+                            - Decimal(left["forecast_probability"])
+                        )
+                        if left and right
+                        else None
+                    ),
+                    "model_version_changed": bool(
+                        left and right and left["model_version"] != right["model_version"]
+                    ),
+                    "attribution_complete": all(
+                        source.get(field)
+                        for field in (
+                            "feature_ref",
+                            "observation_ref",
+                            "orderbook_ref",
+                            "model_version",
+                        )
+                    ),
+                }
+            )
     return changes
 
 
 def _gate_counts(decisions: list[dict[str, Any]]) -> dict[str, int]:
     keys = sorted({str(row["blocker"] or row["status"]) for row in decisions})
     return {
-        key: sum(str(row["blocker"] or row["status"]) == key for row in decisions)
-        for key in keys
+        key: sum(str(row["blocker"] or row["status"]) == key for row in decisions) for key in keys
     }
 
 

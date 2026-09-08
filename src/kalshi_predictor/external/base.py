@@ -55,4 +55,3 @@ def store_external_payload(
         source_timestamp=source_timestamp,
     )
     return ExternalIngestionResult(source=source, records_inserted=1)
-

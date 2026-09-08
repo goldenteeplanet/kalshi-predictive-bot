@@ -197,4 +197,3 @@ def feature_to_dict(row: MicrostructureFeature) -> dict[str, Any]:
         else:
             data[key] = value
     return data
-

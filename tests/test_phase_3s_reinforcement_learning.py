@@ -350,9 +350,7 @@ def _seed_forecast_memory(
             forecast_memory_event_id=f"{forecast_id}-1",
             forecast_id=forecast_id,
             event_type=(
-                "TRADE_SELECTED"
-                if decision_status == "TRADE_SELECTED"
-                else "FORECAST_CREATED"
+                "TRADE_SELECTED" if decision_status == "TRADE_SELECTED" else "FORECAST_CREATED"
             ),
             event_sequence=1,
             event_time=event_time,

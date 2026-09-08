@@ -44,9 +44,7 @@ def test_phase_3t_empty_snapshot_marks_sources_unknown_not_zero(tmp_path) -> Non
     assert required["market_state"]["database_fingerprint"].startswith("sha256:")
     assert required["market_state"]["git_commit"]
     optional = {
-        row["source_id"]: row
-        for row in snapshot["source_watermarks"]
-        if not row["required"]
+        row["source_id"]: row for row in snapshot["source_watermarks"] if not row["required"]
     }
     assert optional["phase_3p_self_evaluation"]["lifecycle_state"] == "DISABLED"
     assert optional["phase_3p_self_evaluation"]["completeness_status"] == "NOT_APPLICABLE"
@@ -148,7 +146,7 @@ def test_phase_3t_csv_export_sanitizes_formula_cells(tmp_path) -> None:
     csv_payload = export_snapshot_csv(snapshot)
 
     assert "panel_id,title,freshness_status" in csv_payload
-    assert sanitize_csv_cell("=HYPERLINK(\"x\")").startswith("'=")
+    assert sanitize_csv_cell('=HYPERLINK("x")').startswith("'=")
     assert sanitize_csv_cell("@cmd").startswith("'@")
 
 

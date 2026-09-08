@@ -206,4 +206,3 @@ def _looks_like_odds(row: dict[str, Any]) -> bool:
         row.get(key) not in (None, "")
         for key in ("home_moneyline", "away_moneyline", "spread", "total")
     )
-

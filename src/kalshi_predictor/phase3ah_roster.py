@@ -12,9 +12,7 @@ from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.utils.time import utc_now
 
 PHASE_3AH_ROSTER_VERSION = "phase3ah_roster_v1"
-DEFAULT_ROSTER_TEMPLATE_PATH = Path(
-    "reports/phase3ah_sports/phase3ah_roster_review_template.json"
-)
+DEFAULT_ROSTER_TEMPLATE_PATH = Path("reports/phase3ah_sports/phase3ah_roster_review_template.json")
 DEFAULT_OUTPUT_DIR = Path("reports/phase3ah_sports")
 VERIFIED_STATUSES = {"APPROVED", "VERIFIED", "READY", "REVIEWED_VERIFIED"}
 VALID_ENTITY_TYPES = {"PLAYER", "PARTICIPANT"}
@@ -285,10 +283,7 @@ def _league_summary(
     rework_rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     leagues = sorted(
-        {
-            str(row.get("league") or "UNKNOWN")
-            for row in [*verified_rows, *rework_rows]
-        }
+        {str(row.get("league") or "UNKNOWN") for row in [*verified_rows, *rework_rows]}
     )
     summary: list[dict[str, Any]] = []
     for league in leagues:
@@ -303,8 +298,7 @@ def _league_summary(
                 "verified_roster_rows": len(verified),
                 "rework_rows": len(rework),
                 "top_rework_reasons": [
-                    {"reason": reason, "count": count}
-                    for reason, count in reasons.most_common(5)
+                    {"reason": reason, "count": count} for reason, count in reasons.most_common(5)
                 ],
             }
         )
@@ -321,8 +315,7 @@ def _next_action_for_reasons(reasons: list[str]) -> str:
     if "MISSING_CANONICAL_PLAYER_ID" in reasons:
         return "Add a stable canonical player or participant id from the source roster."
     if any(
-        reason.startswith("INVALID_VALID") or reason.startswith("VALID_TO")
-        for reason in reasons
+        reason.startswith("INVALID_VALID") or reason.startswith("VALID_TO") for reason in reasons
     ):
         return "Add valid roster effective dates before using this evidence."
     return "Complete missing roster evidence before rerunning Phase 3AE."

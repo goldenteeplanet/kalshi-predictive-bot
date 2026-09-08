@@ -171,9 +171,7 @@ def parse_crypto_market_terms(
             symbol=event_symbol,
             side=None,
             comparator=_text_comparator(text),
-            threshold_value=(
-                _first_target_price_from_text(text) or unsupported_prices[0]
-            ),
+            threshold_value=(_first_target_price_from_text(text) or unsupported_prices[0]),
             reference_price_source=source,
             source_event=market.event_ticker or market.series_ticker,
             source_market=market.ticker,

@@ -16,14 +16,49 @@ from kalshi_predictor.benchmarking.oos_policy import (
     _metrics,
 )
 
-
 TAIL_STRESS_LADDER: tuple[dict[str, str | int], ...] = (
-    {"severity": 0, "forecast_bias": "0", "spread_addition": "0", "depth_multiplier": "1", "adverse_settlement_count": 0},
-    {"severity": 1, "forecast_bias": "-0.02", "spread_addition": "0.02", "depth_multiplier": "0.80", "adverse_settlement_count": 1},
-    {"severity": 2, "forecast_bias": "-0.04", "spread_addition": "0.05", "depth_multiplier": "0.60", "adverse_settlement_count": 2},
-    {"severity": 3, "forecast_bias": "-0.06", "spread_addition": "0.08", "depth_multiplier": "0.40", "adverse_settlement_count": 3},
-    {"severity": 4, "forecast_bias": "-0.08", "spread_addition": "0.12", "depth_multiplier": "0.20", "adverse_settlement_count": 4},
-    {"severity": 5, "forecast_bias": "-0.10", "spread_addition": "0.16", "depth_multiplier": "0.10", "adverse_settlement_count": 5},
+    {
+        "severity": 0,
+        "forecast_bias": "0",
+        "spread_addition": "0",
+        "depth_multiplier": "1",
+        "adverse_settlement_count": 0,
+    },
+    {
+        "severity": 1,
+        "forecast_bias": "-0.02",
+        "spread_addition": "0.02",
+        "depth_multiplier": "0.80",
+        "adverse_settlement_count": 1,
+    },
+    {
+        "severity": 2,
+        "forecast_bias": "-0.04",
+        "spread_addition": "0.05",
+        "depth_multiplier": "0.60",
+        "adverse_settlement_count": 2,
+    },
+    {
+        "severity": 3,
+        "forecast_bias": "-0.06",
+        "spread_addition": "0.08",
+        "depth_multiplier": "0.40",
+        "adverse_settlement_count": 3,
+    },
+    {
+        "severity": 4,
+        "forecast_bias": "-0.08",
+        "spread_addition": "0.12",
+        "depth_multiplier": "0.20",
+        "adverse_settlement_count": 4,
+    },
+    {
+        "severity": 5,
+        "forecast_bias": "-0.10",
+        "spread_addition": "0.16",
+        "depth_multiplier": "0.10",
+        "adverse_settlement_count": 5,
+    },
 )
 
 
@@ -91,10 +126,15 @@ def _run_level(
         ticker = CATEGORY_TICKER[category]
         spread = min(Decimal("0.99"), Decimal(spread_text) + Decimal(str(level["spread_addition"])))
         depth = Decimal(depth_text) * Decimal(str(level["depth_multiplier"]))
-        forecast = max(Decimal("0"), min(
-            Decimal("1"),
-            BASELINE_FORECASTS[ticker] + Decimal(delta_text) + Decimal(str(level["forecast_bias"])),
-        ))
+        forecast = max(
+            Decimal("0"),
+            min(
+                Decimal("1"),
+                BASELINE_FORECASTS[ticker]
+                + Decimal(delta_text)
+                + Decimal(str(level["forecast_bias"])),
+            ),
+        )
         if settlement == "yes" and adverse_remaining > 0:
             settlement = "no"
             adverse_remaining -= 1
@@ -103,17 +143,32 @@ def _run_level(
         baseline_allocate = scenario["status"] == "ALLOCATED"
         robust_allocate = baseline_allocate and zone == "ROBUST_ALLOCATE"
         stressed_id = f"{episode_id}:tail-{level['severity']}"
-        baseline_rows.append(_episode_row(
-            index, stressed_id, category, settlement, scenario, zone,
-            baseline_allocate, None if baseline_allocate else scenario["blocker"],
-        ))
-        robust_rows.append(_episode_row(
-            index, stressed_id, category, settlement, scenario, zone,
-            robust_allocate,
-            None if robust_allocate else (
-                "ROBUST_ZONE_REQUIRED" if baseline_allocate else scenario["blocker"]
-            ),
-        ))
+        baseline_rows.append(
+            _episode_row(
+                index,
+                stressed_id,
+                category,
+                settlement,
+                scenario,
+                zone,
+                baseline_allocate,
+                None if baseline_allocate else scenario["blocker"],
+            )
+        )
+        robust_rows.append(
+            _episode_row(
+                index,
+                stressed_id,
+                category,
+                settlement,
+                scenario,
+                zone,
+                robust_allocate,
+                None
+                if robust_allocate
+                else ("ROBUST_ZONE_REQUIRED" if baseline_allocate else scenario["blocker"]),
+            )
+        )
     baseline = _with_efficiency(_metrics("baseline", baseline_rows))
     robust = _with_efficiency(_metrics("frozen_robust_zone", robust_rows))
     # PMB-19 searches for where the advantage stops improving. A tie therefore
@@ -127,7 +182,9 @@ def _run_level(
         "baseline": baseline,
         "robust_policy": robust,
         "comparison": {
-            "drawdown_delta": str(Decimal(robust["max_drawdown"]) - Decimal(baseline["max_drawdown"])),
+            "drawdown_delta": str(
+                Decimal(robust["max_drawdown"]) - Decimal(baseline["max_drawdown"])
+            ),
             "capital_efficiency_delta": str(
                 Decimal(robust["risk_adjusted_capital_efficiency"])
                 - Decimal(baseline["risk_adjusted_capital_efficiency"])

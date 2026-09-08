@@ -107,9 +107,7 @@ def test_phase3bb_r9_calibration_uses_settled_forecasts_only(tmp_path) -> None:
             limit=100,
         )
 
-    rows = {
-        row["model_name"]: row for row in payload["model_calibration"]["model_rows"]
-    }
+    rows = {row["model_name"]: row for row in payload["model_calibration"]["model_rows"]}
     assert rows["crypto_v2"]["evaluable_forecast_rows"] == 1
     assert rows["crypto_v2"]["brier_score"] == "0.0400"
     assert rows["crypto_v2"]["accuracy"] == "1.0000"

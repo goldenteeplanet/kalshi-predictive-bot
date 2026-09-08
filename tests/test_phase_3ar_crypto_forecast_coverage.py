@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import select
 from typer.testing import CliRunner
 
+from kalshi_predictor import phase3ar
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.crypto.repository import insert_crypto_features, insert_crypto_market_link
@@ -23,7 +24,6 @@ from kalshi_predictor.phase3ar import (
     build_crypto_forecast_coverage,
     write_phase3ar_report,
 )
-from kalshi_predictor import phase3ar
 from kalshi_predictor.utils.time import utc_now
 
 

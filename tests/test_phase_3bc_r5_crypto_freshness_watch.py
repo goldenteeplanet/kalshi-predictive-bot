@@ -26,6 +26,55 @@ from kalshi_predictor.ui.service import crypto_freshness_watch_status
 from kalshi_predictor.utils.time import utc_now
 
 
+def test_artifact_only_risk_preflight_rolls_back_nested_writes(monkeypatch) -> None:
+    class Savepoint:
+        is_active = True
+        rolled_back = False
+
+        def rollback(self) -> None:
+            self.rolled_back = True
+            self.is_active = False
+
+    class Session:
+        def __init__(self) -> None:
+            self.savepoint = Savepoint()
+
+        def begin_nested(self):
+            return self.savepoint
+
+    session = Session()
+    monkeypatch.setattr(
+        phase3bc_r5,
+        "_paper_decision_for_candidate",
+        lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        phase3bc_r5,
+        "ensure_paper_decision_sized",
+        lambda *args, **kwargs: SimpleNamespace(
+            raw_decision_json={
+                "position_sizing_decision_id": 240,
+                "position_sizing_decision": {"tier": "blocked"},
+                "advanced_risk_decision_id": 240,
+                "advanced_risk_decision": {"action": "block"},
+            },
+            quantity=0,
+            reason="artifact-only",
+        ),
+    )
+
+    rows = phase3bc_r5._run_risk_preflight(
+        session,
+        [{"ticker": "KXTEST"}],
+        settings=SimpleNamespace(),
+        persist=False,
+    )
+
+    assert session.savepoint.rolled_back is True
+    assert rows[0]["phase3m_decision_id"] == 240
+    assert rows[0]["phase3n_decision_id"] == 240
+
+
 def test_phase3bc_r5_can_reuse_existing_r3_report(monkeypatch, tmp_path: Path) -> None:
     r3_dir = tmp_path / "phase3bc_r3"
     r3_dir.mkdir()
@@ -631,10 +680,7 @@ def test_phase3bc_r5_snapshot_refresh_allows_unrelated_ranking_gaps(monkeypatch)
         "KXDOGE-POSITIVE-EV",
     ]
     assert observed["limit"] == 2
-    assert (
-        result["trigger"]
-        == "R23_EXACT_SNAPSHOT_REFRESH_FOR_ACTIONABLE_CRYPTO_CANDIDATES"
-    )
+    assert result["trigger"] == "R23_EXACT_SNAPSHOT_REFRESH_FOR_ACTIONABLE_CRYPTO_CANDIDATES"
     assert result["ranking_gaps_did_not_block_refresh"] is True
     assert result["positive_ev_priority"] is True
     assert result["book_visible_priority"] is True
@@ -972,9 +1018,7 @@ def test_phase3bc_r5_payload_exposes_r8_gap_reconciliation_fields() -> None:
             "attempted": 3,
             "repaired": 2,
             "selected_tickers": ["KXBTC-ACTIONABLE"],
-            "candidate_filter": (
-                "ACTIVE_OPEN_PURE_CRYPTO_EV_NEAR_MISS_OR_STALE_MAINTENANCE"
-            ),
+            "candidate_filter": ("ACTIVE_OPEN_PURE_CRYPTO_EV_NEAR_MISS_OR_STALE_MAINTENANCE"),
             "active_open_candidates": 1,
             "book_visible_candidates": 1,
             "no_book_recheck_candidates": 1,
@@ -1066,9 +1110,7 @@ def test_phase3bc_r5_classifies_bounded_freshness_backlog_without_hiding_ev_gap(
     assert summary["data_freshness_gap_after_refresh"] == "SNAPSHOT_STALE"
     assert summary["primary_gap_after_refresh"] == "EV_NOT_POSITIVE"
     assert summary["snapshot_backlog_status"] == "EXACT_TICKER_NOT_REFRESHED"
-    assert summary["forecast_backlog_status"] == (
-        "FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH"
-    )
+    assert summary["forecast_backlog_status"] == ("FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH")
     assert summary["data_freshness_complete"] is False
     assert summary["freshness_backlog_blocks_current_positive_ev"] is False
     assert summary["exact_snapshot_refresh_unselected_tickers"] == ["KXBTC-3"]
@@ -1205,12 +1247,12 @@ def test_phase3bc_r5_payload_detects_liquidity_emergence_from_previous_report() 
     assert payload["liquidity_emergence_examples"][0]["transition_label"] == (
         "Liquidity appeared; Clean execution appeared"
     )
-    assert {
-        row["ticker"] for row in payload["positive_ev_liquidity_emergence_examples"]
-    } == {"KXBTC-POS"}
-    assert {
-        row["ticker"] for row in payload["near_miss_clean_book_emergence_examples"]
-    } == {"KXETH-NEAR"}
+    assert {row["ticker"] for row in payload["positive_ev_liquidity_emergence_examples"]} == {
+        "KXBTC-POS"
+    }
+    assert {row["ticker"] for row in payload["near_miss_clean_book_emergence_examples"]} == {
+        "KXETH-NEAR"
+    }
 
 
 def test_phase3bc_r5_cli_smoke_no_external_fetches(tmp_path) -> None:
@@ -1462,9 +1504,7 @@ def test_crypto_freshness_watch_status_auto_refreshes_when_runner_is_active(
                             "RISK_MISSING",
                         ],
                         "spread": "0.0200",
-                        "what_would_make_paper_ready": [
-                            "Visible ask liquidity must appear."
-                        ],
+                        "what_would_make_paper_ready": ["Visible ask liquidity must appear."],
                     }
                 ],
             }
@@ -1510,14 +1550,9 @@ def test_crypto_freshness_watch_status_auto_refreshes_when_runner_is_active(
     assert status["book_probe"]["expected_value_label"] == "1.7 cents"
     assert status["book_probe"]["liquidity_label"] == "None"
     assert status["book_probe"]["spread_label"] == "2.0 cents"
-    assert status["book_probe"]["blockers_label"] == (
-        "Low edge, No liquidity, Risk missing"
-    )
+    assert status["book_probe"]["blockers_label"] == ("Low edge, No liquidity, Risk missing")
     assert "Visible ask liquidity" in status["book_probe"]["needed_label"]
-    assert (
-        "does not create exchange liquidity"
-        in status["book_probe"]["safety_label"]
-    )
+    assert "does not create exchange liquidity" in status["book_probe"]["safety_label"]
 
 
 def test_crypto_freshness_watch_status_uses_freshness_window_when_running(
@@ -1794,9 +1829,7 @@ def test_phase3bc_r5_status_marks_unattended_overrun(tmp_path, monkeypatch) -> N
     assert "phase3bc-r5-unattended-guard --stop-overrun" in payload["recommended_next_action"]
 
 
-def test_phase3bc_r5_status_respects_freshness_window_for_slow_cycle(
-    tmp_path, monkeypatch
-) -> None:
+def test_phase3bc_r5_status_respects_freshness_window_for_slow_cycle(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(phase3bc_r6, "_pid_matches_phase3bc_r5_watch", lambda pid: pid == 5151)
     output_dir = Path("reports/phase3bc_r5")
@@ -2122,7 +2155,7 @@ def test_phase3bc_r5_pid_exists_treats_permission_error_as_live(monkeypatch) -> 
     def deny_signal(_pid: int, _signal: int) -> None:
         raise PermissionError(1, "Operation not permitted")
 
-    monkeypatch.setattr(phase3bc_r6.os, "kill", deny_signal)
+    monkeypatch.setattr(phase3bc_r6, "os", SimpleNamespace(name="posix", kill=deny_signal))
     monkeypatch.setattr(phase3bc_r6, "_posix_pid_is_zombie", lambda _pid: False)
 
     assert phase3bc_r6._pid_exists(5151) is True
@@ -2132,7 +2165,7 @@ def test_phase3bc_r5_pid_exists_rejects_missing_process(monkeypatch) -> None:
     def missing_process(_pid: int, _signal: int) -> None:
         raise ProcessLookupError(3, "No such process")
 
-    monkeypatch.setattr(phase3bc_r6.os, "kill", missing_process)
+    monkeypatch.setattr(phase3bc_r6, "os", SimpleNamespace(name="posix", kill=missing_process))
 
     assert phase3bc_r6._pid_exists(5151) is False
 
@@ -2364,6 +2397,8 @@ def _row(
         "latest_forecast_at": latest_forecast_at or latest_ranking_at,
         "latest_ranking_at": latest_ranking_at,
     }
+
+
 def test_phase3bc_r5_snapshot_refresh_prioritizes_missing_before_stale_maintenance() -> None:
     tickers, _selection = phase3bc_r5._snapshot_refresh_selection(
         {

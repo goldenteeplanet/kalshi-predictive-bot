@@ -21,9 +21,11 @@ def update_history(
         if isinstance(row, dict) and row.get("observation_id")
     }
     refresh = collector.get("targeted_forecast_refresh", {})
-    targeted_rows = [
-        row for row in refresh.get("rows", []) if isinstance(row, dict)
-    ] if isinstance(refresh, dict) else []
+    targeted_rows = (
+        [row for row in refresh.get("rows", []) if isinstance(row, dict)]
+        if isinstance(refresh, dict)
+        else []
+    )
     targeted_events = {str(row.get("event_ticker")) for row in targeted_rows}
     cycle = str(collector.get("generated_at") or _digest(targeted_rows))
 
@@ -52,12 +54,8 @@ def update_history(
             "forecast_capture_lag_seconds": audit.get("forecast_capture_lag_seconds"),
             "coverage_id": audit.get("coverage_id"),
             "immediate_capture_attempted": bool(immediate_capture.get("attempted")),
-            "immediate_capture_within_budget": bool(
-                immediate_capture.get("within_latency_budget")
-            ),
-            "capture_latency_budget_seconds": immediate_capture.get(
-                "latency_budget_seconds"
-            ),
+            "immediate_capture_within_budget": bool(immediate_capture.get("within_latency_budget")),
+            "capture_latency_budget_seconds": immediate_capture.get("latency_budget_seconds"),
             "reasons": row.get("reasons", []),
         }
         existing[observation["observation_id"]] = observation
@@ -115,9 +113,11 @@ def wilson_interval(successes: int, sample_size: int) -> dict[str, float | int |
     rate = successes / sample_size
     denominator = 1.0 + z * z / sample_size
     center = (rate + z * z / (2.0 * sample_size)) / denominator
-    margin = z * math.sqrt(
-        rate * (1.0 - rate) / sample_size + z * z / (4.0 * sample_size**2)
-    ) / denominator
+    margin = (
+        z
+        * math.sqrt(rate * (1.0 - rate) / sample_size + z * z / (4.0 * sample_size**2))
+        / denominator
+    )
     return {
         "successes": successes,
         "sample_size": sample_size,
@@ -130,18 +130,16 @@ def wilson_interval(successes: int, sample_size: int) -> dict[str, float | int |
 def write_history(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(path)
 
 
-def _summarize_family(
-    family: str, observations: list[dict[str, Any]]
-) -> dict[str, Any]:
-    rows = observations if family == "ALL" else [
-        row for row in observations if str(row.get("family") or "UNKNOWN") == family
-    ]
+def _summarize_family(family: str, observations: list[dict[str, Any]]) -> dict[str, Any]:
+    rows = (
+        observations
+        if family == "ALL"
+        else [row for row in observations if str(row.get("family") or "UNKNOWN") == family]
+    )
     targeted = [row for row in rows if row.get("cohort") == "targeted"]
     forecasted = sum(row.get("forecast_succeeded") is True for row in targeted)
     targeted_alignment = [row for row in targeted if row.get("aligned") is not None]
@@ -176,9 +174,7 @@ def _summarize_family(
         "midpoint_probe_failures": sum(
             int(row.get("midpoint_probe_failures") or 0) for row in targeted
         ),
-        "one_sided_bound_uses": sum(
-            int(row.get("one_sided_bound_uses") or 0) for row in targeted
-        ),
+        "one_sided_bound_uses": sum(int(row.get("one_sided_bound_uses") or 0) for row in targeted),
         "immediate_captures_attempted": sum(
             bool(row.get("immediate_capture_attempted")) for row in targeted
         ),
@@ -239,9 +235,7 @@ def _timestamp(value: Any) -> datetime | None:
 
 def _sanitize_observation(row: dict[str, Any]) -> dict[str, Any]:
     sanitized = dict(row)
-    if sanitized.get("cohort") == "targeted" and not sanitized.get(
-        "forecast_succeeded"
-    ):
+    if sanitized.get("cohort") == "targeted" and not sanitized.get("forecast_succeeded"):
         sanitized["aligned"] = None
         sanitized["forecast_capture_lag_seconds"] = None
         sanitized["coverage_id"] = None

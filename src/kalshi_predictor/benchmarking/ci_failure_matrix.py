@@ -12,7 +12,6 @@ from kalshi_predictor.benchmarking.exposure_bundle import (
 )
 from kalshi_predictor.benchmarking.exposure_ci import DEFAULT_GOLDEN
 
-
 FAILURE_CASES = (
     "missing_artifact",
     "malformed_report",
@@ -22,9 +21,7 @@ FAILURE_CASES = (
 )
 
 
-def build_offline_ci_failure_mode_matrix(
-    project_root: Path, workspace: Path
-) -> dict[str, Any]:
+def build_offline_ci_failure_mode_matrix(project_root: Path, workspace: Path) -> dict[str, Any]:
     workspace.mkdir(parents=True, exist_ok=True)
     golden = project_root / DEFAULT_GOLDEN
     control = _validate_tree(project_root, golden)
@@ -80,12 +77,8 @@ def build_offline_ci_failure_mode_matrix(
     }
 
 
-def write_offline_ci_failure_mode_matrix(
-    project_root: Path, output_dir: Path
-) -> Path:
-    report = build_offline_ci_failure_mode_matrix(
-        project_root, output_dir / "failure_fixtures"
-    )
+def write_offline_ci_failure_mode_matrix(project_root: Path, output_dir: Path) -> Path:
+    report = build_offline_ci_failure_mode_matrix(project_root, output_dir / "failure_fixtures")
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / "pmb30_offline_ci_failure_mode_matrix.json"
     temporary = path.with_suffix(".json.tmp")

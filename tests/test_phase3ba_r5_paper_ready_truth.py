@@ -33,12 +33,10 @@ def test_phase3ba_r5_crypto_blocker_splits_execution_reasons() -> None:
         == "EXECUTABLE_BOOK_MISSING"
     )
     assert (
-        phase3ba_r5._crypto_blocker({"watch_state": "POSITIVE_EV_THIN_BOOK"})
-        == "LIQUIDITY_TOO_LOW"
+        phase3ba_r5._crypto_blocker({"watch_state": "POSITIVE_EV_THIN_BOOK"}) == "LIQUIDITY_TOO_LOW"
     )
     assert (
-        phase3ba_r5._crypto_blocker({"watch_state": "POSITIVE_EV_WIDE_SPREAD"})
-        == "SPREAD_TOO_WIDE"
+        phase3ba_r5._crypto_blocker({"watch_state": "POSITIVE_EV_WIDE_SPREAD"}) == "SPREAD_TOO_WIDE"
     )
 
 

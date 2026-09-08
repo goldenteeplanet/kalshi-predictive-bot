@@ -9,7 +9,6 @@ from kalshi_predictor.benchmarking.export_drift_trend import (
 )
 from kalshi_predictor.benchmarking.runtime_export_import import import_runtime_export_manifest
 
-
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -75,7 +74,9 @@ def test_pmb34f_rejects_duplicate_or_unordered_bundle_timestamps(tmp_path):
     ]
     path.write_text(json.dumps(source))
     report = build_export_drift_trend_preview(path)
-    assert any(code.startswith("DUPLICATE_BUNDLE_TIMESTAMP") for code in report["series_diagnostics"])
+    assert any(
+        code.startswith("DUPLICATE_BUNDLE_TIMESTAMP") for code in report["series_diagnostics"]
+    )
 
 
 def test_pmb34f_is_deterministic_local_and_disabled(tmp_path):

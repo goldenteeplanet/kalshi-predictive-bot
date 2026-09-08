@@ -125,9 +125,7 @@ def news_signals_from_feature(feature: NewsFeature) -> list[dict[str, Any]]:
                 strength=strength,
                 confidence=confidence,
                 direction=direction,
-                explanation=(
-                    f"{count} {category} news item(s) are linked to this market."
-                ),
+                explanation=(f"{count} {category} news item(s) are linked to this market."),
             )
         )
     return signals
@@ -162,9 +160,7 @@ def _signal_strength(
 ) -> Decimal:
     count_factor = min(Decimal(news_count) / Decimal("5"), Decimal("1"))
     value = (
-        max_importance * Decimal("45")
-        + freshness * Decimal("35")
-        + count_factor * Decimal("20")
+        max_importance * Decimal("45") + freshness * Decimal("35") + count_factor * Decimal("20")
     )
     return _clamp_score(value)
 
@@ -176,11 +172,7 @@ def _signal_confidence(
     freshness: Decimal,
 ) -> Decimal:
     sample = min(Decimal(news_count) / Decimal("3"), Decimal("1"))
-    value = (
-        freshness * Decimal("45")
-        + max_importance * Decimal("35")
-        + sample * Decimal("20")
-    )
+    value = freshness * Decimal("45") + max_importance * Decimal("35") + sample * Decimal("20")
     return _clamp_score(value)
 
 

@@ -17,20 +17,18 @@ def test_partial_snapshot_preserves_existing_exact_close_time(tmp_path) -> None:
     factory = get_session_factory(init_db(f"sqlite:///{tmp_path / 'preserve.db'}"))
     close = NOW + timedelta(hours=2)
     with factory() as session:
-        _seed_market_and_link(session, "WX-PRESERVE", close)
+        _seed_market_and_link(session, "KXTEMPNYCH-PRESERVE", close)
         insert_market_snapshot(
             session,
-            {"ticker": "WX-PRESERVE", "status": "open", "yes_bid_dollars": "0.4"},
+            {"ticker": "KXTEMPNYCH-PRESERVE", "status": "open", "yes_bid_dollars": "0.4"},
             {"orderbook_fp": {}},
             NOW,
         )
         session.flush()
-        assert session.get(Market, "WX-PRESERVE").close_time == close.replace(tzinfo=None)
-        rows = latest_snapshots_for_model(
-            session, model_name="weather_v2", as_of=NOW, limit=10
-        )
+        assert session.get(Market, "KXTEMPNYCH-PRESERVE").close_time == close.replace(tzinfo=None)
+        rows = latest_snapshots_for_model(session, model_name="weather_v2", as_of=NOW, limit=10)
     assert rows is not None
-    assert [row.ticker for row in rows] == ["WX-PRESERVE"]
+    assert [row.ticker for row in rows] == ["KXTEMPNYCH-PRESERVE"]
 
 
 def test_explicit_close_time_replacement_is_not_preserved(tmp_path) -> None:

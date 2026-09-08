@@ -180,11 +180,7 @@ def run_phase3bd_r3_economic_value_capture(
 ) -> dict[str, Any]:
     generated_at = utc_now()
     fetch_results = (value_fetcher or fetch_official_economic_values)()
-    observations = [
-        observation
-        for result in fetch_results
-        for observation in result.observations
-    ]
+    observations = [observation for result in fetch_results for observation in result.observations]
     inserted, skipped_existing = _insert_value_observations(session, observations)
     feature_summary = build_economic_features(session)
     discovery_payload = run_phase3bd_economic_market_discovery(
@@ -202,9 +198,7 @@ def run_phase3bd_r3_economic_value_capture(
         limit=opportunity_limit,
         output_path=opportunity_output_path,
     )
-    consensus_missing = sum(
-        1 for observation in observations if observation.forecast_value is None
-    )
+    consensus_missing = sum(1 for observation in observations if observation.forecast_value is None)
     payload = {
         "phase": "3BD-R3",
         "generated_at": generated_at.isoformat(),
@@ -278,11 +272,7 @@ def run_phase3bd_r4_verified_consensus_source(
             min_importance=min_importance,
         )
     )
-    observations = [
-        observation
-        for result in fetch_results
-        for observation in result.observations
-    ]
+    observations = [observation for result in fetch_results for observation in result.observations]
     inserted = skipped_existing = 0
     features_inserted = forecasts_inserted = rankings_inserted = 0
     markets_scanned = opportunities_detected = 0
@@ -498,8 +488,7 @@ def _fetch_trading_economics_consensus(
     end_date = (now + timedelta(days=days_ahead)).date().isoformat()
     country_slug = quote(country.lower(), safe="")
     url = (
-        f"https://api.tradingeconomics.com/calendar/country/{country_slug}/"
-        f"{start_date}/{end_date}"
+        f"https://api.tradingeconomics.com/calendar/country/{country_slug}/{start_date}/{end_date}"
     )
     try:
         response = client.get(
@@ -644,10 +633,7 @@ def _consensus_file_observation(
     if not source_url:
         return None, "source_url is required for verified consensus rows"
     event_time = parse_datetime(
-        row.get("event_time")
-        or row.get("date")
-        or row.get("timestamp")
-        or row.get("released_at")
+        row.get("event_time") or row.get("date") or row.get("timestamp") or row.get("released_at")
     )
     if event_time is None:
         return None, "event_time/date is required"
@@ -900,9 +886,7 @@ def _jobs_observation(
         return None
     actual_change = payroll_rows[latest_key] - payroll_rows[previous_key]
     previous_change = (
-        payroll_rows[previous_key] - payroll_rows[prior_key]
-        if prior_key in payroll_rows
-        else None
+        payroll_rows[previous_key] - payroll_rows[prior_key] if prior_key in payroll_rows else None
     )
     unemployment_rate = unemployment_rows.get(latest_key)
     year, month = latest_key
@@ -986,7 +970,7 @@ def _decimal(value: Any) -> Decimal | None:
 def _consensus_number(value: Any) -> str | None:
     if value is None or str(value).strip() in {"", "-", "None", "null"}:
         return None
-    if isinstance(value, (int, float, Decimal)):
+    if isinstance(value, int | float | Decimal):
         return decimal_to_str(value)
     text = str(value).strip().replace(",", "")
     multiplier = Decimal("1")
@@ -1127,8 +1111,7 @@ def _r4_recommended_next_action(
         return "Fix the verified consensus source/API credentials, then rerun Phase 3BD-R4."
     if not observations:
         return (
-            "No CPI/jobs/GDP/Fed consensus rows matched; widen date range or review "
-            "source mapping."
+            "No CPI/jobs/GDP/Fed consensus rows matched; widen date range or review source mapping."
         )
     if actual_consensus_rows == 0:
         return (

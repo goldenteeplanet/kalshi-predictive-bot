@@ -272,7 +272,9 @@ def _decimal_feature_map(values: dict[str, Any]) -> dict[str, Decimal]:
 
 def _source_watermarks(session: Session) -> SourceWatermarks:
     return SourceWatermarks(
-        market_memory_latest=_iso_or_none(session.scalar(select(func.max(MarketMemory.recorded_at)))),
+        market_memory_latest=_iso_or_none(
+            session.scalar(select(func.max(MarketMemory.recorded_at)))
+        ),
         forecast_memory_latest=_iso_or_none(
             session.scalar(select(func.max(ForecastMemory.recorded_at)))
         ),

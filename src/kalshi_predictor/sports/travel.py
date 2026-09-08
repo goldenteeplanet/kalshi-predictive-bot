@@ -11,4 +11,3 @@ def travel_edge(
 ) -> Decimal:
     del home_team_key, away_team_key
     return Decimal("0")
-

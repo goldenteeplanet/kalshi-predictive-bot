@@ -11,9 +11,17 @@ _SPEC.loader.exec_module(_MODULE)
 
 
 def test_exact_tickers_are_deduplicated_and_bounded() -> None:
-    payload = {"active_exact_tickers": ["B", "A", "B", "C"]}
+    payload = {"active_exact_tickers": ["WX-B", "WX-A", "WX-B", "WX-C"]}
 
-    assert _MODULE._exact_tickers(payload, 2) == ["B", "A"]
+    assert _MODULE._exact_tickers(payload, 2) == ["WX-B", "WX-A"]
+
+
+def test_exact_tickers_share_the_limit_across_series() -> None:
+    payload = {"active_exact_tickers": ["B-1", "B-2", "B-1", "A-1", "A-2"]}
+
+    assert _MODULE._exact_tickers(payload, 3) == ["A-1", "B-1", "A-2"]
+    assert _MODULE._exact_tickers(payload, 10) == ["A-1", "B-1", "A-2", "B-2"]
+    assert _MODULE._exact_tickers(payload, 0) == []
 
 
 def test_exact_tickers_requires_preparation_scope() -> None:

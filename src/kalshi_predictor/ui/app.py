@@ -9,12 +9,11 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy.exc import OperationalError
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.ui.routes import create_router
-
 
 logger = logging.getLogger("kalshi_predictor.ui.audit")
 _SAFE_PATH = re.compile(r"[^A-Za-z0-9_./-]")
@@ -34,10 +33,12 @@ def create_app(
         openapi_url=None if hardened else "/openapi.json",
     )
     allowed_hosts = [
-        host.strip() for host in os.environ.get(
+        host.strip()
+        for host in os.environ.get(
             "UI_ALLOWED_HOSTS",
             "127.0.0.1,localhost,testserver,kalshi-bot-01.taile570d1.ts.net,100.81.127.97",
-        ).split(",") if host.strip()
+        ).split(",")
+        if host.strip()
     ]
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
     static_dir = Path(__file__).parent / "static"
@@ -53,7 +54,10 @@ def create_app(
         except Exception:  # noqa: BLE001 - audit failed requests without leaking inputs.
             logger.exception(
                 "ui_audit request_id=%s method=%s path=%s status=500 latency_ms=%d",
-                request_id, request.method, safe_path, int((time.monotonic() - started) * 1000),
+                request_id,
+                request.method,
+                safe_path,
+                int((time.monotonic() - started) * 1000),
             )
             raise
         if request.url.path != "/api/dashboard/v1/stream":
@@ -61,7 +65,9 @@ def create_app(
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        )
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
         response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
         response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
@@ -76,7 +82,10 @@ def create_app(
         response.headers["X-Request-ID"] = request_id
         logger.info(
             "ui_audit request_id=%s method=%s path=%s status=%d latency_ms=%d",
-            request_id, request.method, safe_path, response.status_code,
+            request_id,
+            request.method,
+            safe_path,
+            response.status_code,
             int((time.monotonic() - started) * 1000),
         )
         return response

@@ -91,8 +91,7 @@ def render_live_readiness_report(decision: dict[str, Any]) -> str:
     )
     for row in blockers[:40]:
         lines.append(
-            f"| {row['control_id']} | {row['severity']} | {row['status']} | "
-            f"{row['title']} |"
+            f"| {row['control_id']} | {row['severity']} | {row['status']} | {row['title']} |"
         )
     if not blockers:
         lines.append("| n/a | n/a | n/a | No critical or high blockers. |")
@@ -168,4 +167,3 @@ def _recommended_next_action(decision: dict[str, Any]) -> str:
     if decision["decision"] == "NO_GO":
         return "Fix failed mandatory controls, collect fresh evidence, and rerun the review."
     return "Supply missing evidence for all critical and high controls, then rerun the review."
-

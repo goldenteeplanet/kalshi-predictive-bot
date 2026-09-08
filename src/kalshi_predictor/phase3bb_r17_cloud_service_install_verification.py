@@ -288,10 +288,7 @@ def _resolve_verification_target(
     db_path: str | None,
 ) -> CloudBootstrapTarget:
     target = dict(
-        r16.get("cloud_target")
-        or r13.get("cloud_target")
-        or r14.get("cloud_target")
-        or {}
+        r16.get("cloud_target") or r13.get("cloud_target") or r14.get("cloud_target") or {}
     )
     if target:
         context = {
@@ -423,9 +420,11 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         r5_pid = pids[0]
     guard_after = guard.get("after") if isinstance(guard, dict) else {}
     guard_after_guard = guard_after.get("guard") if isinstance(guard_after, dict) else {}
-    guard_status = (r5_guard or {}).get("status") or (guard_after_guard or {}).get(
-        "status"
-    ) or guard.get("status")
+    guard_status = (
+        (r5_guard or {}).get("status")
+        or (guard_after_guard or {}).get("status")
+        or guard.get("status")
+    )
     guard_should_stop = bool(
         (r5_guard or {}).get("should_stop")
         or (guard_after_guard or {}).get("should_stop")
@@ -566,8 +565,7 @@ def _verification_checks(
         ),
         _check(
             "r5_guard_healthy",
-            parsed.get("guard_status") == "RUNNING"
-            and parsed.get("guard_should_stop") is False,
+            parsed.get("guard_status") == "RUNNING" and parsed.get("guard_should_stop") is False,
             (
                 f"guard_status={parsed.get('guard_status')}, "
                 f"guard_should_stop={parsed.get('guard_should_stop')}."

@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 WORKFLOW = Path(".github/workflows/pmb28-offline-certification.yml")
 
 
@@ -27,8 +26,11 @@ def build_ci_workflow_integration_preview(project_root: Path) -> dict[str, Any]:
         ),
         "no_secret_reference": "secrets." not in text.lower(),
         "no_runtime_activation": all(
-            token not in text for token in (
-                "EXECUTION_ENABLED=true", "LIVE_EXECUTION_ENABLED=true", "policy_activated=true"
+            token not in text
+            for token in (
+                "EXECUTION_ENABLED=true",
+                "LIVE_EXECUTION_ENABLED=true",
+                "policy_activated=true",
             )
         ),
     }

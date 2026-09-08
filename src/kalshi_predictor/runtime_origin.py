@@ -58,8 +58,7 @@ def resolve_runtime_paths(
     report_root = _configured_path(resolved.kalshi_report_root) or runtime_root / "reports"
     ui_report_root = _configured_path(resolved.kalshi_ui_report_root) or report_root
     research_data_root = (
-        _configured_path(resolved.kalshi_research_data_root)
-        or runtime_root / "data" / "research"
+        _configured_path(resolved.kalshi_research_data_root) or runtime_root / "data" / "research"
     )
     writer_lock = (
         _configured_path(resolved.kalshi_writer_lock)

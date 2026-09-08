@@ -82,9 +82,7 @@ def link_crypto_markets(
         if current_unlinked_only:
             statement = statement.where(
                 Market.ticker.in_(
-                    select(MarketLeg.ticker)
-                    .where(MarketLeg.category == "crypto")
-                    .distinct()
+                    select(MarketLeg.ticker).where(MarketLeg.category == "crypto").distinct()
                 ),
                 ~Market.ticker.in_(select(CryptoMarketLink.ticker).distinct()),
                 current_market_predicate(),
@@ -262,9 +260,9 @@ def detect_crypto_market(
         market,
         resolved_legs,
     )
-    if (
-        target_symbol is not None or target_reason != "No crypto keyword match."
-    ) and ("target price" in _market_text(market).lower() or resolved_legs):
+    if (target_symbol is not None or target_reason != "No crypto keyword match.") and (
+        "target price" in _market_text(market).lower() or resolved_legs
+    ):
         return target_symbol, target_confidence, target_reason
     if terms.status == EXACT_LINK and terms.symbol is not None:
         normalized = _market_text(market).lower()
@@ -421,9 +419,7 @@ def _crypto_legs_by_ticker(
         if not tickers:
             return {}
         statement = statement.where(MarketLeg.ticker.in_(tickers))
-    rows = list(
-        session.scalars(statement)
-    )
+    rows = list(session.scalars(statement))
     grouped: dict[str, list[MarketLeg]] = {}
     for row in rows:
         grouped.setdefault(row.ticker, []).append(row)

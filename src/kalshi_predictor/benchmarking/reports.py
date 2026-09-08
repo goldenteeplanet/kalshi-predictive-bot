@@ -15,13 +15,19 @@ def write_regression_benchmark(output_dir: Path) -> Path:
     results = []
     for payload in synthetic_scenarios().values():
         episode = load_synthetic_episode(payload)
-        for agent in (PassiveAgent(), SeededRandomAgent(seed=7, trade_probability=0.5),
-                      MomentumAgent(threshold=Decimal("0.01"))):
+        for agent in (
+            PassiveAgent(),
+            SeededRandomAgent(seed=7, trade_probability=0.5),
+            MomentumAgent(threshold=Decimal("0.01")),
+        ):
             results.append(run_benchmark(episode, agent).as_dict())
     report = {
-        "phase": "PMB-4", "mode": "LOCAL_SYNTHETIC_READ_ONLY",
-        "database_writes": 0, "execution_enabled": False,
-        "source_code_copied": False, "bundled_external_data_used": False,
+        "phase": "PMB-4",
+        "mode": "LOCAL_SYNTHETIC_READ_ONLY",
+        "database_writes": 0,
+        "execution_enabled": False,
+        "source_code_copied": False,
+        "bundled_external_data_used": False,
         "results": results,
         "comparison": _comparison(results),
         "forecast_ranking_regression": compare_forecast_rankings(
@@ -46,8 +52,7 @@ def write_regression_benchmark(output_dir: Path) -> Path:
 def _comparison(results: list[dict]) -> dict:
     return {
         category: {
-            row["agent_name"]: row["metrics"]
-            for row in results if row["category"] == category
+            row["agent_name"]: row["metrics"] for row in results if row["category"] == category
         }
         for category in ("crypto", "weather", "sports")
     }

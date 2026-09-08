@@ -126,7 +126,12 @@ def _market_accepts_new_paper_order(
         return True
     if str(market.status or "").strip().lower() not in {"open", "active"}:
         return False
-    if session.get(Settlement, decision.ticker) is not None:
+    settlement = session.get(Settlement, decision.ticker)
+    if settlement is not None and (
+        settlement.settled_at is not None
+        or str(settlement.result or "").strip().lower() in {"yes", "no"}
+        or settlement.yes_settlement_value is not None
+    ):
         return False
     close_time = parse_datetime(market.close_time)
     if close_time is None:
@@ -308,9 +313,7 @@ def get_latest_forecast_per_ticker(
     ranked = statement.subquery()
     forecast = aliased(Forecast, ranked)
     return list(
-        session.scalars(
-            select(forecast).where(ranked.c.row_number == 1).order_by(forecast.ticker)
-        )
+        session.scalars(select(forecast).where(ranked.c.row_number == 1).order_by(forecast.ticker))
     )
 
 
@@ -327,9 +330,7 @@ def get_existing_order_for_forecast(session: Session, forecast_id: int) -> Paper
     for item in session.new:
         if isinstance(item, PaperOrder) and item.forecast_id == forecast_id:
             return item
-    return session.scalar(
-        select(PaperOrder).where(PaperOrder.forecast_id == forecast_id).limit(1)
-    )
+    return session.scalar(select(PaperOrder).where(PaperOrder.forecast_id == forecast_id).limit(1))
 
 
 def get_paper_summary(session: Session) -> PaperSummary:

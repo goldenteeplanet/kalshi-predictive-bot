@@ -136,9 +136,10 @@ def test_phase3bb_r33_blocks_when_r32_is_not_verified(tmp_path: Path) -> None:
     decision = payload["readiness_decision"]
     assert decision["status"] == "BLOCKED_PAPER_ONLY_OPERATIONS_READINESS"
     assert decision["first_failed_check"] == "r32_dashboard_scheduler_verified"
-    assert payload["r32_dashboard_scheduler_status"]["verification_decision"][
-        "status"
-    ] == "BLOCKED_PRIVATE_UI_SMOKE_NOT_VERIFIED"
+    assert (
+        payload["r32_dashboard_scheduler_status"]["verification_decision"]["status"]
+        == "BLOCKED_PRIVATE_UI_SMOKE_NOT_VERIFIED"
+    )
 
 
 def test_phase3bb_r33_cli_help_registered() -> None:

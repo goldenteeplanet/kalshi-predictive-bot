@@ -31,14 +31,10 @@ def _candidate_ticker_scope(path: Path | None, *, limit: int) -> list[str] | Non
     raw_tickers = manifest.get("tickers") if isinstance(manifest, dict) else None
     if not isinstance(raw_tickers, list) and isinstance(manifest, dict):
         raw_tickers = [
-            row.get("ticker")
-            for row in manifest.get("candidates") or []
-            if isinstance(row, dict)
+            row.get("ticker") for row in manifest.get("candidates") or [] if isinstance(row, dict)
         ]
     return list(
-        dict.fromkeys(
-            str(ticker).strip() for ticker in (raw_tickers or []) if str(ticker).strip()
-        )
+        dict.fromkeys(str(ticker).strip() for ticker in (raw_tickers or []) if str(ticker).strip())
     )[:limit]
 
 
@@ -70,9 +66,7 @@ def _phase3bc_r5_fast_path_command(argv: list[str] | None = None) -> int | None:
         from kalshi_predictor.roadmap.runtime_reports import write_runtime_roadmap_reports
 
         try:
-            freshness_minutes = int(
-                _fast_option_value(args, "--freshness-minutes", "15") or "15"
-            )
+            freshness_minutes = int(_fast_option_value(args, "--freshness-minutes", "15") or "15")
             market_limit = int(_fast_option_value(args, "--market-limit", "500") or "500")
             paper_order_limit = int(
                 _fast_option_value(args, "--paper-order-limit", "1000") or "1000"
@@ -399,6 +393,37 @@ from kalshi_predictor.personal_trader.service import (
     conversational_response,
     recommendation_audit_events,
 )
+from kalshi_predictor.phase4cd.coverage import replay_coverage_audit
+from kalshi_predictor.phase4cd.attribution import build_edge_attribution
+from kalshi_predictor.phase4cd.expansion import expand_verified_crypto_cohort
+from kalshi_predictor.phase4cd.lineage import (
+    audit_crypto_feature_lineage,
+    build_exact_slice_comparison,
+    build_event_level_comparison,
+)
+from kalshi_predictor.phase4cd.replay import run_research_replay
+from kalshi_predictor.phase4cd.prospective import (
+    capture_prospective_pairs,
+    prospective_status,
+    reconcile_prospective_pairs,
+)
+from kalshi_predictor.phase4cd.operations import (
+    capture_status_lineage,
+    handoff_funnel,
+    prospective_health_report,
+    run_capture_scheduler,
+    run_latest_handoff,
+)
+from kalshi_predictor.phase4cd.reports import (
+    ensemble_audit,
+    fast_settlement_candidates,
+    write_phase4cd_reports,
+)
+from kalshi_predictor.phase4cd.shadow import (
+    capture_shadow_decisions,
+    reconcile_shadow_settlements,
+)
+from kalshi_predictor.ingest.cycle_handoff import write_committed_cycle_artifact
 from kalshi_predictor.phase3aa import write_phase3aa_report
 from kalshi_predictor.phase3aa_r2 import write_phase3aa_r2_exact_settlement_harvest_report
 from kalshi_predictor.phase3aa_r3 import write_phase3aa_r3_residual_audit_report
@@ -440,7 +465,6 @@ from kalshi_predictor.phase3aj import write_phase3aj_report
 from kalshi_predictor.phase3aj_gap_closure import (
     write_composite_settlement_resolve_report,
     write_gap_closure_doctor_report,
-    write_market_data_refresh_status,
     write_paper_trade_funnel_report,
     write_phase_3aj_report,
     write_source_readiness_report,
@@ -804,9 +828,9 @@ from kalshi_predictor.phase3bc_r17 import (
     write_phase3bc_r17_crypto_liquidity_actionability_report,
 )
 from kalshi_predictor.phase3ax_r6 import (
-    write_phase3an_sports_blocker_report,
-    write_phase3aw_dashboard_truth_report,
-    write_phase3ax_gap_analysis_report,
+    write_phase3an_sports_blocker_report as write_phase3an_sports_blocker_artifact_report,
+    write_phase3aw_dashboard_truth_report as write_phase3aw_dashboard_truth_artifact_report,
+    write_phase3ax_gap_analysis_report as write_phase3ax_gap_analysis_artifact_report,
 )
 from kalshi_predictor.phase3y import (
     generate_phase3y_report,
@@ -827,6 +851,11 @@ from kalshi_predictor.paper_trading_gap import write_paper_trading_gap_analysis_
 from kalshi_predictor.professional_ux.reports import (
     generate_phase_3x_report,
     phase_3x_card,
+)
+from kalshi_predictor.professional_ux.operations import (
+    build_ops_status,
+    write_daily_close,
+    write_morning_briefing,
 )
 from kalshi_predictor.professional_ux.service import (
     DEFAULT_SHELL_STATUS_SNAPSHOT_PATH,
@@ -1231,10 +1260,12 @@ def _print_db_writer_monitor(payload: dict[str, object]) -> None:
     console.print(f"Current writer PID: {payload.get('current_writer_pid') or 'none'}")
     console.print(f"Command running: {payload.get('current_writer_command') or 'none'}")
     console.print(f"Elapsed time: {payload.get('current_writer_elapsed') or 'n/a'}")
-    console.print(
-        "Heartbeat status: "
-        f"{payload.get('long_job_heartbeat_display_status') or payload.get('long_job_heartbeat_status') or 'unknown'}"
+    heartbeat_status = (
+        payload.get("long_job_heartbeat_display_status")
+        or payload.get("long_job_heartbeat_status")
+        or "unknown"
     )
+    console.print(f"Heartbeat status: {heartbeat_status}")
     console.print(f"Heartbeat stage: {payload.get('long_job_stage') or 'none'}")
     console.print(f"Heartbeat age: {payload.get('long_job_heartbeat_age') or 'n/a'}")
     console.print(
@@ -1381,10 +1412,14 @@ def runtime_identity_command(
     ] = None,
 ) -> None:
     settings = get_settings()
-    engine = init_db()
+    # Runtime identity is a diagnostic, not a schema-management operation.  Avoid
+    # create_all() and the full SQLite integrity scan here: production databases
+    # can be tens of gigabytes, making an otherwise read-only identity probe look
+    # hung for many minutes.  ``db-health`` remains the explicit full audit.
+    engine = make_engine()
     session_factory = get_session_factory(engine)
     with session_factory() as session:
-        payload = runtime_identity(session, settings=settings)
+        payload = runtime_identity(session, settings=settings, include_integrity=False)
 
     console.print("Runtime identity")
     console.print(f"Repository root: {payload['repository_root']}")
@@ -4375,8 +4410,8 @@ def phase3an_general_sources_status_command(
     console.print(f"Wrote JSON: {artifacts.json_path}")
 
 
-@app.command("phase3an-sports-blocker-report")
-def phase3an_sports_blocker_report_command(
+@app.command("phase3an-sports-blocker-report-artifacts")
+def phase3an_sports_blocker_report_artifacts_command(
     output_dir: Annotated[
         Path,
         typer.Option(help="Directory for Phase 3AN sports blocker artifact."),
@@ -4387,7 +4422,7 @@ def phase3an_sports_blocker_report_command(
     ] = Path("reports"),
 ) -> None:
     """Explain sports placeholder/provenance blockers without upgrades."""
-    artifacts = write_phase3an_sports_blocker_report(
+    artifacts = write_phase3an_sports_blocker_artifact_report(
         output_dir=output_dir,
         reports_dir=reports_dir,
     )
@@ -9481,7 +9516,10 @@ def phase3bb_r26_cloud_ui_access_control_gate_command(
     auth_mode: Annotated[
         str,
         typer.Option(
-            help="Auth mode to evaluate: none, basic_auth, oauth_proxy, cloudflare_access, tailscale_funnel_auth."
+            help=(
+                "Auth mode to evaluate: none, basic_auth, oauth_proxy, cloudflare_access, "
+                "tailscale_funnel_auth."
+            )
         ),
     ] = "none",
     max_public_route_seconds: Annotated[
@@ -9543,7 +9581,10 @@ def phase3bb_r27_cloud_ui_private_access_auth_draft_command(
     preferred_access: Annotated[
         str,
         typer.Option(
-            help="Preferred private access mode: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."
+            help=(
+                "Preferred private access mode: ssh_tunnel, private_vpn, or "
+                "cloudflare_access_tunnel."
+            )
         ),
     ] = "private_vpn",
     operator_email: Annotated[
@@ -9608,7 +9649,10 @@ def phase3bb_r28_cloud_ui_private_access_operator_review_command(
     selected_access: Annotated[
         str | None,
         typer.Option(
-            help="Optional selected access override: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."
+            help=(
+                "Optional selected access override: ssh_tunnel, private_vpn, or "
+                "cloudflare_access_tunnel."
+            )
         ),
     ] = None,
 ) -> None:
@@ -10848,7 +10892,10 @@ def phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_command(
     reset_failed: Annotated[
         bool,
         typer.Option(
-            help="Clear the failed systemd service marker after installing; does not start the service."
+            help=(
+                "Clear the failed systemd service marker after installing; does not start "
+                "the service."
+            )
         ),
     ] = False,
     per_probe_timeout_seconds: Annotated[
@@ -10856,7 +10903,10 @@ def phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_command(
         typer.Option(help="Timeout for each bounded remote repair probe."),
     ] = 45,
 ) -> None:
-    """Repair scheduler writer-gate handling so mid-run BUSY_WRITER becomes a clean retry skip."""
+    (
+        """Repair scheduler writer-gate handling so mid-run"""
+        """ BUSY_WRITER becomes a clean retry skip."""
+    )
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -10971,7 +11021,10 @@ def phase3bb_r47_weather_current_window_series_discovery_linkability_repair_comm
         typer.Option(help="Timeout for each bounded remote linkability probe."),
     ] = 60,
 ) -> None:
-    """Discover current weather windows and repair the scheduler hook that feeds R12 linkability."""
+    (
+        """Discover current weather windows and repair the """
+        """scheduler hook that feeds R12 linkability."""
+    )
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -11844,7 +11897,10 @@ def phase3bb_r55_weather_ranking_path_retry_command(
         typer.Option(help="Timeout for each bounded remote probe."),
     ] = 60,
 ) -> None:
-    """Wait for R5 writer clear, rerun R53, then run R51 only while the weather window is live."""
+    (
+        """Wait for R5 writer clear, rerun R53, then run R5"""
+        """1 only while the weather window is live."""
+    )
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -11946,7 +12002,10 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
     min_minutes_before_target: Annotated[
         int,
         typer.Option(
-            help="Minimum lead time before weather target expiry before running the selected-window pipeline."
+            help=(
+                "Minimum lead time before weather target expiry before running the "
+                "selected-window pipeline."
+            )
         ),
     ] = 10,
     fresh_window_hours: Annotated[
@@ -11962,7 +12021,9 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
     max_records: Annotated[
         int,
         typer.Option(
-            help="Maximum R12 missing-link rows to apply if the current-window gate says it is safe."
+            help=(
+                "Maximum R12 missing-link rows to apply if the current-window gate says it is safe."
+            )
         ),
     ] = 25,
     limit: Annotated[
@@ -12242,7 +12303,9 @@ def phase3bb_r59_weather_catalog_refresh_r57_retry_command(
         typer.Option(help="Timeout for each bounded remote probe."),
     ] = 60,
 ) -> None:
-    """Wait for writer clear, refresh KXTEMPNYCH catalog, then rerun patched R57 if a future window exists."""
+    """Wait for writer clear, refresh KXTEMPNYCH catalog, then rerun patched R57
+    if a future window exists.
+    """
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -12370,7 +12433,10 @@ def phase3bb_r60_weather_next_window_lead_time_scheduler_repair_command(
     max_minutes_before_target: Annotated[
         int,
         typer.Option(
-            help="Maximum lead time before weather target expiry before waiting for a later scheduler tick."
+            help=(
+                "Maximum lead time before weather target expiry before waiting for a later "
+                "scheduler tick."
+            )
         ),
     ] = 90,
     fresh_window_hours: Annotated[
@@ -13100,6 +13166,13 @@ def phase3bc_r3_active_crypto_refresh_command(
             help="Generate the slower opportunity report during R3.",
         ),
     ] = True,
+    refresh_phase3bc_router: Annotated[
+        bool,
+        typer.Option(
+            "--refresh-phase3bc-router/--defer-phase3bc-router",
+            help="Refresh the slower Phase 3BC router inside this transaction.",
+        ),
+    ] = True,
     near_money_only: Annotated[
         bool,
         typer.Option(
@@ -13159,6 +13232,7 @@ def phase3bc_r3_active_crypto_refresh_command(
                 repair_snapshots=repair_snapshots,
                 forecast_current_windows_only=forecast_current_windows_only,
                 generate_opportunity_report=generate_opportunity_report,
+                refresh_phase3bc_router=refresh_phase3bc_router,
                 market_limit=market_limit,
                 market_max_pages=market_max_pages,
                 crypto_market_scan_limit=crypto_market_scan_limit,
@@ -13475,6 +13549,8 @@ def _release_phase3bc_r5_cycle_resources(session: Any, engine: Any) -> None:
             expunge_all()
     engine.dispose()
     gc.collect()
+    if sys.platform != "linux":
+        return
     try:
         import ctypes
 
@@ -15001,8 +15077,8 @@ def phase3an_sports_blocker_report_command(
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
-@app.command("phase3aw-dashboard-truth")
-def phase3aw_dashboard_truth_command(
+@app.command("phase3aw-dashboard-truth-artifacts")
+def phase3aw_dashboard_truth_artifacts_command(
     output_dir: Annotated[
         Path,
         typer.Option(help="Directory for Phase 3AW dashboard truth artifacts."),
@@ -15017,7 +15093,7 @@ def phase3aw_dashboard_truth_command(
     ] = 120,
 ) -> None:
     """Report whether sports provenance dashboard inputs are current."""
-    artifacts = write_phase3aw_dashboard_truth_report(
+    artifacts = write_phase3aw_dashboard_truth_artifact_report(
         output_dir=output_dir,
         reports_dir=reports_dir,
         stale_after_minutes=stale_after_minutes,
@@ -15029,8 +15105,8 @@ def phase3aw_dashboard_truth_command(
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
 
 
-@app.command("phase3ax-gap-analysis")
-def phase3ax_gap_analysis_command(
+@app.command("phase3ax-gap-analysis-artifacts")
+def phase3ax_gap_analysis_artifacts_command(
     output_dir: Annotated[
         Path,
         typer.Option(help="Directory for Phase 3AX-R6 gap analysis artifacts."),
@@ -15045,7 +15121,7 @@ def phase3ax_gap_analysis_command(
     ] = 120,
 ) -> None:
     """Separate exact safe sports repairs from diagnostic-only rows."""
-    artifacts = write_phase3ax_gap_analysis_report(
+    artifacts = write_phase3ax_gap_analysis_artifact_report(
         output_dir=output_dir,
         reports_dir=reports_dir,
         stale_after_minutes=stale_after_minutes,
@@ -15406,7 +15482,8 @@ def synthetic_markets_run_command(
             console.print("Phase 3R synthetic markets: BLOCKED")
             console.print(str(exc))
             console.print(
-                "Next action: create examples/synthetic_markets_candidates.json or rerun without "
+                "Next action: create examples/synthetic_markets_c"
+                "andidates.json or rerun without "
                 "--input-file."
             )
             raise typer.Exit(1) from exc
@@ -15607,7 +15684,8 @@ def rl_shadow_report_command(
         "# Phase 3S Shadow Report\n\n"
         f"- Recommendation: {recommendation.recommended_action}\n"
         f"- Baseline: {recommendation.baseline_action}\n"
-        "- Shadow mode changes no orders, quantities, Phase 3M requests, or Phase 3N decisions.\n",
+        "- Shadow mode changes no orders, quantities, Pha"
+        "se 3M requests, or Phase 3N decisions.\n",
         encoding="utf-8",
     )
     json_output.parent.mkdir(parents=True, exist_ok=True)
@@ -16177,6 +16255,56 @@ def phase_3x_audit_command(
     console.print(f"Phase 3X audit decision: {result['decision']}")
     console.print(f"Artifacts: {len(result['artifacts'])}")
     console.print("Release decision remains INCOMPLETE until evidence gates pass.")
+
+
+@app.command("ops-status")
+def ops_status_command() -> None:
+    """Show the read-only Phase 3X operator status and exact remediation actions."""
+    engine = _init_db_or_exit("Phase 3X operations status")
+    settings = get_settings()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        payload = build_ops_status(session, settings=settings)
+    console.print(f"Operations status: {payload['overall_status']}")
+    console.print(f"Environment: {payload['environment']}")
+    console.print(f"Execution mode: {payload['execution_mode']}")
+    for check in payload["checks"]:
+        console.print(f"[{check['status']}] {check['name']}")
+        console.print(f"  Why: {check['why_it_matters']}")
+        console.print(f"  Next: {check['next_action']}")
+    console.print("Live trading authorized: false")
+
+
+@app.command("morning-briefing")
+def morning_briefing_command(
+    output: Annotated[
+        Path,
+        typer.Option(help="Markdown morning briefing path."),
+    ] = Path("reports/morning_briefing.md"),
+) -> None:
+    engine = _init_db_or_exit("Phase 3X morning briefing")
+    settings = get_settings()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        report_path = write_morning_briefing(session, output_path=output, settings=settings)
+    console.print(f"Wrote morning briefing to {report_path}")
+    console.print("Live trading authorized: false")
+
+
+@app.command("daily-close")
+def daily_close_command(
+    output: Annotated[
+        Path,
+        typer.Option(help="Markdown daily close path."),
+    ] = Path("reports/daily_close.md"),
+) -> None:
+    engine = _init_db_or_exit("Phase 3X daily close")
+    settings = get_settings()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        report_path = write_daily_close(session, output_path=output, settings=settings)
+    console.print(f"Wrote daily close to {report_path}")
+    console.print("Live trading authorized: false")
 
 
 @app.command("ui-shell-status-refresh")
@@ -17123,9 +17251,13 @@ def gh1_websocket_orderbook_watch_command(
     persist_every_deltas: Annotated[
         int, typer.Option(help="Stage a checkpoint after this many applied deltas.")
     ] = 25,
-    status_path: Annotated[
-        Path, typer.Option(help="Filesystem heartbeat/status artifact.")
-    ] = Path("reports/phase_gh1/watch/status.json"),
+    status_path: Annotated[Path, typer.Option(help="Filesystem heartbeat/status artifact.")] = Path(
+        "reports/phase_gh1/watch/status.json"
+    ),
+    active_market_catalog_path: Annotated[
+        Path | None,
+        typer.Option(help="Filesystem-only bounded active-market rollover catalog."),
+    ] = None,
     preferred_tickers_path: Annotated[
         Path | None,
         typer.Option(help="Optional GH-2 actionable-ticker manifest."),
@@ -17170,6 +17302,7 @@ def gh1_websocket_orderbook_watch_command(
             reconnect_max_seconds=reconnect_max_seconds,
             persist_every_deltas=persist_every_deltas,
             status_path=status_path,
+            active_market_catalog_path=active_market_catalog_path,
             preferred_tickers_path=preferred_tickers_path,
             max_preferred_tickers=max_preferred_tickers,
             max_cycles=max_cycles or None,
@@ -17844,7 +17977,8 @@ def forecast_command(
         typer.Option(
             "--model",
             help=(
-                "Forecast model: market_implied_v1, weather_v1, weather_v2, crypto_v1, crypto_v2, "
+                "Forecast model: market_implied_v1, weather_v1, w"
+                "eather_v2, crypto_v1, crypto_v2, "
                 "economic_v1, news_v1, mlb_v1, nba_v1, nfl_v1, nhl_v1, sports_v1, "
                 "microstructure_v1, meta_model_v1, meta_ensemble_v1, ensemble_v1, "
                 "ensemble_v2, or all."
@@ -19493,7 +19627,10 @@ def link_crypto_markets_command(
     stop_after_minutes: Annotated[
         int,
         typer.Option(
-            help="Stop cleanly after N minutes and keep committed checkpoint batches. Use 0 for no limit."
+            help=(
+                "Stop cleanly after N minutes and keep committed checkpoint batches. Use 0 "
+                "for no limit."
+            )
         ),
     ] = 0,
     heartbeat_dir: Annotated[
@@ -19789,6 +19926,10 @@ def gh2_single_writer_decision_refresh_command(
         Path,
         typer.Option(help="Manifest consumed by the reconnecting GH-1 watch."),
     ] = Path("reports/phase_gh1/watch/actionable_tickers.json"),
+    active_market_catalog_path: Annotated[
+        Path | None,
+        typer.Option(help="GH-1 staged active-market catalog used for bounded rollover."),
+    ] = None,
     candidate_limit: Annotated[
         int,
         typer.Option(help="Maximum ranked tickers published to GH-1."),
@@ -19805,6 +19946,10 @@ def gh2_single_writer_decision_refresh_command(
         int,
         typer.Option(help="Maximum rankings/opportunities written per category."),
     ] = 100,
+    weather_decision_limit: Annotated[
+        int,
+        typer.Option(help="Maximum current weather tickers refreshed in the GH-2 writer."),
+    ] = 14,
     freshness_minutes: Annotated[
         int,
         typer.Option(help="Maximum snapshot/ranking age for fresh decision truth."),
@@ -19837,6 +19982,7 @@ def gh2_single_writer_decision_refresh_command(
         active_link_limit,
         forecast_limit,
         opportunity_limit,
+        weather_decision_limit,
         freshness_minutes,
         soak_cycles_required,
     )
@@ -19853,9 +19999,7 @@ def gh2_single_writer_decision_refresh_command(
 
     settings = get_settings()
     writer_monitor_at_start = db_writer_monitor(settings=settings)
-    if guard_active_writer and not bool(
-        writer_monitor_at_start.get("safe_to_start_write", True)
-    ):
+    if guard_active_writer and not bool(writer_monitor_at_start.get("safe_to_start_write", True)):
         current = writer_monitor_at_start.get("current_writer_command") or "unknown"
         console.print(f"Status: BLOCKED_ACTIVE_WRITER ({current})")
         raise typer.Exit(code=2)
@@ -19868,11 +20012,13 @@ def gh2_single_writer_decision_refresh_command(
         crypto_staging_dir=crypto_staging_dir,
         gh1_staging_dir=gh1_staging_dir,
         candidate_manifest_path=candidate_manifest_path,
+        active_market_catalog_path=active_market_catalog_path,
         settings=settings,
         candidate_limit=candidate_limit,
         active_link_limit=active_link_limit,
         forecast_limit=forecast_limit,
         opportunity_limit=opportunity_limit,
+        weather_decision_limit=weather_decision_limit,
         freshness_minutes=freshness_minutes,
         soak_cycles_required=soak_cycles_required,
         refresh_weather_gate=refresh_weather_gate,
@@ -20436,9 +20582,7 @@ def candidate_funnel_audit_command(
     )
 
     settings = get_settings()
-    engine = make_candidate_funnel_read_only_engine(
-        database_url_from_settings(settings)
-    )
+    engine = make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
     with session_factory() as session:
         artifacts = write_candidate_funnel_audit(
@@ -20453,6 +20597,165 @@ def candidate_funnel_audit_command(
     console.print("Order creation: disabled")
     console.print(f"Wrote JSON: {artifacts.json_path}")
     console.print(f"Wrote Markdown: {artifacts.markdown_path}")
+
+
+@app.command("no-opportunity-root-cause-audit")
+def no_opportunity_root_cause_audit_command(
+    runtime_worktree: Annotated[
+        Path,
+        typer.Option(help="Authoritative runtime checkout whose branch and SHA are fingerprinted."),
+    ],
+    runtime_reports_dir: Annotated[
+        Path,
+        typer.Option(help="Authoritative runtime reports directory."),
+    ],
+    env_path: Annotated[
+        Path,
+        typer.Option(help="Authoritative runtime .env containing the canonical database URL."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Prompt 1 Phase 0-3 read-only diagnostic output directory."),
+    ] = Path("reports/no_opportunity_root_cause"),
+    recent_limit: Annotated[
+        int,
+        typer.Option(help="Bounded recent snapshot, forecast, and ranking rows to inspect."),
+    ] = 5000,
+    allow_noncanonical: Annotated[
+        bool,
+        typer.Option(
+            help="Label an intentionally isolated empty/missing-env database noncanonical."
+        ),
+    ] = False,
+) -> None:
+    """Audit no-opportunity root causes; query-only and incapable of populating the database."""
+    from kalshi_predictor.no_opportunity_audit import (
+        write_no_opportunity_root_cause_audit,
+    )
+
+    if recent_limit < 100:
+        raise typer.BadParameter("recent-limit must be at least 100")
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: PAPER ONLY / SQLITE QUERY ONLY")
+    console.print("This audit does not fetch markets, books, forecasts, or rankings.")
+    artifacts = write_no_opportunity_root_cause_audit(
+        database_url=database_url,
+        output_dir=output_dir,
+        runtime_worktree=runtime_worktree,
+        runtime_reports_dir=runtime_reports_dir,
+        env_path=env_path,
+        recent_limit=recent_limit,
+        allow_noncanonical=allow_noncanonical,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote verdict: {artifacts.verdict_markdown}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
+@app.command("alpha-recovery-audit")
+def alpha_recovery_audit_command(
+    prompt1_dir: Annotated[
+        Path,
+        typer.Option(help="Completed no-opportunity Prompt 1 artifact directory."),
+    ] = Path("reports/no_opportunity_root_cause"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Prompt 2 shadow-only alpha-recovery output directory."),
+    ] = Path("reports/alpha_recovery"),
+    ranking_limit: Annotated[
+        int,
+        typer.Option(help="Maximum recent crypto rankings considered for replay."),
+    ] = 30000,
+    replay_limit: Annotated[
+        int,
+        typer.Option(help="Maximum isolated shadow decisions emitted."),
+    ] = 10000,
+    activation_approved: Annotated[
+        bool,
+        typer.Option(
+            help="Record explicit user approval; activation remains blocked until all gates pass."
+        ),
+    ] = False,
+) -> None:
+    """Run settlement replay and coverage/model experiments without guarded writes."""
+    from kalshi_predictor.alpha_recovery import write_alpha_recovery_reports
+
+    if ranking_limit < 100 or replay_limit < 100:
+        raise typer.BadParameter("ranking-limit and replay-limit must be at least 100")
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: SHADOW ONLY / SQLITE QUERY ONLY")
+    console.print(f"Explicit activation approval recorded: {activation_approved}")
+    console.print("Paper-order creation remains fail-closed until every readiness gate passes.")
+    artifacts = write_alpha_recovery_reports(
+        database_url=database_url,
+        prompt1_dir=prompt1_dir,
+        output_dir=output_dir,
+        ranking_limit=ranking_limit,
+        replay_limit=replay_limit,
+        activation_approved=activation_approved,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote paper readiness: {artifacts.paper_readiness}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
+@app.command("independent-domain-experiment")
+def independent_domain_experiment_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Phase 7 read-only domain selection and shadow report directory."),
+    ] = Path("reports/independent_domain_experiment"),
+) -> None:
+    """Rank independent domains and settlement-score the selected domain read-only."""
+    from kalshi_predictor.independent_domain_experiment import (
+        write_independent_domain_experiment,
+    )
+
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: PHASE 7 / SHADOW ONLY / SQLITE QUERY ONLY")
+    console.print("Paper/live/demo/autopilot and paper-order creation remain blocked.")
+    artifacts = write_independent_domain_experiment(
+        database_url=database_url,
+        output_dir=output_dir,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote domain ranking: {artifacts.domain_ranking}")
+    console.print(f"Wrote readiness: {artifacts.readiness}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
+
+
+@app.command("weather-alpha-validation")
+def weather_alpha_validation_command(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Weather settlement-lineage and shadow-validation reports."),
+    ] = Path("reports/weather_alpha_validation"),
+) -> None:
+    """Audit weather settlement gaps and walk-forward evidence query-only."""
+    from kalshi_predictor.weather_alpha_validation import write_weather_alpha_validation
+
+    settings = get_settings()
+    database_url = database_url_from_settings(settings)
+    console.print(f"Resolved database URL: {database_url}")
+    console.print("Mode: WEATHER SHADOW VALIDATION / SQLITE QUERY ONLY")
+    console.print(
+        "Settlement writes are delegated to the existing serialized sync-settlements job."
+    )
+    console.print("Paper/live/demo/autopilot and paper-order creation remain blocked.")
+    artifacts = write_weather_alpha_validation(
+        database_url=database_url,
+        output_dir=output_dir,
+    )
+    console.print("Guarded paper and exchange writes: 0")
+    console.print(f"Wrote settlement gap audit: {artifacts.gap_audit}")
+    console.print(f"Wrote readiness: {artifacts.readiness}")
+    console.print(f"Wrote next prompt: {artifacts.next_prompt}")
 
 
 @app.command("candidate-coverage-audit")
@@ -20490,9 +20793,7 @@ def candidate_coverage_audit_command(
     if freshness_minutes < 1 or addition_limit < 1:
         raise typer.BadParameter("freshness-minutes and addition-limit must be positive")
     settings = get_settings()
-    engine = make_candidate_funnel_read_only_engine(
-        database_url_from_settings(settings)
-    )
+    engine = make_candidate_funnel_read_only_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
     with session_factory() as session:
         artifacts = write_candidate_coverage_audit(
@@ -20616,9 +20917,7 @@ def catalog_lineage_repair_command(
     if deadline_seconds < 1:
         raise typer.BadParameter("deadline-seconds must be positive")
     if apply and (accepted_plan is None or accepted_plan_sha256 is None):
-        raise typer.BadParameter(
-            "--apply requires --accepted-plan and --accepted-plan-sha256"
-        )
+        raise typer.BadParameter("--apply requires --accepted-plan and --accepted-plan-sha256")
     if not apply and (accepted_plan is not None or accepted_plan_sha256 is not None):
         raise typer.BadParameter("accepted-plan options are apply-only")
     try:
@@ -20866,6 +21165,365 @@ def leaderboard_command(
         session.commit()
     console.print(f"Wrote model leaderboard report to {report_path}")
     console.print(f"Models compared: {len(result.rows)}")
+
+
+@app.command("research-replay")
+def research_replay_command(
+    model: Annotated[str, typer.Option(help="Forecast model to replay.")],
+    category: Annotated[str, typer.Option(help="Category or 'all'.")] = "all",
+    start_date: Annotated[str | None, typer.Option(help="Inclusive YYYY-MM-DD start.")] = None,
+    end_date: Annotated[str | None, typer.Option(help="Inclusive YYYY-MM-DD end.")] = None,
+    limit: Annotated[int, typer.Option(help="Maximum rows in this checkpointed batch.")] = 1000,
+    resume: Annotated[bool, typer.Option(help="Resume the matching checkpointed run.")] = False,
+    require_verified_lineage: Annotated[
+        bool,
+        typer.Option(help="Replay only forecasts with verified/reconstructable lineage."),
+    ] = False,
+) -> None:
+    from datetime import date
+
+    parsed_start = date.fromisoformat(start_date) if start_date else None
+    parsed_end = date.fromisoformat(end_date) if end_date else None
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        result = run_research_replay(
+            session,
+            model=model,
+            category=category,
+            start_date=parsed_start,
+            end_date=parsed_end,
+            limit=limit,
+            resume=resume,
+            require_verified_lineage=require_verified_lineage,
+        )
+    console.print(json.dumps(result.__dict__, indent=2))
+    console.print("Lane: HISTORICAL_REPLAY (paper counters untouched)")
+
+
+@app.command("replay-coverage-audit")
+def replay_coverage_audit_command(
+    run_id: Annotated[str | None, typer.Option(help="Optional research run ID.")] = None,
+) -> None:
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        payload = replay_coverage_audit(session, run_id=run_id)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Calibration metrics are non-trade evidence; executable P&L remains separate.")
+
+
+@app.command("crypto-lineage-audit")
+def crypto_lineage_audit_command(
+    source_db: Annotated[
+        Path,
+        typer.Option(help="Read-only canonical source SQLite database."),
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_engine = make_sqlite_read_only_engine(f"sqlite:///{source_db}")
+    source_factory = get_session_factory(source_engine)
+    with research_factory() as research, source_factory() as source:
+        payload = audit_crypto_feature_lineage(research, source)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Fabricated features: 0")
+
+
+@app.command("evidence-expand-crypto")
+def evidence_expand_crypto_command(
+    source_db: Annotated[
+        Path,
+        typer.Option(help="Read-only canonical source SQLite database."),
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    max_events: Annotated[int, typer.Option(help="Maximum new independent events.")] = 25,
+    scan_limit: Annotated[int, typer.Option(help="Maximum source forecasts per batch.")] = 20000,
+    resume: Annotated[bool, typer.Option(help="Resume matching checkpointed partition.")] = False,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        payload = expand_verified_crypto_cohort(
+            research,
+            source,
+            max_independent_events=max_events,
+            scan_limit=scan_limit,
+            resume=resume,
+        )
+    console.print(json.dumps(payload.__dict__, indent=2))
+    console.print("Original frozen cohort unchanged; source opened read-only.")
+
+
+@app.command("executable-edge-attribution")
+def executable_edge_attribution_command(
+    run_id: Annotated[str, typer.Option(help="Research replay run ID.")],
+) -> None:
+    session_factory = get_session_factory(init_db())
+    with session_factory() as session:
+        payload = build_edge_attribution(session, run_id=run_id)
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("event-calibration-compare")
+def event_calibration_compare_command(
+    market_run: Annotated[str, typer.Option(help="market_implied_v1 run ID.")],
+    crypto_run: Annotated[str, typer.Option(help="crypto_v2 run ID.")],
+) -> None:
+    session_factory = get_session_factory(init_db())
+    with session_factory() as session:
+        payload = build_event_level_comparison(
+            session,
+            model_runs={"market_implied_v1": market_run, "crypto_v2": crypto_run},
+        )
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("exact-slice-compare")
+def exact_slice_compare_command(
+    partition_id: Annotated[str, typer.Option(help="Expansion partition ID.")],
+    market_run: Annotated[str, typer.Option(help="market_implied_v1 run ID.")],
+    crypto_run: Annotated[str, typer.Option(help="crypto_v2 run ID.")],
+) -> None:
+    session_factory = get_session_factory(init_db())
+    with session_factory() as session:
+        payload = build_exact_slice_comparison(
+            session,
+            partition_id=partition_id,
+            market_run_id=market_run,
+            crypto_run_id=crypto_run,
+        )
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("runtime-deployment-origin")
+def runtime_deployment_origin_command(
+    manifest: Annotated[
+        Path | None,
+        typer.Option(help="Optional deployment manifest path."),
+    ] = None,
+) -> None:
+    candidates = [
+        manifest,
+        Path(".kalshi-deployment.json"),
+        Path("/home/james/kalshi-runtime-src/.kalshi-deployment.json"),
+    ]
+    selected = next((path for path in candidates if path and path.is_file()), None)
+    if selected is None:
+        console.print("Runtime origin: UNKNOWN")
+        raise typer.Exit(1)
+    payload = json.loads(selected.read_text(encoding="utf-8"))
+    console.print("Runtime origin")
+    console.print(f"Git SHA: {payload.get('git_sha') or 'unknown'}")
+    console.print(f"Source root: {payload.get('source_root') or 'unknown'}")
+    console.print(f"Runtime root: {payload.get('runtime_root') or 'unknown'}")
+    console.print(f"Deployed at: {payload.get('deployed_at') or 'unknown'}")
+    console.print(f"Manifest: {selected.resolve()}")
+
+
+@app.command("paired-evidence-capture")
+def paired_evidence_capture_command(
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    limit: Annotated[int, typer.Option(help="Maximum open snapshots in this batch.")] = 1000,
+    resume: Annotated[
+        bool, typer.Option(help="Resume the deterministic composite cursor.")
+    ] = False,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        result = capture_prospective_pairs(research, source, limit=limit, resume=resume)
+    console.print(json.dumps(result.__dict__, indent=2))
+    console.print("Lane: PROSPECTIVE_RESEARCH; zero future skew; settlements not queried.")
+
+
+@app.command("paired-evidence-status")
+def paired_evidence_status_command() -> None:
+    with get_session_factory(init_db())() as research:
+        console.print(json.dumps(prospective_status(research), indent=2))
+
+
+@app.command("paired-evidence-health")
+def paired_evidence_health_command(
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        report = prospective_health_report(research, source)
+    console.print(json.dumps(report.__dict__, indent=2))
+
+
+@app.command("paired-evidence-status-lineage")
+def paired_evidence_status_lineage_command(
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    sample_limit: Annotated[int, typer.Option(help="Bounded latest-cycle sample size.")] = 100,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        payload = capture_status_lineage(research, source, sample_limit=sample_limit)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Source database read-only; closed/settled statuses remain ineligible.")
+
+
+@app.command("paired-evidence-scheduler")
+def paired_evidence_scheduler_command(
+    owner_id: Annotated[str, typer.Option(help="Stable scheduler instance identity.")],
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    cycles: Annotated[int, typer.Option(help="Bounded capture cycles.")] = 1,
+    batch_limit: Annotated[int, typer.Option(help="Maximum snapshots per cycle.")] = 250,
+    interval_seconds: Annotated[float, typer.Option(help="Delay between bounded cycles.")] = 30,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        payload = run_capture_scheduler(
+            research,
+            source,
+            owner_id=owner_id,
+            cycles=cycles,
+            batch_limit=batch_limit,
+            interval_seconds=interval_seconds,
+        )
+    console.print(json.dumps(payload, indent=2))
+    console.print("Research-only scheduler; GH-2 and execution modules are not invoked.")
+
+
+@app.command("paired-evidence-handoff")
+def paired_evidence_handoff_command(
+    owner_id: Annotated[str, typer.Option(help="Stable research sidecar identity.")],
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    batch_limit: Annotated[int, typer.Option(help="Bounded exact-cycle capture limit.")] = 250,
+    artifact_path: Annotated[
+        Path | None, typer.Option(help="Optional validated committed-cycle metadata artifact.")
+    ] = None,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        payload = run_latest_handoff(
+            research,
+            source,
+            owner_id=owner_id,
+            batch_limit=batch_limit,
+            artifact_path=artifact_path,
+        )
+        payload["funnel"] = handoff_funnel(research)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Polling sidecar only; production collector and GH-2 remain unmodified.")
+
+
+@app.command("snapshot-cycle-artifact")
+def snapshot_cycle_artifact_command(
+    output: Annotated[Path, typer.Option(help="Atomic generic cycle artifact path.")],
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+) -> None:
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with source_factory() as source:
+        payload = write_committed_cycle_artifact(source, output_path=output)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Metadata only; source database opened read-only.")
+
+
+@app.command("paired-evidence-reconcile")
+def paired_evidence_reconcile_command(
+    source_db: Annotated[
+        Path, typer.Option(help="Read-only runtime source SQLite database.")
+    ] = Path("/home/james/kalshi-predictive-bot-data/kalshi_phase1.db"),
+    limit: Annotated[int, typer.Option(help="Maximum captured pairs to inspect.")] = 5000,
+) -> None:
+    research_factory = get_session_factory(init_db())
+    source_factory = get_session_factory(make_sqlite_read_only_engine(f"sqlite:///{source_db}"))
+    with research_factory() as research, source_factory() as source:
+        payload = reconcile_prospective_pairs(research, source, limit=limit)
+    console.print(json.dumps(payload, indent=2))
+    console.print("Calibration-only and executable attribution remain separately labeled.")
+
+
+@app.command("shadow-capture")
+def shadow_capture_command(
+    model: Annotated[str | None, typer.Option(help="Optional model filter.")] = None,
+    limit: Annotated[int, typer.Option(help="Maximum current forecasts to inspect.")] = 1000,
+    max_age_minutes: Annotated[int, typer.Option(help="Maximum input age.")] = 30,
+) -> None:
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        result = capture_shadow_decisions(
+            session,
+            model=model,
+            limit=limit,
+            max_age_minutes=max_age_minutes,
+        )
+    console.print(json.dumps(result.__dict__, indent=2))
+    console.print("Lane: SHADOW (guarded paper tables untouched)")
+
+
+@app.command("shadow-settlement-reconcile")
+def shadow_settlement_reconcile_command(
+    limit: Annotated[int, typer.Option(help="Maximum open shadow decisions.")] = 5000,
+) -> None:
+    engine = init_db()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        result = reconcile_shadow_settlements(session, limit=limit)
+    console.print(json.dumps(result.__dict__, indent=2))
+    console.print("Join policy: exact ticker canonical settlement")
+
+
+@app.command("ensemble-audit")
+def ensemble_audit_command(
+    model: Annotated[str, typer.Option(help="Ensemble model name.")] = "ensemble_v2",
+    output: Annotated[Path | None, typer.Option(help="Optional JSON output path.")] = None,
+) -> None:
+    engine = make_sqlite_read_only_engine()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        payload = ensemble_audit(session, model=model)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("fast-settlement-candidates")
+def fast_settlement_candidates_command(
+    limit: Annotated[int, typer.Option(help="Maximum ranked candidates.")] = 100,
+    output: Annotated[Path | None, typer.Option(help="Optional JSON output path.")] = None,
+) -> None:
+    engine = make_sqlite_read_only_engine()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        payload = fast_settlement_candidates(session, limit=limit)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    console.print(json.dumps(payload, indent=2))
+
+
+@app.command("phase4cd-report")
+def phase4cd_report_command(
+    output_dir: Annotated[Path, typer.Option(help="Phase 4C/4D report directory.")] = Path(
+        "reports/phase4cd"
+    ),
+) -> None:
+    engine = make_sqlite_read_only_engine()
+    session_factory = get_session_factory(engine)
+    with session_factory() as session:
+        paths = write_phase4cd_reports(session, output_dir=output_dir)
+    for path in paths:
+        console.print(f"Wrote {path}")
 
 
 _install_friendly_cli_error_handlers()

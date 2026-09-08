@@ -113,8 +113,13 @@
           <th scope="col">Market</th>
           <th scope="col">Raw EV</th>
           <th scope="col">Executable EV</th>
+          <th scope="col">Source</th>
+          <th scope="col">Quote age</th>
+          <th scope="col">Spread</th>
           <th scope="col">Liquidity score</th>
           <th scope="col">Book</th>
+          <th scope="col">Ranking</th>
+          <th scope="col">Risk</th>
           <th scope="col">Failed gate</th>
           <th scope="col">Next action</th>
         </tr>
@@ -125,10 +130,67 @@
           <td><a href="{{ candidate.detail_href }}"><strong>{{ candidate.ticker }}</strong></a></td>
           <td>{{ candidate.raw_ev_label }}</td>
           <td>{{ candidate.executable_ev_label }}</td>
+          <td>{{ candidate.source_label }}</td>
+          <td>{{ candidate.quote_age_label }}</td>
+          <td>{{ candidate.spread_label }}</td>
           <td>{{ candidate.liquidity_score }}</td>
           <td>{{ candidate.book_label }}</td>
+          <td>{{ candidate.ranking_label }}</td>
+          <td>{{ candidate.risk_label }}</td>
           <td>{{ candidate.failed_gate_label }}</td>
           <td>{{ candidate.next_action }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if gh3_soak.candidate_diagnostics %}
+<section class="section-band compact-band" aria-labelledby="candidate-diagnostics-title">
+  <div class="section-head">
+    <div>
+      <h2 id="candidate-diagnostics-title">Candidate Gate Diagnostics</h2>
+      <p class="muted">Every observed decision gate is shown without bypassing paper-only safety.</p>
+    </div>
+  </div>
+  <div class="table-wrap professional-table">
+    <table>
+      <caption class="sr-only">Crypto and weather candidate gate diagnostics</caption>
+      <thead>
+        <tr>
+          <th scope="col">Category</th>
+          <th scope="col">Market</th>
+          <th scope="col">Source</th>
+          <th scope="col">Book</th>
+          <th scope="col">Quote age</th>
+          <th scope="col">Raw EV</th>
+          <th scope="col">Executable EV</th>
+          <th scope="col">Spread</th>
+          <th scope="col">Liquidity</th>
+          <th scope="col">Ranking</th>
+          <th scope="col">Risk</th>
+          <th scope="col">Expired</th>
+          <th scope="col">Failed gates</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for candidate in gh3_soak.candidate_diagnostics %}
+        <tr>
+          <td>{{ candidate.category_label }}</td>
+          <td><a href="{{ candidate.detail_href }}"><strong>{{ candidate.ticker }}</strong></a></td>
+          <td>{{ candidate.source_label }}</td>
+          <td>{{ candidate.book_label }}</td>
+          <td>{{ candidate.quote_age_label }}</td>
+          <td>{{ candidate.raw_ev_label }}</td>
+          <td>{{ candidate.executable_ev_label }}</td>
+          <td>{{ candidate.spread_label }}</td>
+          <td>{{ candidate.liquidity_label }}</td>
+          <td>{{ candidate.ranking_label }}</td>
+          <td>{{ candidate.risk_label }}</td>
+          <td>{{ 'Yes' if candidate.expired else 'No' }}</td>
+          <td>{{ candidate.failed_gate_label }}</td>
         </tr>
       {% endfor %}
       </tbody>
@@ -165,6 +227,11 @@
     <div><span>Paper-ready now</span><strong>{{ gh3_soak.current_paper_ready_candidates }}</strong></div>
     <div><span>Positive EV</span><strong>{{ gh3_soak.positive_ev_rows }}</strong></div>
     <div><span>Fresh rankings</span><strong>{{ gh3_soak.fresh_ranked_candidates }}</strong></div>
+    <div><span>Coverage quality</span><strong>{{ 'Pass' if gh3_soak.quality_gates_passed else 'Blocked' }}</strong></div>
+    <div><span>Current crypto</span><strong>{{ gh3_soak.soak_quality.observed.current_crypto_windows|default(0) }}</strong></div>
+    <div><span>Fresh crypto</span><strong>{{ gh3_soak.soak_quality.observed.fresh_crypto_windows|default(0) }}</strong></div>
+    <div><span>Current weather</span><strong>{{ gh3_soak.soak_quality.observed.current_weather_links|default(0) }}</strong></div>
+    <div><span>Fresh manifest</span><strong>{{ gh3_soak.soak_quality.observed.fresh_manifest_candidates|default(0) }} / {{ gh3_soak.soak_quality.observed.manifest_candidates|default(0) }}</strong></div>
     <div><span>Reconnect health</span><strong>{{ gh3_soak.reconnect.status }}</strong></div>
     <div><span>Latest reset</span><strong>{{ gh3_soak.latest_reset_reason }}</strong></div>
   </div>

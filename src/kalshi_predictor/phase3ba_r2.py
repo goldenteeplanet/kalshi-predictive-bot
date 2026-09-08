@@ -321,9 +321,7 @@ def _current_weather_links(
     tickers: list[str] | tuple[str, ...] | None = None,
 ) -> list[WeatherMarketLink]:
     ticker_scope = list(
-        dict.fromkeys(
-            str(ticker).strip() for ticker in (tickers or ()) if str(ticker).strip()
-        )
+        dict.fromkeys(str(ticker).strip() for ticker in (tickers or ()) if str(ticker).strip())
     )
     if tickers is not None and not ticker_scope:
         return []
@@ -392,9 +390,7 @@ def _row_payload(
         "liquidity": ranking.liquidity if ranking is not None else None,
         "liquidity_score": ranking.liquidity_score if ranking is not None else None,
         "time_to_close_minutes": ranking.time_to_close_minutes if ranking is not None else None,
-        "model_confidence_score": (
-            ranking.model_confidence_score if ranking is not None else None
-        ),
+        "model_confidence_score": (ranking.model_confidence_score if ranking is not None else None),
         "ranking_reason": ranking.reason if ranking is not None else None,
         "settlement_terms_known": _settlement_terms_known(raw_market, ranking),
     }
@@ -426,10 +422,7 @@ def _first_weather_blocker(row: dict[str, Any], *, settings: Settings) -> str:
     if edge < settings.opportunity_min_edge or score < settings.opportunity_min_score:
         return "RISK_NOT_ELIGIBLE"
     time_to_close = to_decimal(row.get("time_to_close_minutes"))
-    if (
-        time_to_close is not None
-        and time_to_close < settings.opportunity_min_time_to_close_minutes
-    ):
+    if time_to_close is not None and time_to_close < settings.opportunity_min_time_to_close_minutes:
         return "RISK_NOT_ELIGIBLE"
     return "PAPER_GATE_READY"
 
@@ -466,17 +459,13 @@ def _summary(rows: list[dict[str, Any]], *, writer: dict[str, Any]) -> dict[str,
         "links_with_current_weather_forecasts": sum(
             1 for row in rows if row["has_current_forecast"]
         ),
-        "links_with_current_weather_rankings": sum(
-            1 for row in rows if row["has_current_ranking"]
-        ),
+        "links_with_current_weather_rankings": sum(1 for row in rows if row["has_current_ranking"]),
         "snapshot_gap_rows": sum(1 for row in rows if not row["has_snapshot"]),
         "forecast_gap_rows": sum(
             1 for row in rows if row["has_snapshot"] and not row["has_current_forecast"]
         ),
         "ranking_gap_rows": sum(
-            1
-            for row in rows
-            if row["has_current_forecast"] and not row["has_current_ranking"]
+            1 for row in rows if row["has_current_forecast"] and not row["has_current_ranking"]
         ),
         "paper_gate_ready_rows": blockers.get("PAPER_GATE_READY", 0),
         "first_hard_blocker_counts": blockers,
@@ -504,9 +493,10 @@ def _empty_weather_summary(*, writer: dict[str, Any]) -> dict[str, Any]:
 def _status(*, before_summary: dict[str, Any], after_summary: dict[str, Any]) -> str:
     if after_summary["current_weather_links"] == 0:
         return "NO_CURRENT_WEATHER_LINKS"
-    if after_summary["links_with_current_weather_rankings"] > before_summary[
-        "links_with_current_weather_rankings"
-    ]:
+    if (
+        after_summary["links_with_current_weather_rankings"]
+        > before_summary["links_with_current_weather_rankings"]
+    ):
         return "WEATHER_RANKINGS_ACTIVATED"
     if after_summary["ranking_gap_rows"] < before_summary["ranking_gap_rows"]:
         return "WEATHER_RANKING_GAP_REDUCED"
@@ -768,9 +758,7 @@ def _latest_forecast_iso(session: Session) -> str | None:
 
 def _latest_ranking_iso(session: Session) -> str | None:
     value = session.scalar(
-        select(func.max(MarketRanking.ranked_at)).where(
-            MarketRanking.forecast_model == MODEL_NAME
-        )
+        select(func.max(MarketRanking.ranked_at)).where(MarketRanking.forecast_model == MODEL_NAME)
     )
     return value.isoformat() if hasattr(value, "isoformat") else value
 

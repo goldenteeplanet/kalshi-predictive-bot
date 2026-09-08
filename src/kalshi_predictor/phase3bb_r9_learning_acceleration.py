@@ -368,9 +368,7 @@ def _replay_candidates(
             .group_by(BacktestRun.model_name)
         ).all()
     )
-    calibration_by_model = {
-        row["model_name"]: row for row in calibration.get("model_rows", [])
-    }
+    calibration_by_model = {row["model_name"]: row for row in calibration.get("model_rows", [])}
     models = sorted(
         set(forecast_counts)
         | set(ranking_counts)
@@ -606,8 +604,7 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             "- Real settled paper trades: "
             f"`{summary['real_settled_paper_trades']} / "
             f"{summary['target_settled_paper_trades']}`",
-            "- Historical replay candidate rows: "
-            f"`{summary['historical_replay_candidate_rows']}`",
+            f"- Historical replay candidate rows: `{summary['historical_replay_candidate_rows']}`",
             f"- Backtest-only rows: `{summary['backtest_only_rows']}`",
             "- Replay rows counted as real paper learning: "
             f"`{summary['replay_rows_counted_as_real_paper_learning']}`",
@@ -682,9 +679,7 @@ def _render_learning_acceleration(payload: dict[str, Any]) -> str:
     for row in payload["replay_candidates"][:10]:
         lines.append(
             "| {category} | {model_name} | {settled_forecast_rows} | "
-            "{backtest_only_rows} | {brier_score} | {accuracy} | {replay_readiness} |".format(
-                **row
-            )
+            "{backtest_only_rows} | {brier_score} | {accuracy} | {replay_readiness} |".format(**row)
         )
     if not payload["replay_candidates"]:
         lines.append("| n/a | n/a | 0 | 0 |  |  | NO_REPLAY_DATA |")

@@ -134,7 +134,9 @@ def write_phase3bb_r50_weather_post_link_ranking_fast_lane_recheck_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["fast_lane_checks"])
     _write_rows_csv(fast_lane_summary_csv_path, [payload["weather_fast_lane_summary"]])
@@ -214,7 +216,10 @@ def build_phase3bb_r50_weather_post_link_ranking_fast_lane_recheck(
         db_path=db_path,
     )
     runner = probe_runner or _run_ssh_probe
-    initial_results = [runner(probe, target) for probe in _initial_probes(target, timeout_seconds=per_probe_timeout_seconds)]
+    initial_results = [
+        runner(probe, target)
+        for probe in _initial_probes(target, timeout_seconds=per_probe_timeout_seconds)
+    ]
     initial = _parse_initial_probe_outputs(initial_results)
     local_r49_payload = _read_json(
         reports_dir / "phase3bb_r49" / "weather_missing_link_apply_after_feature_refresh.json"
@@ -277,7 +282,10 @@ def build_phase3bb_r50_weather_post_link_ranking_fast_lane_recheck(
         "parsed_fast_lane_state": parsed,
         "fast_lane_checks": checks,
         "weather_fast_lane_summary": parsed.get("weather_fast_lane_summary") or {},
-        "weather_ranking_recheck_report_freshness": parsed.get("weather_ranking_recheck_report_freshness") or [],
+        "weather_ranking_recheck_report_freshness": parsed.get(
+            "weather_ranking_recheck_report_freshness"
+        )
+        or [],
         "fast_lane_decision": decision,
         "next_operator_command": decision["operator_next_command"],
         "safety_flags": safety,
@@ -291,11 +299,19 @@ def build_phase3bb_r50_weather_post_link_ranking_fast_lane_recheck(
 def _initial_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) -> list[RemoteProbe]:
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
         RemoteProbe("db_writer_monitor_pre", writer_cmd, timeout_seconds),
-        RemoteProbe("r49_json", f"cd {app} && cat reports/phase3bb_r49/weather_missing_link_apply_after_feature_refresh.json 2>/dev/null || true", timeout_seconds),
+        RemoteProbe(
+            "r49_json",
+            f"cd {app} && cat reports/phase3bb_r49/weather_mis"
+            f"sing_link_apply_after_feature_refresh.json 2>/de"
+            f"v/null || true",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "command_registry",
             (
@@ -305,7 +321,7 @@ def _initial_probes(target: CloudBootstrapTarget, *, timeout_seconds: int) -> li
                 "phase3bb-r2-weather-fast-lane "
                 "phase3bb-r45-weather-freshness-to-ranking-impact "
                 "phase3bb-r8-unified-paper-gate; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -335,11 +351,22 @@ def _final_probes(
     app = shlex.quote(target.app_path)
     env = shlex.quote(target.env_path)
     report_list = " ".join(shlex.quote(path) for path in WEATHER_RANKING_RECHECK_REPORT_PATHS)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return [
         RemoteProbe("db_writer_monitor_post", writer_cmd, timeout_seconds),
-        RemoteProbe("weather_funnel_json", f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("weather_ranking_activation_json", f"cd {app} && cat reports/phase3ba_r2/weather_ranking_activation.json 2>/dev/null || true", timeout_seconds),
+        RemoteProbe(
+            "weather_funnel_json",
+            f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "weather_ranking_activation_json",
+            f"cd {app} && cat reports/phase3ba_r2/weather_rank"
+            f"ing_activation.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "weather_current_window_snapshot",
             _weather_current_window_snapshot_command(
@@ -354,8 +381,8 @@ def _final_probes(
             "weather_ranking_recheck_report_stats",
             (
                 f"cd {app} && for p in {report_list}; do "
-                "if [ -e \"$p\" ]; then stat -c '%n|%Y|%s' \"$p\"; "
-                "else echo \"$p|MISSING|0\"; fi; done"
+                'if [ -e "$p" ]; then stat -c \'%n|%Y|%s\' "$p"; '
+                'else echo "$p|MISSING|0"; fi; done'
             ),
             timeout_seconds,
         ),
@@ -370,11 +397,17 @@ def _parse_initial_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, 
         writer = {}
     if not isinstance(r49_payload, dict):
         r49_payload = {}
-    r49_decision = r49_payload.get("post_link_decision") if isinstance(r49_payload.get("post_link_decision"), dict) else {}
+    r49_decision = (
+        r49_payload.get("post_link_decision")
+        if isinstance(r49_payload.get("post_link_decision"), dict)
+        else {}
+    )
     return {
         "remote_time_utc": _first_line(_stdout(by_name.get("remote_time_utc"))),
         "writer_pre_status": writer.get("status") or "UNKNOWN",
-        "writer_pre_safe_to_start_write": bool(writer.get("safe_to_start_write")) if writer else False,
+        "writer_pre_safe_to_start_write": bool(writer.get("safe_to_start_write"))
+        if writer
+        else False,
         "writer_pre_current_pid": writer.get("current_writer_pid"),
         "r49_json_available": bool(r49_payload),
         "r49_status": r49_decision.get("status"),
@@ -388,7 +421,11 @@ def _parse_initial_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, 
 
 
 def _merge_local_r49_fallback(parsed: dict[str, Any], payload: dict[str, Any]) -> None:
-    decision = payload.get("post_link_decision") if isinstance(payload.get("post_link_decision"), dict) else {}
+    decision = (
+        payload.get("post_link_decision")
+        if isinstance(payload.get("post_link_decision"), dict)
+        else {}
+    )
     if not decision:
         return
     parsed["r49_json_available"] = True
@@ -435,8 +472,12 @@ def _parse_final_probe_outputs(
         ranking_payload = {}
     if not isinstance(snapshot, dict):
         snapshot = {}
-    funnel_summary = funnel_payload.get("summary") if isinstance(funnel_payload.get("summary"), dict) else {}
-    ranking_summary = ranking_payload.get("summary") if isinstance(ranking_payload.get("summary"), dict) else {}
+    funnel_summary = (
+        funnel_payload.get("summary") if isinstance(funnel_payload.get("summary"), dict) else {}
+    )
+    ranking_summary = (
+        ranking_payload.get("summary") if isinstance(ranking_payload.get("summary"), dict) else {}
+    )
     snapshot_summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), dict) else {}
     fast_lane_result = by_name.get("weather_fast_lane_run")
     return {
@@ -449,7 +490,9 @@ def _parse_final_probe_outputs(
         "fast_lane_run_stdout_tail": _tail(_stdout(fast_lane_result)),
         "fast_lane_run_stderr_tail": _tail(fast_lane_result.stderr if fast_lane_result else ""),
         "writer_post_status": writer_post.get("status") or "UNKNOWN",
-        "writer_post_safe_to_start_write": bool(writer_post.get("safe_to_start_write")) if writer_post else False,
+        "writer_post_safe_to_start_write": bool(writer_post.get("safe_to_start_write"))
+        if writer_post
+        else False,
         "writer_post_current_pid": writer_post.get("current_writer_pid"),
         "weather_funnel_json_ok": bool(funnel_payload),
         "weather_funnel_status": funnel_payload.get("status"),
@@ -469,29 +512,71 @@ def _parse_final_probe_outputs(
         "weather_ranking_activation_summary": ranking_summary,
         "weather_current_window_snapshot_ok": bool(snapshot.get("ok")),
         "weather_current_window_summary": snapshot_summary,
-        "weather_ranking_recheck_report_freshness": _parse_report_stats(_stdout(by_name.get("weather_ranking_recheck_report_stats"))),
+        "weather_ranking_recheck_report_freshness": _parse_report_stats(
+            _stdout(by_name.get("weather_ranking_recheck_report_stats"))
+        ),
         "failed_final_probe_names": [
-            result.name for result in results if not result.ok and result.name != "weather_fast_lane_run"
+            result.name
+            for result in results
+            if not result.ok and result.name != "weather_fast_lane_run"
         ],
     }
 
 
 def _fast_lane_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
     return [
-        _check("initial_remote_probes_completed", not parsed.get("failed_initial_probe_names"), f"failed={','.join(parsed.get('failed_initial_probe_names') or []) or 'none'}."),
-        _check("command_registry_ok", bool(parsed.get("command_registry_ok")), "R50/R49/R2/R45/R8 commands are registered on the cloud host."),
-        _check("r49_post_link_verified", bool(parsed.get("r49_verification_passed")), f"r49_status={parsed.get('r49_status')}."),
-        _check("r49_link_gate_closed", int(parsed.get("r49_rows_safe_to_link") or 0) == 0 and int(parsed.get("r49_rows_safe_to_relink") or 0) == 0, f"safe_to_link={parsed.get('r49_rows_safe_to_link')} safe_to_relink={parsed.get('r49_rows_safe_to_relink')}."),
-        _check("writer_pre_state_captured", parsed.get("writer_pre_status") != "UNKNOWN", f"writer_pre_status={parsed.get('writer_pre_status')}."),
-        _check("fast_lane_run_policy_recorded", parsed.get("fast_lane_skip_reason") is not None, str(parsed.get("fast_lane_skip_reason"))),
+        _check(
+            "initial_remote_probes_completed",
+            not parsed.get("failed_initial_probe_names"),
+            f"failed={','.join(parsed.get('failed_initial_probe_names') or []) or 'none'}.",
+        ),
+        _check(
+            "command_registry_ok",
+            bool(parsed.get("command_registry_ok")),
+            "R50/R49/R2/R45/R8 commands are registered on the cloud host.",
+        ),
+        _check(
+            "r49_post_link_verified",
+            bool(parsed.get("r49_verification_passed")),
+            f"r49_status={parsed.get('r49_status')}.",
+        ),
+        _check(
+            "r49_link_gate_closed",
+            int(parsed.get("r49_rows_safe_to_link") or 0) == 0
+            and int(parsed.get("r49_rows_safe_to_relink") or 0) == 0,
+            f"safe_to_link="
+            f"{parsed.get('r49_rows_safe_to_link')} safe_to_re"
+            f"link={parsed.get('r49_rows_safe_to_relink')}.",
+        ),
+        _check(
+            "writer_pre_state_captured",
+            parsed.get("writer_pre_status") != "UNKNOWN",
+            f"writer_pre_status={parsed.get('writer_pre_status')}.",
+        ),
+        _check(
+            "fast_lane_run_policy_recorded",
+            parsed.get("fast_lane_skip_reason") is not None,
+            str(parsed.get("fast_lane_skip_reason")),
+        ),
         _check(
             "fast_lane_run_succeeded_or_cleanly_skipped",
             (not parsed.get("fast_lane_should_run") and not parsed.get("fast_lane_run_attempted"))
             or bool(parsed.get("fast_lane_run_ok")),
-            f"attempted={parsed.get('fast_lane_run_attempted')} ok={parsed.get('fast_lane_run_ok')} exit={parsed.get('fast_lane_run_exit_code')}.",
+            f"attempted="
+            f"{parsed.get('fast_lane_run_attempted')} ok="
+            f"{parsed.get('fast_lane_run_ok')} exit="
+            f"{parsed.get('fast_lane_run_exit_code')}.",
         ),
-        _check("final_remote_probes_completed", not parsed.get("failed_final_probe_names"), f"failed={','.join(parsed.get('failed_final_probe_names') or []) or 'none'}."),
-        _check("weather_funnel_available", bool(parsed.get("weather_funnel_json_ok")), f"status={parsed.get('weather_funnel_status')}."),
+        _check(
+            "final_remote_probes_completed",
+            not parsed.get("failed_final_probe_names"),
+            f"failed={','.join(parsed.get('failed_final_probe_names') or []) or 'none'}.",
+        ),
+        _check(
+            "weather_funnel_available",
+            bool(parsed.get("weather_funnel_json_ok")),
+            f"status={parsed.get('weather_funnel_status')}.",
+        ),
     ]
 
 
@@ -519,15 +604,26 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         first_blocker = failed[0]["check"].upper()
     elif paper_ready_rows > 0:
         status = "WEATHER_FAST_LANE_PAPER_READY_CANDIDATES"
-        reason = "Weather fast-lane produced paper-ready rows; refresh unified gate before any operator review."
+        reason = (
+            "Weather fast-lane produced paper-ready rows; refresh unified gate before any "
+            "operator review."
+        )
         next_step = "Phase 3BB-R8 - Unified Paper Gate Across Categories"
-        command = "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+            "--reports-dir reports"
+        )
         first_blocker = "PAPER_GATE_REFRESH_NEEDED"
     elif ranking_rows > 0:
         status = "WEATHER_FAST_LANE_RANKING_PRESENT"
-        reason = "Weather fast-lane produced ranking rows; paper gate can now evaluate exact blockers."
+        reason = (
+            "Weather fast-lane produced ranking rows; paper gate can now evaluate exact blockers."
+        )
         next_step = "Phase 3BB-R8 - Unified Paper Gate Across Categories"
-        command = "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports"
+        command = (
+            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+            "--reports-dir reports"
+        )
         first_blocker = summary.get("first_hard_blocker") or "PAPER_GATE_REFRESH_NEEDED"
     elif current_rows > 0:
         status = "WEATHER_FAST_LANE_RANKING_STILL_MISSING"
@@ -543,7 +639,8 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         reason = "The R12 link gate is closed, but fast-lane still sees no current weather rows."
         next_step = "Phase 3BB-R47 - Weather Current Window Series Discovery And Linkability Repair"
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports"
         )
         first_blocker = "NO_CURRENT_WEATHER_ROWS"

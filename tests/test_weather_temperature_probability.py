@@ -15,8 +15,7 @@ from kalshi_predictor.weather.temperature_probability import (
 
 @pytest.mark.parametrize(
     ("lead_time", "expected"),
-    [(0, 1.5), (6, 1.5), (6.01, 2.0), (12, 2.0), (24, 2.5), (48, 3.5),
-     (72, 5.0), (72.01, 6.5)],
+    [(0, 1.5), (6, 1.5), (6.01, 2.0), (12, 2.0), (24, 2.5), (48, 3.5), (72, 5.0), (72.01, 6.5)],
 )
 def test_high_sigma_uses_exact_lead_time_bands(lead_time: float, expected: float) -> None:
     assert sigma_for_lead_time(lead_time, HIGH_TEMPERATURE_SIGMA) == expected

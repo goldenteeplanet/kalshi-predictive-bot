@@ -85,11 +85,157 @@ def test_settlement_sync_recovers_missing_paper_ticker_exactly(tmp_path) -> None
         assert session.get(Settlement, "RECOVER-ME") is not None
 
 
+def test_settlement_sync_recovers_recent_past_close_market_without_paper_order(
+    tmp_path,
+) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = datetime.now(UTC)
+    client = _ExactRecoveryClient(now)
+    with session_factory() as session:
+        upsert_market(
+            session,
+            {
+                "ticker": "PAST-CLOSE-MISSING",
+                "event_ticker": "KXBTC-PAST-CLOSE",
+                "status": "active",
+                "close_time": (now - timedelta(minutes=5)).isoformat(),
+            },
+        )
+        upsert_market(
+            session,
+            {
+                "ticker": "UNRELATED-PAST-CLOSE",
+                "event_ticker": "UNRELATED-PAST-CLOSE",
+                "status": "active",
+                "close_time": (now - timedelta(minutes=5)).isoformat(),
+            },
+        )
+        session.flush()
+
+        telemetry = []
+        count = sync_settlements(
+            session=session,
+            client=client,
+            max_pages=1,
+            telemetry_callback=telemetry.append,
+        )
+
+        assert count == 1
+        assert client.requested == ["PAST-CLOSE-MISSING"]
+        settlement = session.get(Settlement, "PAST-CLOSE-MISSING")
+        assert settlement is not None
+        assert settlement.result == "yes"
+        assert telemetry == [
+            {
+                "global_page_seen": 0,
+                "global_page_canonical": 0,
+                "global_page_unresolved": 0,
+                "global_page_outside_window": 0,
+                "paper_exact_candidates": 0,
+                "due_local_exact_candidates": 1,
+                "explicit_exact_candidates": 0,
+                "exact_unique_candidates": 1,
+                "exact_canonical": 1,
+                "exact_unresolved": 0,
+                "exact_api_errors": 0,
+                "persisted": 1,
+                "commits": 0,
+                "exact_recovery_budget": 100,
+                "explicit_exact_admitted": 0,
+                "paper_exact_admitted": 0,
+                "series_candidates": {
+                    "KXBTC": 1,
+                    "KXETH": 0,
+                    "KXSOLE": 0,
+                    "KXXRP": 0,
+                    "KXDOGE": 0,
+                },
+            }
+        ]
+
+
+def test_settlement_due_local_recovery_is_fair_across_authorized_series(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = datetime.now(UTC)
+    client = _ExactRecoveryClient(now)
+    roots = ("KXBTC", "KXETH", "KXSOLE", "KXXRP", "KXDOGE")
+    with session_factory() as session:
+        for root in roots:
+            upsert_market(
+                session,
+                {
+                    "ticker": f"{root}-DUE-TICKER",
+                    "event_ticker": f"{root}-DUE-EVENT",
+                    "status": "active",
+                    "close_time": (now - timedelta(minutes=5)).isoformat(),
+                },
+            )
+        upsert_market(
+            session,
+            {
+                "ticker": "KXBTC-NEWER-DUE-TICKER",
+                "event_ticker": "KXBTC-NEWER-DUE-EVENT",
+                "status": "active",
+                "close_time": (now - timedelta(minutes=1)).isoformat(),
+            },
+        )
+        session.flush()
+        telemetry = []
+
+        count = sync_settlements(
+            session=session,
+            client=client,
+            max_pages=0,
+            exact_recovery_limit=5,
+            recover_paper_tickers=False,
+            telemetry_callback=telemetry.append,
+        )
+
+        assert count == 5
+        assert set(client.requested) == {f"{root}-DUE-TICKER" for root in roots}
+        assert "KXBTC-NEWER-DUE-TICKER" not in client.requested
+        assert telemetry[0]["series_candidates"] == {root: 1 for root in roots}
+        assert telemetry[0]["exact_unique_candidates"] == 5
+
+
+def test_explicit_hints_reserve_but_do_not_increase_fair_budget(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = datetime.now(UTC)
+    client = _ExactRecoveryClient(now)
+    roots = ("KXBTC", "KXETH", "KXSOLE", "KXXRP", "KXDOGE")
+    with session_factory() as session:
+        for root in roots:
+            for suffix in ("OLD", "HINT"):
+                upsert_market(
+                    session,
+                    {
+                        "ticker": f"{root}-{suffix}",
+                        "event_ticker": f"{root}-EVENT",
+                        "status": "active",
+                        "close_time": (now - timedelta(minutes=5)).isoformat(),
+                    },
+                )
+        session.flush()
+        telemetry = []
+        count = sync_settlements(
+            session=session,
+            client=client,
+            max_pages=0,
+            exact_recovery_limit=5,
+            recover_paper_tickers=False,
+            exact_recovery_tickers=[f"{root}-HINT" for root in roots],
+            telemetry_callback=telemetry.append,
+        )
+        assert count == 5
+        assert set(client.requested) == {f"{root}-HINT" for root in roots}
+        assert telemetry[0]["exact_recovery_budget"] == 5
+        assert telemetry[0]["explicit_exact_admitted"] == 5
+        assert telemetry[0]["due_local_exact_candidates"] == 0
+
+
 def test_runtime_launcher_runs_settlement_and_pnl_cycle() -> None:
     root = Path(__file__).parents[1]
-    launcher = (root / "scripts/local/kalshi-fixed-rate-refresh.sh").read_text(
-        encoding="utf-8"
-    )
+    launcher = (root / "scripts/local/kalshi-fixed-rate-refresh.sh").read_text(encoding="utf-8")
 
     assert "sync-settlements" in launcher
     assert "--lookback-days 90 --limit 200 --max-pages 10" in launcher

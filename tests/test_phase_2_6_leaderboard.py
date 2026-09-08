@@ -19,9 +19,9 @@ def test_leaderboard_includes_models_with_no_data(tmp_path) -> None:
 
     names = {row["model_name"] for row in result.rows}
     assert "weather_v1" in names
-    assert next(row for row in result.rows if row["model_name"] == "weather_v1")[
-        "forecast_count"
-    ] == 0
+    assert (
+        next(row for row in result.rows if row["model_name"] == "weather_v1")["forecast_count"] == 0
+    )
 
 
 def test_leaderboard_computes_forecast_counts(tmp_path) -> None:

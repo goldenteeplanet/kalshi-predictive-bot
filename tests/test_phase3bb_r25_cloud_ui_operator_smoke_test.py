@@ -141,7 +141,11 @@ def _fake_runner(*, fail_path: str | None = None):
                 }
             )
             return _result(probe, url, body, 200, "application/json")
-        body = f"<!doctype html><html><body>Kalshi Opportunities Markets System Coverage Portfolio Model Settings {probe.name}</body></html>"
+        body = (
+            f"<!doctype html><html><body>Kalshi Opportunities "
+            f"Markets System Coverage Portfolio Model Settings"
+            f" {probe.name}</body></html>"
+        )
         return _result(probe, url, body, 200, "text/html; charset=utf-8")
 
     return runner

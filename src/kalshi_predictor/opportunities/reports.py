@@ -217,7 +217,10 @@ def _render_best_payouts(rows: list[dict[str, Any]], *, model_name: str) -> str:
         "",
         "## Best payout-adjusted opportunities",
         "",
-        "| Ticker | Kalshi URL | Market | Recommendation | Expected value | Payout/risk | Score | Why | Risks |",
+        (
+            "| Ticker | Kalshi URL | Market | Recommendation | Expected value | Payout/risk "
+            "| Score | Why | Risks |"
+        ),
         "|---|---|---|---|---:|---:|---:|---|---|",
     ]
     if not rows:

@@ -34,13 +34,15 @@ def build_timeline_export_status(reports_root: Path) -> dict[str, Any]:
         verified = actual_sha is not None and actual_sha == expected_sha and len(expected_sha) == 64
         if actual_sha is not None and not verified:
             failures.append(f"{kind.upper()}_EXPORT_HASH_MISMATCH")
-        exports.append({
-            "kind": kind.upper(),
-            "name": expected_name,
-            "sha256": expected_sha or None,
-            "verified": verified,
-            "href": f"/system/progress/certification-export/{kind}" if verified else None,
-        })
+        exports.append(
+            {
+                "kind": kind.upper(),
+                "name": expected_name,
+                "sha256": expected_sha or None,
+                "verified": verified,
+                "href": f"/system/progress/certification-export/{kind}" if verified else None,
+            }
+        )
     bundle_sha = str(manifest.get("bundle_sha256") or "")
     status = "PASSED" if manifest.get("status") == "PASSED" and not failures else "FAILED"
     return {

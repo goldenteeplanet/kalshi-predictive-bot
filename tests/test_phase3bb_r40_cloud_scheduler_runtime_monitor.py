@@ -119,20 +119,35 @@ def _fake_probe_runner(
 ):
     journal = "\n".join(
         [
-            "Jul 13 04:37:03 kalshi-bot-01 systemd[1]: Starting kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only multi-category refresh scheduler...",
-            "Jul 13 04:37:39 kalshi-bot-01 runner[1]: [phase3bb-r35] db-writer-monitor JSON parse failed; skip writer-gated job",
-            "Jul 13 04:37:39 kalshi-bot-01 runner[1]: [phase3bb-r35] Writer active; skip writer-gated job weather_fast_lane",
-            "Jul 13 04:39:55 kalshi-bot-01 systemd[1]: Finished kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only multi-category refresh scheduler.",
-            "Jul 13 04:52:43 kalshi-bot-01 systemd[1]: Starting kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only multi-category refresh scheduler...",
-            "Jul 13 04:52:50 kalshi-bot-01 runner[1]: [phase3bb-r35] running weather_current_catalog_refresh",
+            "Jul 13 04:37:03 kalshi-bot-01 systemd[1]: Starting "
+            "kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only "
+            "multi-category refresh scheduler...",
+            "Jul 13 04:37:39 kalshi-bot-01 runner[1]: [phase3bb-r35] db-writer-monitor "
+            "JSON parse failed; skip writer-gated job",
+            "Jul 13 04:37:39 kalshi-bot-01 runner[1]: [phase3bb-r35] Writer active; skip "
+            "writer-gated job weather_fast_lane",
+            "Jul 13 04:39:55 kalshi-bot-01 systemd[1]: Finished "
+            "kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only "
+            "multi-category refresh scheduler.",
+            "Jul 13 04:52:43 kalshi-bot-01 systemd[1]: Starting "
+            "kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only "
+            "multi-category refresh scheduler...",
+            "Jul 13 04:52:50 kalshi-bot-01 runner[1]: [phase3bb-r35] running "
+            "weather_current_catalog_refresh",
             "Jul 13 04:52:55 kalshi-bot-01 runner[1]: Synced 10 markets.",
             "Jul 13 04:53:15 kalshi-bot-01 runner[1]: Market leg parse summary",
-            "Jul 13 04:53:18 kalshi-bot-01 runner[1]: Inserted 156 weather forecast row(s) and 0 observation row(s) from noaa.",
-            "Jul 13 04:53:21 kalshi-bot-01 runner[1]: Processed 156 weather forecast row(s) for new_york and inserted 156 feature row(s).",
-            "Jul 13 04:53:25 kalshi-bot-01 runner[1]: Wrote JSON: reports/phase3az_r12_weather/weather_activation_preview.json",
+            "Jul 13 04:53:18 kalshi-bot-01 runner[1]: Inserted 156 weather forecast "
+            "row(s) and 0 observation row(s) from noaa.",
+            "Jul 13 04:53:21 kalshi-bot-01 runner[1]: Processed 156 weather forecast "
+            "row(s) for new_york and inserted 156 feature row(s).",
+            "Jul 13 04:53:25 kalshi-bot-01 runner[1]: Wrote JSON: "
+            "reports/phase3az_r12_weather/weather_activation_preview.json",
             "Jul 13 04:53:30 kalshi-bot-01 runner[1]: [phase3bb-r35] running weather_fast_lane",
-            "Jul 13 04:54:10 kalshi-bot-01 runner[1]: Wrote JSON: reports/phase3bb_r2/weather_funnel.json",
-            "Jul 13 04:55:26 kalshi-bot-01 systemd[1]: Finished kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only multi-category refresh scheduler.",
+            "Jul 13 04:54:10 kalshi-bot-01 runner[1]: Wrote JSON: "
+            "reports/phase3bb_r2/weather_funnel.json",
+            "Jul 13 04:55:26 kalshi-bot-01 systemd[1]: Finished "
+            "kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only "
+            "multi-category refresh scheduler.",
         ]
     )
     outputs = {
@@ -142,13 +157,16 @@ def _fake_probe_runner(
         "scheduler_service_active": ("inactive\n", True, 0, ""),
         "scheduler_timer_list": (
             "NEXT LEFT LAST PASSED UNIT ACTIVATES\n"
-            "Mon 2026-07-13 05:07:50 UTC 11min Mon 2026-07-13 04:52:43 UTC 3min ago kalshi-multicategory-refresh-scheduler.timer kalshi-multicategory-refresh-scheduler.service\n",
+            "Mon 2026-07-13 05:07:50 UTC 11min Mon 2026-07-13 04:52:43 UTC 3min ago "
+            "kalshi-multicategory-refresh-scheduler.timer "
+            "kalshi-multicategory-refresh-scheduler.service\n",
             True,
             0,
             "",
         ),
         "scheduler_service_systemd": (
-            "LoadState=loaded\nActiveState=inactive\nSubState=dead\nExecMainPID=0\nResult=success\nNRestarts=0\n",
+            "LoadState=loaded\nActiveState=inactive\nSubState=dead\nExecMainPID=0\nResult=suc"
+            "cess\nNRestarts=0\n",
             True,
             0,
             "",
@@ -188,7 +206,8 @@ def _fake_probe_runner(
             "",
         ),
         "r5_processes": (
-            "10573 /opt/kalshi-predictive-bot/.venv/bin/python phase3bc-r5-crypto-freshness-watch\n",
+            "10573 /opt/kalshi-predictive-bot/.venv/bin/python "
+            "phase3bc-r5-crypto-freshness-watch\n",
             True,
             0,
             "",
@@ -239,8 +258,14 @@ run_job() {
 }
 
 # cadence_minutes=30 category=weather-catalog
-run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; .venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit 1500; .venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 --match-tolerance-hours 3'
+run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; \
+.venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 \
+--series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit \
+1500; .venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir \
+reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 \
+--match-tolerance-hours 3'
 
 # cadence_minutes=30 category=weather
-run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane --output-dir reports/phase3bb_r2 --reports-dir reports
+run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane \
+--output-dir reports/phase3bb_r2 --reports-dir reports
 """

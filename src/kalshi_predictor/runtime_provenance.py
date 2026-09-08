@@ -13,19 +13,21 @@ from kalshi_predictor.forecast_provenance import (
     verify_envelope,
     write_synthetic_provenance_audit,
 )
-from kalshi_predictor.utils.time import parse_datetime, utc_now
+from kalshi_predictor.utils.time import utc_now
 
 
 def write_runtime_provenance_audit(
-    *, database_path: Path, output_dir: Path, model_names: list[str] | None = None,
-    max_rows: int = 100, golden_report: Path | None = None,
+    *,
+    database_path: Path,
+    output_dir: Path,
+    model_names: list[str] | None = None,
+    max_rows: int = 100,
+    golden_report: Path | None = None,
 ) -> Path:
     if max_rows < 1:
         raise ValueError("max_rows must be positive")
     output_dir.mkdir(parents=True, exist_ok=True)
-    golden_path = golden_report or write_synthetic_provenance_audit(
-        output_dir / "synthetic_golden"
-    )
+    golden_path = golden_report or write_synthetic_provenance_audit(output_dir / "synthetic_golden")
     golden = json.loads(golden_path.read_text(encoding="utf-8"))
     expected_fields = {field.name for field in fields(RankingProvenance)}
 
@@ -43,29 +45,30 @@ def write_runtime_provenance_audit(
     finally:
         connection.close()
 
-    golden_fields = {
-        key for row in golden.get("records", []) for key in row.get("attribution", {})
-    }
-    runtime_fields = {
-        key for row in envelopes for key in row.get("attribution", {})
-    }
+    golden_fields = {key for row in golden.get("records", []) for key in row.get("attribution", {})}
+    runtime_fields = {key for row in envelopes for key in row.get("attribution", {})}
     integrity_valid = all(verify_envelope(row) for row in envelopes)
     completeness = sum(not row["diagnostics"] for row in envelopes)
     report = {
-        "phase": "PROV-2", "generated_at": utc_now().isoformat(),
+        "phase": "PROV-2",
+        "generated_at": utc_now().isoformat(),
         "mode": "RUNTIME_SQLITE_READ_ONLY_PROVENANCE_ADAPTER",
-        "database_path": str(database_path), "database_open_mode": "mode=ro+query_only",
-        "database_writes": 0, "execution_enabled": False,
+        "database_path": str(database_path),
+        "database_open_mode": "mode=ro+query_only",
+        "database_writes": 0,
+        "execution_enabled": False,
         "synthetic_golden_report": str(golden_path),
         "rows": envelopes,
         "summary": {
-            "runtime_rows": len(envelopes), "complete_rows": completeness,
+            "runtime_rows": len(envelopes),
+            "complete_rows": completeness,
             "incomplete_rows": len(envelopes) - completeness,
             "all_runtime_digests_valid": integrity_valid,
             "golden_chain_valid": bool(golden.get("summary", {}).get("chain_valid")),
             "golden_contract_match": (
                 expected_fields == golden_fields and expected_fields == runtime_fields
-                if envelopes else expected_fields == golden_fields
+                if envelopes
+                else expected_fields == golden_fields
             ),
             "diagnostic_counts": _counts(diagnostics),
             "activation_or_execution_changed": False,
@@ -78,8 +81,9 @@ def write_runtime_provenance_audit(
     return path
 
 
-def _adapt_rows(connection: sqlite3.Connection, tables: set[str], forecasts: list[sqlite3.Row]
-                ) -> tuple[list[dict[str, Any]], list[str]]:
+def _adapt_rows(
+    connection: sqlite3.Connection, tables: set[str], forecasts: list[sqlite3.Row]
+) -> tuple[list[dict[str, Any]], list[str]]:
     envelopes: list[dict[str, Any]] = []
     all_diagnostics: list[str] = []
     previous = "GENESIS"
@@ -87,7 +91,8 @@ def _adapt_rows(connection: sqlite3.Connection, tables: set[str], forecasts: lis
         ticker, model = str(forecast["ticker"]), str(forecast["model_name"])
         ranking = connection.execute(
             "SELECT * FROM market_rankings WHERE ticker=? AND forecast_model=? "
-            "ORDER BY ranked_at DESC, id DESC LIMIT 1", (ticker, model),
+            "ORDER BY ranked_at DESC, id DESC LIMIT 1",
+            (ticker, model),
         ).fetchone()
         snapshot = connection.execute(
             "SELECT * FROM market_snapshots WHERE ticker=? AND captured_at<=? "
@@ -126,10 +131,14 @@ def _adapt_rows(connection: sqlite3.Connection, tables: set[str], forecasts: lis
             observation_timestamp=str(observation_at or "MISSING"),
             feature_set_id=(
                 f"feature:{feature['id']}:{feature['feature_set_name']}"
-                if feature else f"forecast-feature-json:{forecast['id']}"
+                if feature
+                else f"forecast-feature-json:{forecast['id']}"
             ),
-            feature_generated_at=str(feature["generated_at"] if feature else forecast["forecasted_at"]),
-            model_name=model, model_version=str(model_version or "MISSING"),
+            feature_generated_at=str(
+                feature["generated_at"] if feature else forecast["forecasted_at"]
+            ),
+            model_name=model,
+            model_version=str(model_version or "MISSING"),
             orderbook_snapshot_id=(f"snapshot:{snapshot['id']}" if snapshot else "MISSING"),
             orderbook_timestamp=str(snapshot["captured_at"] if snapshot else "MISSING"),
             ranking_generated_at=str(ranking["ranked_at"] if ranking else "MISSING"),
@@ -147,8 +156,9 @@ def _adapt_rows(connection: sqlite3.Connection, tables: set[str], forecasts: lis
     return envelopes, all_diagnostics
 
 
-def _latest_forecasts(connection: sqlite3.Connection, models: list[str] | None,
-                      limit: int) -> list[sqlite3.Row]:
+def _latest_forecasts(
+    connection: sqlite3.Connection, models: list[str] | None, limit: int
+) -> list[sqlite3.Row]:
     selected: dict[tuple[str, str], sqlite3.Row] = {}
     if models:
         per_model_limit = max(limit, (limit // len(models)) * 4)
@@ -175,9 +185,10 @@ def _latest_forecasts(connection: sqlite3.Connection, models: list[str] | None,
 
 
 def _tables(connection: sqlite3.Connection) -> set[str]:
-    return {str(row[0]) for row in connection.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    )}
+    return {
+        str(row[0])
+        for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
 
 
 def _json_object(value: Any) -> dict[str, Any]:

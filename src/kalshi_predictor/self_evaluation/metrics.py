@@ -80,9 +80,7 @@ def build_metric_records(
     metrics.extend(
         _phase_3m_3n_metrics(dataset, evaluation_run_id=evaluation_run_id, settings=settings)
     )
-    metrics.extend(
-        _trade_metrics(dataset, evaluation_run_id=evaluation_run_id, settings=settings)
-    )
+    metrics.extend(_trade_metrics(dataset, evaluation_run_id=evaluation_run_id, settings=settings))
     metrics.extend(
         _model_and_quality_metrics(
             dataset,
@@ -388,11 +386,7 @@ def _trade_metrics(
         gross_values = [
             value for value in (to_decimal(row.gross_pnl) for row in finalized) if value is not None
         ]
-        cost_values = [
-            _trade_cost(row)
-            for row in finalized
-            if _trade_cost(row) is not None
-        ]
+        cost_values = [_trade_cost(row) for row in finalized if _trade_cost(row) is not None]
         wins = [value for value in net_values if value > 0]
         metrics.extend(
             [
@@ -482,18 +476,10 @@ def _model_and_quality_metrics(
     settings: Settings,
 ) -> list[MetricRecord]:
     versions = sorted(
-        {
-            row.primary_model_version
-            for row in dataset.forecast_rows
-            if row.primary_model_version
-        }
+        {row.primary_model_version for row in dataset.forecast_rows if row.primary_model_version}
     )
     feature_versions = sorted(
-        {
-            row.feature_schema_version
-            for row in dataset.forecast_rows
-            if row.feature_schema_version
-        }
+        {row.feature_schema_version for row in dataset.forecast_rows if row.feature_schema_version}
     )
     missing_lineage = sum(
         1

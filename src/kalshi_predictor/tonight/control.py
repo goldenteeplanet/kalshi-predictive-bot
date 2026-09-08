@@ -293,8 +293,7 @@ def build_tonight_check(
             TonightCheckItem(
                 "Paper trades today",
                 READY,
-                f"{learning['paper_trades_created_today']} / "
-                f"{learning['daily_paper_trade_cap']}",
+                f"{learning['paper_trades_created_today']} / {learning['daily_paper_trade_cap']}",
             ),
             TonightCheckItem(
                 "Settled paper trades",
@@ -407,9 +406,7 @@ def run_tonight(
     except KeyboardInterrupt:
         stop_reason = "Interrupted by user."
     status = (
-        "COMPLETED_WITH_ERRORS"
-        if any(step.status == "ERROR" for step in steps)
-        else "COMPLETED"
+        "COMPLETED_WITH_ERRORS" if any(step.status == "ERROR" for step in steps) else "COMPLETED"
     )
     if stop_reason:
         status = "INTERRUPTED"
@@ -666,9 +663,7 @@ def _reports_writable_item(reports_dir: Path) -> TonightCheckItem:
 
 def _ui_dependency_item() -> TonightCheckItem:
     missing = [
-        name
-        for name in ("fastapi", "uvicorn", "jinja2")
-        if importlib.util.find_spec(name) is None
+        name for name in ("fastapi", "uvicorn", "jinja2") if importlib.util.find_spec(name) is None
     ]
     if missing:
         return TonightCheckItem("UI dependencies", WARNING, f"Missing: {', '.join(missing)}")

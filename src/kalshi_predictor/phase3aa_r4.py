@@ -29,9 +29,7 @@ def build_phase3aa_r4_settlement_fetch_recovery(
 ) -> dict[str, Any]:
     inputs = _load_inputs(reports_dir)
     r2_rows = _r2_rows(inputs)
-    fetch_error_rows = [
-        row for row in r2_rows if row.get("source_fetch_status") == "FETCH_ERROR"
-    ]
+    fetch_error_rows = [row for row in r2_rows if row.get("source_fetch_status") == "FETCH_ERROR"]
     closed_without_outcome_rows = _closed_without_outcome_rows(r2_rows)
     unusable_rows = [
         row
@@ -76,9 +74,7 @@ def build_phase3aa_r4_settlement_fetch_recovery(
             "sibling_resolution_allowed": False,
         },
         "input_paths": _input_paths(reports_dir),
-        "source_availability": {
-            key: value is not None for key, value in inputs.items()
-        },
+        "source_availability": {key: value is not None for key, value in inputs.items()},
         "summary": summary,
         "freshness_reconciliation": freshness,
         "fetch_error_groups": _fetch_error_groups(fetch_error_rows, sample_limit=sample_limit),
@@ -136,15 +132,11 @@ def _load_inputs(reports_dir: Path) -> dict[str, dict[str, Any] | list[Any] | No
 def _input_paths(reports_dir: Path) -> dict[str, Path]:
     return {
         "phase3aa": reports_dir / "phase3aa" / "phase3aa_outcome_realizer.json",
-        "phase3aa_r2": reports_dir
-        / "phase3aa_r2"
-        / "phase3aa_r2_exact_settlement_harvest.json",
+        "phase3aa_r2": reports_dir / "phase3aa_r2" / "phase3aa_r2_exact_settlement_harvest.json",
         "phase3aa_r2_rows": reports_dir
         / "phase3aa_r2"
         / "phase3aa_r2_exact_settlement_harvest_rows.json",
-        "phase3aa_r3": reports_dir
-        / "phase3aa_r3"
-        / "phase3aa_r3_residual_settlement_audit.json",
+        "phase3aa_r3": reports_dir / "phase3aa_r3" / "phase3aa_r3_residual_settlement_audit.json",
         "paper_settlement": reports_dir
         / "paper_settlement_reconciliation"
         / "paper_settlement_reconciliation.json",
@@ -158,7 +150,7 @@ def _load_json(path: Path) -> dict[str, Any] | list[Any] | None:
     if not path.exists():
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
-    return payload if isinstance(payload, (dict, list)) else None
+    return payload if isinstance(payload, dict | list) else None
 
 
 def _r2_rows(inputs: dict[str, dict[str, Any] | list[Any] | None]) -> list[dict[str, Any]]:
@@ -279,8 +271,10 @@ def _freshness_reconciliation(
         and paper_eligible == 0
         and (
             str(watch.get("recommended_next_action") or "").startswith("Realize")
-            or (isinstance(watch_settlement, dict)
-                and watch_settlement.get("status") == "EXACT_SETTLEMENTS_READY_TO_REALIZE")
+            or (
+                isinstance(watch_settlement, dict)
+                and watch_settlement.get("status") == "EXACT_SETTLEMENTS_READY_TO_REALIZE"
+            )
         )
     )
     return {
@@ -351,9 +345,7 @@ def _diagnostic_rows(
     for row in closed_without_outcome_rows:
         rows.append(_source_outcome_diagnostic_row(row, "SOURCE_CLOSED_WITHOUT_OUTCOME"))
     for row in unusable_rows:
-        rows.append(
-            _source_outcome_diagnostic_row(row, "SOURCE_SETTLED_WITHOUT_USABLE_OUTCOME")
-        )
+        rows.append(_source_outcome_diagnostic_row(row, "SOURCE_SETTLED_WITHOUT_USABLE_OUTCOME"))
     return rows
 
 
@@ -513,10 +505,10 @@ def _missing_outcome_fields(row: dict[str, Any]) -> list[str]:
 
 def _outcome_shape(row: dict[str, Any]) -> str:
     result = str(row.get("source_result") or "").strip().lower()
-    value = row.get("source_settlement_value_dollars") or row.get(
-        "source_settlement_value"
-    ) or row.get(
-        "source_yes_settlement_value"
+    value = (
+        row.get("source_settlement_value_dollars")
+        or row.get("source_settlement_value")
+        or row.get("source_yes_settlement_value")
     )
     if result in {"yes", "no"}:
         return "BINARY_RESULT"

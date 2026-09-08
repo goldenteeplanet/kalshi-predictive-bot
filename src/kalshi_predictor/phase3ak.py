@@ -44,9 +44,9 @@ from kalshi_predictor.opportunities.payout_scoring import payout_metrics_from_ra
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3bc_r3 import (
-    DEFAULT_CRYPTO_REFRESH_CADENCE_MINUTES,
     DEFAULT_CRYPTO_LINK_SCAN_LIMIT,
     DEFAULT_CRYPTO_MARKET_SCAN_LIMIT,
+    DEFAULT_CRYPTO_REFRESH_CADENCE_MINUTES,
     DEFAULT_MARKET_PAGE_LIMIT,
     DEFAULT_NEAR_MONEY_PER_SYMBOL_LIMIT,
     DEFAULT_NEAR_MONEY_WINDOW_LIMIT,
@@ -133,7 +133,9 @@ def build_crypto_window_sync(
         )
         for market in markets
     ]
-    rows.sort(key=lambda row: (str(row["asset"] or ""), str(row["close_time"] or ""), row["ticker"]))
+    rows.sort(
+        key=lambda row: (str(row["asset"] or ""), str(row["close_time"] or ""), row["ticker"])
+    )
     summary = _window_summary(rows)
     blocker = _primary_blocker(summary)
     payload = _with_metadata(
@@ -151,7 +153,9 @@ def build_crypto_window_sync(
             "diagnosis": _diagnosis(summary),
             "readiness_funnel": _readiness_funnel(rows),
             "state_counts": dict(sorted(Counter(row["window_state"] for row in rows).items())),
-            "blocker_counts": dict(sorted(Counter(row["readiness_reason"] for row in rows).items())),
+            "blocker_counts": dict(
+                sorted(Counter(row["readiness_reason"] for row in rows).items())
+            ),
             "rows": rows,
             "next_action": _next_action_for_blocker(blocker),
             "idempotency": {
@@ -241,13 +245,15 @@ def build_crypto_watch_status(
         if latest_generated_at is not None
         else None
     )
-    runner_status = str(guard.get("status") or status_payload.get("process", {}).get("status") or "UNKNOWN")
-    runner_running = bool(guard.get("running") or status_payload.get("process", {}).get("pid_running"))
+    runner_status = str(
+        guard.get("status") or status_payload.get("process", {}).get("status") or "UNKNOWN"
+    )
+    runner_running = bool(
+        guard.get("running") or status_payload.get("process", {}).get("pid_running")
+    )
     freshness_seconds = freshness_minutes * 60
     cycle_overdue_seconds = (
-        max(0, latest_age_seconds - freshness_seconds)
-        if latest_age_seconds is not None
-        else None
+        max(0, latest_age_seconds - freshness_seconds) if latest_age_seconds is not None else None
     )
     heartbeat_state = _heartbeat_state(
         runner_status=runner_status,
@@ -282,12 +288,17 @@ def build_crypto_watch_status(
             "runner_running": runner_running,
             "runner_pid": guard.get("pid") or status_payload.get("pid"),
             "runner_heartbeat": {
-                "latest_generated_at": latest_generated_at.isoformat() if latest_generated_at else None,
+                "latest_generated_at": latest_generated_at.isoformat()
+                if latest_generated_at
+                else None,
                 "latest_age_seconds": latest_age_seconds,
                 "freshness_seconds": freshness_seconds,
-                "last_status_check": status_generated_at.isoformat() if status_generated_at else None,
+                "last_status_check": status_generated_at.isoformat()
+                if status_generated_at
+                else None,
                 "status_age_seconds": status_age_seconds,
-                "last_attempt": status_payload.get("generated_at") or report_payload.get("generated_at"),
+                "last_attempt": status_payload.get("generated_at")
+                or report_payload.get("generated_at"),
                 "last_success": latest_success_at.isoformat() if latest_success_at else None,
                 "next_scheduled_scan": (
                     (latest_success_at + timedelta(minutes=freshness_minutes)).isoformat()
@@ -362,8 +373,9 @@ def build_market_data_refresh_status(
 ) -> dict[str, Any]:
     resolved = settings or get_settings()
     writer = _writer_status(settings=resolved)
-    generated_at = utc_now()
-    watermark = _market_data_watermark(session, freshness_minutes=DEFAULT_CRYPTO_REFRESH_CADENCE_MINUTES)
+    watermark = _market_data_watermark(
+        session, freshness_minutes=DEFAULT_CRYPTO_REFRESH_CADENCE_MINUTES
+    )
     blocked = require_no_active_writer and not writer["safe_to_write"]
     state = "BLOCKED_BY_ACTIVE_WRITER" if blocked else "READY_TO_REFRESH"
     refresh_summary: dict[str, Any] | None = None
@@ -403,11 +415,12 @@ def build_market_data_refresh_status(
                 else {}
             )
             summary = (
-                r3_payload.get("summary")
-                if isinstance(r3_payload.get("summary"), dict)
-                else {}
+                r3_payload.get("summary") if isinstance(r3_payload.get("summary"), dict) else {}
             )
-            data_complete = not bool(rate_limit.get("rate_limited")) and summary.get("data_complete") is not False
+            data_complete = (
+                not bool(rate_limit.get("rate_limited"))
+                and summary.get("data_complete") is not False
+            )
             state = "REFRESH_COMPLETED" if data_complete else "RATE_LIMITED_KALSHI_API"
             refresh_summary = {
                 "artifact": str(artifacts.json_path),
@@ -455,7 +468,11 @@ def build_market_data_refresh_status(
             "next_action": (
                 "Retry after db-writer-monitor reports safe_to_write=true."
                 if blocked
-                else ("Refresh not started by this status-only command." if not run_refresh else _refresh_next_action(state))
+                else (
+                    "Refresh not started by this status-only command."
+                    if not run_refresh
+                    else _refresh_next_action(state)
+                )
             ),
             "retry_after": "after active writer finishes" if blocked else None,
         },
@@ -682,9 +699,7 @@ def write_phase3ak_report(
 def multi_leg_learning_eligibility(session: Session, ticker: str) -> dict[str, Any]:
     legs = list(
         session.scalars(
-            select(MarketLeg)
-            .where(MarketLeg.ticker == ticker)
-            .order_by(MarketLeg.leg_index)
+            select(MarketLeg).where(MarketLeg.ticker == ticker).order_by(MarketLeg.leg_index)
         )
     )
     if len(legs) <= 1:
@@ -746,9 +761,7 @@ def build_multi_leg_component_provenance(
                 "learning_eligibility": NOT_MULTILEG
                 if not is_multi_leg
                 else MULTILEG_REQUIRES_COMPONENT_PROVENANCE,
-                "blocking_reason": None
-                if eligible
-                else "multi_leg_component_provenance_required",
+                "blocking_reason": None if eligible else "multi_leg_component_provenance_required",
                 "components": [
                     {
                         "leg_index": leg.leg_index,
@@ -787,7 +800,11 @@ def _crypto_markets(
     prefixes = [
         prefix
         for symbol in symbols
-        for prefix in ((supported_crypto_asset(symbol) or None).event_prefixes if supported_crypto_asset(symbol) else ())
+        for prefix in (
+            (supported_crypto_asset(symbol) or None).event_prefixes
+            if supported_crypto_asset(symbol)
+            else ()
+        )
     ]
     if not prefixes:
         return []
@@ -838,7 +855,9 @@ def _window_row(
         if snapshot is not None and ranking is not None and ranking.best_side in {BUY_YES, BUY_NO}
         else None
     )
-    ranking_spread = to_decimal(ranking.spread if ranking is not None else snapshot.spread if snapshot else None)
+    ranking_spread = to_decimal(
+        ranking.spread if ranking is not None else snapshot.spread if snapshot else None
+    )
     spread = book.spread if book is not None and book.spread is not None else ranking_spread
     executable_ev = raw_ev - (spread or Decimal("0")) if raw_ev is not None else None
     phase3m_proposed_contracts = max(0, int(sizing.proposed_contracts)) if sizing is not None else 0
@@ -869,7 +888,9 @@ def _window_row(
         spread=spread,
         book=book,
         liquidity_score=to_decimal(ranking.liquidity_score if ranking is not None else None),
-        confidence_score=to_decimal(ranking.model_confidence_score if ranking is not None else None),
+        confidence_score=to_decimal(
+            ranking.model_confidence_score if ranking is not None else None
+        ),
         opportunity_score=to_decimal(ranking.opportunity_score if ranking is not None else None),
         sizing=sizing,
         phase3m_proposed_contracts=phase3m_proposed_contracts,
@@ -895,8 +916,7 @@ def _window_row(
         "strike": strike,
         "comparator": comparator,
         "observation_time": (
-            terms.observation_time
-            or (close_time.isoformat() if close_time is not None else None)
+            terms.observation_time or (close_time.isoformat() if close_time is not None else None)
         ),
         "close_time": close_time.isoformat() if close_time is not None else None,
         "settlement_rule": terms.settlement_rules or market.rules_primary,
@@ -920,10 +940,13 @@ def _window_row(
         "opportunity_score": ranking.opportunity_score if ranking else None,
         "phase3s_score_pass": (
             bool(ranking is not None)
-            and (to_decimal(ranking.opportunity_score) or Decimal("0")) >= settings.opportunity_min_score
+            and (to_decimal(ranking.opportunity_score) or Decimal("0"))
+            >= settings.opportunity_min_score
         ),
         "book_state": book.state if book is not None else None,
-        "book_reason": book.reason if book is not None else "No eligible side/snapshot for executable book check.",
+        "book_reason": book.reason
+        if book is not None
+        else "No eligible side/snapshot for executable book check.",
         "book_usable": book.usable if book is not None else False,
         "book_has_visible_bid_ask": book.has_visible_bid_ask if book is not None else False,
         "book_has_executable_depth": book.has_executable_depth if book is not None else False,
@@ -932,10 +955,14 @@ def _window_row(
         "book_ask_price": decimal_to_str(book.ask_price if book is not None else None),
         "book_ask_depth": decimal_to_str(book.ask_depth if book is not None else None),
         "book_min_depth": decimal_to_str(book.min_depth if book is not None else None),
-        "book_min_liquidity_score": decimal_to_str(book.min_liquidity_score if book is not None else None),
+        "book_min_liquidity_score": decimal_to_str(
+            book.min_liquidity_score if book is not None else None
+        ),
         "book_max_spread": decimal_to_str(book.max_spread if book is not None else None),
         "book_liquidity_pass": (
-            bool(book is not None and book.has_executable_depth and book.liquidity_score is not None)
+            bool(
+                book is not None and book.has_executable_depth and book.liquidity_score is not None
+            )
             and book.liquidity_score >= MIN_EXECUTABLE_LIQUIDITY_SCORE
         ),
         "book_spread_pass": (
@@ -1081,7 +1108,9 @@ def _window_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "parsed_markets": sum(1 for row in active_markets if row["parsed_status"] == EXACT_LINK),
         "linked_markets": sum(1 for row in active_markets if row["linked"]),
         "active_windows": len(current_windows),
-        "active_fresh_windows": sum(1 for row in current_windows if row["window_state"] == "ACTIVE"),
+        "active_fresh_windows": sum(
+            1 for row in current_windows if row["window_state"] == "ACTIVE"
+        ),
         "active_stale_windows": sum(1 for row in current_windows if row["window_state"] == "STALE"),
         "upcoming_windows": sum(1 for row in rows if row["window_state"] == "UPCOMING"),
         "expired_windows": sum(1 for row in rows if row["window_state"] == "EXPIRED"),
@@ -1094,7 +1123,9 @@ def _window_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "valid_features": sum(1 for row in current_windows if row["feature_fresh"]),
         "valid_forecasts": sum(1 for row in current_windows if row["forecast_valid"]),
         "positive_raw_ev": sum(
-            1 for row in current_windows if (to_decimal(row["raw_expected_value"]) or Decimal("0")) > 0
+            1
+            for row in current_windows
+            if (to_decimal(row["raw_expected_value"]) or Decimal("0")) > 0
         ),
         "positive_executable_ev": sum(
             1
@@ -1104,26 +1135,20 @@ def _window_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "confidence_pass": sum(
             1
             for row in current_windows
-            if (to_decimal(row["confidence_score"]) or Decimal("0")) >= MIN_EXECUTABLE_CONFIDENCE_SCORE
+            if (to_decimal(row["confidence_score"]) or Decimal("0"))
+            >= MIN_EXECUTABLE_CONFIDENCE_SCORE
         ),
-        "phase3s_score_pass": sum(
-            1 for row in current_windows if row["phase3s_score_pass"]
-        ),
+        "phase3s_score_pass": sum(1 for row in current_windows if row["phase3s_score_pass"]),
         "liquidity_pass": sum(1 for row in current_windows if row["book_liquidity_pass"]),
         "spread_pass": sum(1 for row in current_windows if row["book_spread_pass"]),
         "usable_bid_ask_books": sum(1 for row in current_windows if row["book_usable"]),
         "phase3s_proceed": sum(
             1
             for row in current_windows
-            if row["readiness_reason"] not in {"PHASE_3S_SKIP"}
-            and row["phase3s_score_pass"]
+            if row["readiness_reason"] not in {"PHASE_3S_SKIP"} and row["phase3s_score_pass"]
         ),
-        "phase3m_nonzero_size": sum(
-            1 for row in current_windows if row["phase3m_nonzero_size"]
-        ),
-        "phase3n_approved": sum(
-            1 for row in current_windows if row["phase3n_approved"]
-        ),
+        "phase3m_nonzero_size": sum(1 for row in current_windows if row["phase3m_nonzero_size"]),
+        "phase3n_approved": sum(1 for row in current_windows if row["phase3n_approved"]),
         "paper_ready_opportunities": sum(1 for row in rows if row["paper_ready"]),
         "active_readiness_reason_counts": dict(
             sorted(Counter(row["readiness_reason"] for row in current_windows).items())
@@ -1252,7 +1277,9 @@ def _latest_crypto_links(session: Session, tickers: list[str]) -> dict[str, Cryp
     rows = session.scalars(
         select(CryptoMarketLink)
         .where(CryptoMarketLink.ticker.in_(tickers))
-        .order_by(CryptoMarketLink.ticker, desc(CryptoMarketLink.detected_at), desc(CryptoMarketLink.id))
+        .order_by(
+            CryptoMarketLink.ticker, desc(CryptoMarketLink.detected_at), desc(CryptoMarketLink.id)
+        )
     )
     result: dict[str, CryptoMarketLink] = {}
     for row in rows:
@@ -1423,7 +1450,11 @@ def _age_minutes(value: Any, now: Any) -> Decimal | None:
 
 
 def _market_data_watermark(session: Session, *, freshness_minutes: int) -> dict[str, Any]:
-    latest = session.scalar(select(MarketSnapshot).order_by(desc(MarketSnapshot.captured_at), desc(MarketSnapshot.id)).limit(1))
+    latest = session.scalar(
+        select(MarketSnapshot)
+        .order_by(desc(MarketSnapshot.captured_at), desc(MarketSnapshot.id))
+        .limit(1)
+    )
     now = utc_now()
     age = _age_minutes(latest.captured_at, now) if latest is not None else None
     state = (
@@ -1539,7 +1570,11 @@ def _heartbeat_state(
     if latest_age_seconds is None:
         return "RUNNER_STALE"
     if latest_age_seconds > freshness_minutes * 60 or stale_report:
-        if runner_status == "RUNNING" and seconds_until_timeout is not None and seconds_until_timeout >= 0:
+        if (
+            runner_status == "RUNNING"
+            and seconds_until_timeout is not None
+            and seconds_until_timeout >= 0
+        ):
             return "RUNNING_CYCLE_OVERDUE"
         return "RUNNER_STALE"
     if runner_status == "RUNNING":
@@ -1580,21 +1615,29 @@ def _watch_state_for_blocker(blocker: str) -> str:
 
 def _next_action_for_blocker(blocker: str) -> str:
     return {
-        "PAPER_READY": "Paper-ready candidates exist; keep paper-only and inspect Phase 3M/3N evidence.",
+        "PAPER_READY": "Paper-ready candidates exist; keep paper-only an"
+        "d inspect Phase 3M/3N evidence.",
         "NO_ACTIVE_CRYPTO_MARKETS": "Refresh active Kalshi BTC/ETH markets before forecasting.",
-        "ACTIVE_CRYPTO_MARKETS_NOT_PARSED": "Run/repair crypto market parser before links or forecasts.",
-        "ACTIVE_CRYPTO_MARKETS_NOT_LINKED": "Run/repair crypto market linker for active BTC/ETH tickers.",
-        "EXPIRED_WINDOWS_ONLY": "Run crypto-window-sync after refreshing active markets; expired rows stay historical.",
-        "WINDOW_SYNC_STALE": "Restart or repair the crypto watcher heartbeat before trusting freshness status.",
+        "ACTIVE_CRYPTO_MARKETS_NOT_PARSED": "Run/repair crypto market parser before links or "
+        "forecasts.",
+        "ACTIVE_CRYPTO_MARKETS_NOT_LINKED": "Run/repair crypto market linker for active BTC/E"
+        "TH tickers.",
+        "EXPIRED_WINDOWS_ONLY": (
+            "Run crypto-window-sync after refreshing active markets; expired rows stay historical."
+        ),
+        "WINDOW_SYNC_STALE": "Restart or repair the crypto watcher heartbeat b"
+        "efore trusting freshness status.",
         "QUOTE_STALE": "Refresh exact active-window order books after the writer lane is clear.",
         "NO_FRESH_FEATURES": "Build fresh crypto features for active BTC/ETH windows.",
         "NO_VALID_FORECAST": "Run crypto_v2 forecasts against current active-window snapshots.",
-        "NO_POSITIVE_RAW_EV": "Keep watching; current active windows do not have positive model EV.",
+        "NO_POSITIVE_RAW_EV": "Keep watching; current active windows do not hav"
+        "e positive model EV.",
         "EV_LOST_TO_SPREAD": "Wait for tighter executable spread; do not force a paper trade.",
         "LIQUIDITY_TOO_LOW": "Wait for executable book depth/liquidity.",
         "SPREAD_TOO_WIDE": "Wait for spread to tighten below threshold.",
         "CONFIDENCE_TOO_LOW": "Wait for model confidence to clear the paper gate.",
-        "PHASE_3S_SKIP": "Keep paper-only row skipped until Phase 3S opportunity policy allows proceed.",
+        "PHASE_3S_SKIP": "Keep paper-only row skipped until Phase 3S oppor"
+        "tunity policy allows proceed.",
         "PHASE_3N_RISK_BLOCK": "Respect risk block; inspect Phase 3N logs.",
         "BLOCKED_BY_ACTIVE_WRITER": "Retry after db-writer-monitor reports safe_to_write=true.",
     }.get(blocker, "Continue bounded crypto watch and inspect the next report.")
@@ -1604,7 +1647,10 @@ def _refresh_next_action(state: str) -> str:
     if state == "REFRESH_COMPLETED":
         return "Rerun crypto-window-sync and crypto-watch-status to update UI evidence."
     if state == "RATE_LIMITED_KALSHI_API":
-        return "Wait for Kalshi backoff, then rerun bounded market-data-refresh; keep paper-ready blocked while data is partial."
+        return (
+            "Wait for Kalshi backoff, then rerun bounded market-data-refresh; keep "
+            "paper-ready blocked while data is partial."
+        )
     if state == "REFRESH_FAILED":
         return "Inspect market_data_refresh_status refresh_error before retrying."
     return "Ready to run bounded refresh."
@@ -1640,12 +1686,17 @@ def _database_fingerprint(settings: Settings) -> dict[str, Any]:
     }
 
 
-def _with_metadata(payload: dict[str, Any], *, session: Session, settings: Settings) -> dict[str, Any]:
+def _with_metadata(
+    payload: dict[str, Any], *, session: Session, settings: Settings
+) -> dict[str, Any]:
     payload.setdefault("generated_at", utc_now().isoformat())
     payload.setdefault("command", " ".join(str(part) for part in sys.argv if part))
     payload.setdefault("command_args", sys.argv[1:])
     payload.setdefault("database_fingerprint", _database_fingerprint(settings))
-    payload.setdefault("data_watermark", _market_data_watermark(session, freshness_minutes=DEFAULT_CRYPTO_REFRESH_CADENCE_MINUTES))
+    payload.setdefault(
+        "data_watermark",
+        _market_data_watermark(session, freshness_minutes=DEFAULT_CRYPTO_REFRESH_CADENCE_MINUTES),
+    )
     return payload
 
 
@@ -1723,7 +1774,7 @@ def _render_phase3ak_markdown(payload: dict[str, Any]) -> str:
         "",
         f"- Generated at: `{payload['generated_at']}`",
         f"- Safety: `{payload['paper_only_safety']}`",
-        f"- Live trading: `disabled`",
+        "- Live trading: `disabled`",
         f"- Watch blocker: `{payload['watch_status']['primary_blocker']}`",
         f"- Runner state: `{payload['watch_status']['runner_state']}`",
         f"- Market data state: `{payload['market_data_state']}`",

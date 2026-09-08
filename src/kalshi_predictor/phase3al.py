@@ -208,8 +208,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in payload["excluded_multi_leg_examples"][:20]:
         lines.append(
-            f"| `{row['ticker']}` | {row['sports_leg_count']} | "
-            f"{row['blocking_reason']} |"
+            f"| `{row['ticker']}` | {row['sports_leg_count']} | {row['blocking_reason']} |"
         )
     if not payload["excluded_multi_leg_examples"]:
         lines.append("| none | 0 |  |")

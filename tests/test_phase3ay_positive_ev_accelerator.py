@@ -70,9 +70,7 @@ def test_phase3ay_positive_ev_accelerator_ranks_current_near_miss_only(tmp_path)
     assert payload["thresholds_lowered"] is False
     assert before_orders == after_orders == 0
     assert artifacts.json_path.exists()
-    assert "KXBTC-30JAN0101-B50000" in artifacts.near_miss_rows_path.read_text(
-        encoding="utf-8"
-    )
+    assert "KXBTC-30JAN0101-B50000" in artifacts.near_miss_rows_path.read_text(encoding="utf-8")
 
 
 def test_phase3ay_positive_ev_accelerator_skips_duplicate_watcher_refresh(tmp_path) -> None:

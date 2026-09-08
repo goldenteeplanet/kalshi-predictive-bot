@@ -181,8 +181,7 @@ def _resolve_row(row: dict[str, Any], *, fetcher: SummaryFetcher) -> dict[str, A
                 "safe_to_apply": False,
                 "blocks_phase3ae_upgrade": True,
                 "resolution_note": (
-                    "The source response did not contain exactly one home and away "
-                    "competitor."
+                    "The source response did not contain exactly one home and away competitor."
                 ),
                 "next_action": "Rerun after the source publishes both competitors.",
             }

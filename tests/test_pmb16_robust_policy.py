@@ -31,7 +31,11 @@ def test_pmb16_reports_pnl_drawdown_and_rejected_opportunity_deltas():
     report = build_robust_zone_policy_comparison()
     comparison = report["comparison"]
     assert set(comparison) == {
-        "trade_count_delta", "rejected_opportunity_delta", "capital_usage_delta",
-        "pnl_delta", "max_drawdown_delta", "robust_zone_filtered_trades",
+        "trade_count_delta",
+        "rejected_opportunity_delta",
+        "capital_usage_delta",
+        "pnl_delta",
+        "max_drawdown_delta",
+        "robust_zone_filtered_trades",
     }
     assert comparison["rejected_opportunity_delta"] > 0

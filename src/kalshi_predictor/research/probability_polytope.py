@@ -50,15 +50,12 @@ def _simplex_volume_ratio_upper_bound(widths: list[float]) -> float:
     return 0.0 if best_log == float("-inf") else min(1.0, math.exp(best_log))
 
 
-def _result(
-    feasible: bool, widths: list[float], volume: float | None
-) -> dict[str, Any]:
+def _result(feasible: bool, widths: list[float], volume: float | None) -> dict[str, Any]:
     mean_width = sum(widths) / len(widths) if widths else None
     max_width = max(widths) if widths else None
     checks = {
         "simplex_feasible": feasible,
-        "mean_tightened_width": mean_width is not None
-        and mean_width <= MAX_MEAN_TIGHTENED_WIDTH,
+        "mean_tightened_width": mean_width is not None and mean_width <= MAX_MEAN_TIGHTENED_WIDTH,
         "maximum_tightened_width": max_width is not None
         and max_width <= MAX_COORDINATE_TIGHTENED_WIDTH,
         "simplex_volume_ratio_upper_bound": volume is not None
@@ -72,9 +69,7 @@ def _result(
         "thresholds": {
             "maximum_mean_tightened_width": MAX_MEAN_TIGHTENED_WIDTH,
             "maximum_coordinate_tightened_width": MAX_COORDINATE_TIGHTENED_WIDTH,
-            "maximum_simplex_volume_ratio_upper_bound": (
-                MAX_SIMPLEX_VOLUME_RATIO_UPPER_BOUND
-            ),
+            "maximum_simplex_volume_ratio_upper_bound": (MAX_SIMPLEX_VOLUME_RATIO_UPPER_BOUND),
         },
         "checks": checks,
         "gate_passed": all(checks.values()),

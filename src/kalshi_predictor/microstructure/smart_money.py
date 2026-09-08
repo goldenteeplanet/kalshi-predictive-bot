@@ -85,4 +85,3 @@ def _event(
             "orderbook_imbalance": str(feature.get("orderbook_imbalance")),
         },
     }
-

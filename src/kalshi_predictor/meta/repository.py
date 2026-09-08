@@ -34,9 +34,7 @@ def insert_meta_model_feature(
         model_probabilities_json=encode_json(row.get("model_probabilities") or {}),
         model_disagreement_score=decimal_to_str(row.get("model_disagreement_score")),
         model_agreement_score=decimal_to_str(row.get("model_agreement_score")),
-        model_recent_performance_json=encode_json(
-            row.get("model_recent_performance") or {}
-        ),
+        model_recent_performance_json=encode_json(row.get("model_recent_performance") or {}),
         category_performance_json=encode_json(row.get("category_performance") or {}),
         microstructure_features_json=encode_json(row.get("microstructure_features") or {}),
         news_features_json=encode_json(row.get("news_features") or {}),
@@ -215,10 +213,7 @@ def _existing_training_example(
     forecast_id: int,
 ) -> MetaModelTrainingExample | None:
     for item in session.new:
-        if (
-            isinstance(item, MetaModelTrainingExample)
-            and item.forecast_id == forecast_id
-        ):
+        if isinstance(item, MetaModelTrainingExample) and item.forecast_id == forecast_id:
             return item
     return session.scalar(
         select(MetaModelTrainingExample)

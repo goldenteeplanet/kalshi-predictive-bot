@@ -125,7 +125,9 @@ def _fake_probe_runner(overrides: dict[str, tuple[str, bool, int | None, str]] |
     outputs = {
         "remote_time_utc": ("2026-07-13T14:00:00Z\n", True, 0, ""),
         "db_writer_monitor_raw": (
-            json.dumps({"status": "OPEN_READERS", "safe_to_start_write": True, "current_writer_pid": None}),
+            json.dumps(
+                {"status": "OPEN_READERS", "safe_to_start_write": True, "current_writer_pid": None}
+            ),
             True,
             0,
             "",
@@ -136,12 +138,19 @@ def _fake_probe_runner(overrides: dict[str, tuple[str, bool, int | None, str]] |
         "scheduler_runner_script": (_runner_without_hook(), True, 0, ""),
         "command_registry": ("COMMAND_REGISTRY_OK\n", True, 0, ""),
         "weather_funnel_json": (
-            json.dumps({"status": "NO_CURRENT_WEATHER_ROWS", "summary": {"current_weather_rows": 0}}),
+            json.dumps(
+                {"status": "NO_CURRENT_WEATHER_ROWS", "summary": {"current_weather_rows": 0}}
+            ),
             True,
             0,
             "",
         ),
-        "install_runner_hook": ("INSTALLED_R43_WEATHER_CATALOG_HOOK\nbackup=/tmp/old.bak\n", True, 0, ""),
+        "install_runner_hook": (
+            "INSTALLED_R43_WEATHER_CATALOG_HOOK\nbackup=/tmp/old.bak\n",
+            True,
+            0,
+            "",
+        ),
         "runner_script_after_apply": (_runner_with_hook(), True, 0, ""),
     }
     if overrides:
@@ -175,7 +184,8 @@ run_job() {
 }
 
 # cadence_minutes=30 category=weather
-run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane --output-dir reports/phase3bb_r2 --reports-dir reports
+run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane \
+--output-dir reports/phase3bb_r2 --reports-dir reports
 """
 
 
@@ -183,6 +193,8 @@ def _runner_with_hook() -> str:
     return _runner_without_hook().replace(
         "# cadence_minutes=30 category=weather\n",
         "# cadence_minutes=30 category=weather-catalog\n"
-        "run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; .venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH'\n\n"
+        "run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; "
+        ".venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 "
+        "--series-ticker KXTEMPNYCH'\n\n"
         "# cadence_minutes=30 category=weather\n",
     )

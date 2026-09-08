@@ -1610,7 +1610,7 @@ def _write_candidate_csv(path: Path, rows: list[dict[str, Any]]) -> None:
             writer.writerow(
                 {
                     key: json.dumps(row.get(key), sort_keys=True)
-                    if isinstance(row.get(key), (list, dict))
+                    if isinstance(row.get(key), list | dict)
                     else row.get(key)
                     for key in fieldnames
                 }

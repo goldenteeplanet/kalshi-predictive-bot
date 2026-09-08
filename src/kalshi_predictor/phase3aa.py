@@ -46,9 +46,7 @@ def build_settlement_eta_schedule(
         row for row in rows if row["status"] == "FILLED" and not row["settlement_found"]
     ]
     due_rows = [
-        row
-        for row in active_unsettled
-        if row.get("close_time_bucket") in {"overdue", "0-6h"}
+        row for row in active_unsettled if row.get("close_time_bucket") in {"overdue", "0-6h"}
     ]
     eta_buckets = reconciliation["close_time_buckets"]
     return {
@@ -278,8 +276,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in eta["recommended_watch_intervals"]:
         lines.append(
-            f"| {row['bucket']} | {row['trades']} | {row['interval_minutes']} | "
-            f"{row['policy']} |"
+            f"| {row['bucket']} | {row['trades']} | {row['interval_minutes']} | {row['policy']} |"
         )
     if not eta["recommended_watch_intervals"]:
         lines.append("| None | 0 | 0 | No active unsettled paper trades. |")

@@ -107,8 +107,7 @@ def build_workspace_consistency_guard(
             "virtualenv": str(venv_path) if venv_path else None,
             "package_path": str(package_path),
             "package_directory": str(package_dir),
-            "git_branch": _git_value(repo_root, "rev-parse", "--abbrev-ref", "HEAD")
-            or "unknown",
+            "git_branch": _git_value(repo_root, "rev-parse", "--abbrev-ref", "HEAD") or "unknown",
             "git_commit": _git_value(repo_root, "rev-parse", "--short", "HEAD") or "unknown",
         },
         "database": {

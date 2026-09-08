@@ -22,4 +22,3 @@ class MarketImpliedSnapshotForecaster:
                 orderbook_json=decode_json(snapshot.raw_orderbook_json),
             )
         )
-

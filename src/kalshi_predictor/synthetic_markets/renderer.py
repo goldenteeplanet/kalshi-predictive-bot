@@ -82,11 +82,7 @@ def render_synthetic_markets_markdown(result: SyntheticMarketsResult) -> str:
     for warning in warnings:
         lines.append(f"- {warning}")
     lines.extend(["", "## New Kalshi listing matches", ""])
-    matches = [
-        match
-        for card in result.cards
-        for match in card.listing_check.matches
-    ]
+    matches = [match for card in result.cards for match in card.listing_check.matches]
     if not matches:
         lines.append("- None.")
     for match in matches:

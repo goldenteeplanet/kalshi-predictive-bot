@@ -8,7 +8,6 @@ from kalshi_predictor.ui.notification_pipeline_workflow import (
     write_workflow_preview,
 )
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 

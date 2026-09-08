@@ -183,14 +183,12 @@ def friendly_database_locked_message(
             elapsed = holder.get("elapsed") or "n/a"
             files = ", ".join(Path(path).name for path in holder.get("open_files", []))
             lines.append(
-                f"- pid {holder['pid']}{marker}, elapsed {elapsed}: "
-                f"{holder['command']} ({files})"
+                f"- pid {holder['pid']}{marker}, elapsed {elapsed}: {holder['command']} ({files})"
             )
     else:
         lines.append("No DB file holders were visible to the process scanner.")
     lines.append(
-        "Recommended next command after finish: "
-        f"{monitor['recommended_next_command_after_finish']}"
+        f"Recommended next command after finish: {monitor['recommended_next_command_after_finish']}"
     )
     lines.append("Wait for settlement/learning jobs to finish, then retry the command.")
     return "\n".join(lines)

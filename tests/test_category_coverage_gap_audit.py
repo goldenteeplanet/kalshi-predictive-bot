@@ -117,14 +117,20 @@ def test_read_only_engine_rejects_writes(tmp_path: Path) -> None:
 
 
 def test_paper_readiness_distinguishes_liquidity_from_other_gates() -> None:
-    assert _limitation_class(
-        "PAPER_READINESS_GATE",
-        {"liquidity_score": "0", "executable_book": False},
-    ) == "liquidity_limitation"
-    assert _limitation_class(
-        "PAPER_READINESS_GATE",
-        {"liquidity_score": "0.75", "executable_book": True},
-    ) == "paper_readiness_gate"
+    assert (
+        _limitation_class(
+            "PAPER_READINESS_GATE",
+            {"liquidity_score": "0", "executable_book": False},
+        )
+        == "liquidity_limitation"
+    )
+    assert (
+        _limitation_class(
+            "PAPER_READINESS_GATE",
+            {"liquidity_score": "0.75", "executable_book": True},
+        )
+        == "paper_readiness_gate"
+    )
 
 
 def _session_factory(tmp_path: Path):

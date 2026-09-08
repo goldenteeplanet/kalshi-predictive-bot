@@ -46,10 +46,7 @@ def build_weather_features(
     generated_at = utc_now()
     for forecast in forecasts:
         features = calculate_weather_features(forecast, generated_at=generated_at)
-        if (
-            active_settings.weather_v2_knyc_observation_enabled
-            and location == "new_york"
-        ):
+        if active_settings.weather_v2_knyc_observation_enabled and location == "new_york":
             evidence = _knyc_observation_evidence(
                 session,
                 target_time=forecast.forecast_time,
@@ -120,9 +117,7 @@ def _weather_observation_reference(
             normalized_target.isoformat() if normalized_target is not None else None
         ),
         "observation_at": (
-            normalized_observed_at.isoformat()
-            if normalized_observed_at is not None
-            else None
+            normalized_observed_at.isoformat() if normalized_observed_at is not None else None
         ),
         "offset_seconds": offset_seconds,
         "observation_temperature_f": observation.temperature_f,

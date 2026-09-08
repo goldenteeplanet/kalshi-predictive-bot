@@ -124,9 +124,7 @@ def _category_summary(
     for field, blocker in STAGES:
         numerator = sum(1 for row in active if _truthy(row.get(field)))
         missing = sorted(
-            str(row.get("ticker") or "UNKNOWN")
-            for row in active
-            if not _truthy(row.get(field))
+            str(row.get("ticker") or "UNKNOWN") for row in active if not _truthy(row.get(field))
         )
         stages[field] = {
             "numerator": numerator,
@@ -137,9 +135,7 @@ def _category_summary(
             "missing_tickers": missing[:missing_ticker_limit],
             "missing_tickers_truncated": len(missing) > missing_ticker_limit,
         }
-    first_blockers = Counter(
-        row["first_blocker"] for row in gaps if row.get("first_blocker")
-    )
+    first_blockers = Counter(row["first_blocker"] for row in gaps if row.get("first_blocker"))
     blockers = list(evidence.get("deterministic_blockers") or ())
     if not detail_available:
         blockers.append("DETAIL_EVIDENCE_MISSING")

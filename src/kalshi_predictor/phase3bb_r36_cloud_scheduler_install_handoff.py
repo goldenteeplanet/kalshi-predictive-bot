@@ -23,7 +23,7 @@ DEFAULT_OUTPUT_DIR = Path("reports/phase3bb_r36")
 DEFAULT_REPORTS_DIR = Path("reports")
 DEFAULT_R35_MAX_AGE_MINUTES = 60
 APPROVAL_ENV_VAR = "PHASE3BB_R36_EXECUTE"
-APPROVAL_TOKEN = "I_APPROVE_R36_SCHEDULER_INSTALL"
+APPROVAL_TOKEN = "I_APPROVE_R36_SCHEDULER_INSTALL"  # pragma: allowlist secret
 SCHEDULER_SERVICE_NAME = "kalshi-multicategory-refresh-scheduler.service"
 SCHEDULER_TIMER_NAME = "kalshi-multicategory-refresh-scheduler.timer"
 RUNNER_SCRIPT_NAME = "kalshi-multicategory-refresh-runner.sh"
@@ -531,20 +531,20 @@ def _render_handoff_script(payload: dict[str, Any]) -> str:
         [
             ")",
             "",
-            "if [[ \"$TOKEN\" != \"$REQUIRED\" ]]; then",
+            'if [[ "$TOKEN" != "$REQUIRED" ]]; then',
             "  echo '[phase3bb-r36] dry-run command list:'",
             "  printf '  %s\\n' \"${commands[@]}\"",
             "  echo '[phase3bb-r36] no install/enable/start command executed'",
             "  echo '[phase3bb-r36] to execute install+enable-no-start, set:'",
-            f"  echo \"  {APPROVAL_ENV_VAR}=$REQUIRED bash $0\"",
+            f'  echo "  {APPROVAL_ENV_VAR}=$REQUIRED bash $0"',
             "  exit 0",
             "fi",
             "",
             "echo '[phase3bb-r36] approval token accepted'",
             "echo '[phase3bb-r36] running scheduler install + enable-no-start handoff'",
-            "for command in \"${commands[@]}\"; do",
-            "  echo \"+ $command\"",
-            "  bash -lc \"$command\"",
+            'for command in "${commands[@]}"; do',
+            '  echo "+ $command"',
+            '  bash -lc "$command"',
             "done",
             "echo '[phase3bb-r36] handoff commands completed'",
             "echo '[phase3bb-r36] verify with Phase 3BB-R37 next'",

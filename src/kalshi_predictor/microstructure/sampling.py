@@ -27,11 +27,9 @@ CLOSED_STATUSES = {"closed", "settled", "expired", "resolved", "finalized"}
 
 
 class MicrostructureSamplingClient(Protocol):
-    def get_market(self, ticker: str) -> Mapping[str, Any]:
-        ...
+    def get_market(self, ticker: str) -> Mapping[str, Any]: ...
 
-    def get_orderbook(self, ticker: str) -> Mapping[str, Any]:
-        ...
+    def get_orderbook(self, ticker: str) -> Mapping[str, Any]: ...
 
 
 @dataclass(frozen=True)

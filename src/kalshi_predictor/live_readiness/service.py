@@ -80,9 +80,7 @@ def config_from_settings(settings: Settings | None = None) -> LiveReadinessConfi
         evidence_stale_after_days=resolved.phase_3v_evidence_stale_after_days,
         required_approval_roles=parse_required_roles(resolved.phase_3v_required_approval_roles),
         micro_max_contracts_per_order=resolved.phase_3v_micro_max_contracts_per_order,
-        constrained_max_contracts_per_order=(
-            resolved.phase_3v_constrained_max_contracts_per_order
-        ),
+        constrained_max_contracts_per_order=(resolved.phase_3v_constrained_max_contracts_per_order),
         full_max_contracts_per_order=resolved.phase_3v_full_max_contracts_per_order,
     )
     config.validate()
@@ -592,8 +590,7 @@ def _decision_from_controls(
     ):
         return DECISION_NO_GO
     if any(
-        row["severity"] in {SEVERITY_CRITICAL, SEVERITY_HIGH}
-        and row["status"] == STATUS_NOT_TESTED
+        row["severity"] in {SEVERITY_CRITICAL, SEVERITY_HIGH} and row["status"] == STATUS_NOT_TESTED
         for row in control_results
     ):
         return DECISION_INCOMPLETE

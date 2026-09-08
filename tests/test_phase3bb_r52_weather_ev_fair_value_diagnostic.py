@@ -110,7 +110,9 @@ def _fake_probe_runner(state: dict[str, object]):
     outputs = {
         "remote_time_utc": ("2026-07-13T23:00:00Z\n", True, 0, ""),
         "db_writer_monitor": (
-            json.dumps({"status": "CLEAR", "safe_to_start_write": True, "current_writer_pid": None}),
+            json.dumps(
+                {"status": "CLEAR", "safe_to_start_write": True, "current_writer_pid": None}
+            ),
             True,
             0,
             "",
@@ -155,7 +157,9 @@ def _ev_state(*, rows: list[dict[str, object]]) -> dict[str, object]:
         "summary": {
             "linked_weather_rows": len(rows),
             "ranked_weather_rows": len(rows),
-            "positive_ev_rows": sum(1 for row in rows if str(row["estimated_edge"]).startswith("0.")),
+            "positive_ev_rows": sum(
+                1 for row in rows if str(row["estimated_edge"]).startswith("0.")
+            ),
         },
     }
 

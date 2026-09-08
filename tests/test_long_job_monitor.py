@@ -26,8 +26,7 @@ def test_long_job_monitor_reports_phase3ay_progress_and_finish_hook(
             "pid": pid,
             "running": True,
             "command": (
-                "kalshi-bot phase3ay-health-refresh --duration-hours 9 "
-                "--interval-seconds 300"
+                "kalshi-bot phase3ay-health-refresh --duration-hours 9 --interval-seconds 300"
             ),
             "elapsed_seconds": 3600,
         },
@@ -45,9 +44,7 @@ def test_long_job_monitor_reports_phase3ay_progress_and_finish_hook(
     assert payload["phase3ay"]["budget_label"] == "8h 0m remaining"
     assert payload["phase3ay"]["progress_percent"] == 11.1
     assert payload["post_refresh_hook"]["status"] == "WAITING_FOR_REFRESH"
-    assert "phase3bb-domain-readiness" in " ".join(
-        payload["post_refresh_hook"]["planned_commands"]
-    )
+    assert "phase3bb-domain-readiness" in " ".join(payload["post_refresh_hook"]["planned_commands"])
     assert "phase3bb-r2-general-candidate-routing" in " ".join(
         payload["post_refresh_hook"]["planned_commands"]
     )

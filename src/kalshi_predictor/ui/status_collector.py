@@ -3,17 +3,22 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from kalshi_predictor.ui.cloud_status_adapter import adapt_cloud_status_bundle
 from kalshi_predictor.ui.progress_history import history_path_for, record_progress_snapshot
 
-
 REQUIRED_SOURCES = (
-    "db_writer_monitor", "db_locks", "backup_report", "scheduler", "execution", "process"
+    "db_writer_monitor",
+    "db_locks",
+    "backup_report",
+    "scheduler",
+    "execution",
+    "process",
 )
 
 
@@ -35,7 +40,11 @@ def _parse(value: str) -> datetime:
 
 
 def _recover_stale_lock(
-    lock_path: Path, *, now: datetime, stale_after_seconds: int, owner_alive: OwnerAlive,
+    lock_path: Path,
+    *,
+    now: datetime,
+    stale_after_seconds: int,
+    owner_alive: OwnerAlive,
 ) -> bool:
     if not lock_path.exists():
         return False
@@ -73,9 +82,15 @@ def _atomic_publish(payload: Mapping[str, Any], destination: Path) -> str:
 
 
 def run_status_collector(
-    spec: Mapping[str, Any], runner: SourceRunner, destination: Path, *,
-    now: datetime, pid: int, owner_alive: OwnerAlive = lambda _pid: True,
-    source_timeout_seconds: int = 5, stale_lock_seconds: int = 120,
+    spec: Mapping[str, Any],
+    runner: SourceRunner,
+    destination: Path,
+    *,
+    now: datetime,
+    pid: int,
+    owner_alive: OwnerAlive = lambda _pid: True,
+    source_timeout_seconds: int = 5,
+    stale_lock_seconds: int = 120,
 ) -> dict[str, Any]:
     lock_path = destination.with_suffix(destination.suffix + ".collector.lock")
     temporary = destination.with_suffix(destination.suffix + ".tmp")
@@ -84,8 +99,11 @@ def run_status_collector(
     )
     if lock_path.exists():
         return {
-            "phase": "UI-OBS-2B", "status": "BLOCKED", "published": False,
-            "diagnostics": ["COLLECTOR_OVERLAP_BLOCKED"], "recovered_stale_lock": False,
+            "phase": "UI-OBS-2B",
+            "status": "BLOCKED",
+            "published": False,
+            "diagnostics": ["COLLECTOR_OVERLAP_BLOCKED"],
+            "recovered_stale_lock": False,
         }
     if temporary.exists():
         temporary.unlink()
@@ -121,7 +139,11 @@ def run_status_collector(
             diagnostics.extend(adapter["diagnostics"])
         published = not diagnostics and adapter is not None and adapter["adapter_passed"]
         digest = _atomic_publish(adapter["snapshot"], destination) if published else None
-        history = record_progress_snapshot(adapter["snapshot"], history_path_for(destination)) if published else None
+        history = (
+            record_progress_snapshot(adapter["snapshot"], history_path_for(destination))
+            if published
+            else None
+        )
         return {
             "phase": "UI-OBS-2B",
             "mode": "LOCAL_SYNTHETIC_READ_ONLY_COLLECTOR_RESILIENCE_PREVIEW",
@@ -170,18 +192,27 @@ def write_collector_resilience_preview(fixture_path: Path, output_dir: Path) -> 
         bundle_path = (fixture_path.parent / fixture["bundle_path"]).resolve()
         bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
         fixture["spec"] = {
-            "collected_at": bundle["collected_at"], "alerts": bundle.get("alerts", []),
-            "reports": bundle.get("reports", []), "workstreams": bundle.get("workstreams", []),
+            "collected_at": bundle["collected_at"],
+            "alerts": bundle.get("alerts", []),
+            "reports": bundle.get("reports", []),
+            "workstreams": bundle.get("workstreams", []),
         }
         fixture["source_results"] = {
-            name: {"captured_at": bundle["source_timestamps"].get(name, bundle["collected_at"]), "payload": payload}
+            name: {
+                "captured_at": bundle["source_timestamps"].get(name, bundle["collected_at"]),
+                "payload": payload,
+            }
             for name, payload in bundle["sources"].items()
         }
     output_dir.mkdir(parents=True, exist_ok=True)
     snapshot = output_dir / "ui_obs2b_published_progress_snapshot.json"
     result = run_status_collector(
-        fixture["spec"], ScriptedSyntheticRunner(fixture["source_results"]), snapshot,
-        now=_parse(fixture["now"]), pid=int(fixture["pid"]), owner_alive=lambda _pid: False,
+        fixture["spec"],
+        ScriptedSyntheticRunner(fixture["source_results"]),
+        snapshot,
+        now=_parse(fixture["now"]),
+        pid=int(fixture["pid"]),
+        owner_alive=lambda _pid: False,
     )
     result["destination"] = snapshot.name
     report_path = output_dir / "ui_obs2b_collector_resilience_preview.json"

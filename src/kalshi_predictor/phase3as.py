@@ -124,9 +124,7 @@ def _summary(rows: list[dict[str, Any]], deprecated_marked: int) -> dict[str, An
     active_rows = [row for row in rows if row["status_bucket"] == "active"]
     inactive_rows = [row for row in rows if row["status_bucket"] == "inactive"]
     unknown_rows = [row for row in rows if row["status_bucket"] == "unknown"]
-    active_with_snapshot = [
-        row for row in active_rows if row["has_snapshot"]
-    ]
+    active_with_snapshot = [row for row in active_rows if row["has_snapshot"]]
     return {
         "linked_markets_checked": len(rows),
         "active_linked_markets": len(active_rows),

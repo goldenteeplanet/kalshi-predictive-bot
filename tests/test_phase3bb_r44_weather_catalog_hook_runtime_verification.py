@@ -52,7 +52,9 @@ def test_phase3bb_r44_asks_for_r40_refresh_when_r40_is_stale(tmp_path: Path) -> 
     session_factory = _session_factory(tmp_path)
     reports_dir = tmp_path / "reports"
     _write_context(reports_dir)
-    runner = _fake_probe_runner({"r40_json": (json.dumps({"parsed_runtime_state": {}}), True, 0, "")})
+    runner = _fake_probe_runner(
+        {"r40_json": (json.dumps({"parsed_runtime_state": {}}), True, 0, "")}
+    )
 
     with session_factory() as session:
         payload = build_phase3bb_r44_weather_catalog_hook_runtime_verification(
@@ -135,7 +137,9 @@ def _fake_probe_runner(overrides: dict[str, tuple[str, bool, int | None, str]] |
         "scheduler_service_active": ("inactive\n", True, 0, ""),
         "scheduler_timer_list": (
             "NEXT LEFT LAST PASSED UNIT ACTIVATES\n"
-            "Mon 2026-07-13 14:34:43 UTC 9min Mon 2026-07-13 14:19:43 UTC 5min ago kalshi-multicategory-refresh-scheduler.timer kalshi-multicategory-refresh-scheduler.service\n",
+            "Mon 2026-07-13 14:34:43 UTC 9min Mon 2026-07-13 14:19:43 UTC 5min ago "
+            "kalshi-multicategory-refresh-scheduler.timer "
+            "kalshi-multicategory-refresh-scheduler.service\n",
             True,
             0,
             "",
@@ -177,23 +181,34 @@ def _runner_with_hook() -> str:
 set -euo pipefail
 
 # cadence_minutes=30 category=weather-catalog
-run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; .venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit 1500; .venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 --match-tolerance-hours 3'
+run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; \
+.venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 \
+--series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit \
+1500; .venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir \
+reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 \
+--match-tolerance-hours 3'
 
 # cadence_minutes=30 category=weather
-run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane --output-dir reports/phase3bb_r2 --reports-dir reports
+run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane \
+--output-dir reports/phase3bb_r2 --reports-dir reports
 """
 
 
 def _journal_with_runtime_sequence() -> str:
     return "\n".join(
         [
-            "Jul 13 14:19:43 kalshi-bot-01 systemd[1]: Starting kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only multi-category refresh scheduler...",
-            "Jul 13 14:20:09 kalshi-bot-01 runner[1]: [phase3bb-r35] running weather_current_catalog_refresh",
+            "Jul 13 14:19:43 kalshi-bot-01 systemd[1]: Starting "
+            "kalshi-multicategory-refresh-scheduler.service - Kalshi paper-only "
+            "multi-category refresh scheduler...",
+            "Jul 13 14:20:09 kalshi-bot-01 runner[1]: [phase3bb-r35] running "
+            "weather_current_catalog_refresh",
             "Jul 13 14:20:14 kalshi-bot-01 runner[1]: Synced 10 markets.",
             "Jul 13 14:20:59 kalshi-bot-01 runner[1]: Market leg parse summary",
-            "Jul 13 14:22:26 kalshi-bot-01 runner[1]: Wrote JSON: reports/phase3az_r12_weather/weather_activation_preview.json",
+            "Jul 13 14:22:26 kalshi-bot-01 runner[1]: Wrote JSON: "
+            "reports/phase3az_r12_weather/weather_activation_preview.json",
             "Jul 13 14:22:31 kalshi-bot-01 runner[1]: [phase3bb-r35] running weather_fast_lane",
-            "Jul 13 14:23:45 kalshi-bot-01 runner[1]: Wrote JSON: reports/phase3bb_r2/weather_funnel.json",
+            "Jul 13 14:23:45 kalshi-bot-01 runner[1]: Wrote JSON: "
+            "reports/phase3bb_r2/weather_funnel.json",
         ]
     )
 

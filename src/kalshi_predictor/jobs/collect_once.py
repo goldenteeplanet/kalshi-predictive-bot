@@ -136,9 +136,7 @@ def collect_once(
                     )
                     skipped_forecasts += 1
                     continue
-                record = insert_forecast(
-                    session, forecast, market_snapshot_id=snapshot.id
-                )
+                record = insert_forecast(session, forecast, market_snapshot_id=snapshot.id)
                 session.flush()
                 attribute_forecast_signals(session, record)
                 forecasts_inserted += 1
@@ -176,9 +174,7 @@ def collect_once(
         stopped_reason=collection_state["stopped_reason"],
         resume_cursor=collection_state["resume_cursor"],
         market_pages_processed=int(page_state["market_sync"].get("pages_processed") or 0),
-        snapshot_pages_processed=int(
-            page_state["snapshot_capture"].get("pages_processed") or 0
-        ),
+        snapshot_pages_processed=int(page_state["snapshot_capture"].get("pages_processed") or 0),
         rate_limit_status=rate_limit_status,
         rate_limited=rate_limited,
         rate_limit_details=rate_limit_details,

@@ -240,8 +240,7 @@ def _crypto_truth_from_r4(*, reports_dir: Path, now: Any) -> dict[str, Any]:
     r5_payload, r5_selected_path = _freshest_r5_status_payload(reports_dir)
     r5_status = _r5_status_truth(path=r5_selected_path, payload=r5_payload, now=now)
     rows = [
-        _crypto_row(row, report_status=report_status)
-        for row in payload.get("positive_ev_rows", [])
+        _crypto_row(row, report_status=report_status) for row in payload.get("positive_ev_rows", [])
     ]
     selected_source = "PHASE3BA_R4_DB_ROWS"
     if not rows and _to_int(r5_status.get("positive_ev_rows")) > 0:
@@ -253,9 +252,7 @@ def _crypto_truth_from_r4(*, reports_dir: Path, now: Any) -> dict[str, Any]:
     blocked_rows = max(0, current_rows - paper_ready_rows)
     positive_ev_rows = sum(_positive_ev_weight(row) for row in rows)
     summary_source = (
-        "R5_AGGREGATE_TRUTH_ONLY"
-        if selected_source == "R5_STATUS_JSON"
-        else report_status["path"]
+        "R5_AGGREGATE_TRUTH_ONLY" if selected_source == "R5_STATUS_JSON" else report_status["path"]
     )
     summary = {
         "category": "crypto",
@@ -330,9 +327,7 @@ def _r13_remote_r5_status(payload: dict[str, Any]) -> dict[str, Any]:
     guard_dry_run = (
         parsed.get("guard_dry_run") if isinstance(parsed.get("guard_dry_run"), dict) else {}
     )
-    guard_after = (
-        guard_dry_run.get("after") if isinstance(guard_dry_run.get("after"), dict) else {}
-    )
+    guard_after = guard_dry_run.get("after") if isinstance(guard_dry_run.get("after"), dict) else {}
     r5_status = parsed.get("r5_status") if isinstance(parsed.get("r5_status"), dict) else {}
     status, _path = _freshest_r5_candidate(
         [
@@ -495,8 +490,10 @@ def _r5_aggregate_crypto_row(r5_status: dict[str, Any]) -> dict[str, Any]:
     clean_execution_rows = _to_int(r5_status.get("clean_execution_rows"))
     primary_gap = r5_status.get("primary_gap_after_refresh")
     watch_state = "POSITIVE_EV_NO_BOOK" if no_book_rows > 0 else "POSITIVE_EV_RISK_NOT_ELIGIBLE"
-    detail = "POSITIVE_EV_NO_EXECUTABLE_BOOK" if no_book_rows > 0 else str(
-        primary_gap or "R5_AGGREGATE_POSITIVE_EV_BLOCKED"
+    detail = (
+        "POSITIVE_EV_NO_EXECUTABLE_BOOK"
+        if no_book_rows > 0
+        else str(primary_gap or "R5_AGGREGATE_POSITIVE_EV_BLOCKED")
     )
     return {
         "ticker": None,
@@ -830,8 +827,10 @@ def _classify_3ap_gate(
         and freshest_trusted_at is not None
         and generated_at < freshest_trusted_at
     )
-    stale = not payload or older_than_trusted or (
-        age_seconds is not None and age_seconds > FRESH_REPORT_SECONDS
+    stale = (
+        not payload
+        or older_than_trusted
+        or (age_seconds is not None and age_seconds > FRESH_REPORT_SECONDS)
     )
     summary = payload.get("summary", {}) if isinstance(payload, dict) else {}
     return {
@@ -1196,9 +1195,7 @@ def _latest_iso(session: Session, column: Any) -> str | None:
 
 def _latest_ranking_iso(session: Session, model_name: str) -> str | None:
     value = session.scalar(
-        select(func.max(MarketRanking.ranked_at)).where(
-            MarketRanking.forecast_model == model_name
-        )
+        select(func.max(MarketRanking.ranked_at)).where(MarketRanking.forecast_model == model_name)
     )
     return value.isoformat() if hasattr(value, "isoformat") else value
 

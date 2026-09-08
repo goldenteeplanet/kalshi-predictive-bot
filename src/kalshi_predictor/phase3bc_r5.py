@@ -41,8 +41,6 @@ from kalshi_predictor.learning.config import learning_paper_settings
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES, PaperDecision
 from kalshi_predictor.paper.settlement_reconciliation import PAPER_ONLY_SAFETY
 from kalshi_predictor.phase3ar import repair_crypto_snapshots_for_tickers
-
-_decode_list = decode_list
 from kalshi_predictor.phase3bc_r3 import (
     DEFAULT_CRYPTO_LINK_SCAN_LIMIT,
     DEFAULT_CRYPTO_MARKET_SCAN_LIMIT,
@@ -64,11 +62,11 @@ from kalshi_predictor.runtime_stage_heartbeat import AtomicStageHeartbeat
 from kalshi_predictor.utils.decimals import decimal_to_str, to_decimal
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
+_decode_list = decode_list
+
 PHASE3BC_R5_VERSION = "phase3bc_r5_crypto_freshness_watch_positive_ev_trigger"
 MODEL_NAME = "crypto_v2"
-SNAPSHOT_REFRESH_CANDIDATE_FILTER = (
-    "ACTIVE_OPEN_PURE_CRYPTO_EV_NEAR_MISS_OR_STALE_MAINTENANCE"
-)
+SNAPSHOT_REFRESH_CANDIDATE_FILTER = "ACTIVE_OPEN_PURE_CRYPTO_EV_NEAR_MISS_OR_STALE_MAINTENANCE"
 PREFLIGHT_LOW_SCORE = "LOW_SCORE"
 PREFLIGHT_LOW_EDGE = "LOW_EDGE"
 PREFLIGHT_LIQUIDITY_ZERO = "LIQUIDITY_ZERO"
@@ -77,9 +75,7 @@ PREFLIGHT_RANKING_GAP = "RANKING_GAP"
 PREFLIGHT_RISK_MISSING = "RISK_MISSING"
 SNAPSHOT_REFRESH_ISSUES = {"SNAPSHOT_STALE", "SNAPSHOT_MISSING"}
 EXACT_TICKER_NOT_REFRESHED = "EXACT_TICKER_NOT_REFRESHED"
-FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH = (
-    "FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH"
-)
+FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH = "FORECAST_REFRESH_PENDING_AFTER_SNAPSHOT_REFRESH"
 FORECAST_REFRESHED_STILL_STALE = "FORECAST_REFRESHED_STILL_STALE"
 FRESHNESS_COMPLETE = "COMPLETE"
 EV_NOT_POSITIVE = "EV_NOT_POSITIVE"
@@ -138,6 +134,7 @@ def write_phase3bc_r5_crypto_freshness_watch_report(
     freshness_minutes: int = DEFAULT_CRYPTO_REFRESH_CADENCE_MINUTES,
     max_preflight: int = 10,
     risk_preflight: bool = True,
+    persist_risk_preflight: bool = True,
     ranking_repair: bool = True,
     ranking_repair_limit: int = 500,
     exact_snapshot_refresh: bool = True,
@@ -278,6 +275,7 @@ def write_phase3bc_r5_crypto_freshness_watch_report(
             session,
             candidates,
             settings=_preflight_settings(resolved),
+            persist=persist_risk_preflight,
         )
         if risk_preflight
         else []
@@ -351,9 +349,7 @@ def write_phase3bc_r5_crypto_freshness_watch_report(
     payload.setdefault("summary", {})["post_refresh_dashboard_truth_status"] = (
         dashboard_truth_refresh["status"]
     )
-    payload.setdefault("reports", {})["post_refresh_dashboard_truth"] = (
-        dashboard_truth_refresh
-    )
+    payload.setdefault("reports", {})["post_refresh_dashboard_truth"] = dashboard_truth_refresh
     json_path.write_text(
         json.dumps(payload, indent=2, sort_keys=True, default=str),
         encoding="utf-8",
@@ -521,19 +517,13 @@ def build_phase3bc_r5_payload(
         row for row in positive_ev_rows_for_actionability if _clean_executable_book(row)
     ]
     positive_ev_snapshot_stale = [
-        row
-        for row in positive_ev_rows_for_actionability
-        if _row_has_snapshot_stale_blocker(row)
+        row for row in positive_ev_rows_for_actionability if _row_has_snapshot_stale_blocker(row)
     ]
     positive_ev_forecast_stale = [
-        row
-        for row in positive_ev_rows_for_actionability
-        if _row_has_forecast_stale_blocker(row)
+        row for row in positive_ev_rows_for_actionability if _row_has_forecast_stale_blocker(row)
     ]
     positive_ev_spread_blocked = [
-        row
-        for row in positive_ev_rows_for_actionability
-        if _row_has_spread_blocker(row)
+        row for row in positive_ev_rows_for_actionability if _row_has_spread_blocker(row)
     ]
     positive_ev_clean_book_risk_missing = [
         row for row in positive_ev_clean_book if _row_has_missing_risk(row)
@@ -552,13 +542,10 @@ def build_phase3bc_r5_payload(
         liquidity_watch_rows,
     )
     preflight_blockers = Counter(
-        blocker
-        for row in positive_ev_blocked
-        for blocker in row.get("preflight_blockers", [])
+        blocker for row in positive_ev_blocked for blocker in row.get("preflight_blockers", [])
     )
     preflight_blocker_counts = {
-        blocker: preflight_blockers.get(blocker, 0)
-        for blocker in PREFLIGHT_BLOCKER_ORDER
+        blocker: preflight_blockers.get(blocker, 0) for blocker in PREFLIGHT_BLOCKER_ORDER
     }
     snapshot_refresh_result = exact_snapshot_refresh_result or {}
     forecast_refresh_result = exact_forecast_refresh_result or {}
@@ -595,9 +582,7 @@ def build_phase3bc_r5_payload(
         "positive_ev_snapshot_stale_rows": len(positive_ev_snapshot_stale),
         "positive_ev_forecast_stale_rows": len(positive_ev_forecast_stale),
         "positive_ev_spread_blocked_rows": len(positive_ev_spread_blocked),
-        "positive_ev_clean_book_risk_missing_rows": len(
-            positive_ev_clean_book_risk_missing
-        ),
+        "positive_ev_clean_book_risk_missing_rows": len(positive_ev_clean_book_risk_missing),
         "preflight_blocker_counts": preflight_blocker_counts,
         "ev_calibration_state": ev_calibration["state"],
         "ev_gate_cents": "0.0",
@@ -607,12 +592,8 @@ def build_phase3bc_r5_payload(
         "best_ev_candidate_ticker": ev_calibration["best_candidate_ticker"],
         "best_ev_gap_to_positive_cents": ev_calibration["best_gap_to_positive_cents"],
         "ev_near_miss_rows": ev_calibration["near_miss_rows"],
-        "ev_near_miss_liquidity_positive_rows": ev_calibration[
-            "near_miss_liquidity_positive_rows"
-        ],
-        "ev_near_miss_clean_execution_rows": ev_calibration[
-            "near_miss_clean_execution_rows"
-        ],
+        "ev_near_miss_liquidity_positive_rows": ev_calibration["near_miss_liquidity_positive_rows"],
+        "ev_near_miss_clean_execution_rows": ev_calibration["near_miss_clean_execution_rows"],
         "liquidity_emergence_rows": liquidity_emergence["liquidity_emergence_rows"],
         "positive_ev_liquidity_emergence_rows": liquidity_emergence[
             "positive_ev_liquidity_emergence_rows"
@@ -620,18 +601,14 @@ def build_phase3bc_r5_payload(
         "near_miss_liquidity_emergence_rows": liquidity_emergence[
             "near_miss_liquidity_emergence_rows"
         ],
-        "clean_execution_emergence_rows": liquidity_emergence[
-            "clean_execution_emergence_rows"
-        ],
+        "clean_execution_emergence_rows": liquidity_emergence["clean_execution_emergence_rows"],
         "positive_ev_clean_execution_emergence_rows": liquidity_emergence[
             "positive_ev_clean_execution_emergence_rows"
         ],
         "near_miss_clean_book_emergence_rows": liquidity_emergence[
             "near_miss_clean_book_emergence_rows"
         ],
-        "liquidity_emergence_top_tickers": liquidity_emergence[
-            "liquidity_emergence_top_tickers"
-        ],
+        "liquidity_emergence_top_tickers": liquidity_emergence["liquidity_emergence_top_tickers"],
         "missing_executable_price_rows": ev_calibration["missing_executable_price_rows"],
         "clean_execution_rows": r4_summary.get("clean_execution_rows", 0),
         "risk_ready_rows": r4_summary.get("risk_ready_rows", 0),
@@ -639,12 +616,8 @@ def build_phase3bc_r5_payload(
             "spread_or_liquidity_blocked_rows",
             0,
         ),
-        "exact_snapshot_refresh_attempted": (
-            snapshot_refresh_result
-        ).get("attempted", 0),
-        "exact_snapshot_refresh_repaired": (
-            snapshot_refresh_result
-        ).get("repaired", 0),
+        "exact_snapshot_refresh_attempted": (snapshot_refresh_result).get("attempted", 0),
+        "exact_snapshot_refresh_repaired": (snapshot_refresh_result).get("repaired", 0),
         "exact_snapshot_refresh_selected": len(
             snapshot_refresh_result.get("selected_tickers") or []
         ),
@@ -719,9 +692,7 @@ def build_phase3bc_r5_payload(
             forecast_refresh_result=forecast_refresh_result,
         )
     )
-    summary["primary_gap_after_refresh"] = _actionability_primary_gap_after_refresh(
-        summary
-    )
+    summary["primary_gap_after_refresh"] = _actionability_primary_gap_after_refresh(summary)
     summary["watch_state"] = _watch_state(summary, candidates, preflight_results)
     summary["liquidity_actionability_state"] = _liquidity_actionability_state(summary)
     return {
@@ -757,15 +728,11 @@ def build_phase3bc_r5_payload(
         "positive_ev_snapshot_stale_examples": positive_ev_snapshot_stale[:25],
         "positive_ev_forecast_stale_examples": positive_ev_forecast_stale[:25],
         "positive_ev_spread_blocked_examples": positive_ev_spread_blocked[:25],
-        "positive_ev_clean_book_risk_missing_examples": (
-            positive_ev_clean_book_risk_missing[:25]
-        ),
+        "positive_ev_clean_book_risk_missing_examples": (positive_ev_clean_book_risk_missing[:25]),
         "best_ev_candidates": ev_calibration["best_candidates"],
         "ev_near_miss_examples": ev_calibration["near_miss_examples"],
         "liquidity_watch_rows": liquidity_watch_rows[:50],
-        "liquidity_emergence_examples": liquidity_emergence[
-            "liquidity_emergence_examples"
-        ],
+        "liquidity_emergence_examples": liquidity_emergence["liquidity_emergence_examples"],
         "positive_ev_liquidity_emergence_examples": liquidity_emergence[
             "positive_ev_liquidity_emergence_examples"
         ],
@@ -919,16 +886,10 @@ def _ev_calibration(
     ]
     best = best_rows[0] if best_rows else None
     best_ev = to_decimal(best.get("expected_value")) if best else None
-    near_miss_liquidity_positive = [
-        row for row in near_misses if _liquidity_positive(row)
-    ]
-    near_miss_clean_execution = [
-        row for row in near_misses if _clean_executable_book(row)
-    ]
+    near_miss_liquidity_positive = [row for row in near_misses if _liquidity_positive(row)]
+    near_miss_clean_execution = [row for row in near_misses if _clean_executable_book(row)]
     positive_rows = [row for row in rows if _positive_expected_value(row)]
-    missing_price_rows = [
-        row for row in rows if to_decimal(row.get("best_price")) is None
-    ]
+    missing_price_rows = [row for row in rows if to_decimal(row.get("best_price")) is None]
     return {
         "state": _ev_calibration_state(
             positive_rows=positive_rows,
@@ -980,8 +941,8 @@ def _liquidity_emergence(
         if not previous:
             continue
         liquidity_emerged = _liquidity_crossed_positive(previous, current)
-        clean_book_emerged = (
-            not _clean_executable_book(previous) and _clean_executable_book(current)
+        clean_book_emerged = not _clean_executable_book(previous) and _clean_executable_book(
+            current
         )
         if not liquidity_emerged and not clean_book_emerged:
             continue
@@ -1015,17 +976,13 @@ def _liquidity_emergence(
         "positive_ev_liquidity_emergence_rows": len(positive_ev_liquidity_examples),
         "near_miss_liquidity_emergence_rows": len(near_miss_liquidity_examples),
         "clean_execution_emergence_rows": len(clean_book_examples),
-        "positive_ev_clean_execution_emergence_rows": len(
-            positive_ev_clean_book_examples
-        ),
+        "positive_ev_clean_execution_emergence_rows": len(positive_ev_clean_book_examples),
         "near_miss_clean_book_emergence_rows": len(near_miss_clean_book_examples),
         "liquidity_emergence_top_tickers": [
             str(row.get("ticker")) for row in liquidity_examples[:10]
         ],
         "liquidity_emergence_examples": liquidity_examples[:25],
-        "positive_ev_liquidity_emergence_examples": (
-            positive_ev_liquidity_examples[:25]
-        ),
+        "positive_ev_liquidity_emergence_examples": (positive_ev_liquidity_examples[:25]),
         "near_miss_clean_book_emergence_examples": near_miss_clean_book_examples[:25],
     }
 
@@ -1359,9 +1316,10 @@ def _should_refresh_exact_snapshots(r4_payload: dict[str, Any]) -> bool:
 def _has_actionable_snapshot_recheck_candidate(r4_payload: dict[str, Any]) -> bool:
     now = utc_now()
     for row in _snapshot_refresh_candidate_rows(r4_payload):
-        if _row_needs_exact_snapshot_refresh(
-            row
-        ) and _snapshot_candidate_skip_reason(row, now=now) is None:
+        if (
+            _row_needs_exact_snapshot_refresh(row)
+            and _snapshot_candidate_skip_reason(row, now=now) is None
+        ):
             return True
     return False
 
@@ -1394,16 +1352,11 @@ def _snapshot_refresh_selection(
     skip_reason_by_ticker = {
         str(row.get("ticker") or ""): reason
         for row in rows
-        if (
-            reason := _snapshot_candidate_skip_reason(row, now=resolved_now)
-        )
-        is not None
+        if (reason := _snapshot_candidate_skip_reason(row, now=resolved_now)) is not None
     }
     skipped_reasons = Counter(reason for reason in skip_reason_by_ticker.values())
     active_open_rows = [
-        row
-        for row in rows
-        if str(row.get("ticker") or "") not in skip_reason_by_ticker
+        row for row in rows if str(row.get("ticker") or "") not in skip_reason_by_ticker
     ]
     skipped_rows = sum(skipped_reasons.values())
     active_open_rows = sorted(
@@ -1413,25 +1366,19 @@ def _snapshot_refresh_selection(
     )
     tickers = [str(row["ticker"]) for row in active_open_rows[: max(0, limit)]]
     unselected_rows = active_open_rows[max(0, limit) :]
-    positive_ev_candidates = [
-        row for row in active_open_rows if _positive_expected_value(row)
-    ]
+    positive_ev_candidates = [row for row in active_open_rows if _positive_expected_value(row)]
     near_miss_candidates = [
         row
         for row in active_open_rows
         if _near_positive_expected_value(row, near_miss_band=EV_NEAR_MISS_BAND)
     ]
-    book_visible_candidates = [
-        row for row in active_open_rows if _liquidity_positive(row)
-    ]
+    book_visible_candidates = [row for row in active_open_rows if _liquidity_positive(row)]
     no_book_recheck_candidates = [
         row
         for row in active_open_rows
         if _positive_expected_value(row) and _no_executable_book(row)
     ]
-    clean_execution_candidates = [
-        row for row in active_open_rows if _clean_executable_book(row)
-    ]
+    clean_execution_candidates = [row for row in active_open_rows if _clean_executable_book(row)]
     stale_current_window_maintenance_candidates = [
         row
         for row in active_open_rows
@@ -1463,9 +1410,7 @@ def _snapshot_refresh_selection(
         "selected_tickers": tickers[:100],
         "unselected_active_open_candidates": len(unselected_rows),
         "unselected_reason": EXACT_TICKER_NOT_REFRESHED if unselected_rows else None,
-        "unselected_tickers": [
-            str(row.get("ticker") or "") for row in unselected_rows[:100]
-        ],
+        "unselected_tickers": [str(row.get("ticker") or "") for row in unselected_rows[:100]],
     }
 
 
@@ -1673,9 +1618,7 @@ def _freshness_backlog_classification(
     forecast_backlog = int(summary.get("forecast_stale_rows") or 0) + int(
         summary.get("forecast_missing_rows") or 0
     )
-    snapshot_unselected = int(
-        snapshot_refresh_result.get("unselected_active_open_candidates") or 0
-    )
+    snapshot_unselected = int(snapshot_refresh_result.get("unselected_active_open_candidates") or 0)
     snapshot_status = FRESHNESS_COMPLETE
     if snapshot_backlog > 0:
         snapshot_status = (
@@ -1712,9 +1655,7 @@ def _freshness_backlog_classification(
         "data_freshness_partial_reason": None
         if snapshot_backlog == 0 and forecast_backlog == 0
         else ";".join(
-            reason
-            for reason in (snapshot_status, forecast_status)
-            if reason != FRESHNESS_COMPLETE
+            reason for reason in (snapshot_status, forecast_status) if reason != FRESHNESS_COMPLETE
         ),
     }
 
@@ -1727,9 +1668,10 @@ def _actionability_primary_gap_after_refresh(summary: dict[str, Any]) -> str | N
         summary.get("freshness_backlog_blocks_current_positive_ev")
     ):
         blocker_counts = summary.get("preflight_blocker_counts") or {}
-        if int(blocker_counts.get("LOW_EDGE") or 0) > 0 or int(
-            blocker_counts.get("LOW_SCORE") or 0
-        ) > 0:
+        if (
+            int(blocker_counts.get("LOW_EDGE") or 0) > 0
+            or int(blocker_counts.get("LOW_SCORE") or 0) > 0
+        ):
             return LOW_EDGE_OR_SCORE_BLOCK
         if int(summary.get("positive_ev_no_executable_book_rows") or 0) > 0:
             return POSITIVE_EV_NO_EXECUTABLE_BOOK
@@ -1737,8 +1679,7 @@ def _actionability_primary_gap_after_refresh(summary: dict[str, Any]) -> str | N
             return RISK_OR_SIZE_BLOCK
     if (
         int(summary.get("positive_ev_rows") or 0) <= 0
-        and str(summary.get("phase3bc_main_blocker") or "")
-        == "WATCH_NO_POSITIVE_EXPECTED_VALUE"
+        and str(summary.get("phase3bc_main_blocker") or "") == "WATCH_NO_POSITIVE_EXPECTED_VALUE"
         and not bool(summary.get("freshness_backlog_blocks_current_positive_ev"))
     ):
         return EV_NOT_POSITIVE
@@ -1761,42 +1702,48 @@ def _run_risk_preflight(
     candidates: list[dict[str, Any]],
     *,
     settings: Settings,
+    persist: bool = True,
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    for candidate in candidates:
-        decision = _paper_decision_for_candidate(session, candidate, settings=settings)
-        if decision is None:
+    savepoint = session.begin_nested() if not persist else None
+    try:
+        for candidate in candidates:
+            decision = _paper_decision_for_candidate(session, candidate, settings=settings)
+            if decision is None:
+                results.append(
+                    {
+                        **candidate,
+                        "preflight_status": "SKIPPED",
+                        "preflight_reason": "latest ranking or forecast fields were unavailable",
+                    }
+                )
+                continue
+            sized = ensure_paper_decision_sized(session, decision, settings=settings)
+            raw = sized.raw_decision_json
+            sizing = raw.get("position_sizing_decision") or {}
+            risk = raw.get("advanced_risk_decision") or {}
             results.append(
                 {
                     **candidate,
-                    "preflight_status": "SKIPPED",
-                    "preflight_reason": "latest ranking or forecast fields were unavailable",
+                    "preflight_status": "RECORDED",
+                    "phase3m_decision_id": raw.get("position_sizing_decision_id"),
+                    "phase3m_tier": sizing.get("tier"),
+                    "phase3m_proposed_contracts": sizing.get("proposed_contracts"),
+                    "phase3m_executed_contracts": sizing.get("executed_contracts"),
+                    "phase3n_decision_id": raw.get("advanced_risk_decision_id"),
+                    "phase3n_action": risk.get("action"),
+                    "phase3n_mode": risk.get("mode"),
+                    "phase3n_live_candidate_contracts": risk.get("live_candidate_contracts"),
+                    "phase3n_executed_contracts": risk.get("executed_contracts"),
+                    "phase3n_reason_codes": risk.get("reason_codes", []),
+                    "phase3n_hard_blocks": risk.get("hard_blocks", []),
+                    "paper_decision_quantity_after_preflight": sized.quantity,
+                    "preflight_reason": sized.reason,
                 }
             )
-            continue
-        sized = ensure_paper_decision_sized(session, decision, settings=settings)
-        raw = sized.raw_decision_json
-        sizing = raw.get("position_sizing_decision") or {}
-        risk = raw.get("advanced_risk_decision") or {}
-        results.append(
-            {
-                **candidate,
-                "preflight_status": "RECORDED",
-                "phase3m_decision_id": raw.get("position_sizing_decision_id"),
-                "phase3m_tier": sizing.get("tier"),
-                "phase3m_proposed_contracts": sizing.get("proposed_contracts"),
-                "phase3m_executed_contracts": sizing.get("executed_contracts"),
-                "phase3n_decision_id": raw.get("advanced_risk_decision_id"),
-                "phase3n_action": risk.get("action"),
-                "phase3n_mode": risk.get("mode"),
-                "phase3n_live_candidate_contracts": risk.get("live_candidate_contracts"),
-                "phase3n_executed_contracts": risk.get("executed_contracts"),
-                "phase3n_reason_codes": risk.get("reason_codes", []),
-                "phase3n_hard_blocks": risk.get("hard_blocks", []),
-                "paper_decision_quantity_after_preflight": sized.quantity,
-                "preflight_reason": sized.reason,
-            }
-        )
+    finally:
+        if savepoint is not None and savepoint.is_active:
+            savepoint.rollback()
     return results
 
 
@@ -1919,16 +1866,18 @@ def _watch_state(
         return "POSITIVE_EV_PREFLIGHT_RECORDED"
     if candidates:
         return "POSITIVE_EV_PREFLIGHT_CANDIDATES_FOUND"
-    snapshot_backlog = int(summary.get("snapshot_stale_rows") or 0) > 0 or int(
-        summary.get("snapshot_missing_rows") or 0
-    ) > 0
+    snapshot_backlog = (
+        int(summary.get("snapshot_stale_rows") or 0) > 0
+        or int(summary.get("snapshot_missing_rows") or 0) > 0
+    )
     if snapshot_backlog and int(summary.get("exact_snapshot_refresh_selected") or 0) > 0:
         return "REFRESH_SNAPSHOTS"
     if int(summary.get("true_ranking_gap_after_repair") or 0) > 0:
         return "REFRESH_RANKINGS"
-    if int(summary.get("forecast_stale_rows") or 0) > 0 or int(
-        summary.get("forecast_missing_rows") or 0
-    ) > 0:
+    if (
+        int(summary.get("forecast_stale_rows") or 0) > 0
+        or int(summary.get("forecast_missing_rows") or 0) > 0
+    ):
         return "REFRESH_FORECASTS"
     if int(summary.get("positive_ev_no_executable_book_rows") or 0) > 0:
         return "WAITING_FOR_EXECUTABLE_BOOK"
@@ -1997,8 +1946,7 @@ def _recommended_next_action(summary: dict[str, Any]) -> str:
                 "do not run paper-only preflight until expected value is strictly positive."
             )
         return (
-            "Continue the 15-minute R5 loop until crypto price/model movement creates "
-            "positive EV."
+            "Continue the 15-minute R5 loop until crypto price/model movement creates positive EV."
         )
     if state == "WAITING_FOR_EXECUTION_QUALITY":
         return "Wait for tighter spreads or better liquidity before any paper-ready preflight."
@@ -2134,21 +2082,18 @@ def _render_markdown(payload: dict[str, Any]) -> str:
             f"- best_ev_candidate_ticker: `{summary.get('best_ev_candidate_ticker')}`",
             f"- best_current_expected_value_cents: "
             f"`{summary.get('best_current_expected_value_cents')}`",
-            f"- best_ev_gap_to_positive_cents: "
-            f"`{summary.get('best_ev_gap_to_positive_cents')}`",
+            f"- best_ev_gap_to_positive_cents: `{summary.get('best_ev_gap_to_positive_cents')}`",
             f"- ev_near_miss_rows: `{summary.get('ev_near_miss_rows')}`",
             f"- ev_near_miss_liquidity_positive_rows: "
             f"`{summary.get('ev_near_miss_liquidity_positive_rows')}`",
             f"- ev_near_miss_clean_execution_rows: "
             f"`{summary.get('ev_near_miss_clean_execution_rows')}`",
-            f"- liquidity_emergence_rows: "
-            f"`{summary.get('liquidity_emergence_rows')}`",
+            f"- liquidity_emergence_rows: `{summary.get('liquidity_emergence_rows')}`",
             f"- positive_ev_liquidity_emergence_rows: "
             f"`{summary.get('positive_ev_liquidity_emergence_rows')}`",
             f"- near_miss_liquidity_emergence_rows: "
             f"`{summary.get('near_miss_liquidity_emergence_rows')}`",
-            f"- clean_execution_emergence_rows: "
-            f"`{summary.get('clean_execution_emergence_rows')}`",
+            f"- clean_execution_emergence_rows: `{summary.get('clean_execution_emergence_rows')}`",
             "",
             "### Best EV Candidates Below/At Gate",
             "",

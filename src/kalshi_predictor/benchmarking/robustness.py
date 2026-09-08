@@ -28,23 +28,36 @@ def write_robustness_matrix(output_dir: Path) -> Path:
                 result = run_benchmark(
                     episode, agent, initial_cash=cash, taker_fee_rate=fee
                 ).as_dict()
-                results.append({
-                    "category": category, "configuration": label,
-                    "initial_cash": str(cash), "taker_fee_rate": str(fee),
-                    "agent": agent.name, "final_equity": result["final_equity"],
-                    "metrics": result["metrics"], "replay_digest": result["replay_digest"],
-                })
+                results.append(
+                    {
+                        "category": category,
+                        "configuration": label,
+                        "initial_cash": str(cash),
+                        "taker_fee_rate": str(fee),
+                        "agent": agent.name,
+                        "final_equity": result["final_equity"],
+                        "metrics": result["metrics"],
+                        "replay_digest": result["replay_digest"],
+                    }
+                )
     stable_replays = all(
         len({row["replay_digest"] for row in results if row["category"] == category}) == 1
         for category in synthetic_scenarios()
     )
     payload = {
-        "phase": "PMB-9", "mode": "LOCAL_SYNTHETIC_ROBUSTNESS_MATRIX",
-        "database_writes": 0, "execution_enabled": False,
-        "external_data_copied": False, "results": results,
-        "summary": {"runs": len(results), "categories": 3,
-                    "configurations": 3, "agents": 2,
-                    "replay_digest_stable_across_configurations": stable_replays},
+        "phase": "PMB-9",
+        "mode": "LOCAL_SYNTHETIC_ROBUSTNESS_MATRIX",
+        "database_writes": 0,
+        "execution_enabled": False,
+        "external_data_copied": False,
+        "results": results,
+        "summary": {
+            "runs": len(results),
+            "categories": 3,
+            "configurations": 3,
+            "agents": 2,
+            "replay_digest_stable_across_configurations": stable_replays,
+        },
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     payload["deterministic_digest"] = hashlib.sha256(canonical.encode()).hexdigest()

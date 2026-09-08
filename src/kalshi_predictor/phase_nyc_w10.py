@@ -14,7 +14,10 @@ MAX_MEAN_ABSOLUTE_SHADOW_CHANGE = Decimal("0.10")
 
 
 def write_nyc_w10_review(
-    *, w8_report: Path, w9_report: Path, output_dir: Path,
+    *,
+    w8_report: Path,
+    w9_report: Path,
+    output_dir: Path,
     operations_evidence: dict[str, Any] | None = None,
 ) -> Path:
     w8 = json.loads(w8_report.read_text(encoding="utf-8"))
@@ -29,12 +32,9 @@ def write_nyc_w10_review(
             and bool(summary.get("live_shadow_census_passed"))
         ),
         "provenance_and_alignment_drift_free": (
-            bool(w8_gates.get("all_windows_drift_free"))
-            and not summary.get("drift_blocker_counts")
+            bool(w8_gates.get("all_windows_drift_free")) and not summary.get("drift_blocker_counts")
         ),
-        "rollback_continuously_verified": bool(
-            w8_gates.get("rollback_continuously_verified")
-        ),
+        "rollback_continuously_verified": bool(w8_gates.get("rollback_continuously_verified")),
         "probability_effect_within_review_limit": (
             mean_change is not None and mean_change <= MAX_MEAN_ABSOLUTE_SHADOW_CHANGE
         ),
@@ -56,20 +56,21 @@ def write_nyc_w10_review(
     }
     ready = all(gates.values())
     report = {
-        "phase": "NYC-W10", "generated_at": utc_now().isoformat(),
+        "phase": "NYC-W10",
+        "generated_at": utc_now().isoformat(),
         "mode": "READ_ONLY_GUARDED_ACTIVATION_DECISION_PREVIEW",
         "source_reports": {"nyc_w8": str(w8_report), "nyc_w9": str(w9_report)},
-        "database_writes": 0, "thresholds_changed": False,
-        "feature_flag_changed": False, "execution_enabled": False,
+        "database_writes": 0,
+        "thresholds_changed": False,
+        "feature_flag_changed": False,
+        "execution_enabled": False,
         "automatic_activation_permitted": False,
         "review_limits": {
             "maximum_mean_absolute_shadow_change": str(MAX_MEAN_ABSOLUTE_SHADOW_CHANGE),
         },
         "observed": {
             "certified_live_windows": int(summary.get("certified_live_windows") or 0),
-            "mean_absolute_shadow_change": (
-                str(mean_change) if mean_change is not None else None
-            ),
+            "mean_absolute_shadow_change": (str(mean_change) if mean_change is not None else None),
             "drift_blocker_counts": summary.get("drift_blocker_counts", {}),
             "collector_status": w9.get("status"),
             "operations": operations,
@@ -79,7 +80,8 @@ def write_nyc_w10_review(
             "review_ready": ready,
             "decision": (
                 "ELIGIBLE_FOR_MANUAL_ACTIVATION_REVIEW"
-                if ready else "BLOCKED_PENDING_LIVE_SHADOW_EVIDENCE"
+                if ready
+                else "BLOCKED_PENDING_LIVE_SHADOW_EVIDENCE"
             ),
             "automatic_action_taken": False,
         },

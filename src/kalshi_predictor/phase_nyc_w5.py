@@ -26,9 +26,7 @@ def write_nyc_w5_report(
     output_dir: Path,
     kalshi_client: httpx.Client | None = None,
 ) -> Path:
-    certifications = _load_reports(
-        reports_dir, "phase_nyc_w3b*/nyc_w3_live_alignment_preview.json"
-    )
+    certifications = _load_reports(reports_dir, "phase_nyc_w3b*/nyc_w3_live_alignment_preview.json")
     previews = _load_reports(
         reports_dir, "phase_nyc_w4*/nyc_w4_observation_feature_integration_preview.json"
     )
@@ -57,7 +55,8 @@ def write_nyc_w5_report(
 
     owned_client = kalshi_client is None
     active_client = kalshi_client or httpx.Client(
-        base_url=PRODUCTION_PUBLIC_REST_URL, timeout=15.0,
+        base_url=PRODUCTION_PUBLIC_REST_URL,
+        timeout=15.0,
     )
     try:
         for target, window in windows.items():
@@ -81,7 +80,8 @@ def write_nyc_w5_report(
             observation = to_decimal(window.get("observation_temperature_f"))
             divergence = (
                 abs(observation - settlement_value)
-                if observation is not None and settlement_value is not None else None
+                if observation is not None and settlement_value is not None
+                else None
             )
             window["settlement_temperature_f"] = (
                 str(settlement_value) if settlement_value is not None else None
@@ -98,24 +98,22 @@ def write_nyc_w5_report(
         row for row in ordered if row.get("metadata_passed") and row.get("alignment_passed")
     ]
     divergences = [
-        to_decimal(row.get("absolute_observation_settlement_divergence_f"))
-        for row in certified
+        to_decimal(row.get("absolute_observation_settlement_divergence_f")) for row in certified
     ]
     settled_divergences = [value for value in divergences if value is not None]
     mean_divergence = (
         sum(settled_divergences, Decimal("0")) / len(settled_divergences)
-        if settled_divergences else None
+        if settled_divergences
+        else None
     )
     gates = {
         "minimum_certified_windows": len(certified) >= MIN_CERTIFIED_WINDOWS,
         "minimum_settled_windows": len(settled_divergences) >= MIN_SETTLED_WINDOWS,
         "mean_divergence_within_calibration_limit": (
-            mean_divergence is not None
-            and mean_divergence <= MAX_MEAN_ABSOLUTE_DIVERGENCE_F
+            mean_divergence is not None and mean_divergence <= MAX_MEAN_ABSOLUTE_DIVERGENCE_F
         ),
         "single_window_divergence_within_calibration_limit": (
-            bool(settled_divergences)
-            and max(settled_divergences) <= MAX_SINGLE_WINDOW_DIVERGENCE_F
+            bool(settled_divergences) and max(settled_divergences) <= MAX_SINGLE_WINDOW_DIVERGENCE_F
         ),
     }
     runtime_activation_ready = all(gates.values())
@@ -147,9 +145,7 @@ def write_nyc_w5_report(
             "gates": gates,
             "runtime_activation_ready": runtime_activation_ready,
             "status": (
-                "READY_FOR_RUNTIME_REVIEW"
-                if runtime_activation_ready
-                else "COLLECTING_WINDOWS"
+                "READY_FOR_RUNTIME_REVIEW" if runtime_activation_ready else "COLLECTING_WINDOWS"
             ),
         },
     }

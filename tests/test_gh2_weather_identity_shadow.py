@@ -118,9 +118,7 @@ def test_shadow_defers_before_collector_when_writer_is_active(tmp_path: Path) ->
     assert shadow["status"] == "DEFERRED"
     assert shadow["safety"]["database_opened"] is False
     assert shadow["safety"]["database_writes"] == 0
-    row = json.loads(report_path.read_text(encoding="utf-8"))["weather_gate"][
-        "weather_rows"
-    ][0]
+    row = json.loads(report_path.read_text(encoding="utf-8"))["weather_gate"]["weather_rows"][0]
     assert row["authoritative_identity_verified"] is False
     assert row["freshness_status"] == "NOT_VERIFIED"
     assert row["authoritative_identity_reason"] == "DEFERRED_ACTIVE_WRITER"
@@ -149,6 +147,7 @@ def test_shadow_is_idempotent_and_preserves_authoritative_gate_fields(tmp_path: 
     original = _report()
     report_path, markdown_path = _write_report(tmp_path, original)
     authority_before = deepcopy(original["weather_gate"])
+
     def deferred() -> dict:
         return {"writer_count": 1, "safe_to_start_write": False}
 
@@ -177,9 +176,7 @@ def test_shadow_is_idempotent_and_preserves_authoritative_gate_fields(tmp_path: 
 
 def test_scheduler_runs_shadow_in_post_lock_diagnostics() -> None:
     root = Path(__file__).parents[1]
-    script = (root / "scripts/cloud/kalshi-gh2-decision-refresh.sh").read_text(
-        encoding="utf-8"
-    )
+    script = (root / "scripts/cloud/kalshi-gh2-decision-refresh.sh").read_text(encoding="utf-8")
     cli = (root / "src/kalshi_predictor/cli.py").read_text(encoding="utf-8")
 
     assert script.index("flock -u 9") < script.index("roadmap-runtime-reports")
@@ -189,6 +186,6 @@ def test_scheduler_runs_shadow_in_post_lock_diagnostics() -> None:
     fast_path = cli.index('if command == "roadmap-runtime-reports":')
     typer_command = cli.index('@app.command("roadmap-runtime-reports")')
     assert "append_weather_identity_shadow(" in cli[fast_path:typer_command]
-    assert cli[fast_path:typer_command].index(
-        "write_runtime_roadmap_reports("
-    ) < cli[fast_path:typer_command].index("append_weather_identity_shadow(")
+    assert cli[fast_path:typer_command].index("write_runtime_roadmap_reports(") < cli[
+        fast_path:typer_command
+    ].index("append_weather_identity_shadow(")

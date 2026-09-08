@@ -23,7 +23,7 @@ PHASE3BB_R29_VERSION = "phase3bb_r29_cloud_ui_private_access_install_handoff_v1"
 DEFAULT_OUTPUT_DIR = Path("reports/phase3bb_r29")
 DEFAULT_R28_MAX_AGE_MINUTES = 60
 APPROVAL_ENV_VAR = "PHASE3BB_R29_EXECUTE"
-APPROVAL_TOKEN = "I_APPROVE_R29_PRIVATE_ACCESS_INSTALL"
+APPROVAL_TOKEN = "I_APPROVE_R29_PRIVATE_ACCESS_INSTALL"  # pragma: allowlist secret
 READY_R28_STATUS = "PRIVATE_ACCESS_OPERATOR_REVIEW_READY_NO_INSTALL"
 READY_SELECTED_OPTION = "PRIVATE_VPN_OR_TAILSCALE"
 
@@ -381,9 +381,7 @@ def _handoff_checks(
     r26_decision = r26.get("access_control_decision") or {}
     r24_decision = r24.get("verification_decision") or {}
     all_commands = "\n".join(commands.values()).lower()
-    selected_option = str(
-        selected_plan.get("option") or r28_decision.get("selected_option") or ""
-    )
+    selected_option = str(selected_plan.get("option") or r28_decision.get("selected_option") or "")
     forbidden_public = [
         fragment for fragment in FORBIDDEN_PUBLIC_OR_UI_FRAGMENTS if fragment in all_commands
     ]
@@ -520,8 +518,7 @@ def _decision(
             "bash reports/phase3bb_r29/operator_private_access_install_handoff.sh"
         ),
         "next_codex_step": (
-            "Phase 3BB-R30 - Cloud UI Private Access Install Verification "
-            "After Operator Run"
+            "Phase 3BB-R30 - Cloud UI Private Access Install Verification After Operator Run"
         ),
     }
 
@@ -620,20 +617,20 @@ def _render_handoff_script(payload: dict[str, Any]) -> str:
         [
             ")",
             "",
-            "if [[ \"$TOKEN\" != \"$REQUIRED\" ]]; then",
+            'if [[ "$TOKEN" != "$REQUIRED" ]]; then',
             "  echo '[phase3bb-r29] dry-run command list:'",
             "  printf '  %s\\n' \"${commands[@]}\"",
             "  echo '[phase3bb-r29] no private access install command executed'",
             "  echo '[phase3bb-r29] to execute private access handoff, set:'",
-            f"  echo \"  {APPROVAL_ENV_VAR}=$REQUIRED bash $0\"",
+            f'  echo "  {APPROVAL_ENV_VAR}=$REQUIRED bash $0"',
             "  exit 0",
             "fi",
             "",
             "echo '[phase3bb-r29] approval token accepted'",
             "echo '[phase3bb-r29] running private access handoff'",
-            "for command in \"${commands[@]}\"; do",
-            "  echo \"+ $command\"",
-            "  bash -lc \"$command\"",
+            'for command in "${commands[@]}"; do',
+            '  echo "+ $command"',
+            '  bash -lc "$command"',
             "done",
             "echo '[phase3bb-r29] handoff commands completed'",
             "echo '[phase3bb-r29] verify with Phase 3BB-R30 next'",

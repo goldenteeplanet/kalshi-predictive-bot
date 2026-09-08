@@ -292,10 +292,7 @@ def _build_ui_probe_commands(
         ),
         RemoteProbe(
             "ui_listeners",
-            (
-                "ss -ltnp 2>/dev/null | "
-                f"awk '$4 ~ /:({ui_port}|80|443)$/ {{print}}' || true"
-            ),
+            (f"ss -ltnp 2>/dev/null | awk '$4 ~ /:({ui_port}|80|443)$/ {{print}}' || true"),
             timeout_seconds,
         ),
         RemoteProbe(

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from kalshi_predictor.benchmarking.exact_shadow_mapping import (
     map_exact_shadow_context,
@@ -13,7 +14,6 @@ from kalshi_predictor.benchmarking.runtime_compatibility import (
     normalize_runtime_export_for_shadow,
 )
 from kalshi_predictor.benchmarking.shadow_adapter import ExposureGuardShadowAdapter
-
 
 FORECAST_MAX_AGE_SECONDS = 3600
 BOOK_MAX_AGE_SECONDS = 300
@@ -31,11 +31,14 @@ def _parse_utc(value: Any, label: str, diagnostics: list[str]) -> datetime | Non
     if parsed.tzinfo is None:
         diagnostics.append(f"TIMESTAMP_NAIVE:{label}")
         return None
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _exact_one(
-    rows: Sequence[Mapping[str, Any]], field: str, value: Any, label: str,
+    rows: Sequence[Mapping[str, Any]],
+    field: str,
+    value: Any,
+    label: str,
     diagnostics: list[str],
 ) -> Mapping[str, Any] | None:
     matches = [row for row in rows if row.get(field) == value]
@@ -52,31 +55,47 @@ def join_exact_runtime_exports(bundle: Mapping[str, Any]) -> dict[str, Any]:
     decision = bundle.get("decision") or {}
     diagnostics: list[str] = []
     required = (
-        "ticker", "category", "target_time", "decision_time",
-        "candidate_forecast_id", "reference_forecast_id",
-        "current_market_snapshot_id", "reference_market_snapshot_id",
+        "ticker",
+        "category",
+        "target_time",
+        "decision_time",
+        "candidate_forecast_id",
+        "reference_forecast_id",
+        "current_market_snapshot_id",
+        "reference_market_snapshot_id",
     )
     diagnostics.extend(
-        f"DECISION_FIELD_MISSING:{field}"
-        for field in required if decision.get(field) in (None, "")
+        f"DECISION_FIELD_MISSING:{field}" for field in required if decision.get(field) in (None, "")
     )
     forecasts = bundle.get("forecasts") or []
     books = bundle.get("books") or []
     candidate = _exact_one(
-        forecasts, "forecast_id", decision.get("candidate_forecast_id"),
-        "candidate_forecast", diagnostics,
+        forecasts,
+        "forecast_id",
+        decision.get("candidate_forecast_id"),
+        "candidate_forecast",
+        diagnostics,
     )
     reference = _exact_one(
-        forecasts, "forecast_id", decision.get("reference_forecast_id"),
-        "reference_forecast", diagnostics,
+        forecasts,
+        "forecast_id",
+        decision.get("reference_forecast_id"),
+        "reference_forecast",
+        diagnostics,
     )
     current_book = _exact_one(
-        books, "market_snapshot_id", decision.get("current_market_snapshot_id"),
-        "current_book", diagnostics,
+        books,
+        "market_snapshot_id",
+        decision.get("current_market_snapshot_id"),
+        "current_book",
+        diagnostics,
     )
     reference_book = _exact_one(
-        books, "market_snapshot_id", decision.get("reference_market_snapshot_id"),
-        "reference_book", diagnostics,
+        books,
+        "market_snapshot_id",
+        decision.get("reference_market_snapshot_id"),
+        "reference_book",
+        diagnostics,
     )
 
     joined = {
@@ -100,14 +119,24 @@ def join_exact_runtime_exports(bundle: Mapping[str, Any]) -> dict[str, Any]:
 
     decision_time = _parse_utc(decision.get("decision_time"), "decision", diagnostics)
     times = {
-        "candidate_forecast": _parse_utc(candidate.get("generated_at"), "candidate_forecast", diagnostics)
-        if candidate else None,
-        "reference_forecast": _parse_utc(reference.get("generated_at"), "reference_forecast", diagnostics)
-        if reference else None,
+        "candidate_forecast": _parse_utc(
+            candidate.get("generated_at"), "candidate_forecast", diagnostics
+        )
+        if candidate
+        else None,
+        "reference_forecast": _parse_utc(
+            reference.get("generated_at"), "reference_forecast", diagnostics
+        )
+        if reference
+        else None,
         "current_book": _parse_utc(current_book.get("captured_at"), "current_book", diagnostics)
-        if current_book else None,
-        "reference_book": _parse_utc(reference_book.get("captured_at"), "reference_book", diagnostics)
-        if reference_book else None,
+        if current_book
+        else None,
+        "reference_book": _parse_utc(
+            reference_book.get("captured_at"), "reference_book", diagnostics
+        )
+        if reference_book
+        else None,
     }
     ages: dict[str, int] = {}
     if decision_time is not None:
@@ -140,7 +169,12 @@ def join_exact_runtime_exports(bundle: Mapping[str, Any]) -> dict[str, Any]:
         )
         diagnostics.extend(mapping["diagnostics"])
         diagnostics.extend(compatibility["diagnostics"])
-    joined_ok = not diagnostics and mapping is not None and mapping["mapped"] and compatibility["compatible"]
+    joined_ok = (
+        not diagnostics
+        and mapping is not None
+        and mapping["mapped"]
+        and compatibility["compatible"]
+    )
     return {
         "joined": joined_ok,
         "diagnostics": diagnostics,
@@ -157,17 +191,21 @@ def build_offline_exact_export_join_preview(fixtures_path: Path) -> dict[str, An
     rows = []
     for fixture in fixtures:
         result = join_exact_runtime_exports(fixture)
-        rows.append({
-            "fixture_id": fixture["fixture_id"],
-            "category": (fixture.get("decision") or {}).get("category"),
-            "joined": result["joined"],
-            "diagnostics": result["diagnostics"],
-            "source_ages_seconds": result["source_ages_seconds"],
-            "mapping_provenance": (
-                result["mapping"]["mapping_provenance"] if result["mapping"] else None
-            ),
-            "shadow_preview": adapter.preview(result["normalized"]) if result["joined"] else None,
-        })
+        rows.append(
+            {
+                "fixture_id": fixture["fixture_id"],
+                "category": (fixture.get("decision") or {}).get("category"),
+                "joined": result["joined"],
+                "diagnostics": result["diagnostics"],
+                "source_ages_seconds": result["source_ages_seconds"],
+                "mapping_provenance": (
+                    result["mapping"]["mapping_provenance"] if result["mapping"] else None
+                ),
+                "shadow_preview": adapter.preview(result["normalized"])
+                if result["joined"]
+                else None,
+            }
+        )
     diagnostic_counts: dict[str, int] = {}
     for row in rows:
         for diagnostic in row["diagnostics"]:

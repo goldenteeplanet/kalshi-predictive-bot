@@ -4,7 +4,6 @@ from pathlib import Path
 from kalshi_predictor.ui.incident_resolution import build_incident_resolution_preview
 from kalshi_predictor.ui.progress_history import record_progress_snapshot
 
-
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -17,7 +16,8 @@ def _history(tmp_path):
 
 def test_ui_obs2d_acknowledges_but_never_hides_critical(tmp_path):
     preview = build_incident_resolution_preview(
-        _history(tmp_path), FIXTURES / "ui_obs2d/acknowledgments.json",
+        _history(tmp_path),
+        FIXTURES / "ui_obs2d/acknowledgments.json",
         as_of="2026-07-18T08:10:00Z",
     )
     incident = next(row for row in preview["incidents"] if row["incident_id"] == "feadeff673c63204")
@@ -32,7 +32,8 @@ def test_ui_obs2d_acknowledges_but_never_hides_critical(tmp_path):
 
 def test_ui_obs2d_requires_verified_resolution_evidence(tmp_path):
     preview = build_incident_resolution_preview(
-        _history(tmp_path), FIXTURES / "ui_obs2d/acknowledgments.json",
+        _history(tmp_path),
+        FIXTURES / "ui_obs2d/acknowledgments.json",
         as_of="2026-07-18T08:10:00Z",
     )
     resolved = next(row for row in preview["incidents"] if row["incident_id"] == "c0380bce52dabf85")
@@ -56,8 +57,12 @@ def test_ui_obs2d_escalates_unresolved_duration_deterministically(tmp_path):
 
 def test_ui_obs2d_is_deterministic_and_read_only(tmp_path):
     history = _history(tmp_path)
-    first = build_incident_resolution_preview(history, FIXTURES / "ui_obs2d/acknowledgments.json", as_of="2026-07-18T09:10:00Z")
-    second = build_incident_resolution_preview(history, FIXTURES / "ui_obs2d/acknowledgments.json", as_of="2026-07-18T09:10:00Z")
+    first = build_incident_resolution_preview(
+        history, FIXTURES / "ui_obs2d/acknowledgments.json", as_of="2026-07-18T09:10:00Z"
+    )
+    second = build_incident_resolution_preview(
+        history, FIXTURES / "ui_obs2d/acknowledgments.json", as_of="2026-07-18T09:10:00Z"
+    )
     assert first == second
     assert first["read_only"] is True
     assert first["mutation_endpoints"] == 0

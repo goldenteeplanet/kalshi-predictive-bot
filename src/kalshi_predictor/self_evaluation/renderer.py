@@ -161,10 +161,7 @@ def render_journal_markdown(payload: dict[str, Any]) -> str:
             "",
             f"- Evaluation run: `{payload['evaluation_run_id']}`",
             f"- Journal: `{payload['journal_id']}` revision {payload['journal_revision']}",
-            (
-                "- Dataset manifest: "
-                f"`{payload['source_manifest_summary']['phase_3o_dataset_id']}`"
-            ),
+            (f"- Dataset manifest: `{payload['source_manifest_summary']['phase_3o_dataset_id']}`"),
             f"- Input checksum: `{payload['source_manifest_summary']['input_checksum']}`",
             (
                 "- Metric records: "
@@ -174,10 +171,7 @@ def render_journal_markdown(payload: dict[str, Any]) -> str:
                 "- Finding records: "
                 f"{', '.join(payload['evidence_appendix']['finding_ids']) or 'none'}"
             ),
-            (
-                "- Excluded rows: "
-                f"{payload['evidence_appendix']['excluded_rows_by_reason']}"
-            ),
+            (f"- Excluded rows: {payload['evidence_appendix']['excluded_rows_by_reason']}"),
             "",
             "### Key metrics",
             "",

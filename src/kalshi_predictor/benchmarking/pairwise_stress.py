@@ -9,7 +9,6 @@ from typing import Any
 from kalshi_predictor.benchmarking.joint_surface import build_joint_robust_decision_surface
 from kalshi_predictor.benchmarking.tail_stress import _run_level
 
-
 STRESS_FACTORS: dict[str, tuple[str | int, ...]] = {
     "forecast_bias": ("-0.01", "-0.02", "-0.04"),
     "spread_addition": ("0.01", "0.02", "0.04"),
@@ -48,20 +47,30 @@ def build_pairwise_stress_interaction_matrix() -> dict[str, Any]:
                     _run_level(_level(**{factor_b: value_b}), zones),
                 )
                 joint = _run_level(_level(**{factor_a: value_a, factor_b: value_b}), zones)
-                cells.append(_interaction_cell(
-                    factor_a, value_a, factor_b, value_b,
-                    control, isolated_a, isolated_b, joint,
-                ))
-        pairs.append({
-            "factor_a": factor_a,
-            "factor_b": factor_b,
-            "cells": cells,
-            "classification_counts": {
-                classification: sum(row["classification"] == classification for row in cells)
-                for classification in ("COMPOUNDING", "ADDITIVE", "OFFSETTING")
-            },
-            "joint_only_breaks": sum(row["joint_only_break"] for row in cells),
-        })
+                cells.append(
+                    _interaction_cell(
+                        factor_a,
+                        value_a,
+                        factor_b,
+                        value_b,
+                        control,
+                        isolated_a,
+                        isolated_b,
+                        joint,
+                    )
+                )
+        pairs.append(
+            {
+                "factor_a": factor_a,
+                "factor_b": factor_b,
+                "cells": cells,
+                "classification_counts": {
+                    classification: sum(row["classification"] == classification for row in cells)
+                    for classification in ("COMPOUNDING", "ADDITIVE", "OFFSETTING")
+                },
+                "joint_only_breaks": sum(row["joint_only_break"] for row in cells),
+            }
+        )
     canonical = json.dumps(pairs, sort_keys=True, separators=(",", ":")).encode()
     return {
         "phase": "PMB-21",
@@ -80,9 +89,7 @@ def build_pairwise_stress_interaction_matrix() -> dict[str, Any]:
         "summary": {
             "pair_count": len(pairs),
             "cell_count": sum(len(row["cells"]) for row in pairs),
-            "compounding_cells": sum(
-                row["classification_counts"]["COMPOUNDING"] for row in pairs
-            ),
+            "compounding_cells": sum(row["classification_counts"]["COMPOUNDING"] for row in pairs),
             "additive_cells": sum(row["classification_counts"]["ADDITIVE"] for row in pairs),
             "offsetting_cells": sum(row["classification_counts"]["OFFSETTING"] for row in pairs),
             "joint_only_breaks": sum(row["joint_only_breaks"] for row in pairs),
@@ -136,14 +143,18 @@ def _interaction_cell(
     effects = {}
     for metric in ("drawdown", "capital_efficiency"):
         effect = (
-            _margin(joint, metric) - _margin(isolated_a, metric)
-            - _margin(isolated_b, metric) + _margin(control, metric)
+            _margin(joint, metric)
+            - _margin(isolated_a, metric)
+            - _margin(isolated_b, metric)
+            + _margin(control, metric)
         )
         effects[metric] = str(effect)
     numeric = [Decimal(value) for value in effects.values()]
     classification = (
-        "COMPOUNDING" if any(value < 0 for value in numeric)
-        else "OFFSETTING" if any(value > 0 for value in numeric)
+        "COMPOUNDING"
+        if any(value < 0 for value in numeric)
+        else "OFFSETTING"
+        if any(value > 0 for value in numeric)
         else "ADDITIVE"
     )
     a_survived = isolated_a["comparison"]["both_advantages_survived"]

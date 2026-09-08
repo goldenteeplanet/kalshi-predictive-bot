@@ -49,9 +49,10 @@ def test_phase3bb_r32_verifies_dashboard_truth_and_scheduler_status(
     assert decision["r18_status"] == "SYSTEMD_OWNS_R5"
     assert decision["duplicate_r5"] is False
     assert decision["service_owns_r5"] is True
-    assert payload["ui_dashboard_truth_summaries"]["workspace_guard_api"][
-        "database_fingerprint"
-    ] == DB_FINGERPRINT
+    assert (
+        payload["ui_dashboard_truth_summaries"]["workspace_guard_api"]["database_fingerprint"]
+        == DB_FINGERPRINT
+    )
     assert all(row["passed"] for row in payload["verification_checks"])
     assert artifacts.manifest_path.exists()
 
@@ -105,9 +106,7 @@ def test_phase3bb_r32_cli_help_registered() -> None:
     )
 
     assert result.exit_code == 0
-    assert "phase3bb-r32-cloud-ui-dashboard-truth-scheduler-status-verification" in (
-        result.output
-    )
+    assert "phase3bb-r32-cloud-ui-dashboard-truth-scheduler-status-verification" in (result.output)
     assert "--ui-timeout-seconds" in result.output
 
 

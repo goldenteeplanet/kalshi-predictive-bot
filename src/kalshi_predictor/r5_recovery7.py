@@ -126,9 +126,7 @@ def _finish(metadata: dict[str, Any], status: str, failed_stage: str | None) -> 
     metadata["status"] = status
     metadata["failed_stage"] = failed_stage
     metadata["execution_enabled"] = False
-    metadata["metadata_sha256"] = hashlib.sha256(
-        _canonical(metadata).encode("utf-8")
-    ).hexdigest()
+    metadata["metadata_sha256"] = hashlib.sha256(_canonical(metadata).encode("utf-8")).hexdigest()
     return metadata
 
 

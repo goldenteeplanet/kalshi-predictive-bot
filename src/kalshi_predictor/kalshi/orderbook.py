@@ -261,11 +261,11 @@ def _levels(payload: Mapping[str, Any], *keys: str) -> dict[Decimal, Decimal]:
             break
     if raw is None:
         return {}
-    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+    if not isinstance(raw, Sequence) or isinstance(raw, str | bytes):
         raise OrderbookProtocolError("Orderbook levels must be an array.")
     result: dict[Decimal, Decimal] = {}
     for row in raw:
-        if not isinstance(row, Sequence) or isinstance(row, (str, bytes)) or len(row) < 2:
+        if not isinstance(row, Sequence) or isinstance(row, str | bytes) or len(row) < 2:
             raise OrderbookProtocolError("Each orderbook level must contain price and quantity.")
         price = _decimal(row[0], "price")
         quantity = _decimal(row[1], "quantity")
@@ -412,7 +412,7 @@ def _extract_price(level: Any, *, cents: bool) -> Decimal | None:
             or level.get("yes")
             or level.get("no")
         )
-    elif isinstance(level, (list, tuple)) and level:
+    elif isinstance(level, list | tuple) and level:
         raw_price = level[0]
     else:
         raw_price = level
@@ -445,7 +445,7 @@ def _extract_level(level: Any, *, cents: bool) -> BookLevel | None:
             or level.get("contracts")
             or level.get("count")
         )
-    elif isinstance(level, (list, tuple)) and len(level) >= 2:
+    elif isinstance(level, list | tuple) and len(level) >= 2:
         raw_quantity = level[1]
     else:
         raw_quantity = None

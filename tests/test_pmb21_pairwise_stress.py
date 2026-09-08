@@ -35,5 +35,6 @@ def test_pmb21_classifies_every_cell_and_reconciles_counts():
     assert total == report["summary"]["cell_count"]
     assert all(
         cell["classification"] in {"COMPOUNDING", "ADDITIVE", "OFFSETTING"}
-        for pair in report["pairs"] for cell in pair["cells"]
+        for pair in report["pairs"]
+        for cell in pair["cells"]
     )

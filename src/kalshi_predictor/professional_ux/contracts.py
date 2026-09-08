@@ -15,22 +15,21 @@ THEME_MODES = {"light", "dark", "system"}
 DENSITY_MODES = {"comfortable", "compact"}
 
 NAV_ITEMS: tuple[dict[str, str], ...] = (
-    {"label": "Today", "href": "/today", "family": "today"},
+    {"label": "Dashboard", "href": "/today", "family": "today"},
     {"label": "Opportunities", "href": "/opportunities", "family": "opportunities"},
-    {"label": "Markets", "href": "/markets", "family": "markets"},
-    {"label": "Links", "href": "/links/coverage", "family": "markets"},
     {"label": "Portfolio", "href": "/portfolio", "family": "portfolio"},
-    {"label": "Risk", "href": "/risk", "family": "risk"},
-    {"label": "Trades", "href": "/trades", "family": "trades"},
     {"label": "Models", "href": "/models", "family": "models"},
-    {"label": "Journal", "href": "/journal", "family": "journal"},
-    {"label": "Research", "href": "/research", "family": "research"},
+    {"label": "Signals", "href": "/signals", "family": "signals"},
+    {"label": "Calibration", "href": "/calibration", "family": "calibration"},
+    {"label": "Learning", "href": "/learning", "family": "learning"},
+    {"label": "Risk", "href": "/risk", "family": "risk"},
+    {"label": "Reports", "href": "/reports", "family": "reports"},
     {"label": "System", "href": "/system", "family": "system"},
-    {"label": "Settings", "href": "/settings", "family": "settings"},
 )
 
 COMMAND_ITEMS: tuple[dict[str, str], ...] = NAV_ITEMS + (
     {"label": "System health", "href": "/system/health", "family": "system"},
+    {"label": "Refresh & readiness", "href": "/system/refresh-readiness", "family": "system"},
     {
         "label": "System certification",
         "href": "/system/certification",

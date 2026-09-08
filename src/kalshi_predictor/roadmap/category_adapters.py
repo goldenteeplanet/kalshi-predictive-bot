@@ -66,9 +66,9 @@ def adapt_category_evidence(
         or payload.get("provider")
         or "unknown"
     ).strip()
-    source_kind = str(
-        source.get("kind") or payload.get("source_kind") or source_name
-    ).strip().lower()
+    source_kind = (
+        str(source.get("kind") or payload.get("source_kind") or source_name).strip().lower()
+    )
 
     published_at = _time(payload, source, "published_at", "event_time", "observed_at")
     available_at = _time(payload, source, "available_at", "source_available_at")
@@ -198,7 +198,7 @@ def _nonnegative_int(value: Any) -> int:
 def _normalize_blockers(value: Any) -> list[str]:
     if isinstance(value, str):
         value = [value]
-    if not isinstance(value, (list, tuple, set)):
+    if not isinstance(value, list | tuple | set):
         return []
     return [str(item).strip().upper().replace(" ", "_") for item in value if str(item).strip()]
 

@@ -171,7 +171,7 @@ def _unit_value_to_f(payload: Any) -> Decimal | None:
 def _speed_to_mph(value: Any) -> Decimal | None:
     if value is None:
         return None
-    if isinstance(value, (int, float, Decimal)):
+    if isinstance(value, int | float | Decimal):
         return to_decimal(value)
     text = str(value)
     numbers = [to_decimal(match) for match in re.findall(r"\d+(?:\.\d+)?", text)]

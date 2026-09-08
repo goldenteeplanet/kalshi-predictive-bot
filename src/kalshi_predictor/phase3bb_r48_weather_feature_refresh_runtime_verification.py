@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import json
-import re
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
@@ -140,7 +139,9 @@ def write_phase3bb_r48_weather_feature_refresh_runtime_verification_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["runtime_checks"])
     _write_rows_csv(feature_events_csv_path, payload["scheduler_feature_events"])
@@ -309,24 +310,64 @@ def _build_remote_probes(
     timer = shlex.quote(scheduler_timer_name)
     runner_path = shlex.quote(f"{target.app_path.rstrip('/')}/scripts/{RUNNER_SCRIPT_NAME}")
     report_list = " ".join(shlex.quote(path) for path in WEATHER_REPORT_PATHS)
-    writer_cmd = f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    writer_cmd = (
+        f"cd {app} && set -a && . {env} && set +a && .venv/bin/kalshi-bot db-writer-monitor --json"
+    )
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
-        RemoteProbe("scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds
+        ),
         RemoteProbe(
             "scheduler_service_show",
-            f"systemctl show {service} -p Result -p ActiveState -p SubState -p ExecMainStatus --no-pager || true",
+            f"systemctl show {service} -p Result -p ActiveStat"
+            f"e -p SubState -p ExecMainStatus --no-pager || tr"
+            f"ue",
             timeout_seconds,
         ),
-        RemoteProbe("scheduler_timer_list", f"systemctl list-timers --all {timer} --no-pager || true", timeout_seconds),
-        RemoteProbe("scheduler_journal", f"journalctl -u {service} -n {int(journal_lines)} --no-pager || true", timeout_seconds),
-        RemoteProbe("scheduler_runner_script", f"test -r {runner_path} && sed -n '1,260p' {runner_path} || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_timer_list",
+            f"systemctl list-timers --all {timer} --no-pager || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "scheduler_journal",
+            f"journalctl -u {service} -n {int(journal_lines)} --no-pager || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "scheduler_runner_script",
+            f"test -r {runner_path} && sed -n '1,260p' {runner_path} || true",
+            timeout_seconds,
+        ),
         RemoteProbe("db_writer_monitor_raw", writer_cmd, timeout_seconds),
-        RemoteProbe("r47_json", f"cd {app} && cat reports/phase3bb_r47/weather_current_window_series_discovery.json 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("weather_activation_preview_json", f"cd {app} && cat reports/phase3az_r12_weather/weather_activation_preview.json 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("weather_funnel_json", f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true", timeout_seconds),
-        RemoteProbe("r40_json", f"cd {app} && cat reports/phase3bb_r40/cloud_scheduler_runtime_monitor.json 2>/dev/null || true", timeout_seconds),
+        RemoteProbe(
+            "r47_json",
+            f"cd {app} && cat reports/phase3bb_r47/weather_cur"
+            f"rent_window_series_discovery.json 2>/dev/null ||"
+            f" true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "weather_activation_preview_json",
+            f"cd {app} && cat reports/phase3az_r12_weather/wea"
+            f"ther_activation_preview.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "weather_funnel_json",
+            f"cd {app} && cat reports/phase3bb_r2/weather_funnel.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "r40_json",
+            f"cd {app} && cat reports/phase3bb_r40/cloud_sched"
+            f"uler_runtime_monitor.json 2>/dev/null || true",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "weather_current_window_snapshot",
             _weather_current_window_snapshot_command(
@@ -341,8 +382,8 @@ def _build_remote_probes(
             "weather_report_stats",
             (
                 f"cd {app} && for p in {report_list}; do "
-                "if [ -e \"$p\" ]; then stat -c '%n|%Y|%s' \"$p\"; "
-                "else echo \"$p|MISSING|0\"; fi; done"
+                'if [ -e "$p" ]; then stat -c \'%n|%Y|%s\' "$p"; '
+                'else echo "$p|MISSING|0"; fi; done'
             ),
             timeout_seconds,
         ),
@@ -358,7 +399,7 @@ def _build_remote_probes(
                 "phase3az-r12-weather-activation-preview "
                 "phase3az-r12-weather-missing-link-apply "
                 "phase3bb-r2-weather-fast-lane ingest-weather build-weather-features; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -390,25 +431,46 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
     journal = _stdout(by_name.get("scheduler_journal"))
     job_events = _parse_scheduler_job_runs(journal)
     feature_sequence = _latest_feature_refresh_sequence(job_events)
-    preview_summary = preview_payload.get("summary") if isinstance(preview_payload.get("summary"), dict) else {}
-    funnel_summary = funnel_payload.get("summary") if isinstance(funnel_payload.get("summary"), dict) else {}
+    preview_summary = (
+        preview_payload.get("summary") if isinstance(preview_payload.get("summary"), dict) else {}
+    )
+    funnel_summary = (
+        funnel_payload.get("summary") if isinstance(funnel_payload.get("summary"), dict) else {}
+    )
     snapshot_summary = snapshot.get("summary") if isinstance(snapshot.get("summary"), dict) else {}
-    r47_decision = r47_payload.get("linkability_decision") if isinstance(r47_payload.get("linkability_decision"), dict) else {}
-    r40_parsed = r40_payload.get("parsed_runtime_state") if isinstance(r40_payload.get("parsed_runtime_state"), dict) else {}
-    feature_windows = snapshot.get("feature_windows") if isinstance(snapshot.get("feature_windows"), list) else []
+    r47_decision = (
+        r47_payload.get("linkability_decision")
+        if isinstance(r47_payload.get("linkability_decision"), dict)
+        else {}
+    )
+    r40_parsed = (
+        r40_payload.get("parsed_runtime_state")
+        if isinstance(r40_payload.get("parsed_runtime_state"), dict)
+        else {}
+    )
+    feature_windows = (
+        snapshot.get("feature_windows") if isinstance(snapshot.get("feature_windows"), list) else []
+    )
     return {
         "remote_time_utc": _first_line(_stdout(by_name.get("remote_time_utc"))),
         "scheduler_timer_active_state": _first_line(_stdout(by_name.get("scheduler_timer_active"))),
-        "scheduler_service_active_state": _first_line(_stdout(by_name.get("scheduler_service_active"))),
-        "scheduler_service_show": _parse_systemd_show(_stdout(by_name.get("scheduler_service_show"))),
+        "scheduler_service_active_state": _first_line(
+            _stdout(by_name.get("scheduler_service_active"))
+        ),
+        "scheduler_service_show": _parse_systemd_show(
+            _stdout(by_name.get("scheduler_service_show"))
+        ),
         "scheduler_timer_next": _extract_timer_next(_stdout(by_name.get("scheduler_timer_list"))),
         "scheduler_timer_last": _extract_timer_last(_stdout(by_name.get("scheduler_timer_list"))),
         "runner_has_weather_catalog_hook": WEATHER_CATALOG_JOB_ID in runner_script,
         "runner_has_feature_refresh": _runner_has_weather_feature_refresh(runner_script),
         "scheduler_job_events": job_events,
-        "scheduler_feature_events": [row for row in job_events if str(row.get("event", "")).startswith("WEATHER_")],
+        "scheduler_feature_events": [
+            row for row in job_events if str(row.get("event", "")).startswith("WEATHER_")
+        ],
         "feature_refresh_sequence": feature_sequence,
-        "feature_refresh_runtime_observed": feature_sequence.get("status") == "FEATURE_REFRESH_THEN_PREVIEW_VERIFIED",
+        "feature_refresh_runtime_observed": feature_sequence.get("status")
+        == "FEATURE_REFRESH_THEN_PREVIEW_VERIFIED",
         "writer_status": writer.get("status") or "UNKNOWN",
         "writer_safe_to_start_write": bool(writer.get("safe_to_start_write")) if writer else False,
         "r47_json_available": bool(r47_payload),
@@ -422,15 +484,21 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         "weather_funnel_status": funnel_payload.get("status"),
         "weather_funnel_summary": funnel_summary,
         "r40_json_available": bool(r40_payload),
-        "r40_weather_source_ingest_event_count": r40_parsed.get("weather_source_ingest_event_count"),
-        "r40_weather_feature_build_event_count": r40_parsed.get("weather_feature_build_event_count"),
+        "r40_weather_source_ingest_event_count": r40_parsed.get(
+            "weather_source_ingest_event_count"
+        ),
+        "r40_weather_feature_build_event_count": r40_parsed.get(
+            "weather_feature_build_event_count"
+        ),
         "weather_current_window_snapshot_ok": bool(snapshot.get("ok")),
         "weather_current_window_error": snapshot.get("error"),
         "weather_current_window_summary": snapshot_summary,
         "current_weather_series": snapshot.get("current_weather_series") or [],
         "linkability_rows": snapshot.get("linkability_rows") or [],
         "feature_windows": feature_windows,
-        "weather_report_freshness": _parse_report_stats(_stdout(by_name.get("weather_report_stats"))),
+        "weather_report_freshness": _parse_report_stats(
+            _stdout(by_name.get("weather_report_stats"))
+        ),
         "command_registry_ok": "COMMAND_REGISTRY_OK" in _stdout(by_name.get("command_registry")),
         "failed_probe_names": [result.name for result in results if not result.ok],
     }
@@ -455,7 +523,11 @@ def _latest_feature_refresh_sequence(job_events: list[dict[str, Any]]) -> dict[s
         "WEATHER_CATALOG_PREVIEW_WRITTEN",
     ]
     missing = [event for event in required if event not in events]
-    status = "FEATURE_REFRESH_THEN_PREVIEW_VERIFIED" if not missing else "FEATURE_REFRESH_SEQUENCE_INCOMPLETE"
+    status = (
+        "FEATURE_REFRESH_THEN_PREVIEW_VERIFIED"
+        if not missing
+        else "FEATURE_REFRESH_SEQUENCE_INCOMPLETE"
+    )
     return {
         "status": status,
         "missing_events": missing,
@@ -468,18 +540,48 @@ def _runtime_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
     summary = parsed.get("weather_current_window_summary") or {}
     service_show = parsed.get("scheduler_service_show") or {}
     return [
-        _check("remote_probes_completed", not parsed.get("failed_probe_names"), f"failed={','.join(parsed.get('failed_probe_names') or []) or 'none'}."),
-        _check("scheduler_timer_active", parsed.get("scheduler_timer_active_state") == "active", f"timer={parsed.get('scheduler_timer_active_state')}."),
+        _check(
+            "remote_probes_completed",
+            not parsed.get("failed_probe_names"),
+            f"failed={','.join(parsed.get('failed_probe_names') or []) or 'none'}.",
+        ),
+        _check(
+            "scheduler_timer_active",
+            parsed.get("scheduler_timer_active_state") == "active",
+            f"timer={parsed.get('scheduler_timer_active_state')}.",
+        ),
         _check(
             "scheduler_service_state_valid",
             parsed.get("scheduler_service_active_state") in {"active", "activating", "inactive"},
-            f"service={parsed.get('scheduler_service_active_state')} result={service_show.get('Result')}.",
+            f"service="
+            f"{parsed.get('scheduler_service_active_state')} r"
+            f"esult={service_show.get('Result')}.",
         ),
-        _check("runner_feature_refresh_installed", bool(parsed.get("runner_has_feature_refresh")), "Runner includes ingest-weather and build-weather-features before R12 preview."),
-        _check("current_window_snapshot_readable", bool(parsed.get("weather_current_window_snapshot_ok")), f"error={parsed.get('weather_current_window_error')}."),
-        _check("current_weather_rows_seen", int(summary.get("current_weather_market_rows") or 0) > 0, f"current_rows={summary.get('current_weather_market_rows')}."),
-        _check("r12_preview_available", bool(parsed.get("weather_activation_preview_json_ok")), "R12 weather activation preview JSON exists and parses."),
-        _check("command_registry_ok", bool(parsed.get("command_registry_ok")), "R48/R47/R45/R40/R12/R2/weather feature commands are registered on the cloud host."),
+        _check(
+            "runner_feature_refresh_installed",
+            bool(parsed.get("runner_has_feature_refresh")),
+            "Runner includes ingest-weather and build-weather-features before R12 preview.",
+        ),
+        _check(
+            "current_window_snapshot_readable",
+            bool(parsed.get("weather_current_window_snapshot_ok")),
+            f"error={parsed.get('weather_current_window_error')}.",
+        ),
+        _check(
+            "current_weather_rows_seen",
+            int(summary.get("current_weather_market_rows") or 0) > 0,
+            f"current_rows={summary.get('current_weather_market_rows')}.",
+        ),
+        _check(
+            "r12_preview_available",
+            bool(parsed.get("weather_activation_preview_json_ok")),
+            "R12 weather activation preview JSON exists and parses.",
+        ),
+        _check(
+            "command_registry_ok",
+            bool(parsed.get("command_registry_ok")),
+            "R48/R47/R45/R40/R12/R2/weather feature commands are registered on the cloud host.",
+        ),
     ]
 
 
@@ -510,7 +612,10 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         first_blocker = failed[0]["check"].upper()
     elif not runtime_observed and not fresh_features_present:
         status = "WAIT_FOR_NEXT_SCHEDULER_CYCLE"
-        reason = "R47 is installed, but no repaired scheduler cycle with fresh New York features is visible yet."
+        reason = (
+            "R47 is installed, but no repaired scheduler cycle with fresh New York features "
+            "is visible yet."
+        )
         next_step = "Phase 3BB-R48 - Recheck After Next Scheduler Cycle"
         command = (
             "kalshi-bot phase3bb-r48-weather-feature-refresh-runtime-verification "
@@ -519,7 +624,10 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         first_blocker = "FEATURE_REFRESH_RUNTIME_NOT_OBSERVED"
     elif stale_features > 0:
         status = "WEATHER_FEATURE_REFRESH_RUNTIME_STILL_STALE"
-        reason = "The repaired scheduler cycle was observed, but current weather rows still lack fresh feature windows."
+        reason = (
+            "The repaired scheduler cycle was observed, but current weather rows still lack "
+            "fresh feature windows."
+        )
         next_step = "Phase 3BB-R48 - Inspect Weather Feature Refresh Runtime"
         command = (
             "kalshi-bot phase3bb-r48-weather-feature-refresh-runtime-verification "
@@ -528,7 +636,10 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         first_blocker = "FRESH_FEATURE_WINDOW_MISSING"
     elif rows_safe_to_link > 0 or rows_safe_to_relink > 0 or ready_rows > 0:
         status = "WEATHER_FEATURE_REFRESH_RUNTIME_VERIFIED_LINK_GATE_READY"
-        reason = "Fresh current-window weather features exist; the next safe step is the writer-gated missing-link apply."
+        reason = (
+            "Fresh current-window weather features exist; the next safe step is the "
+            "writer-gated missing-link apply."
+        )
         next_step = "Phase 3BB-R49 - Weather Missing Link Apply After Feature Refresh"
         command = (
             "kalshi-bot phase3bb-r49-weather-missing-link-apply-after-feature-refresh "
@@ -537,7 +648,10 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         first_blocker = "SAFE_LINK_WRITE_GATE_READY"
     elif missing_links == 0 and (current_weather_rows or 0) > 0 and (ranking_rows or 0) > 0:
         status = "WEATHER_FEATURE_REFRESH_RUNTIME_VERIFIED_RANKING_PRESENT"
-        reason = "Weather links, current rows, and rankings are present; refresh the unified paper gate next."
+        reason = (
+            "Weather links, current rows, and rankings are present; refresh the unified "
+            "paper gate next."
+        )
         next_step = "Phase 3BB-R8 - Unified Paper Gate Across Categories"
         command = (
             "kalshi-bot phase3bb-r8-unified-paper-gate "
@@ -546,7 +660,10 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         first_blocker = "PAPER_GATE_REFRESH_NEEDED"
     else:
         status = "WEATHER_FEATURE_REFRESH_RUNTIME_VERIFIED_NEEDS_RANKING_RECHECK"
-        reason = "Fresh weather features are present, but ranking/paper-gate impact is not yet confirmed."
+        reason = (
+            "Fresh weather features are present, but ranking/paper-gate impact is not yet "
+            "confirmed."
+        )
         next_step = "Phase 3BB-R45 - Weather Freshness To Ranking Impact Review"
         command = (
             "kalshi-bot phase3bb-r45-weather-freshness-to-ranking-impact "
@@ -595,7 +712,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- Feature refresh runtime observed: `{decision['feature_refresh_runtime_observed']}`",
             f"- Current weather rows: `{decision['current_weather_market_rows']}`",
             f"- Missing current weather links: `{decision['missing_current_weather_link_rows']}`",
-            f"- Fresh feature window missing rows: `{decision['fresh_feature_window_missing_rows']}`",
+            f"- Fresh feature window missing rows: `"
+            f"{decision['fresh_feature_window_missing_rows']}`",
             f"- R12 rows_safe_to_link: `{decision['rows_safe_to_link']}`",
             f"- R12 rows_safe_to_relink: `{decision['rows_safe_to_relink']}`",
             f"- R2 current weather rows: `{decision['current_weather_rows']}`",
@@ -644,23 +762,62 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in payload["runtime_checks"]:
         lines.append(f"| `{row['check']}` | `{row['passed']}` | {row['detail']} |")
-    lines.extend(["", "## Feature Events", "", "| Event | Job | Count | Line |", "|---|---|---:|---|"])
+    lines.extend(
+        ["", "## Feature Events", "", "| Event | Job | Count | Line |", "|---|---|---:|---|"]
+    )
     for row in payload["scheduler_feature_events"][-80:]:
         lines.append(
-            f"| `{row.get('event')}` | `{row.get('job_id', '')}` | `{row.get('count', '')}` | {row.get('line', '')} |"
+            f"| `{row.get('event')}` | `"
+            f"{row.get('job_id', '')}` | `"
+            f"{row.get('count', '')}` | {row.get('line', '')} "
+            f"|"
         )
-    lines.extend(["", "## Feature Windows", "", "| Location | Rows | Max Generated | Age Hours |", "|---|---:|---|---:|"])
+    lines.extend(
+        [
+            "",
+            "## Feature Windows",
+            "",
+            "| Location | Rows | Max Generated | Age Hours |",
+            "|---|---:|---|---:|",
+        ]
+    )
     for row in payload["weather_feature_windows"]:
         lines.append(
-            "| {location_key} | {feature_rows_sampled} | {max_generated_at} | {max_generated_age_hours} |".format(
-                **{**{"location_key": "", "feature_rows_sampled": "", "max_generated_at": "", "max_generated_age_hours": ""}, **row}
+            "| {location_key} | {feature_rows_sampled} | {max_generated_at} | "
+            "{max_generated_age_hours} |".format(
+                **{
+                    **{
+                        "location_key": "",
+                        "feature_rows_sampled": "",
+                        "max_generated_at": "",
+                        "max_generated_age_hours": "",
+                    },
+                    **row,
+                }
             )
         )
-    lines.extend(["", "## Current Linkability Sample", "", "| Ticker | Location | Target Time | Link | Blocker |", "|---|---|---|---:|---|"])
+    lines.extend(
+        [
+            "",
+            "## Current Linkability Sample",
+            "",
+            "| Ticker | Location | Target Time | Link | Blocker |",
+            "|---|---|---|---:|---|",
+        ]
+    )
     for row in payload["linkability_rows"][:40]:
         lines.append(
             "| {ticker} | {location_key} | {target_time} | {has_weather_link} | {blocker} |".format(
-                **{**{"ticker": "", "location_key": "", "target_time": "", "has_weather_link": "", "blocker": ""}, **row}
+                **{
+                    **{
+                        "ticker": "",
+                        "location_key": "",
+                        "target_time": "",
+                        "has_weather_link": "",
+                        "blocker": "",
+                    },
+                    **row,
+                }
             )
         )
     return "\n".join(lines) + "\n"
@@ -689,7 +846,8 @@ def _render_next_actions(payload: dict[str, Any]) -> str:
             "- Do not start duplicate R5 watchers.",
             "- Do not create paper trades.",
             "- Do not submit/cancel/replace live or demo orders.",
-            "- Do not run weather forecasts until links are written or R48/R45 says the gate is ready.",
+            "- Do not run weather forecasts until links are written or R48/R45 says the "
+            "gate is ready.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -707,11 +865,23 @@ def _render_operator_command(payload: dict[str, Any]) -> str:
 
 
 def _write_probe_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    fieldnames = ["name", "ok", "exit_code", "duration_seconds", "timed_out", "stdout_excerpt", "stderr_excerpt"]
-    _write_rows_csv(path, [{name: row.get(name) for name in fieldnames} for row in rows], fieldnames=fieldnames)
+    fieldnames = [
+        "name",
+        "ok",
+        "exit_code",
+        "duration_seconds",
+        "timed_out",
+        "stdout_excerpt",
+        "stderr_excerpt",
+    ]
+    _write_rows_csv(
+        path, [{name: row.get(name) for name in fieldnames} for row in rows], fieldnames=fieldnames
+    )
 
 
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None) -> None:
+def _write_rows_csv(
+    path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None
+) -> None:
     if fieldnames is None:
         keys: list[str] = []
         for row in rows:

@@ -305,9 +305,7 @@ def _exact_payload(
     return dict(payload)
 
 
-def _blocked_row(
-    ticker: str, reason: str, *, now: datetime, max_age: timedelta
-) -> dict[str, Any]:
+def _blocked_row(ticker: str, reason: str, *, now: datetime, max_age: timedelta) -> dict[str, Any]:
     return {
         "ticker": ticker,
         "authoritative_identity_verified": False,

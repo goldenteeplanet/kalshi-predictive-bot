@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 
 from kalshi_predictor.ui.cloud_snapshot_parity import certify_cloud_snapshot_parity
 
-
 NOW = datetime(2026, 7, 19, 13, 0, tzinfo=UTC)
 
 
@@ -18,17 +17,25 @@ def base_snapshot():
         "phase_roadmap": [{"number": n} for n in range(1, 21)],
         "reports": [{"phase": "R5-RECOVERY-9"}],
         "workstreams": [
-            {"id": "pmb"}, {"id": "prov", "current_phase": "PROV-14B"},
-            {"id": "nyc_weather"}, {"id": "gh_liquidity"}, {"id": "readiness"},
+            {"id": "pmb"},
+            {"id": "prov", "current_phase": "PROV-14B"},
+            {"id": "nyc_weather"},
+            {"id": "gh_liquidity"},
+            {"id": "readiness"},
         ],
     }
 
 
 def authoritative():
     return {
-        "execution_enabled": False, "lock_status": "CLEAR", "safe_to_start_write": True,
-        "bounded_service": "kalshi-r5-bounded.service", "bounded_timer_enabled": True,
-        "bounded_timer_active": False, "legacy_enabled": False, "legacy_active": False,
+        "execution_enabled": False,
+        "lock_status": "CLEAR",
+        "safe_to_start_write": True,
+        "bounded_service": "kalshi-r5-bounded.service",
+        "bounded_timer_enabled": True,
+        "bounded_timer_active": False,
+        "legacy_enabled": False,
+        "legacy_active": False,
     }
 
 

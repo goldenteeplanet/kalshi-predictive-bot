@@ -264,9 +264,7 @@ def build_phase3bb_r7_news_event_discovery(
 def _active_news_event_markets(session: Session, *, limit: int) -> list[Market]:
     linked = set(session.scalars(select(NewsMarketLink.ticker).distinct()))
     parsed = set(
-        session.scalars(
-            select(MarketLeg.ticker).where(MarketLeg.category == "news").distinct()
-        )
+        session.scalars(select(MarketLeg.ticker).where(MarketLeg.category == "news").distinct())
     )
     text_conditions = [
         func.lower(Market.title).like(f"%{keyword}%") for keyword in NEWS_EVENT_KEYWORDS
@@ -382,9 +380,7 @@ def _source_rule(text: str) -> dict[str, Any] | None:
         families = ", ".join(rule["family"] for rule in matches)
         return {
             "family": "ambiguous_multi_source",
-            "official": tuple(
-                source for rule in matches for source in tuple(rule["official"])
-            ),
+            "official": tuple(source for rule in matches for source in tuple(rule["official"])),
             "parser": f"manual_source_family_review:{families}",
         }
     return None

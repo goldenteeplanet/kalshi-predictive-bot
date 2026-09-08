@@ -29,12 +29,15 @@ def _link(session, ticker, *, target_time):
 
 def _market(session, ticker, *, close_time, status="open", snapshot_status="open"):
     now = utc_now()
-    upsert_market(session, {
-        "ticker": ticker,
-        "status": status,
-        "close_time": close_time.isoformat() if close_time else None,
-        "title": "NYC exact eligibility test",
-    })
+    upsert_market(
+        session,
+        {
+            "ticker": ticker,
+            "status": status,
+            "close_time": close_time.isoformat() if close_time else None,
+            "title": "NYC exact eligibility test",
+        },
+    )
     insert_market_snapshot(
         session,
         {
@@ -99,7 +102,7 @@ def test_preview_is_deterministic_and_strictly_no_write(tmp_path):
 
 def test_bounded_cycle_pins_weather_before_feature_write_and_exactly_aligns_target():
     source = (Path(__file__).parents[1] / "scripts" / "prov14_bounded_cycle.py").read_text()
-    pin = source.index('weather_snapshots = latest_snapshots_for_model(')
+    pin = source.index("weather_snapshots = latest_snapshots_for_model(")
     fail_closed = source.index(
         'raise RuntimeError("No exact current weather snapshots are eligible")'
     )

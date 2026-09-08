@@ -150,9 +150,7 @@ def test_phase3ax_r9_uses_refreshed_gap_analysis_next_task(tmp_path) -> None:
         json.dumps(
             {
                 "next_codex_task": {
-                    "task_phase_name": (
-                        "Phase 3AX-R7 Economic/News Parser Compatibility"
-                    ),
+                    "task_phase_name": ("Phase 3AX-R7 Economic/News Parser Compatibility"),
                     "reason": "R8 is aligned.",
                     "problem_statement": "Repair economic/news compatibility.",
                     "acceptance_criteria": [],
@@ -162,9 +160,7 @@ def test_phase3ax_r9_uses_refreshed_gap_analysis_next_task(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    task = phase3ax_r9._next_codex_task(
-        SimpleNamespace(app_gap_analysis_json_path=gap_path)
-    )
+    task = phase3ax_r9._next_codex_task(SimpleNamespace(app_gap_analysis_json_path=gap_path))
 
     assert task["task_phase_name"] == "Phase 3AX-R7 Economic/News Parser Compatibility"
 

@@ -289,8 +289,7 @@ def _handoff_commands(
             f"{ssh_prefix} 'sudo install -D -m 0755 {guard_tmp} {guard_path}'"
         ),
         "install_service_file": (
-            f"{ssh_prefix} 'sudo install -m 0644 {service_tmp} "
-            f"/etc/systemd/system/{service_name}'"
+            f"{ssh_prefix} 'sudo install -m 0644 {service_tmp} /etc/systemd/system/{service_name}'"
         ),
         "daemon_reload": f"{ssh_prefix} 'sudo systemctl daemon-reload'",
         "enable_no_start": f"{ssh_prefix} 'sudo systemctl enable {service_name}'",
@@ -437,9 +436,7 @@ def _handoff_decision(
         "handoff_script_default_dry_run": True,
         "handoff_script_can_enable_no_start_with_token": not failed,
         "required_execute_token": "I_APPROVE_R16_INSTALL",
-        "operator_next_command": (
-            "bash reports/phase3bb_r16/operator_install_handoff.sh"
-        ),
+        "operator_next_command": ("bash reports/phase3bb_r16/operator_install_handoff.sh"),
         "next_codex_step": (
             "Phase 3BB-R17 - Cloud Service Install Verification After Operator Run"
         ),
@@ -537,20 +534,20 @@ def _render_handoff_script(payload: dict[str, Any]) -> str:
         [
             ")",
             "",
-            "if [[ \"$TOKEN\" != \"$REQUIRED\" ]]; then",
+            'if [[ "$TOKEN" != "$REQUIRED" ]]; then',
             "  echo '[phase3bb-r16] dry-run command list:'",
             "  printf '  %s\\n' \"${commands[@]}\"",
             "  echo '[phase3bb-r16] no install/enable/start command executed'",
             "  echo '[phase3bb-r16] to execute install+enable-no-start, set:'",
-            "  echo \"  PHASE3BB_R16_EXECUTE=$REQUIRED bash $0\"",
+            '  echo "  PHASE3BB_R16_EXECUTE=$REQUIRED bash $0"',
             "  exit 0",
             "fi",
             "",
             "echo '[phase3bb-r16] approval token accepted'",
             "echo '[phase3bb-r16] running install + enable-no-start handoff'",
-            "for command in \"${commands[@]}\"; do",
-            "  echo \"+ $command\"",
-            "  bash -lc \"$command\"",
+            'for command in "${commands[@]}"; do',
+            '  echo "+ $command"',
+            '  bash -lc "$command"',
             "done",
             "echo '[phase3bb-r16] handoff commands completed'",
             "echo '[phase3bb-r16] verify with Phase 3BB-R17 next'",

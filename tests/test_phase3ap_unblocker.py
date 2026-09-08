@@ -34,8 +34,8 @@ from kalshi_predictor.phase3aq import (
 from kalshi_predictor.ui.service import (
     _extend_phase3ap_blockers,
     _extend_phase3aq_blockers,
-    _phase3aq_dashboard_status_payload,
     _phase3ap_dashboard_status_payload,
+    _phase3aq_dashboard_status_payload,
 )
 from kalshi_predictor.utils.time import utc_now
 
@@ -383,9 +383,7 @@ def _seed_ranked_market(
             best_no_ask="0.62",
             spread=ranking_spread,
             raw_market_json=encode_json(market_payload),
-            raw_orderbook_json=encode_json(
-                _orderbook() if orderbook is None else orderbook
-            ),
+            raw_orderbook_json=encode_json(_orderbook() if orderbook is None else orderbook),
         )
     )
     session.add(

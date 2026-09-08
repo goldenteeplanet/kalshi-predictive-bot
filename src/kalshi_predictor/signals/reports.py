@@ -38,9 +38,7 @@ def _render_signal_report(
         key=lambda row: to_decimal(row["brier_score"]) or 999,
     )
     needs_data = [
-        row
-        for row in rows
-        if row["missing_data"] != "none" or row["status"] == "Insufficient Data"
+        row for row in rows if row["missing_data"] != "none" or row["status"] == "Insufficient Data"
     ]
     active = [row for row in readiness if row["readiness_status"] == "ACTIVE"]
     inactive = [row for row in readiness if row["readiness_status"] != "ACTIVE"]

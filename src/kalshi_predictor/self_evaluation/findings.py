@@ -194,8 +194,7 @@ def _failed_findings(
                             attribution_level="ASSOCIATION",
                             reason_codes=["MATCHED_EXECUTION_MODE", "PRACTICAL_EFFECT_MET"],
                             hypothesis=(
-                                "Review execution-mode cohort composition before changing "
-                                "policy."
+                                "Review execution-mode cohort composition before changing policy."
                             ),
                         )
                     )

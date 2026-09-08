@@ -109,9 +109,11 @@ def build_category_coverage_gap_audit(
         unsupported_composite = category == "sports" and _unsupported_sports_composite(
             market, leg_categories.get(market.ticker, set())
         )
-        supported = parsed and category in {
-            "crypto", "weather", "economic", "sports", "news"
-        } and not unsupported_composite
+        supported = (
+            parsed
+            and category in {"crypto", "weather", "economic", "sports", "news"}
+            and not unsupported_composite
+        )
         linked = market.ticker in links.get(category, set())
         ranking = rankings.get(market.ticker)
         gross_ev = _gross_ev(ranking)

@@ -102,7 +102,10 @@ def test_phase3ak_stale_current_windows_outrank_expired_history(tmp_path) -> Non
     assert payload["summary"]["stale_windows"] == 1
     assert payload["summary"]["active_windows"] == 1
     assert payload["primary_blocker"] == "QUOTE_STALE"
-    assert payload["diagnosis"]["active_crypto_markets_exist_but_only_expired_windows_attached"] is False
+    assert (
+        payload["diagnosis"]["active_crypto_markets_exist_but_only_expired_windows_attached"]
+        is False
+    )
 
 
 def test_phase3ak_no_active_markets_reports_precise_blocker(tmp_path) -> None:
@@ -338,7 +341,9 @@ def test_phase3ak_stale_watcher_heartbeat_marks_runner_stale(tmp_path) -> None:
         ),
         encoding="utf-8",
     )
-    report_path.write_text(json.dumps({"generated_at": old.isoformat(), "summary": {}}), encoding="utf-8")
+    report_path.write_text(
+        json.dumps({"generated_at": old.isoformat(), "summary": {}}), encoding="utf-8"
+    )
     with session_factory() as session:
         payload = build_crypto_watch_status(
             session,
@@ -373,7 +378,9 @@ def test_phase3ak_overdue_cycle_distinguishes_running_watcher(tmp_path) -> None:
         ),
         encoding="utf-8",
     )
-    report_path.write_text(json.dumps({"generated_at": old.isoformat(), "summary": {}}), encoding="utf-8")
+    report_path.write_text(
+        json.dumps({"generated_at": old.isoformat(), "summary": {}}), encoding="utf-8"
+    )
     with session_factory() as session:
         payload = build_crypto_watch_status(
             session,
@@ -602,7 +609,11 @@ def test_phase3ak_report_uses_existing_artifacts_without_rebuilding(tmp_path, mo
                     "age_minutes": "1",
                     "freshness_threshold_minutes": "15",
                 },
-                "active_writer": {"active_writer": True, "writer_name": "crypto_watcher", "pid": 123},
+                "active_writer": {
+                    "active_writer": True,
+                    "writer_name": "crypto_watcher",
+                    "pid": 123,
+                },
                 "next_action": "cached market",
             }
         ),
@@ -610,15 +621,21 @@ def test_phase3ak_report_uses_existing_artifacts_without_rebuilding(tmp_path, mo
     )
     monkeypatch.setattr(
         "kalshi_predictor.phase3ak.write_crypto_window_sync_report",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not rebuild window artifact")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("must not rebuild window artifact")
+        ),
     )
     monkeypatch.setattr(
         "kalshi_predictor.phase3ak.write_crypto_watch_status_report",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not rebuild watch artifact")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("must not rebuild watch artifact")
+        ),
     )
     monkeypatch.setattr(
         "kalshi_predictor.phase3ak.build_market_data_refresh_status",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not rebuild market artifact")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("must not rebuild market artifact")
+        ),
     )
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
@@ -687,7 +704,9 @@ def test_phase3ak_report_rebuilds_stale_market_status_only(tmp_path, monkeypatch
             "next_action": "rebuilt market",
         }
 
-    monkeypatch.setattr("kalshi_predictor.phase3ak.build_market_data_refresh_status", fake_market_status)
+    monkeypatch.setattr(
+        "kalshi_predictor.phase3ak.build_market_data_refresh_status", fake_market_status
+    )
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
         artifacts = write_phase_3ak_report(
@@ -698,7 +717,10 @@ def test_phase3ak_report_rebuilds_stale_market_status_only(tmp_path, monkeypatch
         )
 
     payload = json.loads(artifacts.json_path.read_text(encoding="utf-8"))
-    assert payload["artifact_sources"]["market_data_refresh_status"] == "status_only_rebuilt_stale_or_missing_artifact"
+    assert (
+        payload["artifact_sources"]["market_data_refresh_status"]
+        == "status_only_rebuilt_stale_or_missing_artifact"
+    )
     assert payload["market_data_state"] == "STATUS_ONLY_REFRESH_NOT_STARTED"
 
 
@@ -743,7 +765,11 @@ def test_phase3ak_report_rebuilds_stale_window_and_watch_artifacts(
                     "age_minutes": "1",
                     "freshness_threshold_minutes": "15",
                 },
-                "active_writer": {"active_writer": True, "writer_name": "crypto_watcher", "pid": 123},
+                "active_writer": {
+                    "active_writer": True,
+                    "writer_name": "crypto_watcher",
+                    "pid": 123,
+                },
                 "next_action": "cached market",
             }
         ),
@@ -797,7 +823,9 @@ def test_phase3ak_report_rebuilds_stale_window_and_watch_artifacts(
     )
     monkeypatch.setattr(
         "kalshi_predictor.phase3ak.build_market_data_refresh_status",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not rebuild market artifact")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("must not rebuild market artifact")
+        ),
     )
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
@@ -975,7 +1003,9 @@ def _seed_crypto_window(
         sizing_id = sizing.id
     if phase3n_action is not None:
         proposed_contracts = phase3m_contracts or 0
-        approved_contracts = phase3n_contracts if phase3n_contracts is not None else proposed_contracts
+        approved_contracts = (
+            phase3n_contracts if phase3n_contracts is not None else proposed_contracts
+        )
         session.add(
             AdvancedRiskDecisionLog(
                 decision_timestamp=now,

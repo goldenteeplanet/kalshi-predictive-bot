@@ -101,8 +101,7 @@ def _market_yes_side(snapshot: MarketSnapshot, *, game: SportsGame | None) -> st
         return "home"
     raw = decode_json(snapshot.raw_market_json)
     text = " ".join(
-        str(raw.get(key) or "")
-        for key in ("title", "subtitle", "rules", "rules_primary", "ticker")
+        str(raw.get(key) or "") for key in ("title", "subtitle", "rules", "rules_primary", "ticker")
     ).lower()
     home_alias = game.home_team_key.split(":", 1)[-1].replace("-", " ")
     away_alias = game.away_team_key.split(":", 1)[-1].replace("-", " ")
@@ -125,4 +124,3 @@ def _clamp_probability(value: Decimal) -> Decimal:
     if value > Decimal("0.99"):
         return Decimal("0.99")
     return value.quantize(Decimal("0.0001"))
-

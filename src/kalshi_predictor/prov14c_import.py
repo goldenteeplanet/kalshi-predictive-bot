@@ -6,8 +6,14 @@ from pathlib import Path
 from typing import Any
 
 REQUIRED_ROW_FIELDS = (
-    "event_id", "model_name", "source_observation_ref", "market_snapshot_id",
-    "feature_source_table", "feature_source_id", "passed", "failures",
+    "event_id",
+    "model_name",
+    "source_observation_ref",
+    "market_snapshot_id",
+    "feature_source_table",
+    "feature_source_id",
+    "passed",
+    "failures",
 )
 
 
@@ -19,7 +25,9 @@ def import_runtime_attribution_exports(paths: list[Path]) -> dict[str, Any]:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            rejected.append({"path": str(path), "diagnostics": [f"EXPORT_INVALID:{type(exc).__name__}"]})
+            rejected.append(
+                {"path": str(path), "diagnostics": [f"EXPORT_INVALID:{type(exc).__name__}"]}
+            )
             continue
         diagnostics: list[str] = []
         boundary = payload.get("boundary", {}).get("after_event_id")
@@ -47,12 +55,22 @@ def import_runtime_attribution_exports(paths: list[Path]) -> dict[str, Any]:
         normalized = {
             "phase": "PROV-14",
             "boundary": {"after_event_id": boundary},
-            "summary": {"certification_passed": payload.get("summary", {}).get("certification_passed") is True},
+            "summary": {
+                "certification_passed": payload.get("summary", {}).get("certification_passed")
+                is True
+            },
             "guardrails": {"execution_enabled": False},
             "rows": rows,
         }
         canonical = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()
-        imported.append({"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "normalized": normalized, "normalized_sha256": hashlib.sha256(canonical).hexdigest()})
+        imported.append(
+            {
+                "path": str(path),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "normalized": normalized,
+                "normalized_sha256": hashlib.sha256(canonical).hexdigest(),
+            }
+        )
     return {
         "phase": "PROV-14C-A",
         "mode": "LOCAL_READ_ONLY_RUNTIME_EXPORT_IMPORT",
@@ -61,7 +79,12 @@ def import_runtime_attribution_exports(paths: list[Path]) -> dict[str, Any]:
         "execution_enabled": False,
         "imported": imported,
         "rejected": rejected,
-        "summary": {"inputs": len(paths), "imported": len(imported), "rejected": len(rejected), "ready_for_prov14c": len(imported) >= 3 and not rejected},
+        "summary": {
+            "inputs": len(paths),
+            "imported": len(imported),
+            "rejected": len(rejected),
+            "ready_for_prov14c": len(imported) >= 3 and not rejected,
+        },
     }
 
 

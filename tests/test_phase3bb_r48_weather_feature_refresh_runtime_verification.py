@@ -4,7 +4,7 @@ import json
 import sqlite3
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -17,18 +17,18 @@ from kalshi_predictor.phase3bb_r12_cloud_bootstrap import (
     RemoteProbe,
     RemoteProbeResult,
 )
+from kalshi_predictor.phase3bb_r47_weather_current_window_series_discovery import (
+    _weather_current_window_snapshot_command,
+)
 from kalshi_predictor.phase3bb_r48_weather_feature_refresh_runtime_verification import (
     build_phase3bb_r48_weather_feature_refresh_runtime_verification,
     write_phase3bb_r48_weather_feature_refresh_runtime_verification_report,
-)
-from kalshi_predictor.phase3bb_r47_weather_current_window_series_discovery import (
-    _weather_current_window_snapshot_command,
 )
 
 
 def test_r48_exact_new_york_rows_survive_large_fresh_feature_catalog(tmp_path: Path) -> None:
     db_path = tmp_path / "r48_exact_match.db"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     target = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
     generated = now - timedelta(minutes=5)
     tickers = [f"KXTEMPNYCH-26JUL1514-T{value}.99" for value in range(88, 98)]
@@ -50,8 +50,13 @@ def test_r48_exact_new_york_rows_survive_large_fresh_feature_catalog(tmp_path: P
         )
         for ticker in tickers:
             conn.execute(
-                "insert into markets values (?, 'KXTEMPNYCH', ?, '', 'active', ?, null, null, null)",
-                (ticker, "New York City temperature at 2pm EDT", target.replace(tzinfo=None).isoformat(sep=" ")),
+                "insert into markets values (?, 'KXTEMPNYCH', ?, '', 'active', ?, null, "
+                "null, null)",
+                (
+                    ticker,
+                    "New York City temperature at 2pm EDT",
+                    target.replace(tzinfo=None).isoformat(sep=" "),
+                ),
             )
         # These rows reproduce the old global-LIMIT failure: all are fresher and sort
         # ahead of the exact target, but none belongs to the candidate-time window.
@@ -68,7 +73,8 @@ def test_r48_exact_new_york_rows_survive_large_fresh_feature_catalog(tmp_path: P
             ],
         )
         conn.execute(
-            "insert into weather_features values (7000, 'new_york', 'stored_forecasts', ?, ?, 82, 1)",
+            "insert into weather_features values (7000, 'new_york', 'stored_forecasts', "
+            "?, ?, 82, 1)",
             (
                 generated.replace(tzinfo=None).isoformat(sep=" "),
                 target.replace(tzinfo=None).isoformat(sep=" "),
@@ -82,7 +88,9 @@ def test_r48_exact_new_york_rows_survive_large_fresh_feature_catalog(tmp_path: P
         match_tolerance_hours=3,
     )
     script = command.split("python3 - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
-    result = subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)
+    result = subprocess.run(
+        [sys.executable, "-c", script], check=True, capture_output=True, text=True
+    )
     payload = json.loads(result.stdout)
     rows = [row for row in payload["linkability_rows"] if row["ticker"] in tickers]
 
@@ -115,7 +123,10 @@ def test_phase3bb_r48_verifies_feature_refresh_and_opens_link_gate(tmp_path: Pat
     assert decision["fresh_feature_window_missing_rows"] == 0
     assert decision["rows_safe_to_link"] == 10
     assert parsed["feature_refresh_sequence"]["status"] == "FEATURE_REFRESH_THEN_PREVIEW_VERIFIED"
-    assert "phase3bb-r49-weather-missing-link-apply-after-feature-refresh" in decision["operator_next_command"]
+    assert (
+        "phase3bb-r49-weather-missing-link-apply-after-feature-refresh"
+        in decision["operator_next_command"]
+    )
     assert payload["safety_flags"]["remote_db_writes_performed"] == 0
     assert payload["safety_flags"]["runs_weather_forecast"] is False
     assert all(row["passed"] for row in payload["runtime_checks"])
@@ -137,7 +148,9 @@ def test_phase3bb_r48_waits_when_repaired_cycle_has_not_run(tmp_path: Path) -> N
             probe_runner=_fake_probe_runner(
                 scheduler_journal=_journal_without_feature_refresh(),
                 weather_snapshot=json.dumps(_stale_snapshot()),
-                weather_preview=json.dumps({"summary": {"rows_safe_to_link": 0, "rows_safe_to_relink": 0}}),
+                weather_preview=json.dumps(
+                    {"summary": {"rows_safe_to_link": 0, "rows_safe_to_relink": 0}}
+                ),
             ),
         )
 
@@ -145,7 +158,10 @@ def test_phase3bb_r48_waits_when_repaired_cycle_has_not_run(tmp_path: Path) -> N
     assert decision["status"] == "WAIT_FOR_NEXT_SCHEDULER_CYCLE"
     assert decision["first_weather_blocker"] == "FEATURE_REFRESH_RUNTIME_NOT_OBSERVED"
     assert decision["fresh_feature_window_missing_rows"] == 10
-    assert "phase3bb-r48-weather-feature-refresh-runtime-verification" in decision["operator_next_command"]
+    assert (
+        "phase3bb-r48-weather-feature-refresh-runtime-verification"
+        in decision["operator_next_command"]
+    )
     assert payload["safety_flags"]["systemctl_start_stop_restart_executed"] == 0
 
 
@@ -211,26 +227,50 @@ def _fake_probe_runner(
         "remote_time_utc": ("2026-07-13T19:35:00Z\n", True, 0, ""),
         "scheduler_timer_active": ("active\n", True, 0, ""),
         "scheduler_service_active": ("inactive\n", True, 0, ""),
-        "scheduler_service_show": ("ActiveState=inactive\nSubState=dead\nResult=success\nExecMainStatus=0\n", True, 0, ""),
+        "scheduler_service_show": (
+            "ActiveState=inactive\nSubState=dead\nResult=success\nExecMainStatus=0\n",
+            True,
+            0,
+            "",
+        ),
         "scheduler_timer_list": (
             "NEXT LEFT LAST PASSED UNIT ACTIVATES\n"
-            "Mon 2026-07-13 19:45:00 UTC 10min Mon 2026-07-13 19:15:00 UTC 20min ago kalshi-multicategory-refresh-scheduler.timer kalshi-multicategory-refresh-scheduler.service\n",
+            "Mon 2026-07-13 19:45:00 UTC 10min Mon 2026-07-13 19:15:00 UTC 20min ago "
+            "kalshi-multicategory-refresh-scheduler.timer "
+            "kalshi-multicategory-refresh-scheduler.service\n",
             True,
             0,
             "",
         ),
         "scheduler_journal": (scheduler_journal, True, 0, ""),
         "scheduler_runner_script": (_runner_with_feature_refresh(), True, 0, ""),
-        "db_writer_monitor_raw": (json.dumps({"status": "OPEN_READERS", "safe_to_start_write": True}), True, 0, ""),
+        "db_writer_monitor_raw": (
+            json.dumps({"status": "OPEN_READERS", "safe_to_start_write": True}),
+            True,
+            0,
+            "",
+        ),
         "r47_json": (
-            json.dumps({"linkability_decision": {"status": "WEATHER_FEATURE_REFRESH_HOOK_INSTALLED", "runner_repaired_after": True}}),
+            json.dumps(
+                {
+                    "linkability_decision": {
+                        "status": "WEATHER_FEATURE_REFRESH_HOOK_INSTALLED",
+                        "runner_repaired_after": True,
+                    }
+                }
+            ),
             True,
             0,
             "",
         ),
         "weather_activation_preview_json": (weather_preview, True, 0, ""),
         "weather_funnel_json": (
-            json.dumps({"status": "NO_CURRENT_WEATHER_ROWS", "summary": {"current_weather_rows": 0, "ranking_rows": 0}}),
+            json.dumps(
+                {
+                    "status": "NO_CURRENT_WEATHER_ROWS",
+                    "summary": {"current_weather_rows": 0, "ranking_rows": 0},
+                }
+            ),
             True,
             0,
             "",
@@ -273,22 +313,33 @@ def _runner_with_feature_refresh() -> str:
 set -euo pipefail
 
 # cadence_minutes=30 category=weather-catalog
-run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; .venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit 1500; .venv/bin/kalshi-bot ingest-weather --location-key new_york; .venv/bin/kalshi-bot build-weather-features --location-key new_york; .venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 --match-tolerance-hours 3'
+run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; \
+.venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 \
+--series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit \
+1500; .venv/bin/kalshi-bot ingest-weather --location-key new_york; .venv/bin/kalshi-bot \
+build-weather-features --location-key new_york; .venv/bin/kalshi-bot \
+phase3az-r12-weather-activation-preview --output-dir reports/phase3az_r12_weather \
+--limit 2000 --fresh-window-hours 24 --match-tolerance-hours 3'
 
 # cadence_minutes=30 category=weather
-run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane --output-dir reports/phase3bb_r2 --reports-dir reports
+run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane \
+--output-dir reports/phase3bb_r2 --reports-dir reports
 """
 
 
 def _journal_with_feature_refresh() -> str:
     return "\n".join(
         [
-            "Jul 13 19:15:00 kalshi-bot-01 runner[1]: [phase3bb-r35] running weather_current_catalog_refresh",
+            "Jul 13 19:15:00 kalshi-bot-01 runner[1]: [phase3bb-r35] running "
+            "weather_current_catalog_refresh",
             "Jul 13 19:15:02 kalshi-bot-01 runner[1]: Synced 30 markets.",
             "Jul 13 19:15:12 kalshi-bot-01 runner[1]: Market leg parse summary",
-            "Jul 13 19:15:18 kalshi-bot-01 runner[1]: Inserted 156 weather forecast row(s) and 0 observation row(s) from noaa.",
-            "Jul 13 19:15:21 kalshi-bot-01 runner[1]: Processed 156 weather forecast row(s) for new_york and inserted 156 feature row(s).",
-            "Jul 13 19:15:25 kalshi-bot-01 runner[1]: Wrote JSON: reports/phase3az_r12_weather/weather_activation_preview.json",
+            "Jul 13 19:15:18 kalshi-bot-01 runner[1]: Inserted 156 weather forecast "
+            "row(s) and 0 observation row(s) from noaa.",
+            "Jul 13 19:15:21 kalshi-bot-01 runner[1]: Processed 156 weather forecast "
+            "row(s) for new_york and inserted 156 feature row(s).",
+            "Jul 13 19:15:25 kalshi-bot-01 runner[1]: Wrote JSON: "
+            "reports/phase3az_r12_weather/weather_activation_preview.json",
             "Jul 13 19:15:28 kalshi-bot-01 runner[1]: [phase3bb-r35] running weather_fast_lane",
         ]
     )
@@ -297,10 +348,12 @@ def _journal_with_feature_refresh() -> str:
 def _journal_without_feature_refresh() -> str:
     return "\n".join(
         [
-            "Jul 13 19:15:00 kalshi-bot-01 runner[1]: [phase3bb-r35] running weather_current_catalog_refresh",
+            "Jul 13 19:15:00 kalshi-bot-01 runner[1]: [phase3bb-r35] running "
+            "weather_current_catalog_refresh",
             "Jul 13 19:15:02 kalshi-bot-01 runner[1]: Synced 30 markets.",
             "Jul 13 19:15:12 kalshi-bot-01 runner[1]: Market leg parse summary",
-            "Jul 13 19:15:25 kalshi-bot-01 runner[1]: Wrote JSON: reports/phase3az_r12_weather/weather_activation_preview.json",
+            "Jul 13 19:15:25 kalshi-bot-01 runner[1]: Wrote JSON: "
+            "reports/phase3az_r12_weather/weather_activation_preview.json",
         ]
     )
 

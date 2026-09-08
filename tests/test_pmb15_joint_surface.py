@@ -27,9 +27,7 @@ def test_pmb15_identifies_robust_and_fragile_decision_zones():
     assert summary["robust_reject_zones"] > 0
     assert summary["fragile_zones"] > 0
     assert (
-        summary["robust_allocate_zones"]
-        + summary["robust_reject_zones"]
-        + summary["fragile_zones"]
+        summary["robust_allocate_zones"] + summary["robust_reject_zones"] + summary["fragile_zones"]
     ) == 27
 
 
@@ -37,6 +35,4 @@ def test_pmb15_rejects_empty_or_unbounded_forecast_grid():
     with pytest.raises(ValueError, match="non-empty"):
         build_joint_robust_decision_surface(forecast_perturbations=())
     with pytest.raises(ValueError, match="bounded"):
-        build_joint_robust_decision_surface(
-            forecast_perturbations=(Decimal("0.11"),)
-        )
+        build_joint_robust_decision_surface(forecast_perturbations=(Decimal("0.11"),))

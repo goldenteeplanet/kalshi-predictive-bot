@@ -228,8 +228,7 @@ def _next_action(summary: dict[str, Any], status: dict[str, Any]) -> dict[str, A
                 "reports/phase3ba_status --reports-dir reports"
             ),
             "reason": (
-                "Paper-only certification passed; continue with the one-command status "
-                "workflow."
+                "Paper-only certification passed; continue with the one-command status workflow."
             ),
             "allow_paper_trade_creation": False,
         }
@@ -250,8 +249,7 @@ def _next_action(summary: dict[str, Any], status: dict[str, Any]) -> dict[str, A
     return {
         "stage": "REFRESH_PHASE3BA_STATUS",
         "command": str(
-            (status.get("next_action") or {}).get("command")
-            or "kalshi-bot phase3ba-status"
+            (status.get("next_action") or {}).get("command") or "kalshi-bot phase3ba-status"
         ),
         "reason": "Certification checks are blocked; refresh status and address failed checks.",
         "allow_paper_trade_creation": False,
@@ -340,10 +338,9 @@ def _running_r5_pids(r5_status: dict[str, Any]) -> list[int]:
 def _no_fake_evidence(status: dict[str, Any]) -> bool:
     safety = status.get("safety_flags") or {}
     composite = status.get("composite_parking") or {}
-    return (
-        not safety.get("recommended_command_contains_forbidden_trade_command")
-        and composite.get("exact_component_evidence_rows") in {0, None}
-    )
+    return not safety.get("recommended_command_contains_forbidden_trade_command") and composite.get(
+        "exact_component_evidence_rows"
+    ) in {0, None}
 
 
 def _operator_should_not_run(status: dict[str, Any]) -> list[str]:

@@ -173,7 +173,9 @@ def _fake_probe_runner(
             state["r53"] += 1
             stdout = json.dumps(r53_states[index])
         elif probe.name == "weather_feature_refresh":
-            stdout = "Inserted 156 weather forecast row(s).\nProcessed 4524 weather forecast row(s).\n"
+            stdout = (
+                "Inserted 156 weather forecast row(s).\nProcessed 4524 weather forecast row(s).\n"
+            )
         elif probe.name == "weather_snapshot_capture":
             stdout = "Captured 10 snapshots.\n"
         elif probe.name == "weather_per_ticker_forecast":

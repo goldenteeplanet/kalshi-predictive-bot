@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings
@@ -72,9 +72,7 @@ def validate_one_contract_paper_activation(
     preflight_row = _ticker_row(preflight, ticker, "results")
     if preflight_row.get("status") != "RECORDED":
         raise RuntimeError("Latest coherent preflight was not recorded.")
-    if preflight_row.get("phase3n_action") != "ALLOW" or preflight_row.get(
-        "phase3n_hard_blocks"
-    ):
+    if preflight_row.get("phase3n_action") != "ALLOW" or preflight_row.get("phase3n_hard_blocks"):
         raise RuntimeError("Latest Phase 3N decision is not an unblocked ALLOW.")
 
     pair_key = str(preflight_row.get("forecast_snapshot_pair_key") or "")
@@ -86,22 +84,27 @@ def validate_one_contract_paper_activation(
         raise RuntimeError("Forecast/snapshot pair is absent from retained idempotency state.")
     forecast = session.get(Forecast, forecast_id)
     snapshot = session.get(MarketSnapshot, snapshot_id)
-    if forecast is None or snapshot is None or forecast.ticker != ticker or snapshot.ticker != ticker:
+    if (
+        forecast is None
+        or snapshot is None
+        or forecast.ticker != ticker
+        or snapshot.ticker != ticker
+    ):
         raise RuntimeError("Forecast/snapshot pair does not resolve to the requested ticker.")
-    ranking = session.scalar(
-        select(MarketRanking)
-        .where(
-            MarketRanking.ticker == ticker,
-            MarketRanking.forecast_model == "weather_v2",
-            MarketRanking.ranked_at >= forecast.forecasted_at,
-        )
-        .order_by(desc(MarketRanking.ranked_at), desc(MarketRanking.id))
-        .limit(1)
-    )
-    if ranking is None or int(gate_row.get("ranking_id") or 0) != ranking.id:
+    ranking_id = int(gate_row.get("ranking_id") or 0)
+    ranking = session.get(MarketRanking, ranking_id)
+    if ranking is None or ranking.ticker != ticker or ranking.forecast_model != "weather_v2":
         raise RuntimeError("Current gate ranking does not match the coherent forecast.")
     if int(gate_row.get("forecast_id") or 0) != forecast.id:
         raise RuntimeError("Current gate forecast does not match the coherent pair.")
+    try:
+        ranking_forecast_id = int((json.loads(ranking.raw_json) or {}).get("forecast_id") or 0)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        ranking_forecast_id = 0
+    if ranking_forecast_id != forecast.id or _aware(ranking.ranked_at) < _aware(
+        forecast.forecasted_at
+    ):
+        raise RuntimeError("Current gate ranking does not match the coherent forecast.")
     captured_at = _aware(snapshot.captured_at)
     forecasted_at = _aware(forecast.forecasted_at)
     if forecasted_at < captured_at:
@@ -174,9 +177,7 @@ def activate_one_contract_paper_order(
         "explicit_operator_approval": True,
         "paper_only": True,
         "live_execution_enabled": False,
-        "position_sizing_historical_evidence_cache": _cache_for_forecast(
-            cache, candidate.forecast
-        ),
+        "position_sizing_historical_evidence_cache": _cache_for_forecast(cache, candidate.forecast),
     }
     probability = to_decimal(candidate.forecast.yes_probability)
     price = to_decimal(candidate.ranking.best_price)
@@ -194,7 +195,9 @@ def activate_one_contract_paper_order(
         limit_price=price,
         edge=edge,
         quantity=1,
-        reason="Explicitly approved one-contract paper activation; live execution remains disabled.",
+        reason=(
+            "Explicitly approved one-contract paper activation; live execution remains disabled."
+        ),
         raw_decision_json=raw,
     )
     activation_settings = settings.model_copy(

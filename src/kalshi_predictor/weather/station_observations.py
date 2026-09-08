@@ -50,7 +50,8 @@ def fetch_nws_station_observations(
     end = datetime.combine(target_local_date, time.max, zone).astimezone(ZoneInfo("UTC"))
     owned_client = client is None
     active_client = client or httpx.Client(
-        base_url="https://api.weather.gov", timeout=timeout_seconds,
+        base_url="https://api.weather.gov",
+        timeout=timeout_seconds,
         headers={"User-Agent": user_agent},
     )
     try:
@@ -60,7 +61,9 @@ def fetch_nws_station_observations(
         )
         response.raise_for_status()
         return parse_nws_station_observations(
-            response.json(), station_id=station_id, target_local_date=target_local_date,
+            response.json(),
+            station_id=station_id,
+            target_local_date=target_local_date,
             timezone=timezone,
         )
     finally:
@@ -140,9 +143,7 @@ def align_point_observation(
     return PointObservationAlignment(validation, observation, True, None, offset)
 
 
-def _station_from_feature(
-    feature: Mapping[str, Any], properties: Mapping[str, Any]
-) -> str | None:
+def _station_from_feature(feature: Mapping[str, Any], properties: Mapping[str, Any]) -> str | None:
     station = properties.get("station") or feature.get("station")
     if not station:
         return None

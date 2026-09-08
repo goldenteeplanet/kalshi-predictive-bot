@@ -38,12 +38,10 @@ def test_prov15c_reports_malformed_mixed_and_unsupported_inputs():
     mixed = json.loads((FIXTURES / "mixed_malformed.json").read_text(encoding="utf-8"))
     result = normalize_runtime_provenance_export(mixed)
     assert result["compatible"] is False
-    assert [row["code"] for row in result["diagnostics"]] == [
-        "MIXED_ROW_SCHEMAS", "MALFORMED_ROW"
-    ]
-    unsupported = normalize_runtime_provenance_export({
-        "schema_version": "99", "rows": mixed["rows"][:1]
-    })
+    assert [row["code"] for row in result["diagnostics"]] == ["MIXED_ROW_SCHEMAS", "MALFORMED_ROW"]
+    unsupported = normalize_runtime_provenance_export(
+        {"schema_version": "99", "rows": mixed["rows"][:1]}
+    )
     assert unsupported["diagnostics"][0]["code"] == "UNSUPPORTED_SCHEMA_VERSION"
     with pytest.raises(ValueError, match="MIXED_ROW_SCHEMAS"):
         adapt_runtime_provenance_export(mixed)

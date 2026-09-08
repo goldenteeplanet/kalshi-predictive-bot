@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll committed Kalshi snapshot cycles for research handoff every minute
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

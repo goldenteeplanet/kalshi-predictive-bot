@@ -51,8 +51,7 @@ def test_paper_trading_gap_opens_operator_review_when_paper_ready(tmp_path) -> N
     assert payload["summary"]["current_blocker"] == "PAPER_READY_REVIEW"
     assert payload["phase_statuses"]["positive_ev_gate"]["status"] == "DONE"
     assert (
-        payload["phase_statuses"]["paper_trade_creation"]["status"]
-        == "READY_FOR_OPERATOR_REVIEW"
+        payload["phase_statuses"]["paper_trade_creation"]["status"] == "READY_FOR_OPERATOR_REVIEW"
     )
     assert all(item != "Do not run accelerate-learning." for item in payload["do_not_run_yet"])
 
@@ -79,10 +78,7 @@ def test_paper_trading_gap_uses_r17_blocker_when_book_not_executable(tmp_path) -
     assert payload["summary"]["paper_trade_ready"] is False
     assert payload["summary"]["accelerate_learning_allowed"] is False
     assert payload["summary"]["current_blocker"] == "WAIT_FOR_EXECUTABLE_BOOK"
-    assert (
-        payload["phase_statuses"]["liquidity_and_risk"]["status"]
-        == "WAIT_FOR_EXECUTABLE_BOOK"
-    )
+    assert payload["phase_statuses"]["liquidity_and_risk"]["status"] == "WAIT_FOR_EXECUTABLE_BOOK"
     assert any(gap["code"] == "WAIT_FOR_EXECUTABLE_BOOK" for gap in payload["remaining_gaps"])
 
 
@@ -107,13 +103,9 @@ def _write_closed_gate_reports(
         "clean_execution_rows": 24,
         "risk_ready_rows": paper_ready_candidates,
         "paper_ready_candidates": paper_ready_candidates,
-        "primary_gap_after_refresh": "EV_NOT_POSITIVE"
-        if positive_ev_rows == 0
-        else "PAPER_READY",
+        "primary_gap_after_refresh": "EV_NOT_POSITIVE" if positive_ev_rows == 0 else "PAPER_READY",
         "phase3bc_main_blocker": "WATCH_NO_POSITIVE_EXPECTED_VALUE",
-        "watch_state": "WAITING_FOR_POSITIVE_EV"
-        if positive_ev_rows == 0
-        else "PAPER_READY_REVIEW",
+        "watch_state": "WAITING_FOR_POSITIVE_EV" if positive_ev_rows == 0 else "PAPER_READY_REVIEW",
         "best_current_expected_value_cents": "-0.5",
         "best_ev_gap_to_positive_cents": "0.5",
         "best_ev_candidate_ticker": "KXXRP-TEST",

@@ -9,13 +9,12 @@ from typing import Any
 from kalshi_predictor.benchmarking.joint_surface import build_joint_robust_decision_surface
 from kalshi_predictor.benchmarking.tail_stress import _run_level
 
-
-FORECAST_BIAS_GRID = tuple(Decimal(value) for value in (
-    "0", "-0.002", "-0.004", "-0.006", "-0.008", "-0.010"
-))
-SPREAD_ADDITION_GRID = tuple(Decimal(value) for value in (
-    "0", "0.002", "0.004", "0.006", "0.008", "0.010"
-))
+FORECAST_BIAS_GRID = tuple(
+    Decimal(value) for value in ("0", "-0.002", "-0.004", "-0.006", "-0.008", "-0.010")
+)
+SPREAD_ADDITION_GRID = tuple(
+    Decimal(value) for value in ("0", "0.002", "0.004", "0.006", "0.008", "0.010")
+)
 
 
 def build_interaction_boundary_refinement() -> dict[str, Any]:
@@ -25,19 +24,17 @@ def build_interaction_boundary_refinement() -> dict[str, Any]:
         for row in training["robust_zones"]
     }
     isolated_forecast = {
-        value: _run_level(_level(forecast_bias=value), zones)
-        for value in FORECAST_BIAS_GRID
+        value: _run_level(_level(forecast_bias=value), zones) for value in FORECAST_BIAS_GRID
     }
     isolated_spread = {
-        value: _run_level(_level(spread_addition=value), zones)
-        for value in SPREAD_ADDITION_GRID
+        value: _run_level(_level(spread_addition=value), zones) for value in SPREAD_ADDITION_GRID
     }
     rows = []
     for forecast_bias in FORECAST_BIAS_GRID:
         for spread_addition in SPREAD_ADDITION_GRID:
-            joint = _run_level(_level(
-                forecast_bias=forecast_bias, spread_addition=spread_addition
-            ), zones)
+            joint = _run_level(
+                _level(forecast_bias=forecast_bias, spread_addition=spread_addition), zones
+            )
             forecast_survived = isolated_forecast[forecast_bias]["comparison"][
                 "both_advantages_survived"
             ]
@@ -45,22 +42,26 @@ def build_interaction_boundary_refinement() -> dict[str, Any]:
                 "both_advantages_survived"
             ]
             joint_survived = joint["comparison"]["both_advantages_survived"]
-            rows.append({
-                "forecast_bias": str(forecast_bias),
-                "spread_addition": str(spread_addition),
-                "combined_magnitude_l1": str(abs(forecast_bias) + spread_addition),
-                "isolated_forecast_survived": forecast_survived,
-                "isolated_spread_survived": spread_survived,
-                "joint_survived": joint_survived,
-                "joint_only_break": forecast_survived and spread_survived and not joint_survived,
-                "drawdown_advantage_margin": str(-Decimal(
-                    joint["comparison"]["drawdown_delta"]
-                )),
-                "capital_efficiency_advantage_margin": joint["comparison"][
-                    "capital_efficiency_delta"
-                ],
-                "all_attribution_complete": joint["summary"]["all_attribution_complete"],
-            })
+            rows.append(
+                {
+                    "forecast_bias": str(forecast_bias),
+                    "spread_addition": str(spread_addition),
+                    "combined_magnitude_l1": str(abs(forecast_bias) + spread_addition),
+                    "isolated_forecast_survived": forecast_survived,
+                    "isolated_spread_survived": spread_survived,
+                    "joint_survived": joint_survived,
+                    "joint_only_break": forecast_survived
+                    and spread_survived
+                    and not joint_survived,
+                    "drawdown_advantage_margin": str(
+                        -Decimal(joint["comparison"]["drawdown_delta"])
+                    ),
+                    "capital_efficiency_advantage_margin": joint["comparison"][
+                        "capital_efficiency_delta"
+                    ],
+                    "all_attribution_complete": joint["summary"]["all_attribution_complete"],
+                }
+            )
     breaks = sorted(
         (row for row in rows if row["joint_only_break"]),
         key=lambda row: (
@@ -105,7 +106,9 @@ def golden_interaction_boundary_summary(report: dict[str, Any]) -> dict[str, Any
         "phase": report["phase"],
         "grid_cells": report["summary"]["cells"],
         "joint_only_breaks": report["summary"]["joint_only_breaks"],
-        "minimum_joint_only_break": None if boundary is None else {
+        "minimum_joint_only_break": None
+        if boundary is None
+        else {
             "forecast_bias": boundary["forecast_bias"],
             "spread_addition": boundary["spread_addition"],
             "combined_magnitude_l1": boundary["combined_magnitude_l1"],
@@ -140,9 +143,7 @@ def _level(**overrides: Decimal) -> dict[str, str | int]:
     return level
 
 
-def _safety_buffer(
-    rows: list[dict[str, Any]], boundary: dict[str, Any] | None
-) -> dict[str, Any]:
+def _safety_buffer(rows: list[dict[str, Any]], boundary: dict[str, Any] | None) -> dict[str, Any]:
     if boundary is None:
         return {
             "certified_within_grid": True,
@@ -157,12 +158,14 @@ def _safety_buffer(
     forecast_buffer = max(lower_forecasts, default=Decimal("0"))
     spread_buffer = max(lower_spreads, default=Decimal("0"))
     rectangle = [
-        row for row in rows
+        row
+        for row in rows
         if abs(Decimal(row["forecast_bias"])) <= forecast_buffer
         and Decimal(row["spread_addition"]) <= spread_buffer
     ]
     return {
-        "certified_within_grid": bool(rectangle) and all(row["joint_survived"] for row in rectangle),
+        "certified_within_grid": bool(rectangle)
+        and all(row["joint_survived"] for row in rectangle),
         "maximum_forecast_bias_magnitude": str(forecast_buffer),
         "maximum_spread_addition": str(spread_buffer),
         "boundary_exclusive": True,

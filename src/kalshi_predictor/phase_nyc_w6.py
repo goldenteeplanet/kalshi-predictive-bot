@@ -20,16 +20,21 @@ def write_runtime_integration_preview(*, w5_report: Path, output_dir: Path) -> P
     if any(not row.get("alignment_passed") for row in windows):
         blockers.append("OBSERVATION_ALIGNMENT_NOT_EXACT")
     report: dict[str, Any] = {
-        "phase": "NYC-W6", "generated_at": utc_now().isoformat(),
+        "phase": "NYC-W6",
+        "generated_at": utc_now().isoformat(),
         "mode": "GUARDED_RUNTIME_INTEGRATION_PREVIEW_NO_WRITE",
-        "database_writes": 0, "execution_enabled": False,
-        "runtime_weather_v2_changed": False, "thresholds_changed": False,
+        "database_writes": 0,
+        "execution_enabled": False,
+        "runtime_weather_v2_changed": False,
+        "thresholds_changed": False,
         "source_policy": {
             "observation_source": "NOAA KNYC",
             "role": "NON_SETTLEMENT_POINT_OBSERVATION_EVIDENCE",
             "settlement_source_remains": "The Weather Company",
-            "allowed_station": "KNYC", "maximum_alignment_minutes": 15,
-            "fuzzy_location_matching": False, "fuzzy_target_time_matching": False,
+            "allowed_station": "KNYC",
+            "maximum_alignment_minutes": 15,
+            "fuzzy_location_matching": False,
+            "fuzzy_target_time_matching": False,
         },
         "proposed_runtime_path": [
             "Require exact KXTEMPNYCH ticker metadata validation.",
@@ -50,7 +55,8 @@ def write_runtime_integration_preview(*, w5_report: Path, output_dir: Path) -> P
         },
         "next_gate": (
             "Implement shadow-only runtime wiring behind the disabled feature flag."
-            if not blockers else "Resolve NYC-W5 blockers before runtime wiring."
+            if not blockers
+            else "Resolve NYC-W5 blockers before runtime wiring."
         ),
     }
     output_dir.mkdir(parents=True, exist_ok=True)

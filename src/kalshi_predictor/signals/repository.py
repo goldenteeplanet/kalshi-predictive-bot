@@ -164,11 +164,13 @@ def _signal_card(
     performance: SignalPerformance | None,
     readiness: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    performance_status = signal.status if performance is None else decode_json(
-        performance.raw_json
-    ).get(
-        "status",
-        signal.status,
+    performance_status = (
+        signal.status
+        if performance is None
+        else decode_json(performance.raw_json).get(
+            "status",
+            signal.status,
+        )
     )
     status = (
         readiness.get("status_label", performance_status)

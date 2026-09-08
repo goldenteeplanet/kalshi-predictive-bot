@@ -40,7 +40,10 @@ def test_phase3bb_r58_reports_r57_patch_and_alignment_gap(tmp_path: Path) -> Non
     assert payload["summary"]["feature_aligned_rows"] == 2
     assert payload["summary"]["forecast_rows"] == 0
     assert payload["summary"]["r57_patch_complete"] is True
-    assert "phase3bb-r57-weather-selected-window-pipeline-speed-repair" in payload["next_operator_command"]
+    assert (
+        "phase3bb-r57-weather-selected-window-pipeline-speed-repair"
+        in payload["next_operator_command"]
+    )
     assert payload["safety_flags"]["creates_paper_trades"] is False
     assert any(probe.name == "selected_window_alignment" for probe in calls)
     assert artifacts.rows_csv_path.exists()

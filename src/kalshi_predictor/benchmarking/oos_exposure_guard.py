@@ -10,7 +10,6 @@ from kalshi_predictor.benchmarking.counterfactual import BASELINE_FORECASTS
 from kalshi_predictor.benchmarking.liquidity_boundary import _evaluate
 from kalshi_predictor.benchmarking.oos_policy import CATEGORY_TICKER, _episode_row, _metrics
 
-
 FROZEN_POSITION_SCALE = Decimal("0.95")
 OOS_EXPOSURE_EPISODES = (
     ("pmb25-oos-crypto-a", "crypto", "-0.004", "0.002", "25", "yes"),
@@ -42,15 +41,18 @@ def build_oos_exposure_guard_validation() -> dict[str, Any]:
         )
         allocated = scenario["status"] == "ALLOCATED"
         full = _episode_row(
-            index, episode_id, category, settlement, scenario,
-            "OOS_CERTIFIED_BUFFER", allocated,
+            index,
+            episode_id,
+            category,
+            settlement,
+            scenario,
+            "OOS_CERTIFIED_BUFFER",
+            allocated,
             None if allocated else scenario["blocker"],
         )
         guarded = dict(full)
         guarded["capital_used"] = str(Decimal(full["capital_used"]) * FROZEN_POSITION_SCALE)
-        guarded["settlement_pnl"] = str(
-            Decimal(full["settlement_pnl"]) * FROZEN_POSITION_SCALE
-        )
+        guarded["settlement_pnl"] = str(Decimal(full["settlement_pnl"]) * FROZEN_POSITION_SCALE)
         guarded["position_scale"] = str(FROZEN_POSITION_SCALE)
         full["position_scale"] = "1"
         for row in (full, guarded):
@@ -98,7 +100,9 @@ def build_oos_exposure_guard_validation() -> dict[str, Any]:
         "summary": {
             "out_of_sample_episodes": len(OOS_EXPOSURE_EPISODES),
             "categories": sorted(CATEGORY_TICKER),
-            "new_episode_ids": all(row[0].startswith("pmb25-oos-") for row in OOS_EXPOSURE_EPISODES),
+            "new_episode_ids": all(
+                row[0].startswith("pmb25-oos-") for row in OOS_EXPOSURE_EPISODES
+            ),
             "identical_trade_selection": full["trade_count"] == guarded["trade_count"],
             "all_attribution_complete": all(
                 row["attribution_complete"] for row in full_rows + guarded_rows

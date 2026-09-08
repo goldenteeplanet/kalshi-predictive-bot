@@ -1,6 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -167,9 +176,7 @@ class CryptoEventLiquidityCoverage(Base):
     bounds_json: Mapped[str] = mapped_column(Text, nullable=False)
 
     __table_args__ = (
-        Index(
-            "ix_crypto_liquidity_event_captured", "event_ticker", "captured_at"
-        ),
+        Index("ix_crypto_liquidity_event_captured", "event_ticker", "captured_at"),
         Index("ix_crypto_liquidity_family_captured", "family", "captured_at"),
     )
 
@@ -516,6 +523,494 @@ class BacktestTrade(Base):
     )
 
 
+class CanonicalEvaluation(Base):
+    """Lane-labelled evaluated evidence; performance is never pooled implicitly."""
+
+    __tablename__ = "canonical_evaluations"
+
+    evaluation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source_lane: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    market_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    event_ticker: Mapped[str | None] = mapped_column(String(128), index=True)
+    series_ticker: Mapped[str | None] = mapped_column(String(128), index=True)
+    model: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    model_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    decision_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    forecast_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    forecast_probability: Mapped[str] = mapped_column(String(80), nullable=False)
+    snapshot_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    executable_price: Mapped[str] = mapped_column(String(80), nullable=False)
+    spread: Mapped[str | None] = mapped_column(String(80))
+    liquidity: Mapped[str | None] = mapped_column(String(80))
+    gross_edge: Mapped[str] = mapped_column(String(80), nullable=False)
+    fees: Mapped[str] = mapped_column(String(80), nullable=False)
+    slippage: Mapped[str] = mapped_column(String(80), nullable=False)
+    net_edge: Mapped[str] = mapped_column(String(80), nullable=False)
+    risk_result: Mapped[str] = mapped_column(String(100), nullable=False)
+    settlement_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    settlement_result: Mapped[str] = mapped_column(String(100), nullable=False)
+    realized_or_simulated_pnl: Mapped[str] = mapped_column(String(80), nullable=False)
+    brier_contribution: Mapped[str] = mapped_column(String(80), nullable=False)
+    log_loss_contribution: Mapped[str] = mapped_column(String(80), nullable=False)
+    independent_event_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    correlation_cluster_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    provenance: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "source_lane IN ('HISTORICAL_REPLAY', 'SHADOW', 'GUARDED_PAPER')",
+            name="ck_canonical_evaluations_source_lane",
+        ),
+        Index("ix_canonical_eval_lane_model", "source_lane", "model"),
+        Index("ix_canonical_eval_lane_event", "source_lane", "independent_event_id"),
+    )
+
+
+class ResearchRun(Base):
+    __tablename__ = "research_runs"
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    model: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    last_completed_event: Mapped[str | None] = mapped_column(String(200))
+    processed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    evaluated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    errors: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    config_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ResearchCheckpoint(Base):
+    __tablename__ = "research_checkpoints"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("research_runs.run_id"), index=True)
+    last_completed_event: Mapped[str | None] = mapped_column(String(200))
+    processed: Mapped[int] = mapped_column(Integer, nullable=False)
+    evaluated: Mapped[int] = mapped_column(Integer, nullable=False)
+    skipped: Mapped[int] = mapped_column(Integer, nullable=False)
+    errors: Mapped[int] = mapped_column(Integer, nullable=False)
+    disposition_counts_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ReplayDisposition(Base):
+    """Exactly one terminal replay disposition for each forecast in a research run."""
+
+    __tablename__ = "replay_dispositions"
+
+    disposition_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("research_runs.run_id"), index=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey("forecasts.id"), index=True)
+    market_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    event_ticker: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    model: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    forecast_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    disposition: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    calibration_eligible: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    details_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "forecast_id", name="uq_replay_disposition_run_forecast"),
+        Index(
+            "ix_replay_disposition_cursor",
+            "run_id",
+            "event_ticker",
+            "forecast_timestamp",
+            "forecast_id",
+        ),
+    )
+
+
+class CalibrationObservation(Base):
+    """Settled forecast scoring only; never executable P&L or a simulated trade."""
+
+    __tablename__ = "calibration_observations"
+
+    observation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("research_runs.run_id"), index=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey("forecasts.id"), index=True)
+    market_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    event_ticker: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    model: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    forecast_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    settlement_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    forecast_probability: Mapped[str] = mapped_column(String(80), nullable=False)
+    settlement_result: Mapped[str] = mapped_column(String(100), nullable=False)
+    brier_contribution: Mapped[str] = mapped_column(String(80), nullable=False)
+    log_loss_contribution: Mapped[str] = mapped_column(String(80), nullable=False)
+    independent_event_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    provenance_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "forecast_id", name="uq_calibration_observation_run_forecast"),
+    )
+
+
+class CryptoFeatureLineage(Base):
+    """Immutable verdict linking a historical crypto forecast to its source features."""
+
+    __tablename__ = "crypto_feature_lineage"
+
+    lineage_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey("forecasts.id"), unique=True, index=True)
+    market_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    forecast_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    verdict: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    feature_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    source_timestamps_json: Mapped[str] = mapped_column(Text, nullable=False)
+    feature_versions_json: Mapped[str] = mapped_column(Text, nullable=False)
+    provenance_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    provenance_json: Mapped[str] = mapped_column(Text, nullable=False)
+    audited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class EventCalibrationMetric(Base):
+    """Run-scoped independent-event aggregation; separate from executable evidence."""
+
+    __tablename__ = "event_calibration_metrics"
+
+    metric_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    comparison_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    model: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    independent_event_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    mean_probability: Mapped[str] = mapped_column(String(80), nullable=False)
+    outcome_rate: Mapped[str] = mapped_column(String(80), nullable=False)
+    brier: Mapped[str] = mapped_column(String(80), nullable=False)
+    log_loss: Mapped[str] = mapped_column(String(80), nullable=False)
+    aggregation_policy: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "comparison_id",
+            "model",
+            "independent_event_id",
+            name="uq_event_calibration_comparison_model_event",
+        ),
+    )
+
+
+class EvidenceExpansionPartition(Base):
+    __tablename__ = "evidence_expansion_partitions"
+
+    partition_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    model: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    max_independent_events: Mapped[int] = mapped_column(Integer, nullable=False)
+    last_event_ticker: Mapped[str | None] = mapped_column(String(200))
+    last_forecast_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_forecast_id: Mapped[int | None] = mapped_column(Integer)
+    scanned: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    admitted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rejected: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    independent_events: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cohort_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    rejection_counts_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    config_json: Mapped[str] = mapped_column(Text, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class EvidenceExpansionMember(Base):
+    __tablename__ = "evidence_expansion_members"
+
+    member_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    partition_id: Mapped[str] = mapped_column(
+        ForeignKey("evidence_expansion_partitions.partition_id"), index=True
+    )
+    source_forecast_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    paired_market_forecast_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    market_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    event_ticker: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    independent_event_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    asset: Mapped[str | None] = mapped_column(String(30), index=True)
+    forecast_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    settlement_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    snapshot_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    lineage_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    source_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "partition_id",
+            "source_forecast_id",
+            name="uq_expansion_member_partition_forecast",
+        ),
+    )
+
+
+class ExecutableEdgeAttribution(Base):
+    __tablename__ = "executable_edge_attributions"
+
+    attribution_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey("forecasts.id"), index=True)
+    independent_event_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    asset: Mapped[str | None] = mapped_column(String(30), index=True)
+    probability_band: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    side: Mapped[str] = mapped_column(String(20), nullable=False)
+    probability_advantage: Mapped[str] = mapped_column(String(80), nullable=False)
+    crossing_spread_cost: Mapped[str] = mapped_column(String(80), nullable=False)
+    fees: Mapped[str] = mapped_column(String(80), nullable=False)
+    slippage: Mapped[str] = mapped_column(String(80), nullable=False)
+    timing_decay: Mapped[str] = mapped_column(String(80), nullable=False)
+    gross_edge: Mapped[str] = mapped_column(String(80), nullable=False)
+    net_edge: Mapped[str] = mapped_column(String(80), nullable=False)
+    spread: Mapped[str | None] = mapped_column(String(80))
+    liquidity: Mapped[str | None] = mapped_column(String(80))
+    forecast_age_seconds: Mapped[str] = mapped_column(String(80), nullable=False)
+    settlement_window_seconds: Mapped[str] = mapped_column(String(80), nullable=False)
+    terminal_reason: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    details_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "forecast_id", name="uq_edge_attribution_run_forecast"),
+    )
+
+
+class ProspectiveCaptureRun(Base):
+    __tablename__ = "prospective_capture_runs"
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    last_event_ticker: Mapped[str | None] = mapped_column(String(128))
+    last_snapshot_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_ticker: Mapped[str | None] = mapped_column(String(128))
+    scanned: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    captured: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rejected: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rejection_counts_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    config_json: Mapped[str] = mapped_column(Text, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProspectivePairedCapture(Base):
+    __tablename__ = "prospective_paired_captures"
+
+    capture_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("prospective_capture_runs.run_id"), index=True)
+    ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    event_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    series_ticker: Mapped[str | None] = mapped_column(String(128), index=True)
+    snapshot_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    snapshot_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    feature_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    feature_hashes_json: Mapped[str] = mapped_column(Text, nullable=False)
+    source_observations_json: Mapped[str] = mapped_column(Text, nullable=False)
+    market_probability: Mapped[str] = mapped_column(String(80), nullable=False)
+    crypto_probability: Mapped[str] = mapped_column(String(80), nullable=False)
+    model_versions_json: Mapped[str] = mapped_column(Text, nullable=False)
+    comparator_lineage_json: Mapped[str | None] = mapped_column(Text)
+    range_comparator_verdict_json: Mapped[str | None] = mapped_column(Text)
+    best_yes_bid: Mapped[str | None] = mapped_column(String(80))
+    best_yes_ask: Mapped[str | None] = mapped_column(String(80))
+    spread: Mapped[str | None] = mapped_column(String(80))
+    liquidity: Mapped[str | None] = mapped_column(String(80))
+    settlement_target: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    bundle_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    latency_json: Mapped[str] = mapped_column(Text, nullable=False)
+    persisted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "event_ticker", "snapshot_timestamp", "ticker", name="uq_prospective_cursor"
+        ),
+    )
+
+
+class ProspectiveCaptureRejection(Base):
+    __tablename__ = "prospective_capture_rejections"
+
+    rejection_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("prospective_capture_runs.run_id"), index=True)
+    snapshot_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    event_ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    snapshot_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reason: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    details_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProspectivePairEvaluation(Base):
+    __tablename__ = "prospective_pair_evaluations"
+
+    evaluation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    capture_id: Mapped[str] = mapped_column(
+        ForeignKey("prospective_paired_captures.capture_id"), unique=True
+    )
+    independent_event_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    settled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    settlement_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    settlement_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    outcome: Mapped[int] = mapped_column(Integer, nullable=False)
+    market_brier: Mapped[str] = mapped_column(String(80), nullable=False)
+    crypto_brier: Mapped[str] = mapped_column(String(80), nullable=False)
+    market_log_loss: Mapped[str] = mapped_column(String(80), nullable=False)
+    crypto_log_loss: Mapped[str] = mapped_column(String(80), nullable=False)
+    probability_advantage: Mapped[str] = mapped_column(String(80), nullable=False)
+    crossing_spread_cost: Mapped[str] = mapped_column(String(80), nullable=False)
+    fees: Mapped[str] = mapped_column(String(80), nullable=False)
+    slippage: Mapped[str] = mapped_column(String(80), nullable=False)
+    gross_edge: Mapped[str] = mapped_column(String(80), nullable=False)
+    net_edge: Mapped[str] = mapped_column(String(80), nullable=False)
+    terminal_reason: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    hypothetical_pnl: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProspectiveCaptureLease(Base):
+    __tablename__ = "prospective_capture_leases"
+
+    lease_name: Mapped[str] = mapped_column(String(80), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    heartbeat_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+
+
+class ProspectiveCaptureAlert(Base):
+    __tablename__ = "prospective_capture_alerts"
+
+    alert_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    run_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    capture_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    alert_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    observed_value: Mapped[str | None] = mapped_column(String(80))
+    threshold_value: Mapped[str | None] = mapped_column(String(80))
+    details_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ProspectiveHealthSnapshot(Base):
+    __tablename__ = "prospective_health_snapshots"
+
+    health_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_max_market_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_max_snapshot_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_max_feature_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    open_markets: Mapped[int] = mapped_column(Integer, nullable=False)
+    open_snapshots: Mapped[int] = mapped_column(Integer, nullable=False)
+    eligible_pairs: Mapped[int] = mapped_column(Integer, nullable=False)
+    exact_crypto_links: Mapped[int] = mapped_column(Integer, nullable=False)
+    two_sided_books: Mapped[int] = mapped_column(Integer, nullable=False)
+    one_sided_books: Mapped[int] = mapped_column(Integer, nullable=False)
+    findings_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ProspectiveStatusLineage(Base):
+    __tablename__ = "prospective_status_lineage"
+
+    lineage_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    fetched_inventory: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_active_or_open: Mapped[int] = mapped_column(Integer, nullable=False)
+    normalized_active_or_open: Mapped[int] = mapped_column(Integer, nullable=False)
+    filtered_inactive: Mapped[int] = mapped_column(Integer, nullable=False)
+    missing_snapshot: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot_active_or_open: Mapped[int] = mapped_column(Integer, nullable=False)
+    status_mismatch: Mapped[int] = mapped_column(Integer, nullable=False)
+    strict_pair_eligible: Mapped[int] = mapped_column(Integer, nullable=False)
+    loss_counts_json: Mapped[str] = mapped_column(Text, nullable=False)
+    samples_json: Mapped[str] = mapped_column(Text, nullable=False)
+    sample_bundle_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+
+
+class ProspectiveSnapshotHandoff(Base):
+    __tablename__ = "prospective_snapshot_handoffs"
+
+    handoff_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    cycle_watermark: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    cycle_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    snapshot_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    active_snapshot_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    details_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ProspectiveHandoffCounter(Base):
+    __tablename__ = "prospective_handoff_counters"
+
+    counter_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    handoff_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    disposition: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    details_json: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ResearchPartition(Base):
+    __tablename__ = "research_partitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("research_runs.run_id"), index=True)
+    partition_key: Mapped[str] = mapped_column(String(240), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    processed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    evaluated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    errors: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "partition_key", name="uq_research_partition_run_key"),
+    )
+
+
+class ShadowDecision(Base):
+    """Canonical shadow-only decision. It has no paper-order foreign key by design."""
+
+    __tablename__ = "shadow_decisions"
+
+    decision_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    ticker: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    event_ticker: Mapped[str | None] = mapped_column(String(128), index=True)
+    series_ticker: Mapped[str | None] = mapped_column(String(128), index=True)
+    model: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    model_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    forecast_id: Mapped[int | None] = mapped_column(ForeignKey("forecasts.id"), index=True)
+    forecast: Mapped[str] = mapped_column(String(80), nullable=False)
+    forecast_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    snapshot_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    side: Mapped[str] = mapped_column(String(20), nullable=False)
+    executable_price: Mapped[str] = mapped_column(String(80), nullable=False)
+    spread: Mapped[str | None] = mapped_column(String(80))
+    liquidity: Mapped[str | None] = mapped_column(String(80))
+    gross_edge: Mapped[str] = mapped_column(String(80), nullable=False)
+    fees: Mapped[str] = mapped_column(String(80), nullable=False)
+    slippage: Mapped[str] = mapped_column(String(80), nullable=False)
+    net_ev: Mapped[str] = mapped_column(String(80), nullable=False)
+    risk_result: Mapped[str] = mapped_column(String(100), nullable=False)
+    paper_eligible: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    decision_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    independent_event_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    correlation_cluster_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    settlement_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    settlement_result: Mapped[str | None] = mapped_column(String(100))
+    hypothetical_pnl: Mapped[str | None] = mapped_column(String(80))
+    provenance: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class MarketRanking(Base):
     __tablename__ = "market_rankings"
 
@@ -598,8 +1093,12 @@ class RuntimeProvenanceEvent(Base):
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("stage", "forecast_id", "ranking_id",
-                         name="uq_runtime_provenance_stage_forecast_ranking"),
+        UniqueConstraint(
+            "stage",
+            "forecast_id",
+            "ranking_id",
+            name="uq_runtime_provenance_stage_forecast_ranking",
+        ),
         Index("ix_runtime_provenance_forecast_event", "forecast_id", "event_at"),
     )
 
@@ -809,7 +1308,15 @@ class WeatherFeature(Base):
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    __table_args__ = (Index("ix_weather_features_location_target", "location_key", "target_time"),)
+    __table_args__ = (
+        Index("ix_weather_features_location_target", "location_key", "target_time"),
+        Index(
+            "ix_weather_features_location_generated_id",
+            "location_key",
+            "generated_at",
+            "id",
+        ),
+    )
 
 
 class WeatherMarketLink(Base):
@@ -2906,9 +3413,7 @@ class FeatureRelationship(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_feature_relationship_run_type", "run_id", "relationship_type"),
-    )
+    __table_args__ = (Index("ix_feature_relationship_run_type", "run_id", "relationship_type"),)
 
 
 class FeatureRecommendation(Base):
@@ -2930,9 +3435,7 @@ class FeatureRecommendation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_feature_recommendation_run_action", "run_id", "action"),
-    )
+    __table_args__ = (Index("ix_feature_recommendation_run_action", "run_id", "action"),)
 
 
 class FeatureHoldoutAccess(Base):
@@ -2950,9 +3453,7 @@ class FeatureHoldoutAccess(Base):
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_feature_holdout_run_batch", "run_id", "candidate_batch_id"),
-    )
+    __table_args__ = (Index("ix_feature_holdout_run_batch", "run_id", "candidate_batch_id"),)
 
 
 class SyntheticMarketRun(Base):
@@ -3043,9 +3544,7 @@ class SyntheticContractRegistry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_synthetic_contract_event_status", "synthetic_event_id", "status"),
-    )
+    __table_args__ = (Index("ix_synthetic_contract_event_status", "synthetic_event_id", "status"),)
 
 
 class SyntheticListingCheck(Base):
@@ -3067,9 +3566,7 @@ class SyntheticListingCheck(Base):
     warnings_json: Mapped[str] = mapped_column(Text, nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_synthetic_listing_event_time", "synthetic_event_id", "checked_at"),
-    )
+    __table_args__ = (Index("ix_synthetic_listing_event_time", "synthetic_event_id", "checked_at"),)
 
 
 class SyntheticListingMatch(Base):
@@ -3093,9 +3590,7 @@ class SyntheticListingMatch(Base):
     effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_synthetic_listing_match_class", "match_class", "semantic_score"),
-    )
+    __table_args__ = (Index("ix_synthetic_listing_match_class", "match_class", "semantic_score"),)
 
 
 class SyntheticProbabilityEstimate(Base):
@@ -3257,9 +3752,7 @@ class RlDatasetManifest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_rl_dataset_run_training", "run_id", "training_as_of"),
-    )
+    __table_args__ = (Index("ix_rl_dataset_run_training", "run_id", "training_as_of"),)
 
 
 class RlRewardDefinition(Base):
@@ -3347,9 +3840,7 @@ class RlBehaviorDecision(Base):
     reason_codes_json: Mapped[str] = mapped_column(Text, nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_rl_behavior_decision_time_action", "decision_at", "chosen_action"),
-    )
+    __table_args__ = (Index("ix_rl_behavior_decision_time_action", "decision_at", "chosen_action"),)
 
 
 class RlPolicyArtifact(Base):
@@ -3369,9 +3860,7 @@ class RlPolicyArtifact(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint("policy_id", "policy_version", name="uq_rl_policy_version"),
-    )
+    __table_args__ = (UniqueConstraint("policy_id", "policy_version", name="uq_rl_policy_version"),)
 
 
 class RlPolicyEvaluation(Base):
@@ -3433,9 +3922,7 @@ class RlPolicyDecision(Base):
     idempotency_key: Mapped[str] = mapped_column(String(300), nullable=False, unique=True)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_rl_policy_decision_mode_action", "mode", "recommended_action"),
-    )
+    __table_args__ = (Index("ix_rl_policy_decision_mode_action", "mode", "recommended_action"),)
 
 
 class RlPolicyPromotion(Base):
@@ -3607,9 +4094,7 @@ class ReadinessDecisionRecord(Base):
     report_path: Mapped[str | None] = mapped_column(String(500))
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_readiness_decision_stage_created", "target_stage", "created_at"),
-    )
+    __table_args__ = (Index("ix_readiness_decision_stage_created", "target_stage", "created_at"),)
 
 
 class LiveReadinessCertificate(Base):
@@ -3635,9 +4120,7 @@ class LiveReadinessCertificate(Base):
     certificate_json: Mapped[str] = mapped_column(Text, nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_live_cert_status_expiry", "status", "expires_at"),
-    )
+    __table_args__ = (Index("ix_live_cert_status_expiry", "status", "expires_at"),)
 
 
 class LiveReadinessCertificateEvent(Base):
@@ -3675,9 +4158,7 @@ class SystemCertificationRun(Base):
     report_md_path: Mapped[str] = mapped_column(String(500), nullable=False)
     raw_json: Mapped[str] = mapped_column(Text, nullable=False)
 
-    __table_args__ = (
-        Index("ix_system_cert_status_completed", "overall_status", "completed_at"),
-    )
+    __table_args__ = (Index("ix_system_cert_status_completed", "overall_status", "completed_at"),)
 
 
 class SystemCertificationArtifact(Base):

@@ -15,4 +15,3 @@ def weather_edge(
     if game.neutral_site:
         return Decimal("0")
     return Decimal("0")
-

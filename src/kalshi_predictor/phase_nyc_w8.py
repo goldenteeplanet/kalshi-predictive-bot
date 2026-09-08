@@ -11,7 +11,6 @@ from typing import Any
 from kalshi_predictor.utils.decimals import to_decimal
 from kalshi_predictor.utils.time import utc_now
 
-
 MIN_DISTINCT_WINDOWS = 3
 MAX_ALIGNMENT_SECONDS = 900
 
@@ -37,11 +36,7 @@ def write_nyc_w8_report(*, reports_dir: Path, output_dir: Path) -> Path:
             blocker_counts["DATABASE_WRITE_DETECTED"] += 1
         for row in payload.get("rows", []):
             provenance = row.get("provenance") or {}
-            target = str(
-                provenance.get("target_utc_time")
-                or row.get("target_utc_time")
-                or ""
-            )
+            target = str(provenance.get("target_utc_time") or row.get("target_utc_time") or "")
             ticker = str(row.get("ticker") or "")
             window_id = target or _ticker_window(ticker)
             if not window_id:
@@ -85,7 +80,8 @@ def write_nyc_w8_report(*, reports_dir: Path, output_dir: Path) -> Path:
 
     gates = {
         "minimum_distinct_live_windows": len(ordered_windows) >= MIN_DISTINCT_WINDOWS,
-        "all_windows_drift_free": bool(ordered_windows) and certified_windows == len(ordered_windows),
+        "all_windows_drift_free": bool(ordered_windows)
+        and certified_windows == len(ordered_windows),
         "rollback_continuously_verified": blocker_counts["ROLLBACK_NOT_EXACT"] == 0,
         "feature_flag_remains_disabled": blocker_counts["FEATURE_FLAG_NOT_DISABLED"] == 0,
         "execution_remains_disabled": blocker_counts["EXECUTION_ENABLED"] == 0,
@@ -113,7 +109,8 @@ def write_nyc_w8_report(*, reports_dir: Path, output_dir: Path) -> Path:
             "maximum_shadow_change": str(max(shadow_changes)) if shadow_changes else None,
             "mean_absolute_shadow_change": (
                 str(sum(map(abs, shadow_changes), Decimal("0")) / len(shadow_changes))
-                if shadow_changes else None
+                if shadow_changes
+                else None
             ),
             "drift_blocker_counts": dict(sorted(blocker_counts.items())),
             "gates": gates,

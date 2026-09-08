@@ -25,7 +25,11 @@ def discover_quoted_demo_tickers(
                 continue
             response = client.get(
                 "/markets",
-                params={"limit": max_markets_per_series, "status": "open", "series_ticker": series_ticker},
+                params={
+                    "limit": max_markets_per_series,
+                    "status": "open",
+                    "series_ticker": series_ticker,
+                },
             )
             response.raise_for_status()
             for market in response.json().get("markets", [])[:max_markets_per_series]:

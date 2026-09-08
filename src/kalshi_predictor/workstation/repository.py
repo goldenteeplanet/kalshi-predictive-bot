@@ -256,11 +256,7 @@ def _active_position_count(
     include_local_derived_composites: bool = True,
     local_derived_only: bool = False,
 ) -> int:
-    statement = (
-        select(func.count())
-        .select_from(PaperPosition)
-        .where(_active_position_clause())
-    )
+    statement = select(func.count()).select_from(PaperPosition).where(_active_position_clause())
     if local_derived_only:
         statement = statement.where(_local_derived_composite_clause())
     elif not include_local_derived_composites:
@@ -281,10 +277,7 @@ def _active_position_clause() -> Any:
 
 def _local_derived_composite_clause() -> Any:
     return or_(
-        *[
-            PaperPosition.ticker.startswith(prefix)
-            for prefix in LOCAL_DERIVED_COMPOSITE_PREFIXES
-        ]
+        *[PaperPosition.ticker.startswith(prefix) for prefix in LOCAL_DERIVED_COMPOSITE_PREFIXES]
     )
 
 
@@ -360,9 +353,7 @@ def _latest_pnl_by_ticker(
 def _settlement_tickers(session: Session, tickers: list[str]) -> set[str]:
     if not tickers:
         return set()
-    return set(
-        session.scalars(select(Settlement.ticker).where(Settlement.ticker.in_(tickers)))
-    )
+    return set(session.scalars(select(Settlement.ticker).where(Settlement.ticker.in_(tickers))))
 
 
 def _local_composite_state(
@@ -380,9 +371,8 @@ def _local_composite_state(
 
 
 def _paper_pnl_is_realized(row: PaperPnl) -> bool:
-    return (
-        (row.notes or "").strip().lower() == "settled market realized paper p&l"
-        and bool(str(row.settlement_result or "").strip())
+    return (row.notes or "").strip().lower() == "settled market realized paper p&l" and bool(
+        str(row.settlement_result or "").strip()
     )
 
 
@@ -431,9 +421,9 @@ def _position_rows_from_loaded(
     rows = [
         {
             **_position_row_from_loaded(
-            position,
-            snapshot=snapshots.get(position.ticker),
-            market=markets.get(position.ticker),
+                position,
+                snapshot=snapshots.get(position.ticker),
+                market=markets.get(position.ticker),
             ),
             "active_trade": active_trade_telemetry(session, position.ticker),
         }
@@ -495,9 +485,7 @@ def _position_row_from_loaded(
         "title": (market.title if market else None) or position.ticker,
         "category": market_category(market),
         "position_kind": (
-            "local_derived_composite"
-            if is_local_derived_composite
-            else "direct_exchange_position"
+            "local_derived_composite" if is_local_derived_composite else "direct_exchange_position"
         ),
         "is_local_derived_composite": is_local_derived_composite,
         "settlement_status": (
@@ -588,9 +576,7 @@ def active_trade_telemetry(session: Session, ticker: str) -> dict[str, Any] | No
     )
     fill_count = int(
         session.scalar(
-            select(func.count())
-            .select_from(PaperFill)
-            .where(PaperFill.paper_order_id == order.id)
+            select(func.count()).select_from(PaperFill).where(PaperFill.paper_order_id == order.id)
         )
         or 0
     )
@@ -614,9 +600,7 @@ def active_trade_telemetry(session: Session, ticker: str) -> dict[str, Any] | No
         ),
         "settlement_result": settlement.result if settlement else None,
         "settled_at": (
-            settlement.settled_at.isoformat()
-            if settlement and settlement.settled_at
-            else None
+            settlement.settled_at.isoformat() if settlement and settlement.settled_at else None
         ),
         "realized_pnl": pnl.realized_pnl if pnl else (position.realized_pnl if position else "0"),
         "position_sizing_decision_id": sizing.id if sizing else None,
@@ -808,9 +792,7 @@ def model_performance_rows(session: Session) -> list[dict[str, Any]]:
     latest = _latest_leaderboard_by_model(session)
     rows = []
     roi_values = [
-        _decimal(row.roi_on_exposure)
-        for row in latest.values()
-        if row.roi_on_exposure is not None
+        _decimal(row.roi_on_exposure) for row in latest.values() if row.roi_on_exposure is not None
     ]
     best_roi = max(roi_values) if roi_values else None
     worst_roi = min(roi_values) if roi_values else None
@@ -1387,10 +1369,7 @@ def _grouped_missing_multileg_sports_row(rows: list[dict[str, Any]]) -> dict[str
     )
     return {
         "ticker": "GROUPED-MISSING-SPORTS-MULTILEG",
-        "market": (
-            f"{len(rows)} {group_label} missing price/liquidity data."
-            f"{example_suffix}"
-        ),
+        "market": (f"{len(rows)} {group_label} missing price/liquidity data.{example_suffix}"),
         "category": "Sports",
         "current_price": "n/a",
         "spread": "n/a",
@@ -1487,10 +1466,7 @@ def _has_sports_terms(title: str) -> bool:
 
 def _market_monitor_leg_labels(session: Session, ticker: str) -> list[str]:
     legs = session.scalars(
-        select(MarketLeg)
-        .where(MarketLeg.ticker == ticker)
-        .order_by(MarketLeg.leg_index)
-        .limit(12)
+        select(MarketLeg).where(MarketLeg.ticker == ticker).order_by(MarketLeg.leg_index).limit(12)
     )
     labels = []
     for leg in legs:

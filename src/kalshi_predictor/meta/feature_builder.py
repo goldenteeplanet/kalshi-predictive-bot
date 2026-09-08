@@ -243,9 +243,13 @@ def _active_signals(
     snapshot: MarketSnapshot,
     forecasts: dict[str, Forecast],
 ) -> list[dict[str, Any]]:
-    preferred_name = "ensemble_v2" if "ensemble_v2" in forecasts else next(
-        iter(forecasts.keys()),
-        "market_implied_v1",
+    preferred_name = (
+        "ensemble_v2"
+        if "ensemble_v2" in forecasts
+        else next(
+            iter(forecasts.keys()),
+            "market_implied_v1",
+        )
     )
     forecast = forecasts.get(preferred_name)
     active = extract_active_signals(

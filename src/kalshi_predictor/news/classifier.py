@@ -212,8 +212,7 @@ def score_freshness(published_at: datetime | None, *, now: datetime | None = Non
 
 def _payload_text(payload: dict[str, Any]) -> str:
     return " ".join(
-        str(payload.get(key) or "")
-        for key in ("title", "summary", "body", "category", "source")
+        str(payload.get(key) or "") for key in ("title", "summary", "body", "category", "source")
     )
 
 

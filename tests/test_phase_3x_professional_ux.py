@@ -12,8 +12,14 @@ from kalshi_predictor.opportunities.repository import insert_market_ranking
 from kalshi_predictor.professional_ux.contracts import (
     BOUNDARY_ASSERTIONS,
     DECISION_INCOMPLETE,
+    NAV_ITEMS,
     ROUTE_INVENTORY,
     STATUS_GRAMMAR,
+)
+from kalshi_predictor.professional_ux.operations import (
+    build_ops_status,
+    write_daily_close,
+    write_morning_briefing,
 )
 from kalshi_predictor.professional_ux.reports import (
     generate_phase_3x_report,
@@ -36,6 +42,51 @@ def test_phase_3x_contracts_define_professional_shell_boundaries() -> None:
     assert "kalshi_predictor.professional_ux" in {
         phase["module"] for phase in build_phase_status()["phases"]
     }
+    assert [item["label"] for item in NAV_ITEMS] == [
+        "Dashboard",
+        "Opportunities",
+        "Portfolio",
+        "Models",
+        "Signals",
+        "Calibration",
+        "Learning",
+        "Risk",
+        "Reports",
+        "System",
+    ]
+
+
+def test_phase_3x_ops_status_and_reports_fail_closed(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    morning = Path(tmp_path) / "reports" / "morning_briefing.md"
+    close = Path(tmp_path) / "reports" / "daily_close.md"
+    with session_factory() as session:
+        payload = build_ops_status(session, settings=_settings(tmp_path))
+        write_morning_briefing(
+            session,
+            output_path=morning,
+            settings=_settings(tmp_path),
+        )
+        write_daily_close(
+            session,
+            output_path=close,
+            settings=_settings(tmp_path),
+        )
+
+    assert payload["overall_status"] == "BLOCKED"
+    assert payload["live_trading_authorized"] is False
+    assert {item["status"] for item in payload["checks"]} <= {
+        "GREEN",
+        "YELLOW",
+        "RED",
+        "DISABLED",
+        "STALE",
+        "NEEDS DATA",
+        "BLOCKED",
+    }
+    assert all(item["next_action"] for item in payload["checks"])
+    assert "Live trading is not authorized" in morning.read_text(encoding="utf-8")
+    assert "Live trading is not authorized" in close.read_text(encoding="utf-8")
 
 
 def test_phase_3x_status_and_report_are_incomplete_without_3w_pass(tmp_path) -> None:
@@ -62,9 +113,7 @@ def test_phase_3x_status_and_report_are_incomplete_without_3w_pass(tmp_path) -> 
 def test_phase_3x_today_route_renders_authority_labels(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/today")
 
@@ -80,9 +129,7 @@ def test_phase_3x_today_route_renders_authority_labels(tmp_path) -> None:
 def test_phase_3x_root_uses_bounded_today_workspace(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/")
 
@@ -102,9 +149,7 @@ def test_phase_3x_root_uses_bounded_today_workspace(tmp_path) -> None:
 def test_phase_3x_opportunities_route_uses_scanner_shell(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/opportunities")
 
@@ -120,8 +165,8 @@ def test_phase_3x_opportunities_route_uses_scanner_shell(tmp_path) -> None:
     assert "Fast bounded view" in response.text
     assert "Page generated" in response.text
     assert "UX-TEST" in response.text
-    assert "styles.css?v=status-artifact-refresh-20260821a" in response.text
-    assert "app.js?v=status-artifact-refresh-20260821a" in response.text
+    assert "styles.css?v=evidence-observability-20260827a" in response.text
+    assert "app.js?v=evidence-observability-20260827a" in response.text
     assert "Status artifact" in response.text
     assert "data-status-artifact-refresh" in response.text
     assert response.headers["cache-control"] == "no-store"
@@ -131,9 +176,7 @@ def test_phase_3x_opportunities_route_lists_fast_bounded_rows(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
     _seed_stale_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/opportunities")
 
@@ -146,9 +189,7 @@ def test_phase_3x_opportunities_route_lists_fast_bounded_rows(tmp_path) -> None:
 def test_phase_3x_opportunities_route_explains_blocked_rows(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_blocked_crypto_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/opportunities")
 
@@ -164,9 +205,7 @@ def test_phase_3x_opportunities_route_explains_blocked_rows(tmp_path) -> None:
 def test_phase_3x_models_route_uses_live_shell_status(tmp_path) -> None:
     session_factory = _session_factory(tmp_path)
     _seed_opportunity(session_factory)
-    client = TestClient(
-        create_app(session_factory=session_factory, settings=_settings(tmp_path))
-    )
+    client = TestClient(create_app(session_factory=session_factory, settings=_settings(tmp_path)))
 
     response = client.get("/models")
 
@@ -201,6 +240,15 @@ def test_phase_3x_system_page_and_api_render(tmp_path) -> None:
     assert "safe_to_start_write" in monitor_api.json()["monitor"]
     assert alias.status_code == 307
     assert alias.headers["location"] == "/system-certification"
+    expected_aliases = {
+        "/system-readiness": "/system",
+        "/calibration": "/analytics",
+        "/reports": "/system/evidence",
+    }
+    for route, destination in expected_aliases.items():
+        response = client.get(route, follow_redirects=False)
+        assert response.status_code == 307
+        assert response.headers["location"] == destination
 
 
 def test_phase_3x_shell_context_exposes_global_status(tmp_path) -> None:
@@ -255,6 +303,9 @@ def test_phase_3x_cli_smoke_and_report(tmp_path) -> None:
         "phase3x-report",
         "phase3x-audit",
         "ui-shell-status-refresh",
+        "ops-status",
+        "morning-briefing",
+        "daily-close",
     ):
         result = runner.invoke(app, [command, "--help"])
         assert result.exit_code == 0

@@ -19,8 +19,16 @@ from kalshi_predictor.kalshi.orderbook import (
 
 def _book() -> LocalOrderbook:
     book = LocalOrderbook("SYN")
-    book.apply_snapshot({"seq": 1, "msg": {"market_ticker": "SYN",
-        "yes_dollars": [["0.40", "5"]], "no_dollars": [["0.55", "4"]]}})
+    book.apply_snapshot(
+        {
+            "seq": 1,
+            "msg": {
+                "market_ticker": "SYN",
+                "yes_dollars": [["0.40", "5"]],
+                "no_dollars": [["0.55", "4"]],
+            },
+        }
+    )
     return book
 
 
@@ -33,8 +41,8 @@ def test_pmb5_ioc_post_only_and_gtc_lifecycle() -> None:
     )
     assert ioc.event == "FILLED"
     post = exchange.submit(
-        LimitOrder("post", "SYN", "yes", "buy", Decimal("1"), Decimal("0.45"),
-                   "POST_ONLY"), book,
+        LimitOrder("post", "SYN", "yes", "buy", Decimal("1"), Decimal("0.45"), "POST_ONLY"),
+        book,
     )
     assert post.reason == "POST_ONLY_WOULD_CROSS"
     gtc = exchange.submit(
@@ -57,8 +65,9 @@ def test_pmb5_queue_partial_fill_cancel_and_replace_are_deterministic() -> None:
     )[0].filled_size == Decimal("1")
     assert exchange.resting["a"].size == Decimal("2")
     cancelled, replacement = exchange.replace(
-        "a", LimitOrder("b", "SYN", "yes", "buy", Decimal("2"), Decimal("0.39"),
-                        "GTC"), book,
+        "a",
+        LimitOrder("b", "SYN", "yes", "buy", Decimal("2"), Decimal("0.39"), "GTC"),
+        book,
     )
     assert cancelled.event == "CANCELLED"
     assert replacement.event == "RESTING"
@@ -73,18 +82,37 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
 
 
 def test_pmb6_json_and_csv_user_owned_imports(tmp_path: Path) -> None:
-    payload = {"episode_id": "owned", "category": "weather", "settlements": {},
-               "events": [{"timestamp": "2026-01-01T00:00:00Z", "ticker": "SYN",
-                            "kind": "snapshot", "message": {"seq": 1, "msg": {
-                                "market_ticker": "SYN", "yes_dollars": [],
-                                "no_dollars": []}}}]}
+    payload = {
+        "episode_id": "owned",
+        "category": "weather",
+        "settlements": {},
+        "events": [
+            {
+                "timestamp": "2026-01-01T00:00:00Z",
+                "ticker": "SYN",
+                "kind": "snapshot",
+                "message": {
+                    "seq": 1,
+                    "msg": {"market_ticker": "SYN", "yes_dollars": [], "no_dollars": []},
+                },
+            }
+        ],
+    }
     json_path = tmp_path / "owned.json"
     json_path.write_text(json.dumps(payload))
     assert import_user_replay(json_path).episode is not None
     csv_path = tmp_path / "owned.csv"
-    _write_csv(csv_path, [{"timestamp": payload["events"][0]["timestamp"],
-                           "ticker": "SYN", "kind": "snapshot",
-                           "message_json": json.dumps(payload["events"][0]["message"])}])
+    _write_csv(
+        csv_path,
+        [
+            {
+                "timestamp": payload["events"][0]["timestamp"],
+                "ticker": "SYN",
+                "kind": "snapshot",
+                "message_json": json.dumps(payload["events"][0]["message"]),
+            }
+        ],
+    )
     result = import_user_replay(csv_path)
     assert result.episode is not None
     assert result.user_owned_data_only is True
@@ -92,12 +120,26 @@ def test_pmb6_json_and_csv_user_owned_imports(tmp_path: Path) -> None:
 
 def test_pmb6_schema_sequence_and_timestamp_diagnostics(tmp_path: Path) -> None:
     path = tmp_path / "bad.json"
-    path.write_text(json.dumps({"events": [
-        {"timestamp": "2026-01-01T00:00:02Z", "ticker": "SYN", "kind": "delta",
-         "message": {"seq": 2, "msg": {}}},
-        {"timestamp": "2026-01-01T00:00:01Z", "ticker": "SYN", "kind": "delta",
-         "message": {"seq": 2, "msg": {}}},
-    ]}))
+    path.write_text(
+        json.dumps(
+            {
+                "events": [
+                    {
+                        "timestamp": "2026-01-01T00:00:02Z",
+                        "ticker": "SYN",
+                        "kind": "delta",
+                        "message": {"seq": 2, "msg": {}},
+                    },
+                    {
+                        "timestamp": "2026-01-01T00:00:01Z",
+                        "ticker": "SYN",
+                        "kind": "delta",
+                        "message": {"seq": 2, "msg": {}},
+                    },
+                ]
+            }
+        )
+    )
     result = import_user_replay(path)
     assert result.episode is None
     assert any("DELTA_BEFORE_SNAPSHOT" in row for row in result.diagnostics)
@@ -130,27 +172,70 @@ def test_pmb7_read_only_forecast_ranking_version_comparison(tmp_path: Path) -> N
 def test_pmb8_missing_snapshot_duplicate_gap_and_liquidity_fail_safely() -> None:
     book = LocalOrderbook("SYN")
     with pytest.raises(OrderbookProtocolError):
-        book.apply_delta({"seq": 1, "msg": {"market_ticker": "SYN", "side": "yes",
-                          "price_dollars": "0.4", "delta_fp": "1"}})
+        book.apply_delta(
+            {
+                "seq": 1,
+                "msg": {
+                    "market_ticker": "SYN",
+                    "side": "yes",
+                    "price_dollars": "0.4",
+                    "delta_fp": "1",
+                },
+            }
+        )
     book = _book()
     with pytest.raises(OrderbookSequenceGap):
-        book.apply_delta({"seq": 1, "msg": {"market_ticker": "SYN", "side": "yes",
-                          "price_dollars": "0.4", "delta_fp": "1"}})
+        book.apply_delta(
+            {
+                "seq": 1,
+                "msg": {
+                    "market_ticker": "SYN",
+                    "side": "yes",
+                    "price_dollars": "0.4",
+                    "delta_fp": "1",
+                },
+            }
+        )
     with pytest.raises(OrderbookSequenceGap):
-        book.apply_delta({"seq": 3, "msg": {"market_ticker": "SYN", "side": "yes",
-                          "price_dollars": "0.4", "delta_fp": "1"}})
+        book.apply_delta(
+            {
+                "seq": 3,
+                "msg": {
+                    "market_ticker": "SYN",
+                    "side": "yes",
+                    "price_dollars": "0.4",
+                    "delta_fp": "1",
+                },
+            }
+        )
     empty = LocalOrderbook("EMPTY")
-    empty.apply_snapshot({"seq": 1, "msg": {"market_ticker": "EMPTY",
-                         "yes_dollars": [], "no_dollars": []}})
+    empty.apply_snapshot(
+        {"seq": 1, "msg": {"market_ticker": "EMPTY", "yes_dollars": [], "no_dollars": []}}
+    )
     assert empty.execution_quote(outcome="yes", action="buy", size="1").filled_size == 0
     thin = _book().execution_quote(outcome="yes", action="buy", size="10")
     assert thin.fully_executable is False
 
 
 def test_pmb8_rest_snapshot_recovery_is_repeatable() -> None:
-    episode = load_synthetic_episode({"events": [{
-        "timestamp": "2026-01-01T00:00:00Z", "ticker": "SYN", "kind": "snapshot",
-        "message": {"seq": 5, "msg": {"market_ticker": "SYN",
-            "yes_dollars": [["0.4", "1"]], "no_dollars": [["0.5", "1"]]}},
-    }], "settlements": {}})
+    episode = load_synthetic_episode(
+        {
+            "events": [
+                {
+                    "timestamp": "2026-01-01T00:00:00Z",
+                    "ticker": "SYN",
+                    "kind": "snapshot",
+                    "message": {
+                        "seq": 5,
+                        "msg": {
+                            "market_ticker": "SYN",
+                            "yes_dollars": [["0.4", "1"]],
+                            "no_dollars": [["0.5", "1"]],
+                        },
+                    },
+                }
+            ],
+            "settlements": {},
+        }
+    )
     assert replay_episode(episode) == replay_episode(episode)

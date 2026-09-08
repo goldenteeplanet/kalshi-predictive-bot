@@ -41,9 +41,7 @@ def overnight_config_payload(settings: Settings) -> dict[str, Any]:
         "EXECUTION_DRY_RUN": settings.execution_dry_run,
         "FORUM_CONSENSUS_ENABLED": settings.forum_consensus_enabled,
         "FORUM_CONSENSUS_MIN_WINNERS": settings.forum_consensus_min_winners,
-        "FORUM_CONSENSUS_MIN_WIN_RATE": decimal_to_str(
-            settings.forum_consensus_min_win_rate
-        ),
+        "FORUM_CONSENSUS_MIN_WIN_RATE": decimal_to_str(settings.forum_consensus_min_win_rate),
         "FORUM_CONSENSUS_LONGSHOT_MAX_PRICE": decimal_to_str(
             settings.forum_consensus_longshot_max_price
         ),
@@ -311,4 +309,3 @@ def _average(rows: list[Any], attr: str) -> Decimal | None:
     if not decimals:
         return None
     return sum(decimals, Decimal("0")) / Decimal(len(decimals))
-

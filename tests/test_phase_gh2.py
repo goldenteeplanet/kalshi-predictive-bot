@@ -300,13 +300,14 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
     assert "build_weather_features" not in implementation
     assert "DEDICATED_RUNTIME_OWNER_REUSE" in implementation
     assert "risk_preflight=True" in implementation
-    assert "risk_preflight=False" not in implementation
+    assert "persist_risk_preflight=False" in implementation
+    assert "            risk_preflight=False," not in implementation
     assert "exact_snapshot_refresh=True" in implementation
     assert "exact_snapshot_refresh=False" not in implementation
-    assert "exact_snapshot_refresh_limit=250" in implementation
+    assert "exact_snapshot_refresh_limit=forecast_limit" in implementation
+    assert "ranking_repair_limit=forecast_limit" in implementation
     assert "ranking_repair=True" in implementation
     assert "ranking_repair=False" not in implementation
-    assert "ranking_repair_limit=250" in implementation
     assert implementation.index('mark_stage("commit_single_writer")') < implementation.index(
         "_write_candidate_manifest(candidate_manifest_path, manifest_candidates)"
     )
@@ -321,19 +322,15 @@ def test_gh2_systemd_units_preserve_paper_only_single_writer_contract() -> None:
 
 def test_fixed_rate_scheduler_splits_weather_gate_from_decision_publication() -> None:
     root = Path(__file__).parents[1]
-    script = (root / "scripts/local/kalshi-fixed-rate-refresh.sh").read_text(
-        encoding="utf-8"
-    )
+    script = (root / "scripts/local/kalshi-fixed-rate-refresh.sh").read_text(encoding="utf-8")
 
     assert "gh2_decision_refresh 300 timeout 300s" in script
     assert "--active-link-limit 24 --forecast-limit 24" in script
     assert "--opportunity-limit 20" in script
     assert "--defer-weather-gate" in script
-    assert "weather_gate_diagnostics 120 timeout 120s" in script
+    assert "weather_gate_diagnostics 75 timeout 75s" in script
     assert "phase3ba-r3-weather-paper-gate" in script
-    assert script.index("--defer-weather-gate") < script.index(
-        "phase3ba-r3-weather-paper-gate"
-    )
+    assert script.index("--defer-weather-gate") < script.index("phase3ba-r3-weather-paper-gate")
     assert "weather_catalog_refresh 180 timeout 180s" in script
     assert "KXTEMPNYCH KXRAINAUSM KXRAINSTPM" in script
     assert "supported_weather_prepare 150 timeout 150s" in script
@@ -374,10 +371,21 @@ def test_stage_telemetry_records_per_stage_durations(tmp_path: Path) -> None:
     ]
 
 
-def test_weather_feature_refresh_is_owned_by_dedicated_runtime() -> None:
+def test_weather_feature_refresh_is_owned_by_dedicated_runtime(monkeypatch) -> None:
+    generated_at = utc_now()
+
     class FakeSession:
         def scalars(self, statement):
             return iter(("new_york", "chicago", "miami"))
+
+        def execute(self, statement):
+            class Rows:
+                def all(self):
+                    return [("new_york", generated_at), ("chicago", generated_at)]
+
+            return Rows()
+
+    monkeypatch.setattr(phase_gh2, "utc_now", lambda: generated_at)
 
     summaries = phase_gh2._weather_feature_owner_evidence(
         FakeSession(),
@@ -393,6 +401,12 @@ def test_weather_feature_refresh_is_owned_by_dedicated_runtime() -> None:
             "location_count": 2,
             "locations": ["new_york", "chicago"],
             "features_built_in_gh2": 0,
+            "features_reused": 2,
+            "fresh_location_count": 2,
+            "fresh_locations": ["chicago", "new_york"],
+            "freshness_minutes": 15,
+            "latest_feature_at": generated_at.isoformat(),
+            "oldest_latest_feature_at": generated_at.isoformat(),
         }
     ]
 
@@ -431,6 +445,73 @@ def test_soak_history_records_candidate_and_reset_evidence(tmp_path: Path) -> No
     assert latest["positive_ev_rows"] == 3
     assert latest["fresh_ranked_candidates"] == 4
     assert latest["reset_reason"] is None
+
+
+def test_soak_quality_rejects_empty_or_all_stale_market_cycles() -> None:
+    quality = phase_gh2._build_soak_quality(
+        r5_summary={
+            "current_active_window_rows": 2,
+            "snapshot_missing_rows": 0,
+            "snapshot_stale_rows": 2,
+        },
+        weather_summary={"current_weather_links": 0, "fresh_snapshot_rows": 0},
+        manifest_count=4,
+        fresh_manifest_count=1,
+    )
+
+    assert quality["passed"] is False
+    assert quality["checks"]["fresh_crypto_windows"] is False
+    assert quality["checks"]["current_weather_links"] is False
+    assert quality["checks"]["manifest_freshness"] is False
+
+
+def test_active_rollover_catalog_import_is_bounded(tmp_path: Path) -> None:
+    session_factory = _session_factory(tmp_path)
+    catalog_path = tmp_path / "active_market_catalog.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "generated_at": utc_now().isoformat(),
+                "markets": [
+                    {"ticker": "KXBTC-NEXT", "series_ticker": "KXBTC", "status": "open"},
+                    {"ticker": "KXTEMPNYCH-NEXT", "series_ticker": "KXTEMPNYCH", "status": "open"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with session_factory() as session:
+        result = phase_gh2._import_active_market_catalog(session, catalog_path, limit=1)
+        session.commit()
+
+    assert result["status"] == "COMPLETE"
+    assert result["rows_seen"] == 2
+    assert result["rows_imported"] == 1
+    assert result["imported_tickers"] == ["KXBTC-NEXT"]
+
+
+def test_active_rollover_catalog_does_not_rejuvenate_stale_discovery(tmp_path: Path) -> None:
+    session_factory = _session_factory(tmp_path)
+    catalog_path = tmp_path / "active_market_catalog.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "generated_at": (utc_now() - timedelta(hours=2)).isoformat(),
+                "markets": [{"ticker": "KXBTC-STALE", "series_ticker": "KXBTC", "status": "open"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with session_factory() as session:
+        result = phase_gh2._import_active_market_catalog(
+            session,
+            catalog_path,
+            limit=10,
+            max_age_minutes=30,
+        )
+
+    assert result["status"] == "STALE_NOT_IMPORTED"
+    assert result["rows_imported"] == 0
 
 
 def _session_factory(tmp_path: Path):

@@ -42,8 +42,12 @@ def test_phase3bb_r55_waits_for_writer_then_runs_r51_for_live_window(tmp_path: P
                     _writer_state(safe=True, pid=None),
                 ],
                 r53_state=_r53_state(missing_links=0, minutes_until_target=20),
-                r51_pre_state=_path_state(live_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0),
-                r51_post_state=_path_state(live_rows=10, snapshot_rows=10, forecast_rows=10, ranking_rows=10),
+                r51_pre_state=_path_state(
+                    live_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0
+                ),
+                r51_post_state=_path_state(
+                    live_rows=10, snapshot_rows=10, forecast_rows=10, ranking_rows=10
+                ),
             ),
         )
 
@@ -86,8 +90,12 @@ def test_phase3bb_r55_does_not_rerun_r51_when_writer_never_clears(tmp_path: Path
                     _writer_state(safe=False, pid=88544),
                 ],
                 r53_state=_r53_state(missing_links=0, minutes_until_target=20),
-                r51_pre_state=_path_state(live_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0),
-                r51_post_state=_path_state(live_rows=10, snapshot_rows=10, forecast_rows=10, ranking_rows=10),
+                r51_pre_state=_path_state(
+                    live_rows=10, snapshot_rows=0, forecast_rows=0, ranking_rows=0
+                ),
+                r51_post_state=_path_state(
+                    live_rows=10, snapshot_rows=10, forecast_rows=10, ranking_rows=10
+                ),
             ),
         )
 
@@ -161,7 +169,9 @@ def _fake_probe_runner(
         elif probe.name == "db_writer_monitor":
             stdout = json.dumps(_writer_state(safe=True, pid=None))
         elif probe.name in {"db_writer_monitor_pre", "db_writer_monitor_post"}:
-            stdout = json.dumps({"status": "CLEAR", "safe_to_start_write": True, "current_writer_pid": None})
+            stdout = json.dumps(
+                {"status": "CLEAR", "safe_to_start_write": True, "current_writer_pid": None}
+            )
         elif probe.name == "command_registry":
             stdout = "COMMAND_REGISTRY_OK\n"
         elif probe.name == "r12_preview_json":
@@ -182,11 +192,16 @@ def _fake_probe_runner(
             stdout = json.dumps(
                 {
                     "status": "WEATHER_FAST_LANE_GAP_EXPLAINED",
-                    "summary": {"current_weather_rows": 10, "ranking_rows": r51_post_state["summary"]["ranking_rows"]},
+                    "summary": {
+                        "current_weather_rows": 10,
+                        "ranking_rows": r51_post_state["summary"]["ranking_rows"],
+                    },
                 }
             )
         elif probe.name == "weather_ranking_activation_json":
-            stdout = json.dumps({"status": "WEATHER_RANKING_ACTIVATED", "summary": r51_post_state["summary"]})
+            stdout = json.dumps(
+                {"status": "WEATHER_RANKING_ACTIVATED", "summary": r51_post_state["summary"]}
+            )
         elif probe.name == "weather_ranking_path_report_stats":
             stdout = _report_stats()
         return RemoteProbeResult(

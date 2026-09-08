@@ -328,7 +328,8 @@ def _build_remote_probes(
         ),
         RemoteProbe(
             "weather_activation_preview_json",
-            f"cd {app} && cat reports/phase3az_r12_weather/weather_activation_preview.json 2>/dev/null || true",
+            f"cd {app} && cat reports/phase3az_r12_weather/wea"
+            f"ther_activation_preview.json 2>/dev/null || true",
             timeout_seconds,
         ),
         RemoteProbe(
@@ -338,12 +339,15 @@ def _build_remote_probes(
         ),
         RemoteProbe(
             "r44_json",
-            f"cd {app} && cat reports/phase3bb_r44/weather_catalog_hook_runtime_verification.json 2>/dev/null || true",
+            f"cd {app} && cat reports/phase3bb_r44/weather_cat"
+            f"alog_hook_runtime_verification.json 2>/dev/null "
+            f"|| true",
             timeout_seconds,
         ),
         RemoteProbe(
             "r40_json",
-            f"cd {app} && cat reports/phase3bb_r40/cloud_scheduler_runtime_monitor.json 2>/dev/null || true",
+            f"cd {app} && cat reports/phase3bb_r40/cloud_sched"
+            f"uler_runtime_monitor.json 2>/dev/null || true",
             timeout_seconds,
         ),
         RemoteProbe(
@@ -443,29 +447,39 @@ try:
         5000,
     )
     parsed_links = [(row, parse_dt(row.get("target_time"))) for row in links]
-    parsed_features = [(row, parse_dt(row.get("target_time")), parse_dt(row.get("generated_at"))) for row in features]
+    parsed_features = [(row, parse_dt(row.get("target_time")), \
+parse_dt(row.get("generated_at"))) for row in features]
     link_locations = Counter(str(row.get("location_key") or "") for row in links)
     feature_locations = Counter(str(row.get("location_key") or "") for row in features)
     payload["ok"] = True
     payload["weather_market_links"] = {{
         "rows_sampled": len(links),
-        "target_time_ge_now_minus_3h": sum(1 for _, dt in parsed_links if dt and dt >= current_since),
+        "target_time_ge_now_minus_3h": sum(1 for _, dt in parsed_links if dt and dt >= \
+current_since),
         "target_time_ge_now": sum(1 for _, dt in parsed_links if dt and dt >= now),
         "min_target_time": iso(min((dt for _, dt in parsed_links if dt), default=None)),
         "max_target_time": iso(max((dt for _, dt in parsed_links if dt), default=None)),
-        "dominant_location_key": link_locations.most_common(1)[0][0] if link_locations else None,
+        "dominant_location_key": link_locations.most_common(1)[0][0] if link_locations \
+else None,
         "dominant_location_count": link_locations.most_common(1)[0][1] if link_locations else 0,
         "sample_rows": links[:25],
     }}
     payload["weather_features"] = {{
         "rows_sampled": len(features),
-        "target_time_ge_now_minus_3h": sum(1 for _, target, _ in parsed_features if target and target >= current_since),
-        "generated_at_ge_now_minus_24h": sum(1 for _, _, generated in parsed_features if generated and generated >= now - timedelta(hours=24)),
-        "min_target_time": iso(min((target for _, target, _ in parsed_features if target), default=None)),
-        "max_target_time": iso(max((target for _, target, _ in parsed_features if target), default=None)),
-        "max_generated_at": iso(max((generated for _, _, generated in parsed_features if generated), default=None)),
-        "dominant_location_key": feature_locations.most_common(1)[0][0] if feature_locations else None,
-        "dominant_location_count": feature_locations.most_common(1)[0][1] if feature_locations else 0,
+        "target_time_ge_now_minus_3h": sum(1 for _, target, _ in parsed_features if \
+target and target >= current_since),
+        "generated_at_ge_now_minus_24h": sum(1 for _, _, generated in parsed_features \
+if generated and generated >= now - timedelta(hours=24)),
+        "min_target_time": iso(min((target for _, target, _ in parsed_features if \
+target), default=None)),
+        "max_target_time": iso(max((target for _, target, _ in parsed_features if \
+target), default=None)),
+        "max_generated_at": iso(max((generated for _, _, generated in parsed_features \
+if generated), default=None)),
+        "dominant_location_key": feature_locations.most_common(1)[0][0] if \
+feature_locations else None,
+        "dominant_location_count": feature_locations.most_common(1)[0][1] if \
+feature_locations else 0,
         "sample_rows": features[:25],
     }}
 except Exception as exc:
@@ -647,13 +661,19 @@ def _impact_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
             "safe_link_gate_closed_or_explicit",
             int(preview_summary.get("rows_safe_to_link") or 0) >= 0
             and int(preview_summary.get("rows_safe_to_relink") or 0) >= 0,
-            f"rows_safe_to_link={preview_summary.get('rows_safe_to_link')} rows_safe_to_relink={preview_summary.get('rows_safe_to_relink')}.",
+            f"rows_safe_to_link="
+            f"{preview_summary.get('rows_safe_to_link')} rows_"
+            f"safe_to_relink="
+            f"{preview_summary.get('rows_safe_to_relink')}.",
         ),
         _check(
             "ranking_impact_explicit",
             funnel_summary.get("current_weather_rows") is not None
             or parsed.get("weather_funnel_status") is not None,
-            f"funnel_status={parsed.get('weather_funnel_status')} current_weather_rows={funnel_summary.get('current_weather_rows')}.",
+            f"funnel_status="
+            f"{parsed.get('weather_funnel_status')} current_we"
+            f"ather_rows="
+            f"{funnel_summary.get('current_weather_rows')}.",
         ),
         _check(
             "current_link_count_recorded",
@@ -681,7 +701,8 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
         ):
             status = "BLOCKED_SCHEDULER_WRITER_GATE_FAILURE"
             reason = (
-                "The last scheduler run failed because a write-capable weather catalog step hit BUSY_WRITER "
+                "The last scheduler run failed because a write-capable weather catalog "
+                "step hit BUSY_WRITER "
                 "while R5/UI held SQLite."
             )
             next_step = "Phase 3BB-R46 - Cloud Scheduler Weather Writer-Gate Failure Repair"
@@ -703,7 +724,10 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
             first_blocker = failed[0]["check"].upper()
     elif rows_safe_to_link > 0 or rows_safe_to_relink > 0:
         status = "WEATHER_LINK_GATE_READY"
-        reason = "R12 found safe weather link/relink rows; ranking impact should wait for a writer-gated link apply."
+        reason = (
+            "R12 found safe weather link/relink rows; ranking impact should wait for a "
+            "writer-gated link apply."
+        )
         next_step = "Phase 3BB-R46 - Weather Safe Link Apply And Ranking Impact Recheck"
         command = (
             "kalshi-bot db-writer-monitor --json\n"
@@ -721,12 +745,14 @@ def _decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> dict[str,
     ):
         status = "WEATHER_REFRESH_DID_NOT_CREATE_RANKABLE_CURRENT_LINKS"
         reason = (
-            "The scheduler hook refreshed the weather catalog and R12 preview, but the fast-lane still "
+            "The scheduler hook refreshed the weather catalog and R12 preview, but the "
+            "fast-lane still "
             "has zero current weather rows to rank."
         )
         next_step = "Phase 3BB-R47 - Weather Current Window Series Discovery And Linkability Repair"
         command = (
-            "kalshi-bot phase3bb-r47-weather-current-window-series-discovery-linkability-repair "
+            "kalshi-bot phase3bb-r47-weather-current-window-s"
+            "eries-discovery-linkability-repair "
             "--output-dir reports/phase3bb_r47 --reports-dir reports"
         )
         first_blocker = "NO_CURRENT_WEATHER_LINKS_AFTER_CATALOG_REFRESH"
@@ -875,7 +901,9 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- Scheduler last failure reason: `{parsed.get('scheduler_last_failure_reason')}`",
             f"- R44 verification passed: `{parsed.get('r44_verification_passed')}`",
             f"- R44 sequence: `{parsed.get('r44_weather_catalog_sequence')}`",
-            f"- R12 active weather markets reviewed: `{preview.get('active_weather_markets_reviewed')}`",
+            f"- R12 active weather markets reviewed: `"
+            f"{preview.get('active_weather_markets_reviewed')}"
+            f"`",
             f"- R12 current linkable tickers: `{decision['current_linkable_weather_tickers']}`",
             f"- R12 rows_safe_to_link: `{decision['rows_safe_to_link']}`",
             f"- R12 rows_safe_to_relink: `{decision['rows_safe_to_relink']}`",
@@ -937,7 +965,9 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in payload["weather_freshness_rows"]:
         lines.append(
-            f"| `{row['source']}` | `{row['metric']}` | `{row.get('value', '')}` | {row.get('detail', '')} |"
+            f"| `{row['source']}` | `{row['metric']}` | `"
+            f"{row.get('value', '')}` | "
+            f"{row.get('detail', '')} |"
         )
     lines.extend(["", "## R12 Blocker Counts", "", "| Blocker | Rows |", "|---|---:|"])
     for row in payload["weather_blocker_counts"]:
@@ -947,7 +977,8 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in parsed.get("weather_report_freshness") or []:
         lines.append(
-            f"| `{row['path']}` | `{row['status']}` | `{row['mtime_epoch']}` | `{row['size_bytes']}` |"
+            f"| `{row['path']}` | `{row['status']}` | `"
+            f"{row['mtime_epoch']}` | `{row['size_bytes']}` |"
         )
     return "\n".join(lines) + "\n"
 
@@ -975,7 +1006,8 @@ def _render_next_actions(payload: dict[str, Any]) -> str:
             "- Do not start duplicate R5 watchers.",
             "- Do not create paper trades.",
             "- Do not submit/cancel/replace live or demo orders.",
-            "- Do not manually run weather refresh jobs while the scheduler is active unless R45/R40 says to.",
+            "- Do not manually run weather refresh jobs while the scheduler is active "
+            "unless R45/R40 says to.",
         ]
     )
     return "\n".join(lines) + "\n"

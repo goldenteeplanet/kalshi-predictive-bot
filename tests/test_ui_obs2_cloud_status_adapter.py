@@ -1,4 +1,3 @@
-import copy
 import json
 from pathlib import Path
 
@@ -6,7 +5,6 @@ from kalshi_predictor.ui.cloud_status_adapter import (
     adapt_cloud_status_bundle,
     write_cloud_status_adapter_preview,
 )
-
 
 FIXTURE = Path(__file__).parent / "fixtures/ui_obs2/cloud_status_bundle.json"
 
@@ -23,8 +21,10 @@ def test_ui_obs2_adapts_captured_sources_to_ui_obs1_contract():
     assert report["snapshot"]["backup"]["state"] == "PASSED"
     assert report["snapshot"]["scheduler"]["cycle"] == "14 / 32"
     assert report["ui_compatibility"] == {
-        "read_only": True, "valid_process_state": True,
-        "execution_disabled": True, "required_workstreams_present": True,
+        "read_only": True,
+        "valid_process_state": True,
+        "execution_disabled": True,
+        "required_workstreams_present": True,
     }
     assert report["cloud_access"] is False
     assert report["database_writes"] == 0

@@ -49,7 +49,7 @@ def test_phase3bb_r38_writes_repair_handoff_for_sudo_block_and_missing_r8(
     assert decision["codex_executed_code_sync"] is False
     assert decision["codex_executed_root_install"] is False
     assert decision["codex_started_scheduler"] is False
-    assert "systemctl enable \"${TIMER}\"" in root_script
+    assert 'systemctl enable "${TIMER}"' in root_script
     assert "systemctl start" not in root_script
     assert "systemctl restart" not in root_script
     assert "PHASE3BB_R38_CODE_SYNC" in sync_script
@@ -92,8 +92,9 @@ def test_phase3bb_r38_blocks_when_tmp_scheduler_files_missing(tmp_path: Path) ->
     decision = payload["repair_decision"]
     assert decision["status"] == "BLOCKED_REPAIR_HANDOFF"
     assert decision["first_failed_check"] == "tmp_scheduler_files_present"
-    assert "PHASE3BB_R36_EXECUTE=I_APPROVE_R36_SCHEDULER_INSTALL" in (
-        decision["operator_next_command"]
+    assert (
+        "PHASE3BB_R36_EXECUTE=I_APPROVE_R36_SCHEDULER_INSTALL"
+        in (decision["operator_next_command"])
     )
 
 
@@ -197,7 +198,12 @@ def _fake_probe_runner(
             "",
         ),
         "app_writable": ("APP_WRITABLE\n", True, 0, ""),
-        "venv_pip": ("pip 24.0 from .venv/lib/python3.12/site-packages/pip\nVENV_PIP_OK\n", True, 0, ""),
+        "venv_pip": (
+            "pip 24.0 from .venv/lib/python3.12/site-packages/pip\nVENV_PIP_OK\n",
+            True,
+            0,
+            "",
+        ),
         "r8_command_registry": (
             "",
             False,

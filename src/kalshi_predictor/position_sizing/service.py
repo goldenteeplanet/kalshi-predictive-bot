@@ -420,7 +420,9 @@ def _cached_historical_accuracy(
     if cache.get("version") != HISTORICAL_EVIDENCE_CACHE_VERSION:
         return None
     prepared_at = parse_datetime(cache.get("prepared_at"))
-    current = decision_timestamp if decision_timestamp.tzinfo else decision_timestamp.replace(tzinfo=UTC)
+    current = (
+        decision_timestamp if decision_timestamp.tzinfo else decision_timestamp.replace(tzinfo=UTC)
+    )
     if prepared_at is None:
         return None
     if prepared_at.tzinfo is None:
@@ -455,17 +457,30 @@ def _closed_historical_orders(
     *,
     decision_timestamp: datetime,
 ) -> list[dict[str, Any]]:
-    rows = session.execute(
-        select(PaperOrder, Forecast, Settlement)
+    order_rows = session.execute(
+        select(PaperOrder, Forecast)
         .join(Forecast, PaperOrder.forecast_id == Forecast.id, isouter=True)
-        .join(Settlement, PaperOrder.ticker == Settlement.ticker)
-        .where(Settlement.settled_at.is_not(None))
-        .where(Settlement.settled_at < decision_timestamp)
-        .order_by(Settlement.settled_at, PaperOrder.created_at, PaperOrder.id)
+        .order_by(PaperOrder.created_at, PaperOrder.id)
     ).all()
+    settlements = {
+        ticker: session.get(Settlement, ticker)
+        for ticker in {order.ticker for order, _forecast in order_rows}
+    }
+    cutoff = parse_datetime(decision_timestamp)
+    historical_rows = []
+    for order, forecast in order_rows:
+        settlement = settlements.get(order.ticker)
+        settled_at = parse_datetime(settlement.settled_at) if settlement is not None else None
+        if settlement is None or settled_at is None or cutoff is None or settled_at >= cutoff:
+            continue
+        historical_rows.append((order, forecast, settlement, settled_at))
+    rows = sorted(
+        historical_rows,
+        key=lambda row: (row[3], parse_datetime(row[0].created_at), row[0].id),
+    )
     output: list[dict[str, Any]] = []
     category_cache: dict[int, str] = {}
-    for order, forecast, settlement in rows:
+    for order, forecast, settlement, settled_at in rows:
         if forecast is None or settlement.result not in {"yes", "no"}:
             continue
         forecast_id = int(forecast.id or 0)
@@ -477,7 +492,7 @@ def _closed_historical_orders(
                 "model_name": order.model_name,
                 "category": category_cache[forecast_id],
                 "won": _order_won(order, settlement),
-                "closed_at": settlement.settled_at,
+                "closed_at": settled_at,
             }
         )
     return output

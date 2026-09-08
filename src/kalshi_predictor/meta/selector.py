@@ -155,8 +155,7 @@ def select_model_for_ticker(
         decision_reason=reason,
         competing_models=competing_models,
         trust_scores={
-            model_name: decimal_to_str(score) or "0"
-            for model_name, score in trust_scores.items()
+            model_name: decimal_to_str(score) or "0" for model_name, score in trust_scores.items()
         },
         feature=feature,
         decision_id=row.id if row is not None else None,
@@ -271,8 +270,7 @@ def _signal_support_score(model_name: str, active_signals: list[dict[str, Any]])
     if not active_signals:
         return Decimal("0")
     categories = " ".join(
-        str(row.get("category") or row.get("signal_name") or "")
-        for row in active_signals
+        str(row.get("category") or row.get("signal_name") or "") for row in active_signals
     )
     categories = categories.lower()
     if "crypto" in model_name and "crypto" in categories:

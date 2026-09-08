@@ -10,10 +10,12 @@ from typing import Any
 from kalshi_predictor.benchmarking.oos_policy import _metrics
 from kalshi_predictor.benchmarking.stress_guard import build_stress_aware_allocation_guard_preview
 
-
 ORDERINGS = ("original", "stress_priority", "category_round_robin")
 PER_CATEGORY_CAPS: tuple[Decimal | None, ...] = (
-    None, Decimal("150"), Decimal("200"), Decimal("250"),
+    None,
+    Decimal("150"),
+    Decimal("200"),
+    Decimal("250"),
 )
 POSITION_SCALES = (Decimal("1"), Decimal("0.95"), Decimal("0.75"))
 DECIMAL_COMPARISON_TOLERANCE = Decimal("1e-24")
@@ -31,25 +33,26 @@ def build_drawdown_aware_guard_refinement() -> dict[str, Any]:
             scaled = _scale_rows(ordered, position_scale)
             for cap in PER_CATEGORY_CAPS:
                 selected, cap_rejections = _apply_category_cap(scaled, cap)
-                metrics = _metrics(
-                    f"{ordering}|scale={position_scale}|cap={cap}", selected
-                )
+                metrics = _metrics(f"{ordering}|scale={position_scale}|cap={cap}", selected)
                 capital = Decimal(metrics["capital_usage"])
                 roc = Decimal(metrics["total_pnl"]) / capital if capital > 0 else Decimal("0")
                 metrics["return_on_capital"] = str(roc)
                 roc_preserved = roc + DECIMAL_COMPARISON_TOLERANCE >= required_roc
                 qualifies = roc_preserved and Decimal(metrics["max_drawdown"]) <= maximum_drawdown
-                candidates.append({
-                    "ordering": ordering,
-                    "position_scale": str(position_scale),
-                    "per_category_cap": str(cap) if cap is not None else None,
-                    "cap_rejections": cap_rejections,
-                    "metrics": metrics,
-                    "return_on_capital_preserved": roc_preserved,
-                    "drawdown_regression_prevented": Decimal(metrics["max_drawdown"]) <= maximum_drawdown,
-                    "qualifies": qualifies,
-                    "selection_uses_settlement_outcomes": False,
-                })
+                candidates.append(
+                    {
+                        "ordering": ordering,
+                        "position_scale": str(position_scale),
+                        "per_category_cap": str(cap) if cap is not None else None,
+                        "cap_rejections": cap_rejections,
+                        "metrics": metrics,
+                        "return_on_capital_preserved": roc_preserved,
+                        "drawdown_regression_prevented": Decimal(metrics["max_drawdown"])
+                        <= maximum_drawdown,
+                        "qualifies": qualifies,
+                        "selection_uses_settlement_outcomes": False,
+                    }
+                )
     qualified = [row for row in candidates if row["qualifies"]]
     recommended = max(
         qualified,
@@ -113,9 +116,9 @@ def _order_rows(rows: list[dict[str, Any]], ordering: str) -> list[dict[str, Any
     if ordering == "category_round_robin":
         groups: dict[str, deque[dict[str, Any]]] = {}
         for category in sorted({row["category"] for row in rows}):
-            groups[category] = deque(sorted(
-                (row for row in rows if row["category"] == category), key=_stress_key
-            ))
+            groups[category] = deque(
+                sorted((row for row in rows if row["category"] == category), key=_stress_key)
+            )
         ordered = []
         while any(groups.values()):
             for category in sorted(groups):
@@ -143,9 +146,7 @@ def _apply_category_cap(
     return selected, rejected
 
 
-def _scale_rows(
-    rows: list[dict[str, Any]], scale: Decimal
-) -> list[dict[str, Any]]:
+def _scale_rows(rows: list[dict[str, Any]], scale: Decimal) -> list[dict[str, Any]]:
     scaled = []
     for row in rows:
         copy = dict(row)

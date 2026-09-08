@@ -188,9 +188,7 @@ def _ui_outputs(*, ui_active: bool) -> dict[str, str]:
         ),
         "ui_systemd_enabled": "enabled\n",
         "ui_systemd_active": "active\n" if ui_active else "inactive\n",
-        "ui_processes": "4444 kalshi-bot ui --host 127.0.0.1 --port 8080\n"
-        if ui_active
-        else "",
+        "ui_processes": "4444 kalshi-bot ui --host 127.0.0.1 --port 8080\n" if ui_active else "",
         "ui_listeners": "LISTEN 0 128 127.0.0.1:8080 0.0.0.0:*\n" if ui_active else "",
         "nginx_state": "nginx_missing\n",
         "local_ui_http": "HTTP_OK\n" if ui_active else "HTTP_NOT_READY\n",

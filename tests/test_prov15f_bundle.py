@@ -20,8 +20,10 @@ def test_prov15f_builds_and_verifies_deterministic_bundle(tmp_path):
     second = build_offline_certification_bundle(artifacts, generated_at=NOW, root=tmp_path)
     assert first == second
     assert first["summary"] == {
-        "artifact_count": 5, "cross_report_checks": 5,
-        "cross_report_checks_passed": 5, "tooling_bundle_valid": True,
+        "artifact_count": 5,
+        "cross_report_checks": 5,
+        "cross_report_checks_passed": 5,
+        "tooling_bundle_valid": True,
         "runtime_attribution_release_ready": False,
     }
     bundle, manifest = write_offline_certification_bundle(
@@ -58,19 +60,27 @@ def _artifacts(root):
     payloads = {
         "PROV-15": {"phase": "PROV-15", "database_access": False, "execution_enabled": False},
         "PROV-15B": {
-            "phase": "PROV-15B", "database_access": False, "execution_enabled": False,
+            "phase": "PROV-15B",
+            "database_access": False,
+            "execution_enabled": False,
             "summary": {"passed": False, "events_failed": 2},
         },
         "PROV-15C": {
-            "phase": "PROV-15C", "database_access": False, "execution_enabled": False,
+            "phase": "PROV-15C",
+            "database_access": False,
+            "execution_enabled": False,
             "summary": {"compatible": 3},
         },
         "PROV-15D": {
-            "phase": "PROV-15D", "database_access": False, "execution_enabled": False,
+            "phase": "PROV-15D",
+            "database_access": False,
+            "execution_enabled": False,
             "summary": {"failed_rows": 2},
         },
         "PROV-15E": {
-            "phase": "PROV-15E", "database_access": False, "execution_enabled": False,
+            "phase": "PROV-15E",
+            "database_access": False,
+            "execution_enabled": False,
             "certification": {"before_passed": False, "after_passed": True},
         },
     }

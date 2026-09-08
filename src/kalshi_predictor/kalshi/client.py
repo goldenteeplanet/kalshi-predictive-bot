@@ -385,10 +385,14 @@ class KalshiClient:
     ) -> None:
         retry_after_header = response.headers.get("Retry-After") if response else None
         retry_after = _parse_retry_after(retry_after_header)
-        delay = retry_after if retry_after is not None else _backoff_delay(
-            self.backoff_seconds,
-            attempt,
-            jitter_fraction=self.jitter_fraction,
+        delay = (
+            retry_after
+            if retry_after is not None
+            else _backoff_delay(
+                self.backoff_seconds,
+                attempt,
+                jitter_fraction=self.jitter_fraction,
+            )
         )
         self._command_retries_used += 1
         if response is not None:

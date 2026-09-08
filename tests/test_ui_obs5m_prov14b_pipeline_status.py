@@ -146,17 +146,22 @@ def test_unreported_pipeline_is_waiting_without_inferred_success() -> None:
 
 def test_dashboard_html_and_api_show_read_only_pipeline(tmp_path: Path, monkeypatch) -> None:
     snapshot = tmp_path / "snapshot.json"
-    snapshot.write_text(json.dumps({
-        "generated_at": NOW.isoformat(),
-        "execution_enabled": False,
-        "active_process": {
-            "state": "RUNNING",
-            "name": "SQLite integrity verification",
-            "stage": "integrity_check",
-            "pid": 432831,
-        },
-        "prov14b_certification_pipeline": _pipeline(),
-    }), encoding="utf-8")
+    snapshot.write_text(
+        json.dumps(
+            {
+                "generated_at": NOW.isoformat(),
+                "execution_enabled": False,
+                "active_process": {
+                    "state": "RUNNING",
+                    "name": "SQLite integrity verification",
+                    "stage": "integrity_check",
+                    "pid": 432831,
+                },
+                "prov14b_certification_pipeline": _pipeline(),
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setenv("KALSHI_PROGRESS_SNAPSHOT_PATH", str(snapshot))
     engine = init_db(f"sqlite:///{tmp_path / 'ui.db'}")
     client = TestClient(
@@ -168,7 +173,7 @@ def test_dashboard_html_and_api_show_read_only_pipeline(tmp_path: Path, monkeypa
     assert 'data-pipeline-gate="R2A"' in page.text
     assert 'href="/system/evidence/prov14b-r2a-fixture"' in page.text
     assert "Evidence age:" in page.text
-    section = page.text.split('data-prov14b-pipeline', 1)[1].split("</section>", 1)[0]
+    section = page.text.split("data-prov14b-pipeline", 1)[1].split("</section>", 1)[0]
     assert "<button" not in section
     assert "Execution controls: <strong>NONE</strong>" in section
     api = client.get("/api/system/progress").json()

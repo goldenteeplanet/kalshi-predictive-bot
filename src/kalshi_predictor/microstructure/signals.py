@@ -149,4 +149,3 @@ def _direction(feature: dict[str, Any], event: dict[str, Any] | None = None) -> 
     if imbalance < Decimal("-0.25") or velocity < Decimal("-0.03"):
         return "BUY_NO"
     return "neutral"
-

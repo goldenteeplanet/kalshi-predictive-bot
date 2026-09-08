@@ -1481,9 +1481,7 @@ def _validate_refresh_modes(
     market_refresh_only: bool,
 ) -> None:
     if settlement_only and market_refresh_only:
-        raise ValueError(
-            "--settlement-only and --market-refresh-only are mutually exclusive"
-        )
+        raise ValueError("--settlement-only and --market-refresh-only are mutually exclusive")
 
 
 def _next_commands(
@@ -1795,14 +1793,11 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     for step in payload["steps"]:
         summary = step.get("summary")
         if isinstance(summary, dict):
-            summary_text = ", ".join(
-                f"{key}={value}" for key, value in list(summary.items())[:5]
-            )
+            summary_text = ", ".join(f"{key}={value}" for key, value in list(summary.items())[:5])
         else:
             summary_text = "" if summary is None else str(summary)
         lines.append(
-            f"| {step['name']} | {step['status']} | {step['seconds']} | "
-            f"{_md(summary_text)} |"
+            f"| {step['name']} | {step['status']} | {step['seconds']} | {_md(summary_text)} |"
         )
     if not payload["steps"]:
         lines.append("| none | SKIPPED | 0 | Waiting for active writer to finish. |")
@@ -1882,7 +1877,7 @@ def _render_status_markdown(payload: dict[str, Any]) -> str:
 
 def _render_guard_markdown(payload: dict[str, Any]) -> str:
     action = payload.get("action") or {}
-    after_guard = ((payload.get("after") or {}).get("guard") or {})
+    after_guard = (payload.get("after") or {}).get("guard") or {}
     lines = [
         "# Phase 3AY Unattended Guard",
         "",

@@ -33,8 +33,7 @@ def test_phase3bb_r15_writes_no_start_install_review(tmp_path: Path) -> None:
 
     assert payload["phase"] == "3BB-R15-CLOUD-SERVICE-INSTALL-REVIEW-NO-START"
     assert (
-        payload["install_review_decision"]["status"]
-        == "READY_FOR_OPERATOR_INSTALL_REVIEW_NO_START"
+        payload["install_review_decision"]["status"] == "READY_FOR_OPERATOR_INSTALL_REVIEW_NO_START"
     )
     assert payload["install_review_decision"]["install_allowed_now"] is False
     assert payload["install_review_decision"]["start_allowed_now"] is False
@@ -68,9 +67,7 @@ def test_phase3bb_r15_blocks_when_r13_no_longer_adopts(tmp_path: Path) -> None:
     assert payload["install_review_decision"]["status"] == "BLOCKED_INSTALL_REVIEW"
     assert payload["install_review_decision"]["ready_for_operator_review"] is False
     assert payload["install_review_decision"]["install_allowed_now"] is False
-    assert payload["install_review_decision"]["first_failed_check"] == (
-        "r13_adopts_existing_r5"
-    )
+    assert payload["install_review_decision"]["first_failed_check"] == ("r13_adopts_existing_r5")
 
 
 def test_phase3bb_r15_cli_help_registered() -> None:
@@ -135,8 +132,7 @@ def _write_context(reports_dir: Path, *, recommendation: str) -> None:
                 "[Service]",
                 "User=kalshi",
                 "EnvironmentFile=/etc/kalshi-bot/kalshi-bot.env",
-                "ExecStartPre=/opt/kalshi-predictive-bot/scripts/cloud/"
-                "kalshi-r5-start-guard.sh",
+                "ExecStartPre=/opt/kalshi-predictive-bot/scripts/cloud/kalshi-r5-start-guard.sh",
                 "ExecStart=/opt/kalshi-predictive-bot/.venv/bin/python "
                 "-m kalshi_predictor.cli phase3bc-r5-crypto-freshness-watch",
                 "",

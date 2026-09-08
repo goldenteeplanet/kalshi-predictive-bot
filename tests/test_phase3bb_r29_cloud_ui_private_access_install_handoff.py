@@ -172,8 +172,7 @@ def _write_context(
         "ui_bind_port": 8080,
         "ui_service_name": "kalshi-ui.service",
         "ssh_tunnel_command": (
-            "ssh -i '/home/james/.ssh/id_ed25519_do' "
-            "-L 8081:127.0.0.1:8080 'kalshi@203.0.113.10'"
+            "ssh -i '/home/james/.ssh/id_ed25519_do' -L 8081:127.0.0.1:8080 'kalshi@203.0.113.10'"
         ),
     }
     (r20_dir / "cloud_ui_service_plan.json").write_text(

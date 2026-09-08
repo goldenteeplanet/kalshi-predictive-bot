@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 ARTIFACTS = {
     "PMB-22": Path("reports/phase_pmb22/pmb22_interaction_boundary_refinement.json"),
     "PMB-23": Path("reports/phase_pmb23/pmb23_stress_aware_allocation_guard_preview.json"),
@@ -23,17 +22,20 @@ def build_exposure_guard_certification_bundle(project_root: Path) -> dict[str, A
         raw = path.read_bytes()
         payload = json.loads(raw)
         loaded[phase] = payload
-        artifacts.append({
-            "phase": phase,
-            "path": relative.as_posix(),
-            "bytes": len(raw),
-            "sha256": hashlib.sha256(raw).hexdigest(),
-            "declared_phase_matches": payload.get("phase") == phase,
-        })
+        artifacts.append(
+            {
+                "phase": phase,
+                "path": relative.as_posix(),
+                "bytes": len(raw),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "declared_phase_matches": payload.get("phase") == phase,
+            }
+        )
     p22, p23, p24, p25, p26 = (loaded[f"PMB-{number}"] for number in range(22, 27))
     checks = {
         "all_declared_phases_match": all(row["declared_phase_matches"] for row in artifacts),
-        "pmb22_buffer_certified": p22["deterministic_safety_buffer"]["certified_within_grid"] is True,
+        "pmb22_buffer_certified": p22["deterministic_safety_buffer"]["certified_within_grid"]
+        is True,
         "pmb22_buffer_is_008_008": (
             p22["deterministic_safety_buffer"]["maximum_forecast_bias_magnitude"] == "0.008"
             and p22["deterministic_safety_buffer"]["maximum_spread_addition"] == "0.008"
@@ -94,9 +96,7 @@ def build_exposure_guard_certification_bundle(project_root: Path) -> dict[str, A
 def golden_exposure_bundle_summary(bundle: dict[str, Any]) -> dict[str, Any]:
     return {
         "phase": bundle["phase"],
-        "artifact_hashes": {
-            row["phase"]: row["sha256"] for row in bundle["artifacts"]
-        },
+        "artifact_hashes": {row["phase"]: row["sha256"] for row in bundle["artifacts"]},
         "certification": bundle["certification"],
         "checks_passed": bundle["summary"]["checks_passed"],
         "checks_total": bundle["summary"]["checks_total"],

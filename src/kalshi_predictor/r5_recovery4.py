@@ -36,9 +36,7 @@ def _sha256(payload: Any) -> str:
     return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
 
-def assess_cycle(
-    cycle: dict[str, Any], limits: R5CertificationLimits
-) -> dict[str, Any]:
+def assess_cycle(cycle: dict[str, Any], limits: R5CertificationLimits) -> dict[str, Any]:
     missing = sorted(
         field
         for field in (
@@ -59,9 +57,7 @@ def assess_cycle(
         failures.append("missing_measurement")
     if cycle.get("execution_enabled") is True:
         failures.append("execution_enabled")
-    if int(cycle.get("oom_events", 0) or 0) > 0 or int(
-        cycle.get("oom_kill_events", 0) or 0
-    ) > 0:
+    if int(cycle.get("oom_events", 0) or 0) > 0 or int(cycle.get("oom_kill_events", 0) or 0) > 0:
         failures.append("oom")
     if (
         cycle.get("timed_out") is True
@@ -182,8 +178,7 @@ def build_certification_report(
             ],
         },
         "next_phase": (
-            "R5-RECOVERY-5 Preview — Scheduler Re-entry and Overlap-Prevention "
-            "Certification"
+            "R5-RECOVERY-5 Preview — Scheduler Re-entry and Overlap-Prevention Certification"
         ),
     }
     report["report_sha256"] = _sha256(report)

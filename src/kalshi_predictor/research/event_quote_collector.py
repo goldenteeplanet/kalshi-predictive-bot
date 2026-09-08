@@ -162,14 +162,10 @@ def refresh_targeted_event_forecasts(
         try:
             with session.begin_nested():
                 forecast_timestamp = utc_now()
-                snapshot = insert_market_snapshot(
-                    session, market, orderbook, forecast_timestamp
-                )
+                snapshot = insert_market_snapshot(session, market, orderbook, forecast_timestamp)
                 session.flush()
                 link_crypto_markets(session, tickers=[ticker], limit=1)
-                summary = run_forecast_models(
-                    session, model_name="crypto_v2", snapshots=[snapshot]
-                )
+                summary = run_forecast_models(session, model_name="crypto_v2", snapshots=[snapshot])
             result_row = {
                 "event_ticker": candidate.event_ticker,
                 "family": family,
@@ -182,11 +178,7 @@ def refresh_targeted_event_forecasts(
                 "one_sided_bound_uses": one_sided_bound_uses,
                 "forecasts_inserted": summary.forecasts_inserted,
                 "forecasts_skipped": summary.skipped,
-                "reasons": (
-                    []
-                    if summary.forecasts_inserted
-                    else ["CRYPTO_V2_FORECAST_SKIPPED"]
-                ),
+                "reasons": ([] if summary.forecasts_inserted else ["CRYPTO_V2_FORECAST_SKIPPED"]),
             }
             if summary.forecasts_inserted and capture_immediately:
                 capture_buckets_admitted += len(buckets)
@@ -217,23 +209,27 @@ def refresh_targeted_event_forecasts(
         "policy": "RANKED_IN_WINDOW_FORECAST_IMMEDIATELY_BEFORE_SIBLING_CAPTURE",
         "events_attempted": len(rows),
         "events_forecasted": sum(row["status"] == "FORECASTED" for row in rows),
-        "midpoint_probe_failures": sum(
-            int(row.get("midpoint_probe_failures", 0)) for row in rows
-        ),
-        "one_sided_bound_uses": sum(
-            int(row.get("one_sided_bound_uses", 0)) for row in rows
-        ),
+        "midpoint_probe_failures": sum(int(row.get("midpoint_probe_failures", 0)) for row in rows),
+        "one_sided_bound_uses": sum(int(row.get("one_sided_bound_uses", 0)) for row in rows),
         "immediate_captures_attempted": sum(
             bool(row.get("immediate_capture", {}).get("attempted")) for row in rows
         ),
         "immediate_captures_within_budget": sum(
-            bool(row.get("immediate_capture", {}).get("within_latency_budget"))
-            for row in rows
+            bool(row.get("immediate_capture", {}).get("within_latency_budget")) for row in rows
         ),
         "capture_bucket_request_budget": capture_bucket_request_budget,
         "capture_buckets_admitted": capture_buckets_admitted,
         "rows": rows,
     }
+
+
+def capture_request_budget_reason(
+    candidate: EventCandidate, *, bucket_request_budget: int
+) -> str | None:
+    """Reject a coherent capture before fan-out when its API budget cannot fit."""
+    if len(candidate.markets) > max(0, bucket_request_budget):
+        return "CAPTURE_REQUEST_BUDGET_EXCEEDED"
+    return None
 
 
 def _capture_immediate_polytope(
@@ -288,9 +284,8 @@ def _capture_immediate_polytope(
         if coverage_timestamp is not None
         else (capture_completed_at - forecast_timestamp).total_seconds()
     )
-    within_budget = (
-        coverage is not None
-        and 0.0 <= latency_seconds <= max(0.0, latency_budget_seconds)
+    within_budget = coverage is not None and 0.0 <= latency_seconds <= max(
+        0.0, latency_budget_seconds
     )
     return {
         "attempted": True,
@@ -316,10 +311,7 @@ def _representative_buckets(buckets: list[dict[str, Any]]) -> list[dict[str, Any
     rows = interiors or buckets
     center = (len(rows) - 1) / 2.0
     return [
-        row
-        for _, row in sorted(
-            enumerate(rows), key=lambda item: (abs(item[0] - center), item[0])
-        )
+        row for _, row in sorted(enumerate(rows), key=lambda item: (abs(item[0] - center), item[0]))
     ]
 
 
@@ -333,18 +325,26 @@ def select_candidates_with_fresh_forecasts(
 ) -> list[EventCandidate]:
     if not candidates:
         return []
-    events = [candidate.event_ticker for candidate in candidates]
+    event_by_ticker = {
+        str(market.get("ticker")): candidate.event_ticker
+        for candidate in candidates
+        for market in candidate.markets
+        if market.get("ticker")
+    }
     rows = session.execute(
-        select(Market.event_ticker, func.max(Forecast.forecasted_at))
-        .join(Forecast, Forecast.ticker == Market.ticker)
+        select(Forecast.ticker, func.max(Forecast.forecasted_at))
         .where(
-            Market.event_ticker.in_(events),
+            Forecast.ticker.in_(event_by_ticker),
             Forecast.model_name == model_name,
             Forecast.forecasted_at <= now,
         )
-        .group_by(Market.event_ticker)
+        .group_by(Forecast.ticker)
     ).all()
-    latest = {str(event): captured for event, captured in rows if event and captured}
+    latest: dict[str, datetime] = {}
+    for ticker, captured in rows:
+        event = event_by_ticker.get(str(ticker))
+        if event and captured and (event not in latest or captured > latest[event]):
+            latest[event] = captured
     selected = []
     for candidate in candidates:
         forecasted_at = latest.get(candidate.event_ticker)
@@ -425,9 +425,7 @@ def discover_candidates(
     ]
 
 
-def discover_candidates_from_session(
-    session: Session, series: list[str]
-) -> list[EventCandidate]:
+def discover_candidates_from_session(session: Session, series: list[str]) -> list[EventCandidate]:
     """Use the preceding market-refresh transaction as the discovery watermark."""
     now = utc_now()
     prefix_checks = [Market.event_ticker.like(f"{value}%") for value in series]
@@ -459,9 +457,7 @@ def discover_candidates_from_session(
     ]
 
 
-def discover_candidates_from_registry(
-    session: Session, series: list[str]
-) -> list[EventCandidate]:
+def discover_candidates_from_registry(session: Session, series: list[str]) -> list[EventCandidate]:
     rows = session.scalars(
         select(CryptoCurrentEvent)
         .where(
@@ -496,21 +492,15 @@ def discover_candidates_from_registry(
         observations = family_rows.get(family, [])
         count = len(observations)
         average = (
-            sum(float(row.two_sided_coverage) for row in observations) / count
-            if count
-            else 0.50
+            sum(float(row.two_sided_coverage) for row in observations) / count if count else 0.50
         )
         score = family_yield_score(
             average_coverage=average,
             bounds_failure_rate=(
-                sum(row.bounds_feasible != "true" for row in observations) / count
-                if count
-                else 0.0
+                sum(row.bounds_feasible != "true" for row in observations) / count if count else 0.0
             ),
             coherence_failure_rate=(
-                sum(row.coherence_ms > 2500 for row in observations) / count
-                if count
-                else 0.0
+                sum(row.coherence_ms > 2500 for row in observations) / count if count else 0.0
             ),
             bucket_count=len(item.markets),
             observed_events=count,
@@ -534,16 +524,28 @@ def backfill_registry(
     effective_watermark = source_watermark
     if latest_snapshot is not None:
         effective_watermark = max(source_watermark, latest_snapshot - timedelta(minutes=15))
-    seed_rows = session.execute(
-        select(Market.event_ticker)
-        .join(MarketSnapshot, MarketSnapshot.ticker == Market.ticker)
-        .where(
-            MarketSnapshot.captured_at >= effective_watermark,
-            Market.event_ticker.is_not(None),
-            Market.close_time >= utc_now(),
+    # Keep SQLite on the selective captured_at index. A direct markets-to-snapshots
+    # join is commonly reordered to scan the full historical market catalog first.
+    recent_tickers = list(
+        session.scalars(
+            select(MarketSnapshot.ticker)
+            .where(MarketSnapshot.captured_at >= effective_watermark)
+            .distinct()
         )
-        .distinct()
-    ).all()
+    )
+    seed_rows = (
+        session.execute(
+            select(Market.event_ticker)
+            .where(
+                Market.ticker.in_(recent_tickers),
+                Market.event_ticker.is_not(None),
+                Market.close_time >= utc_now(),
+            )
+            .distinct()
+        ).all()
+        if recent_tickers
+        else []
+    )
     events = sorted({str(event) for (event,) in seed_rows if event})
     updated = 0
     rejected: dict[str, list[str]] = {}
@@ -573,9 +575,7 @@ def backfill_registry(
         markets = [row for row in page.get("markets", []) if isinstance(row, dict)]
         buckets, reasons = validate_topology(markets)
         close_times = [
-            value
-            for row in markets
-            if (value := _datetime(row.get("close_time"))) is not None
+            value for row in markets if (value := _datetime(row.get("close_time"))) is not None
         ]
         if not close_times:
             reasons.append("CLOSE_TIME_MISSING")
@@ -624,11 +624,14 @@ def capture_candidate(
     coherence_limit_ms: int = 2500,
     max_workers: int = 16,
 ) -> tuple[CryptoEventQuoteCapture | None, list[str]]:
-    if session.scalar(
-        select(CryptoEventQuoteCapture.id).where(
-            CryptoEventQuoteCapture.event_ticker == candidate.event_ticker
+    if (
+        session.scalar(
+            select(CryptoEventQuoteCapture.id).where(
+                CryptoEventQuoteCapture.event_ticker == candidate.event_ticker
+            )
         )
-    ) is not None:
+        is not None
+    ):
         return None, ["EVENT_ALREADY_CAPTURED"]
     buckets, reasons = validate_topology(list(candidate.markets))
     if reasons:

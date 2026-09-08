@@ -76,9 +76,7 @@ def generate_paper_decisions(
             targets=learning_targets,
         )[: max(1, resolved_settings.learning_candidate_scan_limit)]
     phase3ak_gates = (
-        _phase3ak_gates_for_forecasts(session, forecasts)
-        if resolved_settings.learning_mode
-        else {}
+        _phase3ak_gates_for_forecasts(session, forecasts) if resolved_settings.learning_mode else {}
     )
     selected_keys: set[tuple[str, str, str]] = set()
 
@@ -165,16 +163,13 @@ def generate_paper_decisions(
                 settings=resolved_settings,
             )
             continue
-        if (
-            resolved_settings.learning_mode
-            and is_duplicate_candidate(
-                session,
-                ticker=decision.ticker,
-                model_name=decision.model_name,
-                side=decision.side,
-                cooldown_hours=resolved_settings.learning_duplicate_cooldown_hours,
-                pending_keys=selected_keys,
-            )
+        if resolved_settings.learning_mode and is_duplicate_candidate(
+            session,
+            ticker=decision.ticker,
+            model_name=decision.model_name,
+            side=decision.side,
+            cooldown_hours=resolved_settings.learning_duplicate_cooldown_hours,
+            pending_keys=selected_keys,
         ):
             duplicates_skipped += 1
             _log_learning_strategy_rejection(

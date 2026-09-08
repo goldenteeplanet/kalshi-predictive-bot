@@ -85,14 +85,10 @@ def parse_rss_feed(
     root = ElementTree.fromstring(xml_text)
     channel_items = [_item_payload(item) for item in root.findall(".//item")]
     if channel_items:
-        return _with_source(
-            channel_items[:limit], source_name, category, source_url, fetched_at
-        )
+        return _with_source(channel_items[:limit], source_name, category, source_url, fetched_at)
 
     atom_entries = [
-        _atom_payload(entry)
-        for entry in root.iter()
-        if _tag_name(entry.tag) == "entry"
+        _atom_payload(entry) for entry in root.iter() if _tag_name(entry.tag) == "entry"
     ]
     return _with_source(atom_entries[:limit], source_name, category, source_url, fetched_at)
 

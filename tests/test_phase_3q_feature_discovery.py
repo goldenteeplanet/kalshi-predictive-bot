@@ -199,9 +199,7 @@ def test_experiment_export_requires_human_approval_reference(tmp_path) -> None:
             settings=_settings(),
         )
         evaluation = session.scalar(
-            select(FeatureEvaluation)
-            .where(FeatureEvaluation.status != "REJECTED")
-            .limit(1)
+            select(FeatureEvaluation).where(FeatureEvaluation.status != "REJECTED").limit(1)
         )
         assert evaluation is not None
         with pytest.raises(ValueError):

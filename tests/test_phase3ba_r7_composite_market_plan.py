@@ -16,8 +16,7 @@ def test_phase3ba_r7_classifies_composite_types() -> None:
         == "cross_category"
     )
     assert (
-        phase3ba_r7._classify_composite_type("KXMVEFOO-ABC", None, None)
-        == "other_kxmve_composite"
+        phase3ba_r7._classify_composite_type("KXMVEFOO-ABC", None, None) == "other_kxmve_composite"
     )
 
 

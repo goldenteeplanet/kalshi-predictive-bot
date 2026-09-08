@@ -174,7 +174,9 @@ def run_forecast_models(
                     skipped += 1
                     continue
                 record = insert_forecast(
-                    session, forecast, market_snapshot_id=snapshot.id,
+                    session,
+                    forecast,
+                    market_snapshot_id=snapshot.id,
                 )
                 if not builtin_signals_ensured:
                     ensure_builtin_signals(session)
@@ -231,10 +233,36 @@ def latest_snapshots_for_model(
         ~snapshot_status.in_(tuple(sorted(INACTIVE_MARKET_STATUSES))),
     ]
     if model_name in {"weather_v1", "weather_v2"}:
-        eligibility.extend((
-            Market.close_time.is_not(None),
-            Market.close_time > (as_of or utc_now()),
-        ))
+        # Weather can accumulate a large snapshot history. Grouping that whole history by
+        # ticker made a bounded 500-row forecast refresh take more than five minutes on the
+        # canonical SQLite database. First identify the small current linked universe, then
+        # use the existing (ticker, captured_at) index for one latest-row lookup per ticker.
+        current_tickers = list(
+            session.scalars(
+                select(link_table.ticker)
+                .join(Market, Market.ticker == link_table.ticker)
+                .where(
+                    ~market_status.in_(tuple(sorted(INACTIVE_MARKET_STATUSES))),
+                    Market.close_time.is_not(None),
+                    Market.close_time > (as_of or utc_now()),
+                    *(
+                        (link_table.ticker.startswith("KXTEMPNYCH-"),)
+                        if model_name == "weather_v2"
+                        else ()
+                    ),
+                )
+                .distinct()
+                .limit(max(limit * 2, limit))
+            )
+        )
+        snapshots = latest_snapshots_for_forecasts(session, current_tickers)
+        snapshots = [
+            row
+            for row in snapshots
+            if str(row.status or "").lower() not in INACTIVE_MARKET_STATUSES
+        ]
+        snapshots.sort(key=lambda row: row.captured_at, reverse=True)
+        return snapshots[:limit]
     latest_per_ticker = (
         select(
             MarketSnapshot.ticker.label("ticker"),

@@ -135,7 +135,8 @@ def _fake_probe_runner(
         [
             "Jul 13 13:22:43 kalshi-bot-01 runner[1]: [phase3bb-r35] running weather_fast_lane",
             "Jul 13 13:23:01 kalshi-bot-01 runner[1]: Phase 3BB-R2 Weather Fast Lane",
-            "Jul 13 13:23:01 kalshi-bot-01 runner[1]: Wrote JSON: reports/phase3bb_r2/weather_funnel.json",
+            "Jul 13 13:23:01 kalshi-bot-01 runner[1]: Wrote JSON: "
+            "reports/phase3bb_r2/weather_funnel.json",
         ]
     )
     weather_funnel = json.dumps(
@@ -154,7 +155,9 @@ def _fake_probe_runner(
     outputs = {
         "remote_time_utc": ("2026-07-13T13:24:00Z\n", True, 0, ""),
         "db_writer_monitor_raw": (
-            json.dumps({"status": "OPEN_READERS", "safe_to_start_write": True, "current_writer_pid": None}),
+            json.dumps(
+                {"status": "OPEN_READERS", "safe_to_start_write": True, "current_writer_pid": None}
+            ),
             True,
             0,
             "",
@@ -166,7 +169,9 @@ def _fake_probe_runner(
         "ui_service_active": ("active\n", True, 0, ""),
         "scheduler_timer_list": (
             "NEXT LEFT LAST PASSED UNIT ACTIVATES\n"
-            "Mon 2026-07-13 13:37:43 UTC 13min Mon 2026-07-13 13:22:43 UTC 1min ago kalshi-multicategory-refresh-scheduler.timer kalshi-multicategory-refresh-scheduler.service\n",
+            "Mon 2026-07-13 13:37:43 UTC 13min Mon 2026-07-13 13:22:43 UTC 1min ago "
+            "kalshi-multicategory-refresh-scheduler.timer "
+            "kalshi-multicategory-refresh-scheduler.service\n",
             True,
             0,
             "",
@@ -174,9 +179,21 @@ def _fake_probe_runner(
         "scheduler_journal_post_unblock": (journal, True, 0, ""),
         "weather_report_stats": (_report_stats(mtime=1783948981), True, 0, ""),
         "weather_funnel_json": (weather_funnel, True, 0, ""),
-        "weather_ranking_activation_json": (json.dumps({"summary": {"ranking_rows": 0}}), True, 0, ""),
+        "weather_ranking_activation_json": (
+            json.dumps({"summary": {"ranking_rows": 0}}),
+            True,
+            0,
+            "",
+        ),
         "weather_paper_gate_json": (
-            json.dumps({"summary": {"paper_ready_rows": 0, "first_hard_blocker": "NO_CURRENT_WEATHER_ROWS"}}),
+            json.dumps(
+                {
+                    "summary": {
+                        "paper_ready_rows": 0,
+                        "first_hard_blocker": "NO_CURRENT_WEATHER_ROWS",
+                    }
+                }
+            ),
             True,
             0,
             "",

@@ -165,4 +165,3 @@ def _run_summary(
         "opportunities_found": sum(cycle.opportunities_found for cycle in cycles),
         "errors_count": sum(len(cycle.errors) for cycle in cycles),
     }
-

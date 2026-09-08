@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import json
 import shlex
 from dataclasses import dataclass
@@ -135,7 +134,9 @@ def write_phase3bb_r57_weather_selected_window_pipeline_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(wait_checks_csv_path, payload["writer_wait_checks"])
     _write_rows_csv(pipeline_steps_csv_path, payload["pipeline_steps"])
     _write_rows_csv(selected_tickers_csv_path, payload["selected_window_tickers"])
@@ -244,7 +245,10 @@ def build_phase3bb_r57_weather_selected_window_pipeline(
             output_dir=r53_output_dir,
             reports_dir=reports_dir,
             settings=resolved,
-            command_args=["phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair", "--r57-initial"],
+            command_args=[
+                "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair",
+                "--r57-initial",
+            ],
             ssh_target=ssh_target,
             identity_file=identity_file,
             app_path=app_path,
@@ -256,7 +260,9 @@ def build_phase3bb_r57_weather_selected_window_pipeline(
             per_probe_timeout_seconds=per_probe_timeout_seconds,
             runner=runner,
         )
-        probe_results.extend(_probe_payloads_to_results(r53_initial.get("remote_probe_results") or []))
+        probe_results.extend(
+            _probe_payloads_to_results(r53_initial.get("remote_probe_results") or [])
+        )
 
     active_r53 = r53_initial
     link_gate = _link_apply_gate(
@@ -275,7 +281,9 @@ def build_phase3bb_r57_weather_selected_window_pipeline(
         )
         apply_probe = RemoteProbe(
             apply_probe.name,
-            apply_probe.command.replace("reports/phase3az_r12_weather_r54", "reports/phase3az_r12_weather_r57"),
+            apply_probe.command.replace(
+                "reports/phase3az_r12_weather_r54", "reports/phase3az_r12_weather_r57"
+            ),
             apply_probe.timeout_seconds,
         )
         apply_result = runner(apply_probe, target)
@@ -288,7 +296,10 @@ def build_phase3bb_r57_weather_selected_window_pipeline(
                 output_dir=r53_output_dir,
                 reports_dir=reports_dir,
                 settings=resolved,
-                command_args=["phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair", "--r57-post-link-apply"],
+                command_args=[
+                    "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair",
+                    "--r57-post-link-apply",
+                ],
                 ssh_target=ssh_target,
                 identity_file=identity_file,
                 app_path=app_path,
@@ -301,7 +312,9 @@ def build_phase3bb_r57_weather_selected_window_pipeline(
                 runner=runner,
             )
             active_r53 = r53_after_apply
-            probe_results.extend(_probe_payloads_to_results(r53_after_apply.get("remote_probe_results") or []))
+            probe_results.extend(
+                _probe_payloads_to_results(r53_after_apply.get("remote_probe_results") or [])
+            )
 
     pipeline_gate = _pipeline_gate(
         active_r53,
@@ -331,7 +344,10 @@ def build_phase3bb_r57_weather_selected_window_pipeline(
             output_dir=r53_output_dir,
             reports_dir=reports_dir,
             settings=resolved,
-            command_args=["phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair", "--r57-final"],
+            command_args=[
+                "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair",
+                "--r57-final",
+            ],
             ssh_target=ssh_target,
             identity_file=identity_file,
             app_path=app_path,
@@ -343,7 +359,9 @@ def build_phase3bb_r57_weather_selected_window_pipeline(
             per_probe_timeout_seconds=per_probe_timeout_seconds,
             runner=runner,
         )
-        probe_results.extend(_probe_payloads_to_results(r53_final.get("remote_probe_results") or []))
+        probe_results.extend(
+            _probe_payloads_to_results(r53_final.get("remote_probe_results") or [])
+        )
 
     decision = _decision(
         writer_wait=writer_wait,
@@ -365,11 +383,21 @@ def build_phase3bb_r57_weather_selected_window_pipeline(
         + len((r53_final.get("remote_probe_results") or []) if r53_final else []),
         "ssh_write_capable_commands_executed": len(pipeline_results),
         "runs_missing_link_apply": apply_result is not None,
-        "runs_weather_feature_refresh": _pipeline_probe_ok_or_seen(pipeline_results, "weather_feature_refresh"),
-        "runs_weather_snapshot_capture": _pipeline_probe_ok_or_seen(pipeline_results, "weather_snapshot_capture"),
-        "runs_weather_per_ticker_forecast": _pipeline_probe_ok_or_seen(pipeline_results, "weather_per_ticker_forecast"),
-        "runs_weather_fast_lane": _pipeline_probe_ok_or_seen(pipeline_results, "weather_fast_lane_run"),
-        "runs_unified_paper_gate": _pipeline_probe_ok_or_seen(pipeline_results, "unified_paper_gate_run"),
+        "runs_weather_feature_refresh": _pipeline_probe_ok_or_seen(
+            pipeline_results, "weather_feature_refresh"
+        ),
+        "runs_weather_snapshot_capture": _pipeline_probe_ok_or_seen(
+            pipeline_results, "weather_snapshot_capture"
+        ),
+        "runs_weather_per_ticker_forecast": _pipeline_probe_ok_or_seen(
+            pipeline_results, "weather_per_ticker_forecast"
+        ),
+        "runs_weather_fast_lane": _pipeline_probe_ok_or_seen(
+            pipeline_results, "weather_fast_lane_run"
+        ),
+        "runs_unified_paper_gate": _pipeline_probe_ok_or_seen(
+            pipeline_results, "unified_paper_gate_run"
+        ),
         "runs_ba_r5_truth": _pipeline_probe_ok_or_seen(pipeline_results, "ba_r5_truth_run"),
         "uses_broad_weather_forecast": False,
         "creates_paper_trades": False,
@@ -406,7 +434,9 @@ def build_phase3bb_r57_weather_selected_window_pipeline(
         "r53_after_apply_payload": _r53_compact(r53_after_apply),
         "r53_final_payload": _r53_compact(r53_final),
         "r12_apply_gate": link_gate,
-        "r12_apply_summary": r12_apply_payload.get("summary") if isinstance(r12_apply_payload, dict) else {},
+        "r12_apply_summary": r12_apply_payload.get("summary")
+        if isinstance(r12_apply_payload, dict)
+        else {},
         "pipeline_gate": pipeline_gate,
         "pipeline_steps": _pipeline_steps(pipeline_results),
         "selected_window_tickers": _selected_ticker_rows(r53_final or active_r53),
@@ -542,16 +572,17 @@ def _pipeline_probes(
     return [
         RemoteProbe(
             "weather_feature_refresh",
-            prefix
-            + f"timeout {timeout_value} .venv/bin/kalshi-bot ingest-weather --location-key new_york && "
-            + f"timeout {timeout_value} .venv/bin/kalshi-bot build-weather-features --location-key new_york",
+            prefix + f"timeout {timeout_value} .venv/bin/kalshi-bot ing"
+            f"est-weather --location-key new_york && "
+            + f"timeout {timeout_value} .venv/bin/kalshi-bot bui"
+            f"ld-weather-features --location-key new_york",
             timeout_value * 2 + 20,
         ),
         RemoteProbe(
             "weather_snapshot_capture",
-            prefix
-            + f"timeout {timeout_value} .venv/bin/kalshi-bot snapshot "
-            "--status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH --include-orderbook",
+            prefix + f"timeout {timeout_value} .venv/bin/kalshi-bot snapshot "
+            "--status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH "
+            "--include-orderbook",
             timeout_value + 20,
         ),
         RemoteProbe(
@@ -568,22 +599,22 @@ def _pipeline_probes(
         ),
         RemoteProbe(
             "weather_fast_lane_run",
-            prefix
-            + f"timeout {timeout_value} .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane "
+            prefix + f"timeout {timeout_value} .venv/bin/kalshi-bot pha"
+            f"se3bb-r2-weather-fast-lane "
             "--output-dir reports/phase3bb_r2 --reports-dir reports",
             timeout_value + 20,
         ),
         RemoteProbe(
             "unified_paper_gate_run",
-            prefix
-            + f"timeout {timeout_value} .venv/bin/kalshi-bot phase3bb-r8-unified-paper-gate "
+            prefix + f"timeout {timeout_value} .venv/bin/kalshi-bot pha"
+            f"se3bb-r8-unified-paper-gate "
             "--output-dir reports/phase3bb_r8 --reports-dir reports",
             timeout_value + 20,
         ),
         RemoteProbe(
             "ba_r5_truth_run",
-            prefix
-            + f"timeout {timeout_value} .venv/bin/kalshi-bot phase3ba-r5-paper-ready-truth "
+            prefix + f"timeout {timeout_value} .venv/bin/kalshi-bot pha"
+            f"se3ba-r5-paper-ready-truth "
             "--output-dir reports/phase3ba_r5 --reports-dir reports --max-duration-seconds 120",
             timeout_value + 20,
         ),
@@ -642,7 +673,8 @@ else:
     placeholders = ",".join("?" for _ in selected_tickers)
     rows = [dict(row) for row in conn.execute(
         f'''
-        select ticker, close_time, expected_expiration_time, expiration_time, settlement_ts, status
+        select ticker, close_time, expected_expiration_time, expiration_time, \
+settlement_ts, status
         from markets
         where ticker in ({{placeholders}})
           and (status is null or lower(status) not in ('closed','settled','expired','inactive'))
@@ -652,7 +684,8 @@ else:
     ).fetchall()]
     for row in rows:
         target = None
-        for key in ("close_time", "expected_expiration_time", "expiration_time", "settlement_ts"):
+        for key in ("close_time", "expected_expiration_time", "expiration_time", \
+"settlement_ts"):
             target = parse_dt(row.get(key))
             if target is not None:
                 break
@@ -666,7 +699,8 @@ while IFS= read -r ticker; do
   case "$ticker" in PHASE3BB_R57_SELECTED_TICKERS=*) echo "$ticker"; continue ;; esac
   count=$((count + 1))
   echo "PHASE3BB_R57_FORECAST_TICKER=$ticker"
-  timeout {int(per_ticker_timeout_seconds)} .venv/bin/kalshi-bot forecast --model weather_v2 --ticker "$ticker" --limit {int(forecast_limit)}
+  timeout {int(per_ticker_timeout_seconds)} .venv/bin/kalshi-bot forecast --model \
+weather_v2 --ticker "$ticker" --limit {int(forecast_limit)}
 done </tmp/phase3bb_r57_weather_tickers.txt
 echo "PHASE3BB_R57_FORECASTED_TICKERS=$count"
 """
@@ -726,7 +760,11 @@ def _decision(
     r12_apply_payload: dict[str, Any],
     final_gate_summary: dict[str, Any],
 ) -> dict[str, Any]:
-    final_summary = ((r53_final or active_r53).get("summary") or {}) if isinstance(r53_final or active_r53, dict) else {}
+    final_summary = (
+        ((r53_final or active_r53).get("summary") or {})
+        if isinstance(r53_final or active_r53, dict)
+        else {}
+    )
     first_failed = next((result for result in pipeline_results if not result.ok), None)
     weather_ready = _int_or_zero(final_gate_summary.get("weather_paper_ready_rows"))
     weather_positive = _int_or_zero(final_gate_summary.get("weather_positive_ev_rows"))
@@ -760,7 +798,10 @@ def _decision(
     elif weather_ready > 0:
         status = "PAPER_READY_GATE_OPEN"
         blocker = "PAPER_ONLY_OPERATOR_REVIEW_NEXT"
-        reason = "Unified paper gate reports weather paper-ready rows. Do not create trades automatically."
+        reason = (
+            "Unified paper gate reports weather paper-ready rows. Do not create trades "
+            "automatically."
+        )
         command = (
             "kalshi-bot phase3bb-r8-unified-paper-gate "
             "--output-dir reports/phase3bb_r8 --reports-dir reports"
@@ -768,7 +809,9 @@ def _decision(
         next_step = "Paper-only operator review / risk preflight"
     elif weather_positive > 0:
         status = "WEATHER_POSITIVE_EV_NOT_PAPER_READY"
-        blocker = final_gate_summary.get("first_weather_positive_blocker") or "PAPER_GATE_STILL_CLOSED"
+        blocker = (
+            final_gate_summary.get("first_weather_positive_blocker") or "PAPER_GATE_STILL_CLOSED"
+        )
         reason = "Weather has positive-EV rows, but the paper gate is still closed."
         command = (
             "kalshi-bot phase3bb-r8-unified-paper-gate "
@@ -787,7 +830,10 @@ def _decision(
     else:
         status = "PIPELINE_COMPLETED_STILL_BLOCKED"
         blocker = (final_summary.get("first_window_blocker_counts") or {}) or "NO_RANKING_ROWS"
-        reason = "Selected-window pipeline completed, but final R53/R8 still shows no ranked paper-ready rows."
+        reason = (
+            "Selected-window pipeline completed, but final R53/R8 still shows no ranked "
+            "paper-ready rows."
+        )
         command = (
             "kalshi-bot phase3bb-r57-weather-selected-window-pipeline-speed-repair "
             "--output-dir reports/phase3bb_r57 --reports-dir reports"
@@ -803,8 +849,12 @@ def _decision(
         "live_demo_orders_allowed": False,
         "weather_positive_ev_rows": weather_positive,
         "weather_paper_ready_rows": weather_ready,
-        "final_selected_window_ranking_rows": _int_or_zero(final_summary.get("selected_window_ranking_rows")),
-        "final_selected_window_forecast_rows": _int_or_zero(final_summary.get("selected_window_forecast_rows")),
+        "final_selected_window_ranking_rows": _int_or_zero(
+            final_summary.get("selected_window_ranking_rows")
+        ),
+        "final_selected_window_forecast_rows": _int_or_zero(
+            final_summary.get("selected_window_forecast_rows")
+        ),
     }
 
 
@@ -871,7 +921,12 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
     decision = payload["decision"]
     wait = payload["writer_wait"]
     gate = payload["pipeline_gate"]
-    r53 = (payload.get("r53_final_payload") or payload.get("r53_after_apply_payload") or payload.get("r53_initial_payload") or {})
+    r53 = (
+        payload.get("r53_final_payload")
+        or payload.get("r53_after_apply_payload")
+        or payload.get("r53_initial_payload")
+        or {}
+    )
     summary = r53.get("summary") or {}
     lines = _metadata_lines(payload, "# Phase 3BB-R57 Selected-Window Weather Pipeline")
     lines.extend(
@@ -905,7 +960,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             decision["operator_next_command"],
             "```",
             "",
-            "R57 does not stop R5, start services, create paper trades, submit live/demo orders, or lower thresholds.",
+            "R57 does not stop R5, start services, create paper trades, submit live/demo "
+            "orders, or lower thresholds.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -925,7 +981,8 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     ]
     for row in payload["pipeline_steps"]:
         lines.append(
-            f"| {row['step']} | {row['name']} | {row['ok']} | {row['exit_code']} | {row['timed_out']} |"
+            f"| {row['step']} | {row['name']} | {row['ok']} | "
+            f"{row['exit_code']} | {row['timed_out']} |"
         )
     lines.extend(
         [
@@ -948,25 +1005,32 @@ def _render_markdown(payload: dict[str, Any]) -> str:
 
 def _render_next_actions(payload: dict[str, Any]) -> str:
     decision = payload["decision"]
-    return "\n".join(
-        [
-            "# Next Actions",
-            "",
-            f"Status: `{decision['status']}`",
-            f"First hard blocker: `{decision['first_hard_blocker']}`",
-            "",
-            "```bash",
-            decision["operator_next_command"],
-            "```",
-            "",
-            "Guardrails:",
-            "- Do not stop R5 from this phase.",
-            "- Do not create paper trades unless a downstream paper-ready gate opens.",
-            "- Do not submit/cancel/replace live or demo orders.",
-            "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Next Actions",
+                "",
+                f"Status: `{decision['status']}`",
+                f"First hard blocker: `{decision['first_hard_blocker']}`",
+                "",
+                "```bash",
+                decision["operator_next_command"],
+                "```",
+                "",
+                "Guardrails:",
+                "- Do not stop R5 from this phase.",
+                "- Do not create paper trades unless a downstream paper-ready gate opens.",
+                "- Do not submit/cancel/replace live or demo orders.",
+                "- Do not lower EV, confidence, liquidity, spread, settlement, or risk thresholds.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
-    return "#!/usr/bin/env bash\nset -euo pipefail\n" + payload["decision"]["operator_next_command"] + "\n"
+    return (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + payload["decision"]["operator_next_command"]
+        + "\n"
+    )

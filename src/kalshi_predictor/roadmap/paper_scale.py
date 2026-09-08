@@ -25,8 +25,7 @@ def evaluate_paper_scale_gate(
     required_per_live_category: int = 30,
 ) -> dict[str, Any]:
     category_checks = {
-        category: int(evidence.settled_by_category.get(category, 0))
-        >= required_per_live_category
+        category: int(evidence.settled_by_category.get(category, 0)) >= required_per_live_category
         for category in proposed_live_categories
     }
     eligible_settled = max(

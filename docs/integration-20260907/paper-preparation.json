@@ -1,0 +1,109 @@
+{
+  "prepared_at": "2026-09-07T23:24:30.649514+00:00",
+  "code_commit": "11893275bd194753fa457639221e93e1f196e868",
+  "root": "C:\\Users\\user1\\AppData\\Local\\CodexPaperRehearsals\\20260907T232421Z",
+  "database": "C:\\Users\\user1\\AppData\\Local\\CodexPaperRehearsals\\20260907T232421Z\\paper.db",
+  "database_sha256": "3d26fbf80aa40123d78a4366f7d2be92a2ad3b90891981386388864a4633fc8d",
+  "database_integrity": "ok",
+  "table_count": 164,
+  "all_tables_empty": true,
+  "guard_flags": {
+    "EXECUTION_ENABLED": "false",
+    "EXECUTION_DRY_RUN": "true",
+    "EXECUTION_GATEWAY_MODE": "disabled",
+    "AUTOPILOT_ENABLED": "false",
+    "AUTOPILOT_DRY_RUN": "true",
+    "PAPER_ORDER_CREATION_ENABLED": "false",
+    "PAPER_ORDER_KILL_SWITCH": "true",
+    "DYNAMIC_POSITION_SIZING_MODE": "disabled",
+    "ADVANCED_RISK_ENGINE_MODE": "disabled",
+    "KALSHI_WEBSOCKET_ENABLED": "false"
+  },
+  "credentials_loaded": false,
+  "orders_created": 0,
+  "requests": [
+    {
+      "url": "https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=KXTEMPNYCH&status=open&limit=10",
+      "method": "GET",
+      "status": 200,
+      "started_at": "2026-09-07T23:24:21.388418+00:00",
+      "received_at": "2026-09-07T23:24:21.660839+00:00",
+      "server_date": "Mon, 07 Sep 2026 23:24:21 GMT",
+      "file": "markets.json",
+      "sha256": "ecf2859147a22cf53fe4366bfd93822f55dab1c45cca1e55da43717457173f4c",
+      "bytes": 20236
+    },
+    {
+      "url": "https://external-api.kalshi.com/trade-api/v2/series/KXTEMPNYCH",
+      "method": "GET",
+      "status": 200,
+      "started_at": "2026-09-07T23:24:21.665828+00:00",
+      "received_at": "2026-09-07T23:24:21.760543+00:00",
+      "server_date": "Mon, 07 Sep 2026 23:24:21 GMT",
+      "file": "series.json",
+      "sha256": "75b4cb2411e96e62df15321e95075dff5dd701695b870437201262fdd9005d42",
+      "bytes": 1130
+    },
+    {
+      "url": "https://external-api.kalshi.com/trade-api/v2/markets/KXTEMPNYCH-26SEP0720-T76.99/orderbook?depth=5",
+      "method": "GET",
+      "status": 200,
+      "started_at": "2026-09-07T23:24:21.763570+00:00",
+      "received_at": "2026-09-07T23:24:21.858085+00:00",
+      "server_date": "Mon, 07 Sep 2026 23:24:21 GMT",
+      "file": "orderbook-0.json",
+      "sha256": "77b0c97ebadefe7e97559911bf6bbf1760450ddcc04361ac746fc3097e59f152",
+      "bytes": 141
+    },
+    {
+      "url": "https://external-api.kalshi.com/trade-api/v2/markets/KXTEMPNYCH-26SEP0720-T75.99/orderbook?depth=5",
+      "method": "GET",
+      "status": 200,
+      "started_at": "2026-09-07T23:24:21.861438+00:00",
+      "received_at": "2026-09-07T23:24:21.952220+00:00",
+      "server_date": "Mon, 07 Sep 2026 23:24:21 GMT",
+      "file": "orderbook-1.json",
+      "sha256": "4506d9edae3dc7fb7acf718bec532e60303f9cf10aaf5c244104555e0cb9d927",
+      "bytes": 141
+    },
+    {
+      "url": "https://external-api.kalshi.com/trade-api/v2/markets/KXTEMPNYCH-26SEP0720-T74.99/orderbook?depth=5",
+      "method": "GET",
+      "status": 200,
+      "started_at": "2026-09-07T23:24:21.957596+00:00",
+      "received_at": "2026-09-07T23:24:22.053862+00:00",
+      "server_date": "Mon, 07 Sep 2026 23:24:22 GMT",
+      "file": "orderbook-2.json",
+      "sha256": "5a5f13eb9489f317534b56fd2ad16f429f5841d6137944947a8f7884ec066088",
+      "bytes": 222
+    }
+  ],
+  "selected_markets": [
+    {
+      "ticker": "KXTEMPNYCH-26SEP0720-T76.99",
+      "status": "active",
+      "close_time": "2026-09-08T00:00:00Z",
+      "title": "Will the temp in New York City be above 76.99\u00b0 on Sep 7, 2026 at 8pm EDT?",
+      "yes_bid_levels": 0,
+      "no_bid_levels": 5
+    },
+    {
+      "ticker": "KXTEMPNYCH-26SEP0720-T75.99",
+      "status": "active",
+      "close_time": "2026-09-08T00:00:00Z",
+      "title": "Will the temp in New York City be above 75.99\u00b0 on Sep 7, 2026 at 8pm EDT?",
+      "yes_bid_levels": 0,
+      "no_bid_levels": 5
+    },
+    {
+      "ticker": "KXTEMPNYCH-26SEP0720-T74.99",
+      "status": "active",
+      "close_time": "2026-09-08T00:00:00Z",
+      "title": "Will the temp in New York City be above 74.99\u00b0 on Sep 7, 2026 at 8pm EDT?",
+      "yes_bid_levels": 4,
+      "no_bid_levels": 5
+    }
+  ],
+  "status": "PREPARED_NOT_STARTED",
+  "authorization": "No deployment, trading activation, or orders."
+}

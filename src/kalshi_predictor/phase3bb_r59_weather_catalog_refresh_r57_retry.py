@@ -21,7 +21,6 @@ from kalshi_predictor.phase3bb_r12_cloud_bootstrap import (
     ProbeRunner,
     RemoteProbe,
     RemoteProbeResult,
-    _json_from_probe,
     _resolve_target,
     _result_payload,
     _run_ssh_probe,
@@ -152,7 +151,9 @@ def write_phase3bb_r59_weather_catalog_refresh_r57_retry_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_rows_csv(wait_checks_csv_path, payload["writer_wait_checks"])
     _write_rows_csv(refresh_steps_csv_path, payload["refresh_steps"])
     _write_rows_csv(r53_summary_csv_path, [payload.get("r53_payload", {}).get("summary") or {}])
@@ -281,7 +282,10 @@ def build_phase3bb_r59_weather_catalog_refresh_r57_retry(
             output_dir=r53_output_dir,
             reports_dir=reports_dir,
             settings=resolved,
-            command_args=["phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair", "--r59-post-catalog-refresh"],
+            command_args=[
+                "phase3bb-r53-weather-current-window-cadence-preview-narrowing-repair",
+                "--r59-post-catalog-refresh",
+            ],
             ssh_target=ssh_target,
             identity_file=identity_file,
             app_path=app_path,
@@ -296,9 +300,16 @@ def build_phase3bb_r59_weather_catalog_refresh_r57_retry(
             probe_runner=runner,
         )
         r53_payload = _read_json(r53_artifacts.json_path)
-        probe_results.extend(_probe_payloads_to_results(r53_payload.get("remote_probe_results") or []))
+        probe_results.extend(
+            _probe_payloads_to_results(r53_payload.get("remote_probe_results") or [])
+        )
 
-    r57_gate = _r57_gate(r53_payload, writer_wait=writer_wait, refresh_result=refresh_result, min_minutes_before_target=min_minutes_before_target)
+    r57_gate = _r57_gate(
+        r53_payload,
+        writer_wait=writer_wait,
+        refresh_result=refresh_result,
+        min_minutes_before_target=min_minutes_before_target,
+    )
     if r57_gate["allowed"]:
         r57_artifacts = write_phase3bb_r57_weather_selected_window_pipeline_report(
             session,
@@ -306,7 +317,10 @@ def build_phase3bb_r59_weather_catalog_refresh_r57_retry(
             reports_dir=reports_dir,
             r53_output_dir=r53_output_dir,
             settings=resolved,
-            command_args=["phase3bb-r57-weather-selected-window-pipeline-speed-repair", "--r59-retry"],
+            command_args=[
+                "phase3bb-r57-weather-selected-window-pipeline-speed-repair",
+                "--r59-retry",
+            ],
             ssh_target=ssh_target,
             identity_file=identity_file,
             app_path=app_path,
@@ -327,7 +341,9 @@ def build_phase3bb_r59_weather_catalog_refresh_r57_retry(
             probe_runner=runner,
         )
         r57_payload = _read_json(r57_artifacts.json_path)
-        probe_results.extend(_probe_payloads_to_results(r57_payload.get("remote_probe_results") or []))
+        probe_results.extend(
+            _probe_payloads_to_results(r57_payload.get("remote_probe_results") or [])
+        )
 
     decision = _decision(
         writer_wait=writer_wait,
@@ -336,7 +352,9 @@ def build_phase3bb_r59_weather_catalog_refresh_r57_retry(
         r53_payload=r53_payload,
         r57_payload=r57_payload,
     )
-    r57_safety = r57_payload.get("safety_flags") if isinstance(r57_payload.get("safety_flags"), dict) else {}
+    r57_safety = (
+        r57_payload.get("safety_flags") if isinstance(r57_payload.get("safety_flags"), dict) else {}
+    )
     safety = {
         **_safety_flags(),
         "paper_only": True,
@@ -381,7 +399,9 @@ def build_phase3bb_r59_weather_catalog_refresh_r57_retry(
         "writer_wait": {key: value for key, value in writer_wait.items() if key != "probe_results"},
         "writer_wait_checks": writer_wait["checks"],
         "refresh_steps": _refresh_steps(refresh_result),
-        "catalog_refresh_probe": _result_payload(refresh_result) if refresh_result is not None else {},
+        "catalog_refresh_probe": _result_payload(refresh_result)
+        if refresh_result is not None
+        else {},
         "r53_payload": _r53_compact(r53_payload),
         "r57_gate": r57_gate,
         "r57_payload": _r57_compact(r57_payload),
@@ -460,9 +480,13 @@ def _decision(
     r53_payload: dict[str, Any],
     r57_payload: dict[str, Any],
 ) -> dict[str, Any]:
-    r53_decision = r53_payload.get("decision") if isinstance(r53_payload.get("decision"), dict) else {}
+    r53_decision = (
+        r53_payload.get("decision") if isinstance(r53_payload.get("decision"), dict) else {}
+    )
     r53_summary = r53_payload.get("summary") if isinstance(r53_payload.get("summary"), dict) else {}
-    r57_decision = r57_payload.get("decision") if isinstance(r57_payload.get("decision"), dict) else {}
+    r57_decision = (
+        r57_payload.get("decision") if isinstance(r57_payload.get("decision"), dict) else {}
+    )
     if not writer_wait.get("cleared"):
         status = "WAITING_FOR_WRITER_CLEAR"
         blocker = "ACTIVE_WRITER"
@@ -472,7 +496,9 @@ def _decision(
     elif writer_wait.get("unexpected_writer"):
         status = "BLOCKED_BY_UNEXPECTED_WRITER"
         blocker = "UNEXPECTED_WRITER_PID"
-        reason = "A writer other than the expected PID was seen; R59 did not run write-capable work."
+        reason = (
+            "A writer other than the expected PID was seen; R59 did not run write-capable work."
+        )
         command = "kalshi-bot db-writer-monitor --json"
         next_step = "Inspect active writer before weather refresh"
     elif refresh_result is None:
@@ -508,9 +534,13 @@ def _decision(
     else:
         status = f"R57_{r57_decision.get('status') or 'COMPLETED'}"
         blocker = r57_decision.get("first_hard_blocker") or "R57_COMPLETED"
-        reason = r57_decision.get("primary_reason") or "Patched R57 completed after targeted catalog refresh."
+        reason = (
+            r57_decision.get("primary_reason")
+            or "Patched R57 completed after targeted catalog refresh."
+        )
         command = r57_decision.get("operator_next_command") or (
-            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 --reports-dir reports"
+            "kalshi-bot phase3bb-r8-unified-paper-gate --output-dir reports/phase3bb_r8 "
+            "--reports-dir reports"
         )
         next_step = r57_decision.get("next_codex_step") or "Follow R57 next action"
     return {
@@ -603,7 +633,8 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             decision["operator_next_command"],
             "```",
             "",
-            "R59 does not stop R5, start services, create paper trades, submit live/demo orders, or lower thresholds.",
+            "R59 does not stop R5, start services, create paper trades, submit live/demo "
+            "orders, or lower thresholds.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -634,21 +665,28 @@ def _render_markdown(payload: dict[str, Any]) -> str:
 
 def _render_next_actions(payload: dict[str, Any]) -> str:
     decision = payload["decision"]
-    return "\n".join(
-        [
-            "# Next Actions",
-            "",
-            f"Status: `{decision['status']}`",
-            f"First hard blocker: `{decision['first_hard_blocker']}`",
-            "",
-            "```bash",
-            decision["operator_next_command"],
-            "```",
-            "",
-            "Do not create paper trades or live/demo orders from this phase.",
-        ]
-    ) + "\n"
+    return (
+        "\n".join(
+            [
+                "# Next Actions",
+                "",
+                f"Status: `{decision['status']}`",
+                f"First hard blocker: `{decision['first_hard_blocker']}`",
+                "",
+                "```bash",
+                decision["operator_next_command"],
+                "```",
+                "",
+                "Do not create paper trades or live/demo orders from this phase.",
+            ]
+        )
+        + "\n"
+    )
 
 
 def _render_operator_command(payload: dict[str, Any]) -> str:
-    return "#!/usr/bin/env bash\nset -euo pipefail\n" + payload["decision"]["operator_next_command"] + "\n"
+    return (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + payload["decision"]["operator_next_command"]
+        + "\n"
+    )

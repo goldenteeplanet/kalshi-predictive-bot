@@ -31,8 +31,7 @@ def evaluate_candidates(
 ) -> list[CandidateEvaluation]:
     folds = build_purged_walk_forward_folds(rows, config=config)
     raw_results = [
-        _evaluate_one(rows, candidate, config=config, folds=folds)
-        for candidate in candidates
+        _evaluate_one(rows, candidate, config=config, folds=folds) for candidate in candidates
     ]
     q_values = _benjamini_hochberg([_pseudo_pvalue(result) for result in raw_results])
     adjusted: list[CandidateEvaluation] = []
@@ -279,9 +278,12 @@ def _composite_score(
     predictive = (paired_delta or Decimal("0")).copy_abs()
     economic = min((economic_effect or Decimal("0")).copy_abs(), Decimal("1"))
     sample_quality = min(Decimal(sample_size) / Decimal("100"), Decimal("1"))
-    return (predictive * Decimal("40")) + (economic * Decimal("30")) + (
-        stability_score * Decimal("20")
-    ) + (sample_quality * Decimal("10"))
+    return (
+        (predictive * Decimal("40"))
+        + (economic * Decimal("30"))
+        + (stability_score * Decimal("20"))
+        + (sample_quality * Decimal("10"))
+    )
 
 
 def _pseudo_pvalue(result: CandidateEvaluation) -> Decimal:

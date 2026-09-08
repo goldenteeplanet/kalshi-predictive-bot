@@ -504,10 +504,7 @@ def _acceptance(summary: dict[str, Any], blocked_rows: list[dict[str, Any]]) -> 
         ),
         "cushman_remains_blocked_without_authorized_evidence": (
             not cushman_blockers
-            or all(
-                blocker == "PROPRIETARY_REVIEW_REQUIRED"
-                for blocker in cushman_blockers
-            )
+            or all(blocker == "PROPRIETARY_REVIEW_REQUIRED" for blocker in cushman_blockers)
         ),
         "no_paper_live_demo_orders": True,
         "no_paid_proprietary_sources_used": True,
@@ -569,8 +566,7 @@ def _source_publication_date(
         _text(_nested(usda_date_report, "preserved_row_state", "evidence_notes")),
     ]
     haystacks.extend(
-        _text(row.get("result"))
-        for row in _list(usda_date_report.get("sources_checked"))
+        _text(row.get("result")) for row in _list(usda_date_report.get("sources_checked"))
     )
     for text in haystacks:
         extracted = _extract_reported_date(text)

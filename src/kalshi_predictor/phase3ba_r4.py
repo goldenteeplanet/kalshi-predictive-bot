@@ -197,9 +197,7 @@ def build_phase3ba_r4_crypto_executable_book_watch(
             "min_edge": str(resolved.opportunity_min_edge),
             "min_score": str(resolved.opportunity_min_score),
             "min_confidence_score": str(MIN_EXECUTABLE_CONFIDENCE_SCORE),
-            "min_time_to_close_minutes": str(
-                resolved.opportunity_min_time_to_close_minutes
-            ),
+            "min_time_to_close_minutes": str(resolved.opportunity_min_time_to_close_minutes),
         },
         "router_summary": router.get("summary", {}),
         "r5_background_status": r5_status,
@@ -374,9 +372,7 @@ def _execution_assessment(
     )
     spread_pass = bool(spread is not None and spread <= settings.opportunity_max_spread)
     score_pass = bool(score is not None and score >= settings.opportunity_min_score)
-    confidence_pass = bool(
-        confidence is None or confidence >= MIN_EXECUTABLE_CONFIDENCE_SCORE
-    )
+    confidence_pass = bool(confidence is None or confidence >= MIN_EXECUTABLE_CONFIDENCE_SCORE)
     time_pass = bool(
         time_to_close is None or time_to_close >= settings.opportunity_min_time_to_close_minutes
     )
@@ -585,11 +581,7 @@ def _no_book_detail(row: dict[str, Any]) -> str:
 
 
 def _url_gate_pass(identity: dict[str, Any]) -> bool:
-    status = str(
-        identity.get("kalshi_url_status")
-        or identity.get("url_verification_status")
-        or ""
-    )
+    status = str(identity.get("kalshi_url_status") or identity.get("url_verification_status") or "")
     if status == "BUILT_FROM_EXACT_CATALOG":
         return True
     return bool(identity.get("tradeable") or status.startswith("VERIFIED"))
@@ -660,8 +652,10 @@ def _r5_aggregate_positive_ev_row(r5_status: dict[str, Any]) -> dict[str, Any]:
     paper_ready = _to_int(r5_status.get("paper_ready_candidates"))
     primary_gap = r5_status.get("primary_gap_after_refresh")
     watch_state = "POSITIVE_EV_NO_BOOK" if no_book_rows > 0 else "POSITIVE_EV_RISK_NOT_ELIGIBLE"
-    detail = "POSITIVE_EV_NO_EXECUTABLE_BOOK" if no_book_rows > 0 else str(
-        primary_gap or "R5_AGGREGATE_POSITIVE_EV_BLOCKED"
+    detail = (
+        "POSITIVE_EV_NO_EXECUTABLE_BOOK"
+        if no_book_rows > 0
+        else str(primary_gap or "R5_AGGREGATE_POSITIVE_EV_BLOCKED")
     )
     return {
         "ticker": None,
@@ -991,8 +985,7 @@ def _markets_by_ticker(session: Session, tickers: list[str]) -> dict[str, Market
     if not tickers:
         return {}
     return {
-        row.ticker: row
-        for row in session.scalars(select(Market).where(Market.ticker.in_(tickers)))
+        row.ticker: row for row in session.scalars(select(Market).where(Market.ticker.in_(tickers)))
     }
 
 
@@ -1076,9 +1069,7 @@ def _latest_iso(session: Session, column: Any) -> str | None:
 
 def _latest_crypto_ranking_iso(session: Session) -> str | None:
     value = session.scalar(
-        select(func.max(MarketRanking.ranked_at)).where(
-            MarketRanking.forecast_model == MODEL_NAME
-        )
+        select(func.max(MarketRanking.ranked_at)).where(MarketRanking.forecast_model == MODEL_NAME)
     )
     return value.isoformat() if hasattr(value, "isoformat") else value
 

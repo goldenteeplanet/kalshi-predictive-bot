@@ -79,7 +79,4 @@ def fetch_public_sports_data(
     normalized_source = source.strip().lower()
     if normalized_source in {"manual", "file"}:
         return ManualSportsProvider().fetch(league=league, settings=resolved)
-    raise SportsProviderUnavailable(
-        f"{source} is not configured. {PUBLIC_PROVIDER_MESSAGE}"
-    )
-
+    raise SportsProviderUnavailable(f"{source} is not configured. {PUBLIC_PROVIDER_MESSAGE}")

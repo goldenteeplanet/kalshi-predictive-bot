@@ -39,9 +39,7 @@ def test_r5_heartbeat_records_exact_cycle_identity(tmp_path: Path) -> None:
     timer.mark("phase3bc_r3_refresh")
     timer.mark("complete")
 
-    payload = json.loads(
-        (tmp_path / "phase3bc_r5_heartbeat.json").read_text(encoding="utf-8")
-    )
+    payload = json.loads((tmp_path / "phase3bc_r5_heartbeat.json").read_text(encoding="utf-8"))
     assert payload["cycle_number"] == 4
     assert payload["total_cycles"] == 32
     assert payload["pid"] > 0

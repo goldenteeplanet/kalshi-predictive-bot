@@ -72,9 +72,7 @@ def run_sports_provenance_repair(
     resolved = settings or get_settings()
     before = build_sports_provenance_snapshot(session)
     parse_result = (
-        parse_and_store_market_legs(session, limit=limit, refresh=False)
-        if parse_first
-        else None
+        parse_and_store_market_legs(session, limit=limit, refresh=False) if parse_first else None
     )
     derived = derive_sports_schedule_from_market_legs(
         session,

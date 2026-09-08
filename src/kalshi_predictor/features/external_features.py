@@ -23,4 +23,3 @@ def build_external_features(session: Session, ticker: str) -> dict[str, Any]:
         if payload:
             payloads[feature_set] = payload
     return payloads
-

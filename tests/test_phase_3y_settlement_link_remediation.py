@@ -255,16 +255,12 @@ def test_crypto_linker_uses_cross_category_associated_events(tmp_path) -> None:
             {
                 "ticker": "KXMVECROSSCATEGORY-DOGE-ETH-XRP",
                 "title": (
-                    "yes Target Price: $0.075,"
-                    "yes Target Price: $1,625,"
-                    "yes Target Price: $1.06"
+                    "yes Target Price: $0.075,yes Target Price: $1,625,yes Target Price: $1.06"
                 ),
                 "raw_json": {
                     "custom_strike": {
                         "Associated Events": (
-                            "KXDOGE15M-26JUN241230,"
-                            "KXETH15M-26JUN241230,"
-                            "KXXRP15M-26JUN241230"
+                            "KXDOGE15M-26JUN241230,KXETH15M-26JUN241230,KXXRP15M-26JUN241230"
                         ),
                         "Associated Market Sides": "yes,yes,yes",
                         "Associated Markets": (
@@ -602,10 +598,14 @@ def test_paper_settlement_doctor_reports_close_buckets_and_learning_guidance(tmp
 
     assert payload["close_time_buckets"]["0-6h"] == 1
     assert payload["close_time_buckets"]["2-3d"] == 1
-    assert payload["close_time_buckets"].get("7d+", 0) + payload["close_time_buckets"].get(
-        "unknown",
-        0,
-    ) == 1
+    assert (
+        payload["close_time_buckets"].get("7d+", 0)
+        + payload["close_time_buckets"].get(
+            "unknown",
+            0,
+        )
+        == 1
+    )
     guidance = payload["learning_slow_settlement_guidance"]
     assert guidance["active_unsettled_trades"] == 3
     assert guidance["recommended_env"]["LEARNING_PRIORITIZE_FAST_SETTLEMENT"] == "true"

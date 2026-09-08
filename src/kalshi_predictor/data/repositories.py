@@ -124,7 +124,10 @@ def insert_market_snapshot(
 
 
 def insert_forecast(
-    session: Session, forecast: Any, *, market_snapshot_id: int | None = None,
+    session: Session,
+    forecast: Any,
+    *,
+    market_snapshot_id: int | None = None,
     attribution_enabled: bool | None = None,
 ) -> Forecast:
     payload = _to_mapping(forecast)
@@ -148,7 +151,10 @@ def insert_forecast(
     from kalshi_predictor.provenance.dual_write import capture_forecast_provenance
 
     capture_forecast_provenance(
-        session, record, payload, market_snapshot_id=market_snapshot_id,
+        session,
+        record,
+        payload,
+        market_snapshot_id=market_snapshot_id,
         enabled=attribution_enabled,
     )
     from kalshi_predictor.memory.capture import capture_forecast_created

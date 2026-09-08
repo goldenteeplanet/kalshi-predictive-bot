@@ -128,9 +128,7 @@ def _collect_read_only(
         engine.dispose()
 
 
-def _deferred_payload(
-    tickers: list[str], reason: str, monitor: dict[str, Any]
-) -> dict[str, Any]:
+def _deferred_payload(tickers: list[str], reason: str, monitor: dict[str, Any]) -> dict[str, Any]:
     return {
         "generated_at": utc_now().isoformat(),
         "mode": "SHADOW_ONLY_AUTHORITATIVE_WEATHER_IDENTITY",
@@ -160,9 +158,7 @@ def _deferred_payload(
     }
 
 
-def _enrich_weather_gate(
-    weather_gate: dict[str, Any], shadow: dict[str, Any]
-) -> dict[str, Any]:
+def _enrich_weather_gate(weather_gate: dict[str, Any], shadow: dict[str, Any]) -> dict[str, Any]:
     evidence = {row["ticker"]: row for row in shadow.get("rows") or []}
     rows = []
     for source in weather_gate.get("weather_rows") or []:

@@ -3,10 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
-
+from typing import Any
 
 STREAMS = {
     "pmb": ("PMB evaluation", ("phase_pmb",)),
@@ -64,7 +64,12 @@ def _state(payload: Mapping[str, Any]) -> str:
             if "WAIT" in normalized or "PENDING" in normalized:
                 return "WAITING"
     booleans = {key: value for key, value in _walk_values(payload) if isinstance(value, bool)}
-    for key in ("certification_passed", "verification_passed", "multi_window_complete", "runtime_activation_ready"):
+    for key in (
+        "certification_passed",
+        "verification_passed",
+        "multi_window_complete",
+        "runtime_activation_ready",
+    ):
         if key in booleans:
             return "PASSED" if booleans[key] else "BLOCKED"
     return "WAITING"
@@ -91,7 +96,9 @@ def _candidate_paths(root: Path, tokens: tuple[str, ...], *, limit: int) -> list
     return sorted(candidates, key=lambda path: path.stat().st_mtime, reverse=True)[:limit]
 
 
-def discover_workstream_evidence(reports_root: Path, *, max_files_per_stream: int = 80) -> dict[str, Any]:
+def discover_workstream_evidence(
+    reports_root: Path, *, max_files_per_stream: int = 80
+) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     reports: list[dict[str, Any]] = []
     diagnostics: list[str] = []
@@ -118,19 +125,33 @@ def discover_workstream_evidence(reports_root: Path, *, max_files_per_stream: in
         relative = path.relative_to(reports_root).as_posix()
         sha = hashlib.sha256(raw).hexdigest()
         row = {
-            "id": stream, "name": name, "state": state, "current_phase": phase,
+            "id": stream,
+            "name": name,
+            "state": state,
+            "current_phase": phase,
             "completed": [phase] if state == "PASSED" else [],
             "blocked": [phase] if state in {"BLOCKED", "FAILED"} else [],
-            "next_safe_phase": _next_action(payload), "evidence_path": f"reports/{relative}",
-            "evidence_sha256": sha, "reported": True,
+            "next_safe_phase": _next_action(payload),
+            "evidence_path": f"reports/{relative}",
+            "evidence_sha256": sha,
+            "reported": True,
         }
         rows.append(row)
-        reports.append({
-            "phase": phase, "state": state, "path": f"reports/{relative}",
-            "sha256": sha, "verified": True,
-            "generated_at": datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).isoformat().replace("+00:00", "Z"),
-        })
+        reports.append(
+            {
+                "phase": phase,
+                "state": state,
+                "path": f"reports/{relative}",
+                "sha256": sha,
+                "verified": True,
+                "generated_at": datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+                .isoformat()
+                .replace("+00:00", "Z"),
+            }
+        )
     return {
-        "workstreams": rows, "reports": reports,
-        "diagnostics": diagnostics, "files_scanned_limit": max_files_per_stream * len(STREAMS),
+        "workstreams": rows,
+        "reports": reports,
+        "diagnostics": diagnostics,
+        "files_scanned_limit": max_files_per_stream * len(STREAMS),
     }

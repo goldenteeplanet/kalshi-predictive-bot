@@ -64,13 +64,19 @@ def current_market_window_status(
         "minutes_to_close": decimal_to_str(minutes_to_close),
     }
 
-    if _lifecycle_closed(lifecycle) or settlement_time is not None or getattr(market, "result", None):
+    if (
+        _lifecycle_closed(lifecycle)
+        or settlement_time is not None
+        or getattr(market, "result", None)
+    ):
         return _status_payload(
             MARKET_CLOSED_OR_SETTLED,
             now=resolved_now,
             current=False,
             diagnostic_only=True,
-            reason="Market lifecycle is closed, finalized, settled, expired, or already has a result.",
+            reason=(
+                "Market lifecycle is closed, finalized, settled, expired, or already has a result."
+            ),
             **base,
         )
     if close_time is not None and close_time <= resolved_now:
@@ -120,7 +126,10 @@ def current_market_window_status(
                 now=resolved_now,
                 current=False,
                 diagnostic_only=False,
-                reason="Ranking time_to_close_minutes is inside the configured final paper-entry cutoff.",
+                reason=(
+                    "Ranking time_to_close_minutes is inside the configured final "
+                    "paper-entry cutoff."
+                ),
                 **base,
             )
     if lifecycle and not is_active_market_status(lifecycle):

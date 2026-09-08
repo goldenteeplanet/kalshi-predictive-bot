@@ -40,6 +40,7 @@ from kalshi_predictor.data.schema import (
 from kalshi_predictor.learning.config import learning_paper_settings
 from kalshi_predictor.opportunities.market_identity import (
     BUILT_FROM_EXACT_CATALOG,
+    VERIFIED,
     verify_market_identity,
 )
 from kalshi_predictor.opportunities.window_eligibility import current_market_window_status
@@ -72,7 +73,12 @@ WEATHER_PAPER_BLOCKERS = (
     "LINK_UNVERIFIED",
     "SNAPSHOT_MISSING",
     "SOURCE_MISSING",
+    "MARKET_SOURCE_MISSING",
     "SNAPSHOT_STALE",
+    "WEATHER_SOURCE_MISSING",
+    "WEATHER_SOURCE_STALE",
+    "WEATHER_FEATURE_MISSING",
+    "WEATHER_FEATURE_STALE",
     "FORECAST_MISSING",
     "RANKING_MISSING",
     "EV_NOT_POSITIVE",
@@ -342,6 +348,9 @@ def _weather_paper_gate_row(
     exact_identity_verified = (
         decode_json(link.raw_json).get("exact_market_identity_verified") is True
     )
+    source_identity_ready = exact_identity_verified or _weather_source_identity_ready(
+        identity_payload, ticker=link.ticker
+    )
     snapshot_age = _age_minutes(snapshot.captured_at, now) if snapshot is not None else None
     snapshot_fresh = bool(
         snapshot is not None
@@ -384,7 +393,7 @@ def _weather_paper_gate_row(
         ranking=ranking,
         now=now,
     )
-    raw_ev, executable_ev = _ev_values(ranking=ranking, forecast=forecast)
+    raw_ev, fee_adjusted_ev = _ev_values(ranking=ranking, forecast=forecast)
     book = _book_probe(
         ranking=ranking,
         market=market,
@@ -396,6 +405,10 @@ def _weather_paper_gate_row(
         snapshot_age=snapshot_age,
         settings=settings,
         window=window,
+    )
+    executable_ev = _executable_ev(
+        fee_adjusted_ev=fee_adjusted_ev,
+        executable_book=bool(book.get("executable_book")),
     )
     settlement = _settlement_entry_check(
         session,
@@ -427,6 +440,9 @@ def _weather_paper_gate_row(
         "exact_market_identity_verified": exact_identity_verified,
         "kalshi_url": identity_payload.get("kalshi_url"),
         "kalshi_url_status": identity_payload.get("kalshi_url_status"),
+        "kalshi_api_url": identity_payload.get("api_url"),
+        "source_identity_ready": source_identity_ready,
+        "source_identity_reason": identity_payload.get("kalshi_url_reason"),
         "source_lineage": identity_payload.get("source_lineage"),
         "current_window_eligible": bool(window.get("current_window_eligible")),
         "window_status": window.get("window_status"),
@@ -460,10 +476,12 @@ def _weather_paper_gate_row(
         "forecast_probability": getattr(ranking, "forecast_probability", None)
         or (forecast.yes_probability if forecast is not None else None),
         "raw_ev": decimal_to_str(raw_ev),
+        "fee_adjusted_ev": decimal_to_str(fee_adjusted_ev),
         "executable_ev": decimal_to_str(executable_ev),
         "estimated_edge": getattr(ranking, "estimated_edge", None),
         "opportunity_score": getattr(ranking, "opportunity_score", None),
         "spread": getattr(ranking, "spread", None),
+        "max_spread": decimal_to_str(settings.opportunity_max_spread),
         "liquidity": getattr(ranking, "liquidity", None),
         "liquidity_score": getattr(ranking, "liquidity_score", None),
         "executable_book": bool(book.get("executable_book")),
@@ -498,11 +516,12 @@ def _weather_paper_gate_row(
         "weather_feature_id": getattr(feature, "id", None),
         "weather_source_forecast_id": getattr(source_forecast, "id", None),
     }
-    row["first_blocker"] = _first_weather_paper_blocker(row)
+    row["failed_gates"] = _weather_paper_blockers(row)
+    row["first_blocker"] = row["failed_gates"][0] if row["failed_gates"] else "PAPER_READY"
     row["paper_ready"] = row["first_blocker"] == "PAPER_READY"
     row["entered_paper_gate"] = bool(
         row["current_window_eligible"]
-        and row["verified_kalshi_url"]
+        and row["source_identity_ready"]
         and row["snapshot_fresh"]
         and row["has_weather_feature"]
         and row["weather_feature_fresh"]
@@ -641,54 +660,73 @@ def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _first_weather_paper_blocker(row: dict[str, Any]) -> str:
+    blockers = _weather_paper_blockers(row)
+    return blockers[0] if blockers else "PAPER_READY"
+
+
+def _weather_source_identity_ready(identity: dict[str, Any], *, ticker: str) -> bool:
+    return bool(
+        identity.get("market_ticker") == ticker
+        and identity.get("api_url")
+        and identity.get("kalshi_url_status") in {VERIFIED, BUILT_FROM_EXACT_CATALOG}
+    )
+
+
+def _weather_paper_blockers(row: dict[str, Any]) -> list[str]:
+    blockers: list[str] = []
     if not row.get("current_window_eligible"):
-        return "MARKET_WINDOW_INELIGIBLE"
+        blockers.append("MARKET_WINDOW_INELIGIBLE")
     if not row.get("terminal_weather_horizon_complete", True):
-        return "RAIN_HORIZON_INCOMPLETE"
+        blockers.append("RAIN_HORIZON_INCOMPLETE")
     if not row.get("verified_kalshi_url"):
         if row.get("kalshi_url_status") == BUILT_FROM_EXACT_CATALOG:
-            return "LINK_EXACT_CATALOG_URL_UNCONFIRMED"
-        return "LINK_UNVERIFIED"
+            blockers.append("LINK_EXACT_CATALOG_URL_UNCONFIRMED")
+        else:
+            blockers.append("LINK_UNVERIFIED")
+    if row.get("source_identity_ready") is False:
+        blockers.append("MARKET_SOURCE_MISSING")
     if not row.get("has_snapshot"):
-        return "SNAPSHOT_MISSING"
+        blockers.append("SNAPSHOT_MISSING")
     if not row.get("snapshot_fresh"):
-        return "SNAPSHOT_STALE"
+        blockers.append("SNAPSHOT_STALE")
     if not row.get("has_weather_source_forecast") or not row.get("weather_source_forecast_fresh"):
-        return "SOURCE_MISSING"
+        blockers.append("SOURCE_MISSING")
     if not row.get("has_weather_feature") or not row.get("weather_feature_fresh"):
-        return "SOURCE_MISSING"
+        blockers.append("SOURCE_MISSING")
     if not row.get("has_current_forecast"):
-        return "FORECAST_MISSING"
+        blockers.append("FORECAST_MISSING")
     if not row.get("has_current_ranking"):
-        return "RANKING_MISSING"
+        blockers.append("RANKING_MISSING")
     raw_ev = to_decimal(row.get("raw_ev"))
     if raw_ev is None or raw_ev <= 0:
-        return "EV_NOT_POSITIVE"
-    executable_ev = to_decimal(row.get("executable_ev"))
-    if executable_ev is None or executable_ev <= 0:
-        return "EXECUTABLE_EV_NOT_POSITIVE"
+        blockers.append("EV_NOT_POSITIVE")
+    fee_adjusted_ev = to_decimal(row.get("fee_adjusted_ev"))
+    if fee_adjusted_ev is None:
+        fee_adjusted_ev = to_decimal(row.get("executable_ev"))
+    if fee_adjusted_ev is None or fee_adjusted_ev <= 0:
+        blockers.append("EXECUTABLE_EV_NOT_POSITIVE")
     if row.get("no_book_reason") in {
         "ZERO_VISIBLE_DEPTH",
         "INSUFFICIENT_DEPTH",
         "INSUFFICIENT_BUY_SIDE_SIZE",
     }:
-        return "LIQUIDITY_TOO_LOW"
+        blockers.append("LIQUIDITY_TOO_LOW")
     if row.get("no_book_reason") == "WIDE_SPREAD":
-        return "SPREAD_TOO_WIDE"
+        blockers.append("SPREAD_TOO_WIDE")
     if not row.get("executable_book"):
-        return "BOOK_MISSING"
+        blockers.append("BOOK_MISSING")
     spread = to_decimal(row.get("spread"))
     if spread is not None and spread > (to_decimal(row.get("max_spread")) or Decimal("1")):
-        return "SPREAD_TOO_WIDE"
+        blockers.append("SPREAD_TOO_WIDE")
     if not row.get("settlement_terms_known") or not row.get("paper_entry_settlement_eligible"):
-        return "SETTLEMENT_TERMS_UNKNOWN"
+        blockers.append("SETTLEMENT_TERMS_UNKNOWN")
     if not row.get("phase3s_proceed"):
-        return "RISK_NOT_ELIGIBLE"
+        blockers.append("RISK_NOT_ELIGIBLE")
     if not row.get("phase3m_nonzero_size"):
-        return "PHASE_3M_ZERO_SIZE"
+        blockers.append("PHASE_3M_ZERO_SIZE")
     if not row.get("phase3n_approved"):
-        return "PHASE_3N_RISK_BLOCK"
-    return "PAPER_READY"
+        blockers.append("PHASE_3N_RISK_BLOCK")
+    return list(dict.fromkeys(blockers))
 
 
 def _ev_values(
@@ -707,6 +745,16 @@ def _ev_values(
     raw_ev = side_probability - price
     spread = to_decimal(ranking.spread) or Decimal("0")
     return raw_ev, raw_ev - spread - RAW_EV_COST_BUFFER
+
+
+def _executable_ev(
+    *,
+    fee_adjusted_ev: Decimal | None,
+    executable_book: bool,
+) -> Decimal | None:
+    if not executable_book:
+        return None
+    return fee_adjusted_ev
 
 
 def _book_probe(
@@ -943,6 +991,7 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             if not row["verified_kalshi_url"]
             and row.get("kalshi_url_status") == BUILT_FROM_EXACT_CATALOG
         ),
+        "source_identity_ready_rows": sum(1 for row in rows if row["source_identity_ready"]),
         "fresh_snapshot_rows": sum(1 for row in rows if row["snapshot_fresh"]),
         "weather_source_rows": sum(
             1

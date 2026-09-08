@@ -15,7 +15,6 @@ from kalshi_predictor.benchmarking.oos_exposure_guard import (
 )
 from kalshi_predictor.benchmarking.oos_policy import CATEGORY_TICKER, _episode_row, _metrics
 
-
 STABILITY_SEEDS = (11, 29, 47, 71, 97)
 
 
@@ -45,9 +44,7 @@ def build_multi_seed_exposure_stability_census() -> dict[str, Any]:
             "identical_trade_selection_all_seeds": all(
                 row["comparison"]["identical_trade_selection"] for row in seeds
             ),
-            "all_attribution_complete": all(
-                row["all_attribution_complete"] for row in seeds
-            ),
+            "all_attribution_complete": all(row["all_attribution_complete"] for row in seeds),
             "deterministic_digest": hashlib.sha256(canonical).hexdigest(),
         },
     }
@@ -83,15 +80,18 @@ def _run_seed(seed: int) -> dict[str, Any]:
         )
         allocated = scenario["status"] == "ALLOCATED"
         full = _episode_row(
-            index, f"{episode_id}:seed-{seed}", category, settlement, scenario,
-            "OOS_MULTI_SEED", allocated,
+            index,
+            f"{episode_id}:seed-{seed}",
+            category,
+            settlement,
+            scenario,
+            "OOS_MULTI_SEED",
+            allocated,
             None if allocated else scenario["blocker"],
         )
         guarded = dict(full)
         guarded["capital_used"] = str(Decimal(full["capital_used"]) * FROZEN_POSITION_SCALE)
-        guarded["settlement_pnl"] = str(
-            Decimal(full["settlement_pnl"]) * FROZEN_POSITION_SCALE
-        )
+        guarded["settlement_pnl"] = str(Decimal(full["settlement_pnl"]) * FROZEN_POSITION_SCALE)
         guarded["position_scale"] = str(FROZEN_POSITION_SCALE)
         full["position_scale"] = "1"
         full_rows.append(full)
@@ -106,9 +106,7 @@ def _run_seed(seed: int) -> dict[str, Any]:
     )
     roc_preserved = abs(roc_delta) <= Decimal("1e-24")
     identical = full["trade_count"] == guarded["trade_count"]
-    attribution_complete = all(
-        row["attribution_complete"] for row in full_rows + guarded_rows
-    )
+    attribution_complete = all(row["attribution_complete"] for row in full_rows + guarded_rows)
     return {
         "seed": seed,
         "episode_order": [values[0] for values in episodes],

@@ -1,0 +1,29 @@
+{
+  "artifact_hash": "531f6bbd091b34acc221f173bccbc9d8605916f8a333a3607eaad3baa3cde3a2",
+  "entries": [
+    {"capability": "ORM_OR_DYNAMIC_MUTATION", "justification": "Dynamic SELECT-only audit queries; all database opens enforce mode=ro and query_only.", "path": "scripts/local/phase4af_settlement_timestamp_audit.py", "scope": "ISOLATED_RESEARCH"},
+    {"capability": "MUTATION_CAPABLE_ENTRYPOINT", "justification": "Marker-gated disposable protocol simulation with production identity separation.", "path": "scripts/local/phase4al_offline_protocol_simulation.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "ORM_OR_DYNAMIC_MUTATION", "justification": "Marker-gated disposable protocol simulation with production identity separation.", "path": "scripts/local/phase4al_offline_protocol_simulation.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "SETTLEMENT_UPDATE_SQL", "justification": "Marker-gated disposable protocol simulation with production identity separation.", "path": "scripts/local/phase4al_offline_protocol_simulation.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "WRITABLE_SQLITE_CONNECTION", "justification": "Marker-gated disposable protocol simulation with production identity separation.", "path": "scripts/local/phase4al_offline_protocol_simulation.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "MUTATION_CAPABLE_ENTRYPOINT", "justification": "Marker-gated crash recovery simulation in exact temporary disposable workspaces.", "path": "scripts/local/phase4an_crash_recovery_simulation.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "SETTLEMENT_UPDATE_SQL", "justification": "Marker-gated crash recovery simulation in exact temporary disposable workspaces.", "path": "scripts/local/phase4an_crash_recovery_simulation.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "WRITABLE_SQLITE_CONNECTION", "justification": "Marker-gated crash recovery simulation in exact temporary disposable workspaces.", "path": "scripts/local/phase4an_crash_recovery_simulation.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "MUTATION_CAPABLE_ENTRYPOINT", "justification": "Marker-gated contention simulation using copied disposable databases only.", "path": "scripts/local/phase4ao_concurrency_proof.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "ORM_OR_DYNAMIC_MUTATION", "justification": "Marker-gated contention simulation using copied disposable databases only.", "path": "scripts/local/phase4ao_concurrency_proof.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "SETTLEMENT_UPDATE_SQL", "justification": "Marker-gated contention simulation using copied disposable databases only.", "path": "scripts/local/phase4ao_concurrency_proof.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "WRITABLE_SQLITE_CONNECTION", "justification": "Marker-gated contention simulation using copied disposable databases only.", "path": "scripts/local/phase4ao_concurrency_proof.py", "scope": "DISPOSABLE_SIMULATION"},
+    {"capability": "WRITABLE_SQLITE_CONNECTION", "justification": "Creates only new disposable snapshot and distinct restore databases; protected paths are refused.", "path": "scripts/local/phase4ap_backup_restore_verification.py", "scope": "DISPOSABLE_SIMULATION"}
+    ,{"capability": "MUTATION_CAPABLE_ENTRYPOINT", "justification": "One-operation executor cryptographically restricted to marker-gated disposable databases with protected identity refusal.", "path": "scripts/local/phase4at_sandbox_executor.py", "scope": "DISPOSABLE_SIMULATION"}
+    ,{"capability": "WRITABLE_SQLITE_CONNECTION", "justification": "One-operation executor cryptographically restricted to marker-gated disposable databases with protected identity refusal.", "path": "scripts/local/phase4at_sandbox_executor.py", "scope": "DISPOSABLE_SIMULATION"}
+    ,{"capability": "SETTLEMENT_UPDATE_SQL", "justification": "Parameterized compare-and-swap limited to one marker-gated disposable settlement timestamp.", "path": "scripts/local/phase4at_sandbox_executor.py", "scope": "DISPOSABLE_SIMULATION"}
+    ,{"capability": "ORM_OR_DYNAMIC_MUTATION", "justification": "Dynamic identifiers are used only for read-only full-schema comparison through SQLite mode=ro.", "path": "scripts/local/phase4au_field_level_mutation_diff.py", "scope": "ISOLATED_RESEARCH"}
+    ,{"capability": "MUTATION_CAPABLE_ENTRYPOINT", "justification": "Rollback matrix mutates only fresh marker-gated disposable copies in owned temporary workspaces.", "path": "scripts/local/phase4av_rollback_certification_matrix.py", "scope": "DISPOSABLE_SIMULATION"}
+    ,{"capability": "ORM_OR_DYNAMIC_MUTATION", "justification": "Dynamic identifiers snapshot only marker-gated disposable test copies for rollback equality.", "path": "scripts/local/phase4av_rollback_certification_matrix.py", "scope": "DISPOSABLE_SIMULATION"}
+    ,{"capability": "WRITABLE_SQLITE_CONNECTION", "justification": "Rollback matrix writes only fresh marker-gated disposable copies in owned temporary workspaces.", "path": "scripts/local/phase4av_rollback_certification_matrix.py", "scope": "DISPOSABLE_SIMULATION"}
+    ,{"capability": "SETTLEMENT_UPDATE_SQL", "justification": "Failure injections target only marker-gated disposable copies and always roll back.", "path": "scripts/local/phase4av_rollback_certification_matrix.py", "scope": "DISPOSABLE_SIMULATION"}
+    ,{"capability": "WRITABLE_SQLITE_CONNECTION", "justification": "Resource-bound checks create only a fresh in-memory SQLite database and roll back the synthetic row update.", "path": "scripts/local/phase4bg_resource_bounds_audit.py", "scope": "DISPOSABLE_SIMULATION"}
+  ],
+  "include_globs": ["scripts/local/phase4a*.py", "tests/test_phase4a*.py", "scripts/local/phase4b*.py", "tests/test_phase4b*.py"],
+  "schema": "phase4as.mutation-surface-allowlist.v1"
+}

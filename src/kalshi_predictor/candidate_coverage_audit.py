@@ -127,9 +127,7 @@ def collect_candidate_coverage_evidence(
     ranking_ids: dict[str, int] = {
         str(ticker): int(ranking_id)
         for ticker, ranking_id in session.execute(
-            select(MarketRanking.ticker, func.max(MarketRanking.id)).group_by(
-                MarketRanking.ticker
-            )
+            select(MarketRanking.ticker, func.max(MarketRanking.id)).group_by(MarketRanking.ticker)
         )
         if ranking_id is not None
     }
@@ -156,7 +154,9 @@ def collect_candidate_coverage_evidence(
         gross_ev = _decimal(
             ranking_raw.get("gross_expected_value")
             if ranking_raw
-            else ranking.estimated_edge if ranking else None
+            else ranking.estimated_edge
+            if ranking
+            else None
         )
         fee_ev = _decimal(ranking_raw.get("fee_adjusted_expected_value"))
         tick_valid = ranking_raw.get("price_tick_valid")
@@ -178,9 +178,7 @@ def collect_candidate_coverage_evidence(
                 "forecast": _fresh(forecast_at, fresh_after),
                 "ranking": _fresh(ranking_at, fresh_after),
                 "positive_gross_ev": gross_ev is not None and gross_ev > 0,
-                "executable_ev": (
-                    fee_ev is not None and fee_ev > 0 and tick_valid is not False
-                ),
+                "executable_ev": (fee_ev is not None and fee_ev > 0 and tick_valid is not False),
                 "gross_expected_value": _decimal_text(gross_ev),
                 "estimated_taker_fee": ranking_raw.get("estimated_taker_fee"),
                 "fee_adjusted_expected_value": _decimal_text(fee_ev),
@@ -196,9 +194,7 @@ def collect_candidate_coverage_evidence(
                 "ranking_at": _iso(ranking_at),
                 "crypto_symbol": crypto_links.get(ticker),
                 "weather_location": (weather_links.get(ticker) or {}).get("location_key"),
-                "weather_target_time": _iso(
-                    (weather_links.get(ticker) or {}).get("target_time")
-                ),
+                "weather_target_time": _iso((weather_links.get(ticker) or {}).get("target_time")),
                 "leg_categories": sorted(legs.get(ticker, set())),
             }
         )
@@ -227,9 +223,7 @@ def build_candidate_coverage_audit(
         row["exclusion_reason"] = _exclusion_reason(row["first_exclusion_stage"], row)
         rows.append(row)
     categories = sorted({str(row["category"]) for row in rows})
-    funnels = {
-        category: _category_funnel(rows, category=category) for category in categories
-    }
+    funnels = {category: _category_funnel(rows, category=category) for category in categories}
     additions = _safe_additions(rows, limit=addition_limit)
     return {
         "audit_version": AUDIT_VERSION,
@@ -299,9 +293,7 @@ def _safe_additions(rows: list[dict[str, Any]], *, limit: int) -> list[dict[str,
     candidates = [
         row
         for row in rows
-        if row["active"]
-        and row["semantically_supported"]
-        and not row["candidate_manifest"]
+        if row["active"] and row["semantically_supported"] and not row["candidate_manifest"]
     ]
     candidates.sort(
         key=lambda row: (
@@ -432,11 +424,7 @@ def _manifest_selection_diagnostics(
 ) -> dict[str, Any]:
     ranking_index = FUNNEL_STAGES.index("ranking")
     stages_through_ranking = FUNNEL_STAGES[: ranking_index + 1]
-    ranked = [
-        row
-        for row in rows
-        if all(bool(row.get(stage)) for stage in stages_through_ranking)
-    ]
+    ranked = [row for row in rows if all(bool(row.get(stage)) for stage in stages_through_ranking)]
     unknown_series = [row for row in ranked if not row.get("series_ticker")]
     unknown_manifest = [row for row in unknown_series if row.get("candidate_manifest")]
     unknown_excluded = [row for row in unknown_series if not row.get("candidate_manifest")]
@@ -474,9 +462,7 @@ def _semantically_supported(
     *, ticker: str, category: str, leg_categories: set[str], linked: bool
 ) -> bool:
     if category == "crypto":
-        return ticker.startswith(CRYPTO_TICKER_PREFIXES) and (
-            "crypto" in leg_categories or linked
-        )
+        return ticker.startswith(CRYPTO_TICKER_PREFIXES) and ("crypto" in leg_categories or linked)
     if category == "weather":
         return ticker.startswith(WEATHER_TICKER_PREFIXES) and (
             "weather" in leg_categories or linked
@@ -534,9 +520,7 @@ def _decode_object(value: str | None) -> dict[str, Any]:
 
 
 def _manifest_tickers(manifest: dict[str, Any], gh2: dict[str, Any]) -> set[str]:
-    raw = manifest.get("tickers") or [
-        row.get("ticker") for row in manifest.get("candidates") or []
-    ]
+    raw = manifest.get("tickers") or [row.get("ticker") for row in manifest.get("candidates") or []]
     if not raw:
         raw = (gh2.get("candidate_alignment") or {}).get("tickers") or []
     return {str(ticker) for ticker in raw if ticker}
@@ -581,9 +565,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     for category, funnel in payload["category_funnels"].items():
         counts = funnel["counts"]
         lines.append(
-            f"| {category} | "
-            + " | ".join(str(counts[stage]) for stage in FUNNEL_STAGES)
-            + " |"
+            f"| {category} | " + " | ".join(str(counts[stage]) for stage in FUNNEL_STAGES) + " |"
         )
     lines.extend(
         [

@@ -91,9 +91,7 @@ class AtomicStageHeartbeat:
             **self.metadata,
         }
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.output_path.with_name(
-            f".{self.output_path.name}.{os.getpid()}.tmp"
-        )
+        temporary = self.output_path.with_name(f".{self.output_path.name}.{os.getpid()}.tmp")
         temporary.write_text(
             json.dumps(payload, indent=2, sort_keys=True, default=str),
             encoding="utf-8",

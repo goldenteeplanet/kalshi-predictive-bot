@@ -156,9 +156,7 @@ def render_feature_discovery_markdown(result: FeatureDiscoveryResult) -> str:
 
 def _append_candidate_table(lines: list[str], result: FeatureDiscoveryResult, status: str) -> None:
     matches = [
-        evaluation
-        for evaluation in result.candidate_evaluations
-        if evaluation.status == status
+        evaluation for evaluation in result.candidate_evaluations if evaluation.status == status
     ][:25]
     if not matches:
         lines.append("- None.")

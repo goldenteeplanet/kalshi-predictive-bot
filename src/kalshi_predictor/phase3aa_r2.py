@@ -47,8 +47,7 @@ LOCAL_DERIVED_TICKER_PREFIXES = (
 
 
 class ExactMarketClient(Protocol):
-    def get_market(self, ticker: str) -> dict[str, Any]:
-        ...
+    def get_market(self, ticker: str) -> dict[str, Any]: ...
 
 
 @dataclass(frozen=True)
@@ -229,9 +228,7 @@ def _harvest_one_ticker(
                 "exact_settlement_written": True,
                 "settlement_result": settlement.result,
                 "settlement_yes_value": settlement.yes_settlement_value,
-                "settled_at": settlement.settled_at.isoformat()
-                if settlement.settled_at
-                else None,
+                "settled_at": settlement.settled_at.isoformat() if settlement.settled_at else None,
                 "paper_pnl_realized": False,
             }
         )
@@ -358,9 +355,7 @@ def _summary(
         "due_or_overdue_rows_reviewed": len(candidate_rows),
         "exact_tickers_checked": len(by_ticker),
         "exact_market_rows_written": sum(1 for row in rows if row.get("exact_market_written")),
-        "exact_settlements_written": sum(
-            1 for row in rows if row.get("exact_settlement_written")
-        ),
+        "exact_settlements_written": sum(1 for row in rows if row.get("exact_settlement_written")),
         "source_settled_without_usable_outcome": fetch_counts.get(
             "SOURCE_SETTLED_WITHOUT_USABLE_OUTCOME",
             0,

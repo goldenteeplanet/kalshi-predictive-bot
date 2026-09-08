@@ -9,7 +9,6 @@ from kalshi_predictor.benchmarking.export_drift import (
 )
 from kalshi_predictor.benchmarking.runtime_export_import import import_runtime_export_manifest
 
-
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -55,8 +54,13 @@ def test_pmb34e_rejects_unexplained_provenance_and_schema_drift():
     candidate["rankings"][0]["new_runtime_field"] = "unexpected"
     result = compare_export_datasets(baseline, candidate)
     assert result["certified"] is False
-    assert "PROVENANCE_BREAKING_DRIFT:rankings:PMB34C-CRYPTO|crypto:market_snapshot_id" in result["diagnostics"]
-    assert "UNEXPLAINED_DRIFT:rankings:PMB34C-CRYPTO|crypto:new_runtime_field" in result["diagnostics"]
+    assert (
+        "PROVENANCE_BREAKING_DRIFT:rankings:PMB34C-CRYPTO|crypto:market_snapshot_id"
+        in result["diagnostics"]
+    )
+    assert (
+        "UNEXPLAINED_DRIFT:rankings:PMB34C-CRYPTO|crypto:new_runtime_field" in result["diagnostics"]
+    )
     assert result["summary"]["schema_changes"] == 1
 
 
@@ -64,11 +68,12 @@ def test_pmb34e_rejects_removed_rows_and_unused_declarations():
     baseline = _datasets()
     candidate = copy.deepcopy(baseline)
     candidate["books"] = candidate["books"][1:]
-    result = compare_export_datasets(
-        baseline, candidate, {"forecasts:501:probability"}
-    )
+    result = compare_export_datasets(baseline, candidate, {"forecasts:501:probability"})
     assert result["certified"] is False
-    assert any(code.startswith("PROVENANCE_BREAKING_DRIFT:books:601:ROW_REMOVED") for code in result["diagnostics"])
+    assert any(
+        code.startswith("PROVENANCE_BREAKING_DRIFT:books:601:ROW_REMOVED")
+        for code in result["diagnostics"]
+    )
     assert "DECLARED_CHANGE_NOT_OBSERVED:forecasts:501:probability" in result["diagnostics"]
 
 

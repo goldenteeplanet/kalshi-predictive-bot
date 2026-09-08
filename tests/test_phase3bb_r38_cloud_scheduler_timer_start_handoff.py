@@ -50,7 +50,7 @@ def test_phase3bb_r38_timer_start_handoff_ready_without_starting(tmp_path: Path)
     assert "systemctl start kalshi-multicategory-refresh-scheduler.timer" in operator_script
     assert "systemctl start kalshi-multicategory-refresh-scheduler.service" not in operator_script
     assert "systemctl status kalshi-multicategory-refresh-scheduler.timer" not in operator_script
-    assert "systemctl start \"${TIMER}\"" in root_script
+    assert 'systemctl start "${TIMER}"' in root_script
     assert "create-paper-trade" not in operator_script
     assert payload["safety_flags"]["scheduler_timer_started_by_codex"] is False
     assert artifacts.manifest_path.exists()

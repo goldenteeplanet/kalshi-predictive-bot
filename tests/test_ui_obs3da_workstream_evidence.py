@@ -11,11 +11,21 @@ def write(root: Path, directory: str, name: str, payload: dict) -> None:
 
 
 def test_discovers_all_exact_workstreams_with_hashes(tmp_path: Path) -> None:
-    write(tmp_path, "phase_pmb34f", "report.json", {"phase":"PMB-34F","summary":{"certification_passed":True}})
-    write(tmp_path, "phase_prov14", "report.json", {"phase":"PROV-14B","status":"BLOCKED","next_phase":"PROV-14C"})
-    write(tmp_path, "phase_nyc_w10", "report.json", {"phase":"NYC-W10","status":"PASSED"})
-    write(tmp_path, "phase_gh1v", "report.json", {"phase":"GH-1V","multi_window_complete":True})
-    write(tmp_path, "readiness_1", "report.json", {"phase":"READINESS-1","status":"WAITING"})
+    write(
+        tmp_path,
+        "phase_pmb34f",
+        "report.json",
+        {"phase": "PMB-34F", "summary": {"certification_passed": True}},
+    )
+    write(
+        tmp_path,
+        "phase_prov14",
+        "report.json",
+        {"phase": "PROV-14B", "status": "BLOCKED", "next_phase": "PROV-14C"},
+    )
+    write(tmp_path, "phase_nyc_w10", "report.json", {"phase": "NYC-W10", "status": "PASSED"})
+    write(tmp_path, "phase_gh1v", "report.json", {"phase": "GH-1V", "multi_window_complete": True})
+    write(tmp_path, "readiness_1", "report.json", {"phase": "READINESS-1", "status": "WAITING"})
     result = discover_workstream_evidence(tmp_path)
     assert not result["diagnostics"]
     assert len(result["workstreams"]) == 5

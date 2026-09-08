@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 REPORTS = tuple(
     Path(f"reports/phase_pmb{number}") / filename
     for number, filename in (
@@ -56,7 +55,8 @@ def build_benchmark_release_manifest(project_root: Path) -> dict[str, Any]:
     }
     canonical = json.dumps(
         {"files": files, "commands": COMMANDS, "compatibility": compatibility},
-        sort_keys=True, separators=(",", ":"),
+        sort_keys=True,
+        separators=(",", ":"),
     ).encode()
     return {
         "phase": "PMB-32",
@@ -100,9 +100,7 @@ def write_benchmark_release_manifest(project_root: Path, output_dir: Path) -> Pa
     temporary.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(path)
     checksums = output_dir / "pmb32_SHA256SUMS.txt"
-    checksum_text = "".join(
-        f"{row['sha256']}  {row['path']}\n" for row in manifest["files"]
-    )
+    checksum_text = "".join(f"{row['sha256']}  {row['path']}\n" for row in manifest["files"])
     checksum_tmp = checksums.with_suffix(".txt.tmp")
     checksum_tmp.write_text(checksum_text, encoding="utf-8")
     checksum_tmp.replace(checksums)

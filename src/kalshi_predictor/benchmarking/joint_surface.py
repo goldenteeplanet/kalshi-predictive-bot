@@ -35,10 +35,14 @@ def build_joint_robust_decision_surface(
                     row = _evaluate(ticker, spread, depth, forecast)
                     row["forecast_delta"] = str(delta)
                     rows.append(row)
-    rows.sort(key=lambda row: (
-        row["ticker"], Decimal(row["spread"]), Decimal(row["top_five_depth"]),
-        Decimal(row["forecast_delta"]),
-    ))
+    rows.sort(
+        key=lambda row: (
+            row["ticker"],
+            Decimal(row["spread"]),
+            Decimal(row["top_five_depth"]),
+            Decimal(row["forecast_delta"]),
+        )
+    )
     zones = _zones(rows, forecast_perturbations, spreads, top_five_depths)
     canonical = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
     return {
@@ -61,9 +65,7 @@ def build_joint_robust_decision_surface(
             "robust_allocate_zones": sum(
                 row["classification"] == "ROBUST_ALLOCATE" for row in zones
             ),
-            "robust_reject_zones": sum(
-                row["classification"] == "ROBUST_REJECT" for row in zones
-            ),
+            "robust_reject_zones": sum(row["classification"] == "ROBUST_REJECT" for row in zones),
             "fragile_zones": sum(row["classification"] == "FRAGILE" for row in zones),
             "all_attribution_complete": all(row["attribution_complete"] for row in rows),
             "deterministic_digest": hashlib.sha256(canonical).hexdigest(),
@@ -92,31 +94,38 @@ def _zones(
         for spread in spreads:
             for depth in depths:
                 selected = [
-                    row for row in rows
+                    row
+                    for row in rows
                     if row["ticker"] == ticker
                     and Decimal(row["spread"]) == spread
                     and Decimal(row["top_five_depth"]) == depth
                 ]
                 allocated = sum(row["status"] == "ALLOCATED" for row in selected)
                 classification = (
-                    "ROBUST_ALLOCATE" if allocated == len(perturbations)
-                    else "ROBUST_REJECT" if allocated == 0 else "FRAGILE"
+                    "ROBUST_ALLOCATE"
+                    if allocated == len(perturbations)
+                    else "ROBUST_REJECT"
+                    if allocated == 0
+                    else "FRAGILE"
                 )
-                zones.append({
-                    "ticker": ticker,
-                    "spread": str(spread),
-                    "top_five_depth": str(depth),
-                    "classification": classification,
-                    "allocated_forecast_variants": allocated,
-                    "total_forecast_variants": len(perturbations),
-                    "outcomes_by_forecast_delta": {
-                        row["forecast_delta"]: {
-                            "status": row["status"], "blocker": row["blocker"],
-                            "fill_state": row["fill_state"],
-                        }
-                        for row in sorted(
-                            selected, key=lambda value: Decimal(value["forecast_delta"])
-                        )
-                    },
-                })
+                zones.append(
+                    {
+                        "ticker": ticker,
+                        "spread": str(spread),
+                        "top_five_depth": str(depth),
+                        "classification": classification,
+                        "allocated_forecast_variants": allocated,
+                        "total_forecast_variants": len(perturbations),
+                        "outcomes_by_forecast_delta": {
+                            row["forecast_delta"]: {
+                                "status": row["status"],
+                                "blocker": row["blocker"],
+                                "fill_state": row["fill_state"],
+                            }
+                            for row in sorted(
+                                selected, key=lambda value: Decimal(value["forecast_delta"])
+                            )
+                        },
+                    }
+                )
     return zones

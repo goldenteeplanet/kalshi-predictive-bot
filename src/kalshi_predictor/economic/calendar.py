@@ -225,14 +225,12 @@ def parse_fed_fomc_calendar(
             flags=re.IGNORECASE,
         )
         section_end = (
-            year_match.end() + next_panel.start()
-            if next_panel is not None
-            else len(html_text)
+            year_match.end() + next_panel.start() if next_panel is not None else len(html_text)
         )
         section = html_text[year_match.start() : section_end]
     pattern = (
-        r'fomc-meeting__month[^>]*>\s*<strong>(.*?)</strong>.*?'
-        r'fomc-meeting__date[^>]*>(.*?)</div>'
+        r"fomc-meeting__month[^>]*>\s*<strong>(.*?)</strong>.*?"
+        r"fomc-meeting__date[^>]*>(.*?)</div>"
     )
     for month_html, date_html in re.findall(pattern, section, flags=re.IGNORECASE | re.DOTALL):
         month = _strip_html(month_html)

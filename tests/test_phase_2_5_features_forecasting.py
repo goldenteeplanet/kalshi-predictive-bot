@@ -123,4 +123,3 @@ def _seed_snapshot(session, *, ticker: str, title: str = "Will it rain?"):
         },
         now,
     )
-

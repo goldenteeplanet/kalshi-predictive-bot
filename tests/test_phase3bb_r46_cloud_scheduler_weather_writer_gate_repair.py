@@ -25,7 +25,7 @@ def test_patch_runner_adds_midrun_writer_busy_clean_skip() -> None:
 
     assert "Writer became active during" in patched
     assert "Status: BUSY_WRITER|Database is busy" in patched
-    assert "output=$(\"$@\" 2>&1)" in patched
+    assert 'output=$("$@" 2>&1)' in patched
     assert patched == patch_runner_midrun_writer_gate(patched)
 
 
@@ -150,13 +150,24 @@ def _fake_probe_runner(*, post_apply: bool = False):
             stdout = patched_runner if post_apply and call_counts[probe.name] > 1 else old_runner
         elif probe.name == "scheduler_service_systemd":
             result = "success" if post_apply and call_counts[probe.name] > 1 else "exit-code"
-            stdout = f"LoadState=loaded\nActiveState=failed\nSubState=failed\nResult={result}\nNRestarts=0\n"
+            stdout = (
+                f"LoadState=loaded\nActiveState=failed\nSubState=f"
+                f"ailed\nResult={result}\nNRestarts=0\n"
+            )
         elif probe.name == "scheduler_timer_systemd":
-            stdout = "LoadState=loaded\nActiveState=active\nSubState=waiting\nUnitFileState=enabled\n"
+            stdout = (
+                "LoadState=loaded\nActiveState=active\nSubState=waiting\nUnitFileState=enabled\n"
+            )
         elif probe.name == "scheduler_journal_tail":
             stdout = "Database is busy. Another bot process is using SQLite.\nStatus: BUSY_WRITER\n"
         elif probe.name == "db_writer_monitor_raw":
-            stdout = json.dumps({"status": "WRITER_ACTIVE", "safe_to_start_write": False, "current_writer_pid": 59223})
+            stdout = json.dumps(
+                {
+                    "status": "WRITER_ACTIVE",
+                    "safe_to_start_write": False,
+                    "current_writer_pid": 59223,
+                }
+            )
         elif probe.name == "command_registry":
             stdout = "COMMAND_REGISTRY_OK\n"
         elif probe.name == "install_runner_writer_gate_repair":
@@ -202,8 +213,14 @@ run_job() {
 }
 
 # cadence_minutes=30 category=weather-catalog
-run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; .venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit 1500; .venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 --match-tolerance-hours 3'
+run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; \
+.venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 \
+--series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit \
+1500; .venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir \
+reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 \
+--match-tolerance-hours 3'
 
 # cadence_minutes=30 category=weather
-run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane --output-dir reports/phase3bb_r2 --reports-dir reports
+run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane \
+--output-dir reports/phase3bb_r2 --reports-dir reports
 """

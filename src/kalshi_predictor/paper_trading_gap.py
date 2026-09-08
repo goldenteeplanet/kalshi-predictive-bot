@@ -47,19 +47,13 @@ def build_paper_trading_gap_analysis(
 ) -> dict[str, Any]:
     generated = generated_at or utc_now()
     r5_status = _read_json(reports_dir / "phase3bc_r5" / "phase3bc_r5_status.json")
-    r5_watch = _read_json(
-        reports_dir / "phase3bc_r5" / "phase3bc_r5_crypto_freshness_watch.json"
-    )
+    r5_watch = _read_json(reports_dir / "phase3bc_r5" / "phase3bc_r5_crypto_freshness_watch.json")
     funnel = _read_json(reports_dir / "phase3aw" / "current_crypto_funnel.json")
     r16 = _read_json(
-        reports_dir
-        / "phase3bc_r16"
-        / "phase3bc_r16_crypto_paper_ready_edge_hunt.json"
+        reports_dir / "phase3bc_r16" / "phase3bc_r16_crypto_paper_ready_edge_hunt.json"
     )
     r17 = _read_json(
-        reports_dir
-        / "phase3bc_r17"
-        / "phase3bc_r17_crypto_liquidity_actionability.json"
+        reports_dir / "phase3bc_r17" / "phase3bc_r17_crypto_liquidity_actionability.json"
     )
     sports = _read_json(reports_dir / "phase3ax" / "phase3ax_gap_analysis.json")
 
@@ -244,17 +238,14 @@ def _facts(
 
 
 def _phase_statuses(facts: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    snapshot_done = (
-        facts["snapshot_stale_rows"] == 0
-        and str(facts["snapshot_backlog_status"]).upper() in {"COMPLETE", "NONE"}
-    )
-    forecast_done = (
-        facts["forecast_stale_rows"] == 0
-        and str(facts["forecast_backlog_status"]).upper() in {"COMPLETE", "NONE"}
-    )
+    snapshot_done = facts["snapshot_stale_rows"] == 0 and str(
+        facts["snapshot_backlog_status"]
+    ).upper() in {"COMPLETE", "NONE"}
+    forecast_done = facts["forecast_stale_rows"] == 0 and str(
+        facts["forecast_backlog_status"]
+    ).upper() in {"COMPLETE", "NONE"}
     ranking_done = (
-        facts["ranking_gap_after_repair"] == 0
-        and facts["missing_or_stale_ranking_rows"] == 0
+        facts["ranking_gap_after_repair"] == 0 and facts["missing_or_stale_ranking_rows"] == 0
     )
     market_fill_done = snapshot_done and forecast_done and ranking_done
     phases = {
@@ -367,7 +358,8 @@ def _remaining_gaps(
         gaps.append(
             _gap(
                 r17_blocker,
-                f"R17 target is {r17_blocker}; positive EV rows do not yet clear the executable book/risk gate.",
+                f"R17 target is {r17_blocker}; positive EV rows do"
+                f" not yet clear the executable book/risk gate.",
                 "Keep the guarded R5 watch running and rerun R17 after fresh book updates.",
             )
         )
@@ -411,9 +403,7 @@ def _next_commands(
         "kalshi-bot phase3bc-r17-crypto-liquidity-actionability --output-dir reports/phase3bc_r17",
     ]
     if phases["watcher"]["status"] != "DONE":
-        commands.append(
-            "kalshi-bot phase3bc-r5-unattended-start --output-dir reports/phase3bc_r5"
-        )
+        commands.append("kalshi-bot phase3bc-r5-unattended-start --output-dir reports/phase3bc_r5")
     elif phases["crypto_market_fill"]["status"] != "DONE":
         commands.append(
             "kalshi-bot phase3bc-r5-crypto-freshness-watch --output-dir reports/phase3bc_r5"
@@ -425,7 +415,8 @@ def _next_commands(
         )
     else:
         commands.append(
-            "Keep the guarded R5 watch running; do not run accelerate-learning until paper_ready_candidates > 0."
+            "Keep the guarded R5 watch running; do not run accelerate-learning until "
+            "paper_ready_candidates > 0."
         )
     return commands
 
@@ -465,9 +456,7 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         "|---|---|---|",
     ]
     for phase in payload["phase_statuses"].values():
-        lines.append(
-            f"| {_cell(phase['name'])} | `{phase['status']}` | {_cell(phase['reason'])} |"
-        )
+        lines.append(f"| {_cell(phase['name'])} | `{phase['status']}` | {_cell(phase['reason'])} |")
     lines.extend(
         [
             "",

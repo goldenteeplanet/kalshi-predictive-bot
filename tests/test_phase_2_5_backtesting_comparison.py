@@ -88,4 +88,3 @@ def _seed_forecast(session, *, ticker: str, yes_probability: Decimal):
         ),
     )
     session.flush()
-

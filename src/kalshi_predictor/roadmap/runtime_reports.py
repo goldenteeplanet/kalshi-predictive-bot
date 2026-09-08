@@ -319,9 +319,9 @@ def build_paper_settlement_throughput(
         zero_trade_reasons = {"NO_PAPER_ORDERS": 1}
     elif not zero_trade_reasons and not settled_total:
         open_total = sum(order_statuses[status] for status in OPEN_ORDER_STATUSES)
-        zero_trade_reasons = {"OPEN_PAPER_ORDERS": open_total} if open_total else {
-            "NO_SETTLED_PAPER_TRADES": 1
-        }
+        zero_trade_reasons = (
+            {"OPEN_PAPER_ORDERS": open_total} if open_total else {"NO_SETTLED_PAPER_TRADES": 1}
+        )
     rejected_total = sum(rejection_reasons.values())
     rejection_breakdown = [
         {
@@ -331,9 +331,7 @@ def build_paper_settlement_throughput(
             "rate": round(count / rejected_total, 4) if rejected_total else 0.0,
             "recommended_action": _rejection_action(reason),
         }
-        for reason, count in sorted(
-            rejection_reasons.items(), key=lambda item: (-item[1], item[0])
-        )
+        for reason, count in sorted(rejection_reasons.items(), key=lambda item: (-item[1], item[0]))
     ]
     overdue_count = sum(row["past_market_close"] for row in pending_settlements)
     next_actions = _paper_next_actions(

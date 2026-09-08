@@ -120,9 +120,7 @@ def build_certification_report(scenarios: dict[str, list[dict[str, Any]]]) -> di
         result = simulate_scheduler(scenarios[name])
         rule = expected[name]
         reasons = {
-            row["reason"]
-            for row in result["decisions"]
-            if row["action"] in {"BLOCK", "SKIP"}
+            row["reason"] for row in result["decisions"] if row["action"] in {"BLOCK", "SKIP"}
         }
         passed = result["violations"] == rule["violations"]
         if "completed" in rule:

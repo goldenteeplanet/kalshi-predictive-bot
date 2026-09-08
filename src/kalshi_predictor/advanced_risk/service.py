@@ -606,10 +606,7 @@ def _latest_pnl_by_ticker(
         .subquery()
     )
     pnl = aliased(PaperPnl, ranked)
-    return {
-        row.ticker: row
-        for row in session.scalars(select(pnl).where(ranked.c.row_number == 1))
-    }
+    return {row.ticker: row for row in session.scalars(select(pnl).where(ranked.c.row_number == 1))}
 
 
 def _bid_ask_for_side(snapshot: MarketSnapshot, side: str) -> tuple[Decimal | None, Decimal | None]:
@@ -628,7 +625,7 @@ def _executable_depth(raw_orderbook: dict[str, Any], *, side: str) -> Decimal | 
         return None
     depth = Decimal("0")
     for level in levels:
-        if not isinstance(level, (list, tuple)) or len(level) < 2:
+        if not isinstance(level, list | tuple) or len(level) < 2:
             continue
         quantity = to_decimal(level[1])
         if quantity is not None:

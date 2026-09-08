@@ -94,4 +94,3 @@ def _clamp(value: Decimal) -> Decimal:
     if value > Decimal("0.99"):
         return Decimal("0.99")
     return value
-

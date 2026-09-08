@@ -105,8 +105,7 @@ def _write_r20_context(reports_dir: Path, *, host: str = "127.0.0.1") -> None:
                     "r18_status": "SYSTEMD_OWNS_R5",
                     "r5_pid": 16798,
                     "ssh_tunnel_command": (
-                        "ssh -i '~/.ssh/id_ed25519_do' "
-                        "-L 8080:127.0.0.1:8080 'kalshi@203.0.113.10'"
+                        "ssh -i '~/.ssh/id_ed25519_do' -L 8080:127.0.0.1:8080 'kalshi@203.0.113.10'"
                     ),
                 },
                 "parsed_ui_state": {

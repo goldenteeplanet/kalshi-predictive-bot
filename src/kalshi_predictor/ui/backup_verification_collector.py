@@ -22,11 +22,7 @@ def adapt_captured_verification(
     database = dict(sources.get("database") or {})
     io_status = str(sources.get("proc_io_status") or "available")
     io_restricted = io_status == "permission_restricted"
-    io = (
-        {}
-        if io_restricted
-        else _proc_io(str(sources.get("proc_io") or ""), diagnostics)
-    )
+    io = {} if io_restricted else _proc_io(str(sources.get("proc_io") or ""), diagnostics)
     integrity_text = str(sources.get("integrity_output") or "").strip()
     sha_text = str(sources.get("sha256_output") or "").strip()
     execution_text = str(sources.get("execution") or "").strip().lower()
@@ -166,9 +162,7 @@ def _discover_process(proc_root: Path, database_path: Path) -> dict[str, Any]:
         if not candidate.name.isdigit():
             continue
         try:
-            command = (
-                (candidate / "cmdline").read_bytes().replace(b"\0", b" ").decode().strip()
-            )
+            command = (candidate / "cmdline").read_bytes().replace(b"\0", b" ").decode().strip()
         except OSError:
             continue
         if target not in command or not any(

@@ -165,11 +165,7 @@ def parse_and_store_market_legs(
 ) -> MarketLegParseResult:
     session.flush()
     ticker_scope = (
-        list(
-            dict.fromkeys(
-                str(ticker).strip() for ticker in tickers if str(ticker).strip()
-            )
-        )
+        list(dict.fromkeys(str(ticker).strip() for ticker in tickers if str(ticker).strip()))
         if tickers is not None
         else None
     )
@@ -189,9 +185,7 @@ def parse_and_store_market_legs(
     else:
         existing_statement = select(MarketLeg.ticker).distinct()
         if ticker_scope is not None or (limit is not None and limit > 0):
-            existing_statement = existing_statement.where(
-                MarketLeg.ticker.in_(market_tickers)
-            )
+            existing_statement = existing_statement.where(MarketLeg.ticker.in_(market_tickers))
         existing_tickers = set(session.scalars(existing_statement))
     parsed_at = utc_now()
     legs_inserted = 0
@@ -364,9 +358,7 @@ def link_coverage_dashboard(session: Session) -> dict[str, Any]:
         "unlinked_examples": _example_rows(session, link_sets={}, mode="unlinked"),
         "partial_examples": _example_rows(
             session,
-            link_sets={
-                CATEGORY_SPORTS: set(sports_reconciliation["unresolved_partial_tickers"])
-            },
+            link_sets={CATEGORY_SPORTS: set(sports_reconciliation["unresolved_partial_tickers"])},
             mode="partial",
         ),
         "next_commands": _next_commands(category_rows, bottleneck),
@@ -810,9 +802,7 @@ def _link_ticker_counts(session: Session) -> dict[str, int]:
 
 def _partial_link_sets(session: Session) -> dict[str, set[str]]:
     return {
-        CATEGORY_SPORTS: set(
-            _sports_link_reconciliation(session, [])["unresolved_partial_tickers"]
-        )
+        CATEGORY_SPORTS: set(_sports_link_reconciliation(session, [])["unresolved_partial_tickers"])
     }
 
 
@@ -848,9 +838,7 @@ def _market_leg_coverage_counts(session: Session) -> dict[str, dict[str, int]]:
         for category, table in LINK_TABLE_BY_CATEGORY.items()
     ]
     link_pairs = union_all(*link_pair_selects).subquery()
-    distinct_link_pairs = (
-        select(link_pairs.c.category, link_pairs.c.ticker).distinct().subquery()
-    )
+    distinct_link_pairs = select(link_pairs.c.category, link_pairs.c.ticker).distinct().subquery()
     linked_ticker = case(
         (distinct_link_pairs.c.ticker.is_not(None), MarketLeg.ticker),
         else_=None,
@@ -880,9 +868,7 @@ def _market_leg_coverage_counts(session: Session) -> dict[str, dict[str, int]]:
             func.coalesce(func.sum(current_leg), 0).label("current_parsed_legs"),
             func.count(func.distinct(current_ticker)).label("current_parsed_markets"),
             func.coalesce(func.sum(current_linked_leg), 0).label("current_linked_legs"),
-            func.count(func.distinct(current_linked_ticker)).label(
-                "current_linked_markets"
-            ),
+            func.count(func.distinct(current_linked_ticker)).label("current_linked_markets"),
         )
         .join(Market, Market.ticker == MarketLeg.ticker)
         .outerjoin(
@@ -914,9 +900,7 @@ def _market_leg_coverage_counts(session: Session) -> dict[str, dict[str, int]]:
             "linked_legs": linked_leg_count,
             "linked_markets": int(linked_markets or 0),
             "unlinked_legs": (
-                max(parsed_leg_count - linked_leg_count, 0)
-                if category in LINKED_CATEGORIES
-                else 0
+                max(parsed_leg_count - linked_leg_count, 0) if category in LINKED_CATEGORIES else 0
             ),
             "current_parsed_legs": current_parsed_leg_count,
             "current_parsed_markets": int(current_parsed_markets or 0),
@@ -963,18 +947,26 @@ def _linked_market_count(session: Session, category: str, table: Any) -> int:
 
 def _linked_leg_count(session: Session, category: str, table: Any) -> int:
     link_tickers = select(table.ticker).distinct()
-    statement = select(func.count()).select_from(MarketLeg).where(
-        MarketLeg.category == category,
-        MarketLeg.ticker.in_(link_tickers),
+    statement = (
+        select(func.count())
+        .select_from(MarketLeg)
+        .where(
+            MarketLeg.category == category,
+            MarketLeg.ticker.in_(link_tickers),
+        )
     )
     return int(session.scalar(statement) or 0)
 
 
 def _unlinked_leg_count(session: Session, category: str, table: Any) -> int:
     link_tickers = select(table.ticker).distinct()
-    statement = select(func.count()).select_from(MarketLeg).where(
-        MarketLeg.category == category,
-        ~MarketLeg.ticker.in_(link_tickers),
+    statement = (
+        select(func.count())
+        .select_from(MarketLeg)
+        .where(
+            MarketLeg.category == category,
+            ~MarketLeg.ticker.in_(link_tickers),
+        )
     )
     return int(session.scalar(statement) or 0)
 
@@ -1174,9 +1166,7 @@ def _unsupported_composite_counts_by_category(session: Session) -> dict[str, dic
             select(
                 func.count(func.distinct(MarketLeg.ticker)),
                 func.count(MarketLeg.id),
-                func.count(
-                    func.distinct(case((current_market, MarketLeg.ticker), else_=None))
-                ),
+                func.count(func.distinct(case((current_market, MarketLeg.ticker), else_=None))),
                 func.coalesce(func.sum(case((current_market, 1), else_=0)), 0),
             )
             .join(Market, Market.ticker == MarketLeg.ticker)
@@ -1226,8 +1216,7 @@ def _sports_link_provenance_case() -> Any:
             "kalshi_event_derived",
         ),
         (
-            game_key.like("%market-derived%")
-            | reason.like("%market-derived%"),
+            game_key.like("%market-derived%") | reason.like("%market-derived%"),
             "partial_market_derived",
         ),
         else_="other",
@@ -1279,9 +1268,7 @@ def _sports_upgraded_tickers_for_partial_set(
             select(SportsMarketLink.ticker)
             .where(
                 SportsMarketLink.ticker.in_(chunk),
-                _sports_link_provenance_case().in_(
-                    ("kalshi_event_derived", "verified_schedule")
-                ),
+                _sports_link_provenance_case().in_(("kalshi_event_derived", "verified_schedule")),
             )
             .distinct()
         )
@@ -1373,9 +1360,7 @@ def _category_row(
     unsupported_composite = unsupported_composite_counts.get(category, {})
     unsupported_multileg_markets = int(unsupported_composite.get("markets") or 0)
     unsupported_multileg_legs = int(unsupported_composite.get("legs") or 0)
-    current_unsupported_multileg_markets = int(
-        unsupported_composite.get("current_markets") or 0
-    )
+    current_unsupported_multileg_markets = int(unsupported_composite.get("current_markets") or 0)
     current_unsupported_multileg_legs = int(unsupported_composite.get("current_legs") or 0)
     if category == CATEGORY_SPORTS:
         partial_markets = sports_reconciliation["unresolved_partial_markets"]
@@ -1541,8 +1526,7 @@ def _category_next_action(
                 "are parked outside coverage remediation."
             )
         return (
-            "No category coverage action is required; rerun coverage after the next "
-            "market refresh."
+            "No category coverage action is required; rerun coverage after the next market refresh."
         )
     if status == "DERIVED_CONNECTED":
         if category == CATEGORY_SPORTS:
@@ -1556,8 +1540,7 @@ def _category_next_action(
                 "added later for provenance only."
             )
         return (
-            "Derived single-market coverage is complete; no category coverage action "
-            "is required."
+            "Derived single-market coverage is complete; no category coverage action is required."
         )
     if status == "UNSUPPORTED_MULTI_LEG":
         return (
@@ -2033,8 +2016,7 @@ def _count_definitions() -> list[dict[str, str]]:
         {
             "label": "Partial legs",
             "definition": (
-                "Parsed leg rows whose ticker still only has unresolved "
-                "market-derived provenance."
+                "Parsed leg rows whose ticker still only has unresolved market-derived provenance."
             ),
         },
         {

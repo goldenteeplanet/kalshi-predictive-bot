@@ -168,9 +168,7 @@ def _reward_summary(session: Session, pnl_rows: list[PaperPnl]) -> dict[str, Any
         "roi": str(roi.quantize(Decimal("0.0001"))),
         "brier_available": int(
             session.scalar(
-                select(func.count())
-                .select_from(Forecast)
-                .where(Forecast.model_name.is_not(None))
+                select(func.count()).select_from(Forecast).where(Forecast.model_name.is_not(None))
             )
             or 0
         ),

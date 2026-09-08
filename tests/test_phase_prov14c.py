@@ -87,11 +87,18 @@ def test_boundaries_must_strictly_increase(tmp_path: Path) -> None:
 def test_unexpected_model_is_rejected(tmp_path: Path) -> None:
     paths = [_report(tmp_path / f"cycle-{index}.json", index * 10) for index in range(3)]
     payload = json.loads(paths[1].read_text())
-    payload["rows"].append({
-        "event_id": 29, "model_name": "market_implied_v1", "passed": True,
-        "failures": [], "source_observation_ref": {"table": "source", "id": 9},
-        "market_snapshot_id": 9, "feature_source_table": "features", "feature_source_id": 9,
-    })
+    payload["rows"].append(
+        {
+            "event_id": 29,
+            "model_name": "market_implied_v1",
+            "passed": True,
+            "failures": [],
+            "source_observation_ref": {"table": "source", "id": 9},
+            "market_snapshot_id": 9,
+            "feature_source_table": "features",
+            "feature_source_id": 9,
+        }
+    )
     paths[1].write_text(json.dumps(payload))
     report = build_prov14c_stability_census(paths)
     assert report["summary"]["stability_census_passed"] is False

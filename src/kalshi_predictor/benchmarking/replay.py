@@ -64,17 +64,26 @@ def replay_episode(episode: SyntheticEpisode) -> list[ReplayFrame]:
             book.apply_snapshot(event.message)
         else:
             book.apply_delta(event.message)
-        frames.append(ReplayFrame(
-            timestamp=event.timestamp, ticker=event.ticker, sequence=book.sequence,
-            orderbook=book.as_orderbook_json(),
-        ))
+        frames.append(
+            ReplayFrame(
+                timestamp=event.timestamp,
+                ticker=event.ticker,
+                sequence=book.sequence,
+                orderbook=book.as_orderbook_json(),
+            )
+        )
     return frames
 
 
 def replay_digest(frames: list[ReplayFrame]) -> str:
-    payload = [{
-        "timestamp": frame.timestamp.isoformat(), "ticker": frame.ticker,
-        "sequence": frame.sequence, "orderbook": frame.orderbook,
-    } for frame in frames]
+    payload = [
+        {
+            "timestamp": frame.timestamp.isoformat(),
+            "ticker": frame.ticker,
+            "sequence": frame.sequence,
+            "orderbook": frame.orderbook,
+        }
+        for frame in frames
+    ]
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()

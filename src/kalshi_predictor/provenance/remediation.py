@@ -9,9 +9,7 @@ from typing import Any
 
 from kalshi_predictor.provenance.regression import build_attribution_regression_report
 
-ALLOWED_REPAIR_FIELDS = {
-    "source_observation_ref", "market_snapshot_ref", "model_version"
-}
+ALLOWED_REPAIR_FIELDS = {"source_observation_ref", "market_snapshot_ref", "model_version"}
 
 
 def simulate_exact_attribution_repairs(
@@ -44,12 +42,16 @@ def simulate_exact_attribution_repairs(
                 changed.append(field)
         applied.append({"event_key": event_key, "changed_fields": changed})
     before = build_attribution_regression_report(
-        source, expected_model_versions=expected_model_versions,
-        generated_at=generated_at, thresholds=thresholds,
+        source,
+        expected_model_versions=expected_model_versions,
+        generated_at=generated_at,
+        thresholds=thresholds,
     )
     after = build_attribution_regression_report(
-        repaired, expected_model_versions=expected_model_versions,
-        generated_at=generated_at, thresholds=thresholds,
+        repaired,
+        expected_model_versions=expected_model_versions,
+        generated_at=generated_at,
+        thresholds=thresholds,
     )
     return {
         "phase": "PROV-15E",
@@ -134,7 +136,8 @@ def _validate_exact_repair(event_key: str, repair: Mapping[str, Any]) -> None:
             raise ValueError(f"{field} for {event_key} requires exact table and id")
         timestamp_keys = (
             ("observed_at", "forecast_generated_at")
-            if field == "source_observation_ref" else ("captured_at",)
+            if field == "source_observation_ref"
+            else ("captured_at",)
         )
         if not any(value.get(key) for key in timestamp_keys):
             raise ValueError(f"{field} for {event_key} requires an exact timestamp")
@@ -159,7 +162,8 @@ def _mean_age_delta(
         "after": after_mean,
         "change": (
             round(after_mean - before_mean, 6)
-            if before_mean is not None and after_mean is not None else None
+            if before_mean is not None and after_mean is not None
+            else None
         ),
     }
 

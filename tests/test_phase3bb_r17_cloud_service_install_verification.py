@@ -61,9 +61,7 @@ def test_phase3bb_r17_blocks_if_service_started_unexpectedly(tmp_path: Path) -> 
             probe_runner=_fake_runner(pid=1917, service_active=True),
         )
 
-    assert payload["verification_decision"]["status"] == (
-        "BLOCKED_SERVICE_INSTALL_VERIFICATION"
-    )
+    assert payload["verification_decision"]["status"] == ("BLOCKED_SERVICE_INSTALL_VERIFICATION")
     assert payload["verification_decision"]["verification_passed"] is False
     assert payload["verification_decision"]["first_failed_check"] == "service_not_started_now"
     assert payload["verification_decision"]["service_started"] is True
@@ -148,8 +146,7 @@ def _write_context(reports_dir: Path) -> None:
                     "r13_recommendation": "ADOPT_EXISTING_R5",
                     "service_name": "kalshi-r5-watcher.service",
                     "guard_script_path": (
-                        "/opt/kalshi-predictive-bot/scripts/cloud/"
-                        "kalshi-r5-start-guard.sh"
+                        "/opt/kalshi-predictive-bot/scripts/cloud/kalshi-r5-start-guard.sh"
                     ),
                 },
             }
@@ -196,8 +193,7 @@ def _fake_runner(*, pid: int, service_active: bool = False):
             "[Service]",
             "User=kalshi",
             "EnvironmentFile=/etc/kalshi-bot/kalshi-bot.env",
-            "ExecStartPre=/opt/kalshi-predictive-bot/scripts/cloud/"
-            "kalshi-r5-start-guard.sh",
+            "ExecStartPre=/opt/kalshi-predictive-bot/scripts/cloud/kalshi-r5-start-guard.sh",
             "ExecStart=/opt/kalshi-predictive-bot/.venv/bin/python "
             "-m kalshi_predictor.cli phase3bc-r5-crypto-freshness-watch",
             "",

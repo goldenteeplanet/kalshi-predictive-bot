@@ -5,15 +5,16 @@ from types import SimpleNamespace
 from sqlalchemy import select
 from typer.testing import CliRunner
 
-from kalshi_predictor.forecasting import registry
 from kalshi_predictor.cli import app
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.crypto.repository import insert_crypto_features, insert_crypto_market_link
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import insert_market_snapshot
 from kalshi_predictor.data.schema import Forecast, ForecastSkipLog
+from kalshi_predictor.forecasting import registry
 from kalshi_predictor.forecasting.registry import latest_snapshots_for_model, run_forecast_models
 from kalshi_predictor.utils.time import utc_now
+from kalshi_predictor.weather.repository import insert_weather_market_link
 
 
 def test_latest_snapshots_for_model_uses_crypto_link_table(tmp_path) -> None:
@@ -26,6 +27,29 @@ def test_latest_snapshots_for_model_uses_crypto_link_table(tmp_path) -> None:
 
     assert rows is not None
     assert [row.ticker for row in rows] == [linked_snapshot.ticker]
+
+
+def test_weather_v2_scope_excludes_unsupported_hurricane_links(tmp_path) -> None:
+    session_factory = _session_factory(tmp_path)
+    now = utc_now()
+    with session_factory() as session:
+        temperature = _seed_weather_snapshot(
+            session,
+            ticker="KXTEMPNYCH-26AUG1413-T80.99",
+            series_ticker="KXTEMPNYCH",
+            now=now,
+        )
+        _seed_weather_snapshot(
+            session,
+            ticker="KXHURRICANE-26DEC01CPACTOT-1",
+            series_ticker="KXHURRICANE",
+            now=now,
+        )
+
+        rows = latest_snapshots_for_model(session, model_name="weather_v2", limit=10)
+
+    assert rows is not None
+    assert [row.ticker for row in rows] == [temperature.ticker]
 
 
 def test_forecast_cli_scopes_crypto_v2_to_crypto_linked_snapshots(
@@ -220,6 +244,35 @@ def _seed_unlinked_newer_snapshot(session):
         },
         utc_now() + timedelta(minutes=1),
     )
+
+
+def _seed_weather_snapshot(session, *, ticker, series_ticker, now):
+    snapshot = insert_market_snapshot(
+        session,
+        {
+            "ticker": ticker,
+            "status": "open",
+            "title": "Weather test",
+            "series_ticker": series_ticker,
+            "close_time": now + timedelta(hours=2),
+            "yes_bid_dollars": "0.40",
+            "yes_ask_dollars": "0.50",
+        },
+        {"orderbook_fp": {"yes_dollars": [["0.40", "10"]]}},
+        now,
+    )
+    insert_weather_market_link(
+        session,
+        ticker=ticker,
+        location_key="new_york" if ticker.startswith("KXTEMP") else "unknown",
+        weather_metric="TEMPERATURE" if ticker.startswith("KXTEMP") else "HURRICANE",
+        target_operator="ABOVE" if ticker.startswith("KXTEMP") else "UNKNOWN",
+        confidence="1.0",
+        reason="test",
+        target_time=now + timedelta(hours=2),
+    )
+    session.commit()
+    return snapshot
 
 
 def _btc_terms_payload(ticker: str) -> dict:

@@ -140,9 +140,7 @@ def build_phase3z_r2_sports_provenance_repair(
         "paper_only_safety": PAPER_ONLY_SAFETY,
         "runtime_identity": _lightweight_runtime_identity(session, settings=settings),
         "input_reports": _input_report_paths(reports_dir),
-        "source_availability": {
-            key: value is not None for key, value in report_inputs.items()
-        },
+        "source_availability": {key: value is not None for key, value in report_inputs.items()},
         "row_scan": row_scan,
         "summary": summary,
         "count_reconciliation": count_reconciliation,
@@ -430,9 +428,7 @@ def _summary(
             coverage_sports.get("verified_schedule_link_rows")
             or provenance_counts["verified_schedule"]
         ),
-        "kalshi_event_derived_markets": int(
-            coverage_sports.get("derived_usable_markets") or 0
-        ),
+        "kalshi_event_derived_markets": int(coverage_sports.get("derived_usable_markets") or 0),
         "kalshi_event_derived_link_rows": provenance_counts["kalshi_event_derived"],
         "raw_partial_legacy_markets": len(raw_unresolved_partial_tickers),
         "excluded_composite_partial_markets": len(excluded_partial_tickers),
@@ -525,9 +521,7 @@ def _phase3ae_gate(summary: dict[str, Any]) -> dict[str, Any]:
         )
     elif placeholder_rows:
         status = "HOLD_PLACEHOLDER_UPGRADES"
-        next_action = (
-            "Keep Phase 3AE blocked for placeholder rows and legacy partial sports links."
-        )
+        next_action = "Keep Phase 3AE blocked for placeholder rows and legacy partial sports links."
     else:
         status = "NO_SAFE_SPORTS_REPAIR_ROWS"
         next_action = "Ingest verified schedules/rosters, then rerun this diagnostic."
@@ -609,7 +603,7 @@ def _load_json(path: Path) -> dict[str, Any] | list[Any] | None:
     if not path.exists():
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
-    return payload if isinstance(payload, (dict, list)) else None
+    return payload if isinstance(payload, dict | list) else None
 
 
 def _lightweight_runtime_identity(
@@ -673,8 +667,10 @@ def _upgraded_link_condition() -> Any:
 
 
 def _count_sports_links(session: Session, *, ticker_prefix: str | None) -> int:
-    statement = select(func.count()).select_from(SportsMarketLink).where(
-        *_ticker_prefix_filters(SportsMarketLink.ticker, ticker_prefix)
+    statement = (
+        select(func.count())
+        .select_from(SportsMarketLink)
+        .where(*_ticker_prefix_filters(SportsMarketLink.ticker, ticker_prefix))
     )
     return int(session.scalar(statement) or 0)
 
@@ -794,12 +790,9 @@ def _total_sports_parsed_markets(
 ) -> int:
     if ticker_prefix is None and coverage_sports.get("parsed_markets") is not None:
         return int(coverage_sports.get("parsed_markets") or 0)
-    statement = (
-        select(func.count(func.distinct(MarketLeg.ticker)))
-        .where(
-            MarketLeg.category == CATEGORY_SPORTS,
-            *_ticker_prefix_filters(MarketLeg.ticker, ticker_prefix),
-        )
+    statement = select(func.count(func.distinct(MarketLeg.ticker))).where(
+        MarketLeg.category == CATEGORY_SPORTS,
+        *_ticker_prefix_filters(MarketLeg.ticker, ticker_prefix),
     )
     return int(session.scalar(statement) or 0)
 

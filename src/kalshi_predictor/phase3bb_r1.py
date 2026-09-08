@@ -80,8 +80,7 @@ ACTION_COMMANDS = {
     "BLOCKED_BY_ACTIVE_WRITER": "kalshi-bot db-writer-monitor --json",
     "START_R5": "kalshi-bot phase3bc-r5-unattended-start --output-dir reports/phase3bc_r5",
     "STOP_OVERRUN_R5": (
-        "kalshi-bot phase3bc-r5-unattended-guard --output-dir reports/phase3bc_r5 "
-        "--stop-overrun"
+        "kalshi-bot phase3bc-r5-unattended-guard --output-dir reports/phase3bc_r5 --stop-overrun"
     ),
     "RUN_WEATHER_RANKING": (
         "kalshi-bot db-writer-monitor --json\n"
@@ -89,16 +88,13 @@ ACTION_COMMANDS = {
         "reports/phase3bb_r2 --reports-dir reports --limit 100"
     ),
     "RUN_DASHBOARD_TRUTH": (
-        "kalshi-bot phase3ba-status --output-dir reports/phase3ba_status "
-        "--reports-dir reports"
+        "kalshi-bot phase3ba-status --output-dir reports/phase3ba_status --reports-dir reports"
     ),
     "RUN_SETTLEMENT_HEALTH": (
         "kalshi-bot phase3an-settlement-health-confirm --output-dir "
         "reports/phase3an_settlement_health --reports-dir reports --max-records 5"
     ),
-    "RUN_CATEGORY_GAP": (
-        "kalshi-bot market-coverage-doctor --output-dir reports/market_coverage"
-    ),
+    "RUN_CATEGORY_GAP": ("kalshi-bot market-coverage-doctor --output-dir reports/market_coverage"),
 }
 
 
@@ -415,9 +411,7 @@ def _action(
 def _weather_readiness(reports_dir: Path, status: dict[str, Any]) -> dict[str, Any]:
     summary = status.get("summary") or {}
     weather_fast_lane = _read_json(reports_dir / "phase3bb" / "weather_fast_lane.json")
-    weather_r2 = _read_json(
-        reports_dir / "phase3ba_r2" / "weather_ranking_activation.json"
-    )
+    weather_r2 = _read_json(reports_dir / "phase3ba_r2" / "weather_ranking_activation.json")
     artifact_statuses = status.get("artifact_statuses") or {}
     weather_artifact = artifact_statuses.get("weather_ranking_activation") or {}
     current_rows = _to_int(summary.get("weather_current_rows"))
@@ -603,9 +597,7 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
     )
     if payload["stale_artifacts"]:
         for row in payload["stale_artifacts"]:
-            lines.append(
-                f"- {row['name']}: `{row['freshness']}` path=`{row['path']}`"
-            )
+            lines.append(f"- {row['name']}: `{row['freshness']}` path=`{row['path']}`")
     else:
         lines.append("- None.")
     lines.extend(
@@ -657,8 +649,7 @@ def _render_next_actions(payload: dict[str, Any]) -> str:
             "",
             f"- Missing command references: `{len(checks['unregistered_commands'])}`",
             f"- Duplicate R5 start risk: `{int(checks['duplicate_r5_start_risk'])}`",
-            "- Contains forbidden trade command: "
-            f"`{checks['contains_forbidden_trade_command']}`",
+            f"- Contains forbidden trade command: `{checks['contains_forbidden_trade_command']}`",
         ]
     )
     for command in checks["command_names"]:

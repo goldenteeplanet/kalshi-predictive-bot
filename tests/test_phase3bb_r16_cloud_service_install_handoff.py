@@ -65,9 +65,7 @@ def test_phase3bb_r16_blocks_without_operator_approval(tmp_path: Path) -> None:
 
     assert payload["handoff_decision"]["status"] == "BLOCKED_INSTALL_HANDOFF"
     assert payload["handoff_decision"]["handoff_ready"] is False
-    assert payload["handoff_decision"]["first_failed_check"] == (
-        "operator_approved_flag_present"
-    )
+    assert payload["handoff_decision"]["first_failed_check"] == ("operator_approved_flag_present")
 
 
 def test_phase3bb_r16_handoff_script_defaults_to_dry_run(tmp_path: Path) -> None:
@@ -160,8 +158,7 @@ def _write_context(reports_dir: Path) -> None:
                     "r13_recommendation": "ADOPT_EXISTING_R5",
                     "service_name": "kalshi-r5-watcher.service",
                     "guard_script_path": (
-                        "/opt/kalshi-predictive-bot/scripts/cloud/"
-                        "kalshi-r5-start-guard.sh"
+                        "/opt/kalshi-predictive-bot/scripts/cloud/kalshi-r5-start-guard.sh"
                     ),
                     "remote_app_path": "/opt/kalshi-predictive-bot",
                     "remote_env_path": "/etc/kalshi-bot/kalshi-bot.env",
@@ -178,8 +175,7 @@ def _write_context(reports_dir: Path) -> None:
                 "[Service]",
                 "User=kalshi",
                 "EnvironmentFile=/etc/kalshi-bot/kalshi-bot.env",
-                "ExecStartPre=/opt/kalshi-predictive-bot/scripts/cloud/"
-                "kalshi-r5-start-guard.sh",
+                "ExecStartPre=/opt/kalshi-predictive-bot/scripts/cloud/kalshi-r5-start-guard.sh",
                 "ExecStart=/opt/kalshi-predictive-bot/.venv/bin/python "
                 "-m kalshi_predictor.cli phase3bc-r5-crypto-freshness-watch",
                 "",

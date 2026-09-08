@@ -32,15 +32,13 @@ def database_url_from_settings(settings: Settings | None = None) -> str:
     resolved = settings or get_settings()
     configured_url = resolved.kalshi_db_url
     if resolved.db_backend == POSTGRES and _backend_from_url(configured_url) != POSTGRES:
-        url = (
-            URL.create(
-                "postgresql+psycopg",
-                username=resolved.postgres_user,
-                password=resolved.postgres_password,
-                host=resolved.postgres_host,
-                port=resolved.postgres_port,
-                database=resolved.postgres_db,
-            )
+        url = URL.create(
+            "postgresql+psycopg",
+            username=resolved.postgres_user,
+            password=resolved.postgres_password,
+            host=resolved.postgres_host,
+            port=resolved.postgres_port,
+            database=resolved.postgres_db,
         )
         return url.render_as_string(hide_password=False)
     return configured_url

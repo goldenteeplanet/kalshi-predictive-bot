@@ -40,7 +40,10 @@ def test_phase3bb_r49_verifies_apply_and_closed_gate(tmp_path: Path) -> None:
     assert decision["rows_written"] == 10
     assert decision["rows_safe_to_link"] == 0
     assert decision["rows_safe_to_relink"] == 0
-    assert "phase3bb-r50-weather-post-link-ranking-fast-lane-recheck" in decision["operator_next_command"]
+    assert (
+        "phase3bb-r50-weather-post-link-ranking-fast-lane-recheck"
+        in decision["operator_next_command"]
+    )
     assert payload["safety_flags"]["remote_db_writes_performed_by_this_phase"] == 0
     assert payload["safety_flags"]["runs_weather_missing_link_apply"] is False
     assert all(row["passed"] for row in payload["post_link_checks"])
@@ -182,7 +185,8 @@ def _fake_probe_runner(
     apply_payload = apply_payload or {
         "status": "APPLIED",
         "generated_at": "2026-07-13T22:14:04+00:00",
-        "backup": "reports/phase3az_r12_weather/backups/phase3az_r12_weather_missing_link_20260713_221404.json",
+        "backup": "reports/phase3az_r12_weather/backups/phase3az_r12_weather_missing_link_20260713_"
+        "221404.json",
         "summary": {
             "preview_rows_safe_to_link": 10,
             "candidates_reviewed": 10,
@@ -267,7 +271,8 @@ def _fake_probe_runner(
 def _report_stats() -> str:
     return "\n".join(
         [
-            "reports/phase3bb_r48/weather_feature_refresh_runtime_verification.json|1783979900|1000",
+            "reports/phase3bb_r48/weather_feature_refresh_runtime_verification.json|17839"
+            "79900|1000",
             "reports/phase3az_r12_weather/weather_missing_link_apply.json|1783979944|900",
             "reports/phase3az_r12_weather/weather_activation_preview.json|1783979964|900",
             "reports/phase3az_r12_weather/safe_to_link.csv|1783979964|1",

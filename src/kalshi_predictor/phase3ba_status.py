@@ -270,13 +270,13 @@ def _r13_remote_r5_status(payload: dict[str, Any]) -> dict[str, Any]:
     guard_dry_run = (
         parsed.get("guard_dry_run") if isinstance(parsed.get("guard_dry_run"), dict) else {}
     )
-    guard_after = (
-        guard_dry_run.get("after") if isinstance(guard_dry_run.get("after"), dict) else {}
-    )
+    guard_after = guard_dry_run.get("after") if isinstance(guard_dry_run.get("after"), dict) else {}
     r5_status = parsed.get("r5_status") if isinstance(parsed.get("r5_status"), dict) else {}
     status, _source = _freshest_r5_candidate(
-        [(r5_status, "phase3bb_r13.parsed_remote_state.r5_status"),
-         (guard_after, "phase3bb_r13.parsed_remote_state.guard_dry_run.after")]
+        [
+            (r5_status, "phase3bb_r13.parsed_remote_state.r5_status"),
+            (guard_after, "phase3bb_r13.parsed_remote_state.guard_dry_run.after"),
+        ]
     )
     return status
 
@@ -408,11 +408,7 @@ def _status_summary(
             crypto_summary.get("paper_ready_candidates"),
         )
     )
-    crypto_ready = (
-        r5_paper_ready_candidates
-        if r5_paper_ready_present
-        else stale_crypto_ready
-    )
+    crypto_ready = r5_paper_ready_candidates if r5_paper_ready_present else stale_crypto_ready
     weather_ready = int(weather_category.get("paper_ready_rows") or 0)
     truth_paper_ready_rows = _to_int(truth_summary.get("paper_ready_rows"))
     paper_ready_rows = max(0, truth_paper_ready_rows)
@@ -744,9 +740,7 @@ def _command_checks(command: str) -> dict[str, Any]:
         name for name in command_names if name and name not in REGISTERED_OPERATOR_COMMANDS
     ]
     forbidden = [
-        fragment
-        for fragment in FORBIDDEN_RECOMMENDATION_FRAGMENTS
-        if fragment in command.lower()
+        fragment for fragment in FORBIDDEN_RECOMMENDATION_FRAGMENTS if fragment in command.lower()
     ]
     starts_r5 = [name for name in command_names if name in R5_START_COMMANDS]
     return {
@@ -952,8 +946,7 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"4. Is crypto paper-ready? `{summary['crypto_paper_ready']}`",
             f"5. Is weather paper-ready? `{summary['weather_paper_ready']}`",
             f"6. True first blocker: `{summary['true_first_blocker']}`",
-            "7. Codex should build next: "
-            f"`{summary['what_codex_should_build_next']}`",
+            f"7. Codex should build next: `{summary['what_codex_should_build_next']}`",
             "8. Operator should run next:",
             "",
             "```bash",

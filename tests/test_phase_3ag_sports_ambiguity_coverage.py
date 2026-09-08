@@ -99,9 +99,7 @@ def test_phase3ag_repair_pass_groups_failures_and_alias_candidates(tmp_path) -> 
     assert causes["MISSING_TEAM_OR_PLAYER_ALIAS"] == 1
     assert causes["NO_VERIFIED_GAMES_IN_SCHEDULE_WINDOW"] == 1
     assert payload["summary"]["auto_upgrades_created"] == 0
-    assert any(
-        row["entity"] == "Man City" for row in payload["missing_alias_candidates"]
-    )
+    assert any(row["entity"] == "Man City" for row in payload["missing_alias_candidates"])
     assert artifacts.alias_candidates_path.exists()
     assert artifacts.manual_candidates_path.exists()
 

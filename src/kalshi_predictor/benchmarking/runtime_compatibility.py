@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from kalshi_predictor.benchmarking.shadow_adapter import ExposureGuardShadowAdapter
 
-
 REQUIRED_RANKING_FIELDS = (
-    "ticker", "category", "opportunity_score", "forecast_model",
-    "forecast_id", "feature_ref", "observation_ref", "market_snapshot_id",
+    "ticker",
+    "category",
+    "opportunity_score",
+    "forecast_model",
+    "forecast_id",
+    "feature_ref",
+    "observation_ref",
+    "market_snapshot_id",
     "model_version",
 )
 REQUIRED_RISK_FIELDS = ("ticker", "risk_gate_passed", "requested_capital")
@@ -25,16 +31,19 @@ def normalize_runtime_export_for_shadow(
     diagnostics = []
     diagnostics.extend(
         f"RANKING_FIELD_MISSING:{field}"
-        for field in REQUIRED_RANKING_FIELDS if ranking.get(field) in (None, "")
+        for field in REQUIRED_RANKING_FIELDS
+        if ranking.get(field) in (None, "")
     )
     diagnostics.extend(
         f"RISK_FIELD_MISSING:{field}"
-        for field in REQUIRED_RISK_FIELDS if risk.get(field) in (None, "")
+        for field in REQUIRED_RISK_FIELDS
+        if risk.get(field) in (None, "")
     )
     context = dict(shadow_context or {})
     diagnostics.extend(
         f"SHADOW_CONTEXT_MISSING:{field}"
-        for field in REQUIRED_SHADOW_CONTEXT_FIELDS if context.get(field) in (None, "")
+        for field in REQUIRED_SHADOW_CONTEXT_FIELDS
+        if context.get(field) in (None, "")
     )
     if ranking.get("ticker") and risk.get("ticker") and ranking["ticker"] != risk["ticker"]:
         diagnostics.append("TICKER_MISMATCH")
@@ -81,7 +90,8 @@ def build_runtime_field_compatibility_preview(fixtures_path: Path) -> dict[str, 
     rows = []
     for fixture in fixtures:
         result = normalize_runtime_export_for_shadow(
-            fixture.get("ranking", {}), fixture.get("risk", {}),
+            fixture.get("ranking", {}),
+            fixture.get("risk", {}),
             fixture.get("shadow_context"),
         )
         result["fixture_id"] = fixture["fixture_id"]
@@ -94,11 +104,14 @@ def build_runtime_field_compatibility_preview(fixtures_path: Path) -> dict[str, 
         for diagnostic in row["diagnostics"]:
             diagnostic_counts[diagnostic] = diagnostic_counts.get(diagnostic, 0) + 1
     canonical = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode()
-    missing_context = sorted({
-        diagnostic.split(":", 1)[1]
-        for row in rows for diagnostic in row["diagnostics"]
-        if diagnostic.startswith("SHADOW_CONTEXT_MISSING:")
-    })
+    missing_context = sorted(
+        {
+            diagnostic.split(":", 1)[1]
+            for row in rows
+            for diagnostic in row["diagnostics"]
+            if diagnostic.startswith("SHADOW_CONTEXT_MISSING:")
+        }
+    )
     return {
         "phase": "PMB-34",
         "mode": "LOCAL_OFFLINE_RUNTIME_FIELD_COMPATIBILITY_PREVIEW",
@@ -127,9 +140,7 @@ def build_runtime_field_compatibility_preview(fixtures_path: Path) -> dict[str, 
     }
 
 
-def write_runtime_field_compatibility_preview(
-    fixtures_path: Path, output_dir: Path
-) -> Path:
+def write_runtime_field_compatibility_preview(fixtures_path: Path, output_dir: Path) -> Path:
     report = build_runtime_field_compatibility_preview(fixtures_path)
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / "pmb34_runtime_field_compatibility_preview.json"

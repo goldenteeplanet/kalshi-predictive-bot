@@ -454,9 +454,7 @@ def _category_build_score(
 
 def _select_next_category_after_weather(rows: list[dict[str, Any]]) -> dict[str, Any]:
     candidates = [
-        row
-        for row in rows
-        if row["category"] not in {"weather", "general", "cross_category"}
+        row for row in rows if row["category"] not in {"weather", "general", "cross_category"}
     ]
     if not candidates:
         return {
@@ -596,9 +594,7 @@ def _model_counts(
             session.scalar(select(func.count()).select_from(Forecast).where(forecast_filter)) or 0
         ),
         "rankings": int(
-            session.scalar(
-                select(func.count()).select_from(MarketRanking).where(ranking_filter)
-            )
+            session.scalar(select(func.count()).select_from(MarketRanking).where(ranking_filter))
             or 0
         ),
     }
@@ -631,13 +627,9 @@ def _summary(
         "sports_status": _row_status(rows, "sports"),
         "economic_parser_gap": _gap_value(rows, "economic", "parser_gap"),
         "news_parser_gap": _gap_value(rows, "news", "parser_gap"),
-        "general_source_evidence_gap": _gap_value(
-            rows, "general", "general_source_evidence_gap"
-        ),
+        "general_source_evidence_gap": _gap_value(rows, "general", "general_source_evidence_gap"),
         "paper_ready_categories": [
-            row["category"]
-            for row in rows
-            if row["paper_gate_readiness"] == "PAPER_GATE_READY"
+            row["category"] for row in rows if row["paper_gate_readiness"] == "PAPER_GATE_READY"
         ],
     }
 
@@ -838,10 +830,7 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             "## Result",
             "",
             f"- Immediate category work: `{immediate['category']}` / `{immediate['stage']}`",
-            (
-                "- Selected next new category after weather: "
-                f"`{selected['category']}`"
-            ),
+            (f"- Selected next new category after weather: `{selected['category']}`"),
             f"- Selected blocker: `{selected.get('primary_blocker')}`",
             f"- Categories reviewed: `{summary['categories_reviewed']}`",
             "",

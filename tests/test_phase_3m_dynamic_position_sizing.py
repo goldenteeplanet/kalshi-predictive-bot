@@ -17,6 +17,11 @@ from kalshi_predictor.forecasting.base import ForecastOutput
 from kalshi_predictor.paper.ledger import create_paper_order
 from kalshi_predictor.paper.models import BUY_YES, ORDER_FILLED, PaperDecision
 from kalshi_predictor.paper.simulator import run_paper_trading
+from kalshi_predictor.position_sizing import service as sizing_service
+from kalshi_predictor.position_sizing.service import (
+    prepare_position_sizing_historical_evidence,
+    size_paper_decision,
+)
 from kalshi_predictor.position_sizing.sizer import (
     ConfidenceTier,
     DynamicPositionSizer,
@@ -24,11 +29,6 @@ from kalshi_predictor.position_sizing.sizer import (
     PositionSizingConfig,
     PositionSizingInput,
     SizingMode,
-)
-from kalshi_predictor.position_sizing import service as sizing_service
-from kalshi_predictor.position_sizing.service import (
-    prepare_position_sizing_historical_evidence,
-    size_paper_decision,
 )
 
 
@@ -105,9 +105,7 @@ def test_external_caps_bucket_down_without_rounding_up(
 
 
 def test_missing_external_risk_cap_defaults_live_to_one() -> None:
-    decision = DynamicPositionSizer(_sizer_config()).decide(
-        _sizing_input(external_risk_cap=None)
-    )
+    decision = DynamicPositionSizer(_sizer_config()).decide(_sizing_input(external_risk_cap=None))
 
     assert decision.proposed_contracts == 5
     assert decision.live_candidate_contracts == 1
@@ -140,9 +138,7 @@ def test_invalid_input_falls_back_to_one_and_hard_block_returns_zero() -> None:
 
 def test_shadow_and_disabled_modes_preserve_one_contract_execution() -> None:
     shadow = DynamicPositionSizer(_sizer_config(mode=SizingMode.SHADOW)).decide(_sizing_input())
-    disabled = DynamicPositionSizer(_sizer_config(mode=SizingMode.DISABLED)).decide(
-        _sizing_input()
-    )
+    disabled = DynamicPositionSizer(_sizer_config(mode=SizingMode.DISABLED)).decide(_sizing_input())
 
     assert shadow.proposed_contracts == 5
     assert shadow.live_candidate_contracts == 5
@@ -166,9 +162,7 @@ def test_same_input_is_deterministic_and_sizes_are_discrete() -> None:
 
 def test_invalid_configuration_fails() -> None:
     with pytest.raises(ValueError):
-        DynamicPositionSizer(
-            _sizer_config(weights=FactorWeights(confidence=1.0, opportunity=1.0))
-        )
+        DynamicPositionSizer(_sizer_config(weights=FactorWeights(confidence=1.0, opportunity=1.0)))
 
 
 def test_disabled_paper_trading_preserves_one_contract_and_logs_decision(tmp_path) -> None:
@@ -207,9 +201,7 @@ def test_live_paper_trading_can_execute_five_with_valid_history_and_risk_cap(tmp
         )
         session.commit()
 
-        order = session.scalar(
-            select(PaperOrder).where(PaperOrder.ticker == "PHASE3M-HIGH")
-        )
+        order = session.scalar(select(PaperOrder).where(PaperOrder.ticker == "PHASE3M-HIGH"))
         position = session.get(PaperPosition, "PHASE3M-HIGH")
         sizing_log = session.scalar(
             select(PositionSizingDecisionLog)
@@ -331,9 +323,7 @@ def test_historical_accuracy_excludes_future_settlements(tmp_path) -> None:
     assert sizing_log.historical_sample_size == 5
 
 
-def test_cached_historical_evidence_skips_expensive_history_rescan(
-    tmp_path, monkeypatch
-) -> None:
+def test_cached_historical_evidence_skips_expensive_history_rescan(tmp_path, monkeypatch) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
         _seed_history(session, wins=3, losses=2)

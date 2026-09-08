@@ -138,8 +138,9 @@ def test_phase3bb_r37_blocks_when_timer_missing(tmp_path: Path) -> None:
     assert decision["status"] == "BLOCKED_SCHEDULER_INSTALL_VERIFICATION"
     assert decision["verification_passed"] is False
     assert decision["first_failed_check"] == "scheduler_timer_unit_installed"
-    assert "PHASE3BB_R36_EXECUTE=I_APPROVE_R36_SCHEDULER_INSTALL" in (
-        decision["operator_next_command"]
+    assert (
+        "PHASE3BB_R36_EXECUTE=I_APPROVE_R36_SCHEDULER_INSTALL"
+        in (decision["operator_next_command"])
     )
 
 
@@ -220,7 +221,9 @@ def _fake_probe_runner(
             "",
         ),
         "scheduler_timer_unit_file": (
-            "\n".join(["[Timer]", "OnUnitActiveSec=15min", "", "[Install]", "WantedBy=timers.target", ""]),
+            "\n".join(
+                ["[Timer]", "OnUnitActiveSec=15min", "", "[Install]", "WantedBy=timers.target", ""]
+            ),
             True,
             0,
             "",

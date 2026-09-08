@@ -82,10 +82,14 @@ def build_sports_alias_provenance_repair(
     session.flush()
     partial_links = _unresolved_partial_links(session, limit=limit)
     tickers = sorted({link.ticker for link in partial_links})
-    markets = {
-        market.ticker: market
-        for market in session.scalars(select(Market).where(Market.ticker.in_(tickers)))
-    } if tickers else {}
+    markets = (
+        {
+            market.ticker: market
+            for market in session.scalars(select(Market).where(Market.ticker.in_(tickers)))
+        }
+        if tickers
+        else {}
+    )
     legs_by_ticker = _sports_legs_by_ticker(session, tickers)
     teams = list(
         session.scalars(select(SportsTeam).order_by(SportsTeam.league, SportsTeam.team_name))
@@ -164,9 +168,7 @@ def build_sports_alias_provenance_repair(
         "summary": {
             "partial_link_rows_reviewed": len(partial_links),
             "partial_markets_reviewed": len(tickers),
-            "multi_leg_markets": reason_counts[
-                "MULTI_LEG_MARKET_REQUIRES_COMPETITION_PROVENANCE"
-            ],
+            "multi_leg_markets": reason_counts["MULTI_LEG_MARKET_REQUIRES_COMPETITION_PROVENANCE"],
             "soccer_markets": sum(1 for row in rows if row["league"] == "SOCCER"),
             "alias_suggestions": len(alias_suggestions),
             "aliases_applied": sum(1 for row in alias_suggestions if row["applied"]),
@@ -174,8 +176,7 @@ def build_sports_alias_provenance_repair(
             "verified_games_by_league": dict(sorted(verified_games_by_league.items())),
         },
         "reason_breakdown": [
-            {"reason": reason, "count": count}
-            for reason, count in reason_counts.most_common()
+            {"reason": reason, "count": count} for reason, count in reason_counts.most_common()
         ],
         "alias_suggestions": alias_suggestions,
         "competition_suggestions": competition_suggestions,
@@ -221,9 +222,7 @@ def write_phase3aj_report(
 def _unresolved_partial_links(session: Session, *, limit: int | None) -> list[SportsMarketLink]:
     links = list(session.scalars(select(SportsMarketLink).order_by(SportsMarketLink.id)))
     upgraded = {
-        link.ticker
-        for link in links
-        if _link_provenance(link) in {DERIVED_SOURCE, VERIFIED_SOURCE}
+        link.ticker for link in links if _link_provenance(link) in {DERIVED_SOURCE, VERIFIED_SOURCE}
     }
     partial = [
         link

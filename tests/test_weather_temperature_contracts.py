@@ -45,22 +45,38 @@ def test_parser_rejects_fuzzy_or_invalid_tickers() -> None:
 
 
 def _payload() -> dict:
-    return {"features": [
-        {"properties": {"station": "https://api.weather.gov/stations/KNYC",
-                         "timestamp": "2026-07-16T02:51:00+00:00",
-                         "temperature": {"unitCode": "wmoUnit:degC", "value": 25}}},
-        {"properties": {"station": "https://api.weather.gov/stations/KLGA",
-                         "timestamp": "2026-07-16T02:51:00+00:00",
-                         "temperature": {"unitCode": "wmoUnit:degC", "value": 30}}},
-        {"properties": {"station": "https://api.weather.gov/stations/KNYC",
-                         "timestamp": "2026-07-16T04:01:00+00:00",
-                         "temperature": {"unitCode": "wmoUnit:degC", "value": 24}}},
-    ]}
+    return {
+        "features": [
+            {
+                "properties": {
+                    "station": "https://api.weather.gov/stations/KNYC",
+                    "timestamp": "2026-07-16T02:51:00+00:00",
+                    "temperature": {"unitCode": "wmoUnit:degC", "value": 25},
+                }
+            },
+            {
+                "properties": {
+                    "station": "https://api.weather.gov/stations/KLGA",
+                    "timestamp": "2026-07-16T02:51:00+00:00",
+                    "temperature": {"unitCode": "wmoUnit:degC", "value": 30},
+                }
+            },
+            {
+                "properties": {
+                    "station": "https://api.weather.gov/stations/KNYC",
+                    "timestamp": "2026-07-16T04:01:00+00:00",
+                    "temperature": {"unitCode": "wmoUnit:degC", "value": 24},
+                }
+            },
+        ]
+    }
 
 
 def test_observations_require_exact_station_and_local_date() -> None:
     rows = parse_nws_station_observations(
-        _payload(), station_id="KNYC", target_local_date=date(2026, 7, 15),
+        _payload(),
+        station_id="KNYC",
+        target_local_date=date(2026, 7, 15),
         timezone="America/New_York",
     )
     assert len(rows) == 1
@@ -81,8 +97,11 @@ def test_fetch_uses_exact_station_and_local_day_bounds() -> None:
         transport=httpx.MockTransport(handler), base_url="https://api.weather.gov"
     ) as client:
         rows = fetch_nws_station_observations(
-            station_id="KNYC", target_local_date=date(2026, 7, 15),
-            timezone="America/New_York", user_agent="test@example.com", client=client,
+            station_id="KNYC",
+            target_local_date=date(2026, 7, 15),
+            timezone="America/New_York",
+            user_agent="test@example.com",
+            client=client,
         )
     assert len(rows) == 1
     assert observed["path"] == "/stations/KNYC/observations"
@@ -121,9 +140,7 @@ def test_market_metadata_accepts_exact_query_scope_when_response_omits_series() 
     contract = parse_point_temperature_ticker("KXTEMPNYCH-26JUL1523-T80.99")
     assert contract is not None
     market = _market(series_ticker=None)
-    result = validate_point_temperature_market(
-        contract, market, series_scope="KXTEMPNYCH"
-    )
+    result = validate_point_temperature_market(contract, market, series_scope="KXTEMPNYCH")
     assert result.passed is True
 
 
@@ -133,13 +150,20 @@ def test_market_metadata_validation_reports_each_truth_mismatch() -> None:
     result = validate_point_temperature_market(
         contract,
         _market(
-            strike_type="less", floor_strike=81, cap_strike=82,
-            close_time="2026-07-16T04:00:00Z", rules_primary="another source and station",
+            strike_type="less",
+            floor_strike=81,
+            cap_strike=82,
+            close_time="2026-07-16T04:00:00Z",
+            rules_primary="another source and station",
         ),
     )
     assert set(result.blockers) == {
-        "TARGET_TIME_MISMATCH", "SETTLEMENT_SOURCE_MISMATCH", "STATION_MISMATCH",
-        "STRIKE_TYPE_MISMATCH", "FLOOR_STRIKE_MISMATCH", "UNEXPECTED_CAP_STRIKE",
+        "TARGET_TIME_MISMATCH",
+        "SETTLEMENT_SOURCE_MISMATCH",
+        "STATION_MISMATCH",
+        "STRIKE_TYPE_MISMATCH",
+        "FLOOR_STRIKE_MISMATCH",
+        "UNEXPECTED_CAP_STRIKE",
     }
 
 
@@ -167,9 +191,7 @@ def test_alignment_selects_nearest_exact_station_observation() -> None:
     assert result.passed is True
     assert result.offset_seconds == 240
     assert result.observation is not None
-    assert result.observation.observed_at == datetime(
-        2026, 7, 16, 3, 4, tzinfo=ZoneInfo("UTC")
-    )
+    assert result.observation.observed_at == datetime(2026, 7, 16, 3, 4, tzinfo=ZoneInfo("UTC"))
 
 
 def test_alignment_rejects_wrong_station_and_outside_tolerance() -> None:

@@ -40,6 +40,4 @@ def test_general_taker_and_maker_fees_round_up_to_centicent() -> None:
 
 
 def test_fee_adjusted_ev_is_stricter_than_gross_probability_edge() -> None:
-    assert fee_adjusted_expected_value(probability="0.56", price="0.55") == Decimal(
-        "-0.0074"
-    )
+    assert fee_adjusted_expected_value(probability="0.56", price="0.55") == Decimal("-0.0074")

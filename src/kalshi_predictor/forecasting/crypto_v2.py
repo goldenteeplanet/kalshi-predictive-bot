@@ -32,8 +32,14 @@ from kalshi_predictor.utils.time import parse_datetime
 class CryptoV2Forecaster:
     model_name = "crypto_v2"
 
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        *,
+        future_skew_seconds: int = DEFAULT_FUTURE_SKEW_SECONDS,
+    ) -> None:
         self.settings = settings or get_settings()
+        self.future_skew_seconds = future_skew_seconds
         self._feature_rows_by_symbol: dict[str, list[CryptoFeature]] | None = None
 
     def begin_forecast_run(self) -> None:
@@ -93,6 +99,7 @@ class CryptoV2Forecaster:
             terms=terms,
             snapshot=snapshot,
             feature_rows_by_symbol=self._feature_rows_by_symbol,
+            future_skew_seconds=self.future_skew_seconds,
         )
         missing = [item["symbol"] for item in component_rows if item["features"] is None]
         if missing:
@@ -187,8 +194,7 @@ class CryptoV2Forecaster:
                 "structured_terms": terms.as_payload(),
                 "forecast_cutoff": snapshot.captured_at.isoformat(),
                 "point_in_time_validation": {
-                    item["symbol"]: item.get("feature_compatibility")
-                    for item in component_rows
+                    item["symbol"]: item.get("feature_compatibility") for item in component_rows
                 },
                 "title": title,
                 "direction_detected": direction_detected,
@@ -209,9 +215,7 @@ class CryptoV2Forecaster:
                 "component_feature_ids": _component_feature_ids(component_rows),
                 "feature_snapshot_id": _primary_feature_id(component_rows),
                 "source_observation_ref": _primary_observation_reference(component_rows),
-                "component_observation_refs": _component_observation_references(
-                    component_rows
-                ),
+                "component_observation_refs": _component_observation_references(component_rows),
             },
             notes=(
                 "crypto_v2 executable price basis plus bounded momentum adjustment "
@@ -254,9 +258,7 @@ def _market_price_basis(snapshot: MarketSnapshot) -> MarketPriceBasis | None:
         )
     last_price = to_decimal(snapshot.last_price_dollars)
     if last_price is not None:
-        return MarketPriceBasis(
-            last_price, Decimal("0"), Decimal("1"), None, "LAST_TRADE_PRICE"
-        )
+        return MarketPriceBasis(last_price, Decimal("0"), Decimal("1"), None, "LAST_TRADE_PRICE")
     return None
 
 
@@ -319,9 +321,7 @@ def _crypto_terms_for_snapshot(
 def _non_crypto_component_legs(session: Session, ticker: str) -> list[MarketLeg]:
     legs = list(
         session.scalars(
-            select(MarketLeg)
-            .where(MarketLeg.ticker == ticker)
-            .order_by(MarketLeg.leg_index)
+            select(MarketLeg).where(MarketLeg.ticker == ticker).order_by(MarketLeg.leg_index)
         )
     )
     return [leg for leg in legs if str(leg.category).lower() != "crypto"]
@@ -356,9 +356,7 @@ def _link_components(
     symbols = raw.get("component_symbols")
     if isinstance(symbols, list):
         rows = [
-            {"symbol": item, "direction": "UNKNOWN"}
-            for item in symbols
-            if isinstance(item, str)
+            {"symbol": item, "direction": "UNKNOWN"} for item in symbols if isinstance(item, str)
         ]
         if rows:
             return rows
@@ -372,6 +370,7 @@ def _component_feature_rows(
     terms: CryptoMarketTerms,
     snapshot: MarketSnapshot,
     feature_rows_by_symbol: dict[str, list[CryptoFeature]] | None = None,
+    future_skew_seconds: int = DEFAULT_FUTURE_SKEW_SECONDS,
 ) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     seen: set[str] = set()
@@ -386,6 +385,7 @@ def _component_feature_rows(
                 symbol=symbol,
                 terms=terms,
                 forecast_cutoff=snapshot.captured_at,
+                future_skew_seconds=future_skew_seconds,
             )
         else:
             if symbol not in feature_rows_by_symbol:
@@ -394,6 +394,7 @@ def _component_feature_rows(
                 feature_rows_by_symbol[symbol],
                 terms=terms,
                 forecast_cutoff=snapshot.captured_at,
+                future_skew_seconds=future_skew_seconds,
             )
         rows.append(
             {
@@ -513,10 +514,7 @@ def _primary_feature_id(component_rows: list[dict[str, object]]) -> int | None:
 
 
 def _component_feature_ids(component_rows: list[dict[str, object]]) -> dict[str, int | None]:
-    return {
-        str(row["symbol"]): getattr(row.get("features"), "id", None)
-        for row in component_rows
-    }
+    return {str(row["symbol"]): getattr(row.get("features"), "id", None) for row in component_rows}
 
 
 def _primary_observation_reference(
@@ -533,10 +531,7 @@ def _primary_observation_reference(
 def _component_observation_references(
     component_rows: list[dict[str, object]],
 ) -> dict[str, dict[str, object] | None]:
-    return {
-        str(row.get("symbol")): _primary_observation_reference([row])
-        for row in component_rows
-    }
+    return {str(row.get("symbol")): _primary_observation_reference([row]) for row in component_rows}
 
 
 def _clamp_probability(value: Decimal) -> Decimal:

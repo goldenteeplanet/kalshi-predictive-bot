@@ -212,4 +212,3 @@ def _model_name_for_league(league: str) -> str:
         "NFL": "nfl_v1",
         "NHL": "nhl_v1",
     }.get(league, "sports_v1")
-

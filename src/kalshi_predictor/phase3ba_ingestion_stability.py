@@ -556,7 +556,7 @@ def _group_counts(
         text(
             f'SELECT "{group_column}" AS group_value, COUNT(*) AS row_count, '
             f'MAX("{timestamp_column}") AS latest_at FROM "{table_name}" '
-            'WHERE rowid > :min_rowid '
+            "WHERE rowid > :min_rowid "
             f'GROUP BY "{group_column}" ORDER BY row_count DESC LIMIT :limit'
         ),
         {"limit": limit, "min_rowid": min_rowid},
@@ -989,8 +989,7 @@ def _bar_chart_svg(
     else:
         max_value = max(math.log10(value + 1.0) for value in values) if values else 1.0
         scaled = [
-            (math.log10(value + 1.0) / max_value if max_value > 0 else 0.0)
-            for value in values
+            (math.log10(value + 1.0) / max_value if max_value > 0 else 0.0) for value in values
         ]
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '

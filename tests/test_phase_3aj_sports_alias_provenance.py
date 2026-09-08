@@ -74,14 +74,11 @@ def test_phase3aj_suggests_and_applies_observed_soccer_alias(tmp_path) -> None:
 
         payload = build_sports_alias_provenance_repair(session, apply_aliases=True)
         session.commit()
-        refreshed = session.scalar(
-            select(SportsTeam).where(SportsTeam.team_key == "SOCCER:mci")
-        )
+        refreshed = session.scalar(select(SportsTeam).where(SportsTeam.team_key == "SOCCER:mci"))
 
     assert payload["summary"]["alias_suggestions"] >= 1
     assert any(
-        row["alias"] == "man city" and row["applied"]
-        for row in payload["alias_suggestions"]
+        row["alias"] == "man city" and row["applied"] for row in payload["alias_suggestions"]
     )
     assert any(row["competition_code"] == "eng.1" for row in payload["competition_suggestions"])
     assert payload["rows"][0]["reason"] == "SOCCER_COMPETITION_PROVENANCE_MISSING"

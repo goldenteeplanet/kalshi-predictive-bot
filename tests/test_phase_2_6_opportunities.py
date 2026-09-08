@@ -151,8 +151,7 @@ def test_scanner_keeps_incomplete_rain_horizon_diagnostic_only() -> None:
         {
             "model_name": "weather_v2",
             "feature_json": (
-                '{"weather_feature_alignment":'
-                '"LATEST_RAIN_RISK_WITHIN_NOAA_HORIZON"}'
+                '{"weather_feature_alignment":"LATEST_RAIN_RISK_WITHIN_NOAA_HORIZON"}'
             ),
         },
     )()

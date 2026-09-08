@@ -123,13 +123,11 @@ def test_phase3ax_gap_analysis_detects_missing_commands_and_stale_reports(tmp_pa
     assert payload["command_registry_audit"]["missing_command_names"]
     assert "phase3at-handoff-report" in payload["command_registry_audit"]["missing_command_names"]
     assert any(
-        row["classification"] == "CONFLICTS_WITH_R5"
-        and "phase3ar" in row["path"]
+        row["classification"] == "CONFLICTS_WITH_R5" and "phase3ar" in row["path"]
         for row in payload["report_freshness_audit"]["rows"]
     )
     assert any(
-        row["classification"] == "STALE_ARTIFACT"
-        and "phase3at" in row["path"]
+        row["classification"] == "STALE_ARTIFACT" and "phase3at" in row["path"]
         for row in payload["report_freshness_audit"]["rows"]
     )
     assert "phase3at-handoff-report" not in artifacts.next_operator_commands_path.read_text(
@@ -217,9 +215,7 @@ def test_phase3ax_economic_news_gap_reads_exact_parser_backfill_blocker(
                         "--output-dir reports/phase3an --limit 500"
                     ),
                 },
-                "exact_next_action": (
-                    "Run the registered report-only parser backfill plan."
-                ),
+                "exact_next_action": ("Run the registered report-only parser backfill plan."),
             }
         ),
         encoding="utf-8",
@@ -228,14 +224,10 @@ def test_phase3ax_economic_news_gap_reads_exact_parser_backfill_blocker(
     status = _economic_news_gap_status(reports_dir)
 
     assert status["status"] == "PARSER_BACKFILL_REQUIRED"
-    assert status["first_hard_blocker"] == (
-        "CURRENT_EXACT_LINKS_NEED_PARSER_BACKFILL"
-    )
+    assert status["first_hard_blocker"] == ("CURRENT_EXACT_LINKS_NEED_PARSER_BACKFILL")
     assert status["context_ready_count"] == 259
     assert status["exact_linked_current_without_parsed_leg"] == 274
-    assert "phase3an-economic-news-parser-backfill-plan" in (
-        status["next_registered_command"]
-    )
+    assert "phase3an-economic-news-parser-backfill-plan" in (status["next_registered_command"])
 
 
 def test_phase3ax_selects_guarded_refresh_before_source_followup() -> None:

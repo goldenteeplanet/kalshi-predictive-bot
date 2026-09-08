@@ -183,4 +183,3 @@ def _settings(tmp_path) -> Settings:
 def _session_factory(tmp_path):
     engine = init_db(f"sqlite:///{Path(tmp_path) / 'phase3w.db'}")
     return get_session_factory(engine)
-

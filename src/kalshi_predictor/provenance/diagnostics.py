@@ -11,8 +11,8 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.data.schema import (
-    Forecast,
     CryptoFeature,
+    Forecast,
     MarketRanking,
     MarketSnapshot,
     RuntimeProvenanceEvent,
@@ -21,9 +21,7 @@ from kalshi_predictor.data.schema import (
 )
 from kalshi_predictor.utils.time import utc_now
 
-DEFAULT_PROV10_REPORT = Path(
-    "reports/phase_prov10/prov10_full_scheduler_cycle_certification.json"
-)
+DEFAULT_PROV10_REPORT = Path("reports/phase_prov10/prov10_full_scheduler_cycle_certification.json")
 DEFAULT_OUTPUT_DIR = Path("reports/phase_prov11")
 DEFAULT_EVENT_LIMIT = 250
 FEATURE_MODELS = {
@@ -59,15 +57,11 @@ def build_provenance_diagnostics(
     )
     forecast_ids = {row.forecast_id for row in events}
     ranking_ids = {row.ranking_id for row in events if row.ranking_id is not None}
-    snapshot_ids = {
-        row.market_snapshot_id for row in events if row.market_snapshot_id is not None
-    }
+    snapshot_ids = {row.market_snapshot_id for row in events if row.market_snapshot_id is not None}
     existing_forecasts = _existing_ids(session, Forecast, forecast_ids)
     existing_rankings = _existing_ids(session, MarketRanking, ranking_ids)
     existing_snapshots = _existing_ids(session, MarketSnapshot, snapshot_ids)
-    previous_values = {
-        row.previous_digest for row in events if row.previous_digest != "GENESIS"
-    }
+    previous_values = {row.previous_digest for row in events if row.previous_digest != "GENESIS"}
     existing_previous = set()
     if previous_values:
         existing_previous = set(
@@ -186,18 +180,25 @@ def build_market_decision_trace(
     if event_limit < 1 or event_limit > 100:
         raise ValueError("event_limit must be between 1 and 100")
     current = _as_utc(now or utc_now())
-    events = list(session.scalars(
-        select(RuntimeProvenanceEvent)
-        .where(RuntimeProvenanceEvent.ticker == normalized)
-        .order_by(desc(RuntimeProvenanceEvent.id))
-        .limit(event_limit)
-    ))
+    events = list(
+        session.scalars(
+            select(RuntimeProvenanceEvent)
+            .where(RuntimeProvenanceEvent.ticker == normalized)
+            .order_by(desc(RuntimeProvenanceEvent.id))
+            .limit(event_limit)
+        )
+    )
     events.reverse()
     if not events:
         return {
-            "phase": "PROV-12", "ticker": normalized, "status": "NOT_FOUND",
-            "read_only": True, "database_writes": 0, "alerts": ["TRACE_MISSING"],
-            "stages": [], "generated_at": current.isoformat(),
+            "phase": "PROV-12",
+            "ticker": normalized,
+            "status": "NOT_FOUND",
+            "read_only": True,
+            "database_writes": 0,
+            "alerts": ["TRACE_MISSING"],
+            "stages": [],
+            "generated_at": current.isoformat(),
         }
 
     forecast_ids = {event.forecast_id for event in events}
@@ -225,46 +226,54 @@ def build_market_decision_trace(
             stale_after_minutes=stale_after_minutes,
             forecast_exists=forecast is not None,
             ranking_exists=(ranking is not None if event.ranking_id is not None else True),
-            snapshot_exists=(snapshot is not None if event.market_snapshot_id is not None else False),
+            snapshot_exists=(
+                snapshot is not None if event.market_snapshot_id is not None else False
+            ),
             feature_exists=feature is not None,
             observation_exists=bool(observation),
             ranking_stage_exists=(event.forecast_id, "RANKING_CREATED") in event_stages,
         )
         alerts.update(stage_alerts)
-        stages.append({
-            "event_id": event.id,
-            "stage": event.stage,
-            "event_at": _as_utc(event.event_at).isoformat(),
-            "forecast_id": event.forecast_id,
-            "forecast_probability": getattr(forecast, "yes_probability", None),
-            "model_name": event.model_name,
-            "model_version": event.model_version,
-            "observation": observation,
-            "feature_source_table": event.feature_source_table,
-            "feature_source_id": event.feature_source_id,
-            "feature_exists": feature is not None,
-            "snapshot_id": event.market_snapshot_id,
-            "snapshot_at": (
-                _as_utc(snapshot.captured_at).isoformat() if snapshot is not None else None
-            ),
-            "ranking_id": event.ranking_id,
-            "opportunity_score": getattr(ranking, "opportunity_score", None),
-            "estimated_edge": getattr(ranking, "estimated_edge", None),
-            "previous_digest": event.previous_digest,
-            "digest": event.provenance_digest,
-            "digest_valid": _digest_valid(event),
-            "alerts": stage_alerts,
-        })
+        stages.append(
+            {
+                "event_id": event.id,
+                "stage": event.stage,
+                "event_at": _as_utc(event.event_at).isoformat(),
+                "forecast_id": event.forecast_id,
+                "forecast_probability": getattr(forecast, "yes_probability", None),
+                "model_name": event.model_name,
+                "model_version": event.model_version,
+                "observation": observation,
+                "feature_source_table": event.feature_source_table,
+                "feature_source_id": event.feature_source_id,
+                "feature_exists": feature is not None,
+                "snapshot_id": event.market_snapshot_id,
+                "snapshot_at": (
+                    _as_utc(snapshot.captured_at).isoformat() if snapshot is not None else None
+                ),
+                "ranking_id": event.ranking_id,
+                "opportunity_score": getattr(ranking, "opportunity_score", None),
+                "estimated_edge": getattr(ranking, "estimated_edge", None),
+                "previous_digest": event.previous_digest,
+                "digest": event.provenance_digest,
+                "digest_valid": _digest_valid(event),
+                "alerts": stage_alerts,
+            }
+        )
     latest = events[-1]
     return {
-        "phase": "PROV-12", "ticker": normalized,
+        "phase": "PROV-12",
+        "ticker": normalized,
         "status": "HEALTHY" if not alerts else "DRIFT_ALERT",
-        "read_only": True, "database_writes": 0,
+        "read_only": True,
+        "database_writes": 0,
         "generated_at": current.isoformat(),
         "latest_event_at": _as_utc(latest.event_at).isoformat(),
-        "model_name": latest.model_name, "model_version": latest.model_version,
+        "model_name": latest.model_name,
+        "model_version": latest.model_version,
         "stale_after_minutes": stale_after_minutes,
-        "alerts": sorted(alerts), "stages": stages,
+        "alerts": sorted(alerts),
+        "stages": stages,
         "guardrails": {"thresholds_changed": False, "execution_enabled": False},
     }
 
@@ -281,25 +290,27 @@ def build_provenance_drift_alerts(
     current = _as_utc(now or utc_now())
     ranked = select(
         RuntimeProvenanceEvent.id.label("event_id"),
-        func.row_number().over(
+        func.row_number()
+        .over(
             partition_by=RuntimeProvenanceEvent.ticker,
             order_by=desc(RuntimeProvenanceEvent.id),
-        ).label("row_number"),
+        )
+        .label("row_number"),
     ).subquery()
-    events = list(session.scalars(
-        select(RuntimeProvenanceEvent)
-        .join(ranked, RuntimeProvenanceEvent.id == ranked.c.event_id)
-        .where(ranked.c.row_number == 1)
-        .order_by(desc(RuntimeProvenanceEvent.id))
-        .limit(ticker_limit)
-    ))
+    events = list(
+        session.scalars(
+            select(RuntimeProvenanceEvent)
+            .join(ranked, RuntimeProvenanceEvent.id == ranked.c.event_id)
+            .where(ranked.c.row_number == 1)
+            .order_by(desc(RuntimeProvenanceEvent.id))
+            .limit(ticker_limit)
+        )
+    )
     feature_refs = _feature_rows(session, events)
     rows = []
     counts: Counter[str] = Counter()
     for event in events:
-        age_minutes = max(
-            0, int((current - _as_utc(event.event_at)).total_seconds() // 60)
-        )
+        age_minutes = max(0, int((current - _as_utc(event.event_at)).total_seconds() // 60))
         alerts = []
         if age_minutes > stale_after_minutes:
             alerts.append("TRACE_STALE")
@@ -316,18 +327,24 @@ def build_provenance_drift_alerts(
         if not _digest_valid(event):
             alerts.append("DIGEST_INVALID")
         counts.update(alerts)
-        rows.append({
-            "ticker": event.ticker, "model_name": event.model_name,
-            "model_version": event.model_version, "latest_stage": event.stage,
-            "latest_event_at": _as_utc(event.event_at).isoformat(),
-            "age_minutes": age_minutes,
-            "status": "HEALTHY" if not alerts else "DRIFT_ALERT",
-            "alerts": sorted(alerts),
-        })
+        rows.append(
+            {
+                "ticker": event.ticker,
+                "model_name": event.model_name,
+                "model_version": event.model_version,
+                "latest_stage": event.stage,
+                "latest_event_at": _as_utc(event.event_at).isoformat(),
+                "age_minutes": age_minutes,
+                "status": "HEALTHY" if not alerts else "DRIFT_ALERT",
+                "alerts": sorted(alerts),
+            }
+        )
     return {
-        "phase": "PROV-12", "generated_at": current.isoformat(),
+        "phase": "PROV-12",
+        "generated_at": current.isoformat(),
         "mode": "READ_ONLY_PROVENANCE_DRIFT_ALERT_PREVIEW",
-        "read_only": True, "database_writes": 0,
+        "read_only": True,
+        "database_writes": 0,
         "summary": {
             "tickers_checked": len(rows),
             "healthy_tickers": sum(row["status"] == "HEALTHY" for row in rows),
@@ -358,7 +375,8 @@ def _feature_rows(
     result: dict[tuple[str | None, int | None], Any] = {}
     for table, model in FEATURE_MODELS.items():
         ids = {
-            event.feature_source_id for event in events
+            event.feature_source_id
+            for event in events
             if event.feature_source_table == table and event.feature_source_id is not None
         }
         for row_id, row in _rows_by_id(session, model, ids).items():

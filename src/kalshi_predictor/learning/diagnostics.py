@@ -122,9 +122,7 @@ def build_learning_diagnostics(
         ),
         "duplicate_cooldown": {
             "hours": learning_settings.learning_duplicate_cooldown_hours,
-            "status": (
-                "Active; ticker/model/side repeats are blocked inside the cooldown window."
-            ),
+            "status": ("Active; ticker/model/side repeats are blocked inside the cooldown window."),
         },
         "recommended_next_action": advisor.next_action,
         "current_thresholds": {
@@ -146,9 +144,13 @@ def threshold_advisor(
     current_min_edge = settings.learning_min_edge
     current_min_score = settings.learning_min_opportunity_score
     observed_top_score = _latest_top_score(session)
-    opportunities_detected = latest_cycle.opportunities_found if latest_cycle else _count(
-        session,
-        LearningOpportunity,
+    opportunities_detected = (
+        latest_cycle.opportunities_found
+        if latest_cycle
+        else _count(
+            session,
+            LearningOpportunity,
+        )
     )
     recommended_score = current_min_score
     message = "Learning thresholds look usable for the latest stored rankings."
@@ -159,14 +161,10 @@ def threshold_advisor(
     )
     if (
         suggest_thresholds
-        and
-        opportunities_detected == 0
+        and opportunities_detected == 0
         and current_min_score > Decimal("25")
         and (
-            (
-                observed_top_score is not None
-                and observed_top_score < current_min_score
-            )
+            (observed_top_score is not None and observed_top_score < current_min_score)
             or _has_candidates_at_score(
                 candidate_rows,
                 settings=settings,
@@ -189,7 +187,8 @@ def threshold_advisor(
     )
     expected = replay["expected_additional_paper_trades"]
     duplicate_rejections = sum(
-        1 for row in (rejections or recent_learning_rejections(session, limit=500))
+        1
+        for row in (rejections or recent_learning_rejections(session, limit=500))
         if row.reason == "duplicate_trade"
     )
     if (
@@ -198,8 +197,7 @@ def threshold_advisor(
         and replay["duplicate_blocked_additional_candidates"] > 0
     ):
         message = (
-            "Lowering score will not help because duplicate protection is the current "
-            "bottleneck."
+            "Lowering score will not help because duplicate protection is the current bottleneck."
         )
     elif (
         recommended_score < current_min_score
@@ -338,10 +336,7 @@ def render_learning_diagnostics_report(diagnostics: dict[str, Any]) -> str:
                 "- Candidates passing suggested thresholds: "
                 f"{advisor['candidates_passing_suggested_thresholds']}"
             ),
-            (
-                "- Additional candidates available: "
-                f"{advisor['additional_candidates_available']}"
-            ),
+            (f"- Additional candidates available: {advisor['additional_candidates_available']}"),
             (
                 "- Duplicate-blocked additional candidates: "
                 f"{advisor['duplicate_blocked_additional_candidates']}"
@@ -356,10 +351,7 @@ def render_learning_diagnostics_report(diagnostics: dict[str, Any]) -> str:
             ),
             f"- Recommended min edge: {advisor['recommended_min_edge']}",
             f"- Recommended min score: {advisor['recommended_min_score']}",
-            (
-                "- Expected additional paper trades: "
-                f"{advisor['expected_additional_paper_trades']}"
-            ),
+            (f"- Expected additional paper trades: {advisor['expected_additional_paper_trades']}"),
             f"- Recommendation: {advisor['message']}",
             "",
             "## Category Breakdown",
@@ -492,9 +484,7 @@ def _latest_top_score(session: Session) -> Decimal | None:
     if latest_ranked_at is None:
         return None
     scores = session.scalars(
-        select(MarketRanking.opportunity_score).where(
-            MarketRanking.ranked_at == latest_ranked_at
-        )
+        select(MarketRanking.opportunity_score).where(MarketRanking.ranked_at == latest_ranked_at)
     )
     decimal_scores = [
         score for score in (to_decimal(value) for value in scores) if score is not None
@@ -594,15 +584,12 @@ def _candidate_from_ranking(
         ),
     )
     side = ranking.best_side
-    duplicate = (
-        bool(side)
-        and is_duplicate_candidate(
-            session,
-            ticker=ranking.ticker,
-            model_name=ranking.forecast_model,
-            side=side,
-            cooldown_hours=settings.learning_duplicate_cooldown_hours,
-        )
+    duplicate = bool(side) and is_duplicate_candidate(
+        session,
+        ticker=ranking.ticker,
+        model_name=ranking.forecast_model,
+        side=side,
+        cooldown_hours=settings.learning_duplicate_cooldown_hours,
     )
     position_limited = _position_limited(
         session,
@@ -626,9 +613,7 @@ def _candidate_from_ranking(
         "score_decimal": to_decimal(ranking.opportunity_score),
         "spread_decimal": to_decimal(ranking.spread),
         "liquidity_decimal": to_decimal(ranking.liquidity) or Decimal("0"),
-        "settlement_eta_hours_decimal": (
-            minutes / Decimal("60") if minutes is not None else None
-        ),
+        "settlement_eta_hours_decimal": (minutes / Decimal("60") if minutes is not None else None),
         "learning_priority_decimal": priority,
         "edge": decimal_to_str(to_decimal(ranking.estimated_edge)),
         "opportunity_score": decimal_to_str(to_decimal(ranking.opportunity_score)),
@@ -645,9 +630,7 @@ def _candidate_from_ranking(
         "market_status": resolved_market_status,
         "phase3ak_blocked": phase3ak_blocked,
         "phase3ak_reason": (
-            phase3ak_learning_rejection_reason(phase3ak_gate or {})
-            if phase3ak_blocked
-            else None
+            phase3ak_learning_rejection_reason(phase3ak_gate or {}) if phase3ak_blocked else None
         ),
         "ranking_id": ranking.id,
     }
@@ -753,14 +736,12 @@ def _threshold_replay(
     additional = [
         candidate
         for candidate in suggested_pass
-        if (candidate["ticker"], candidate["model_name"], candidate.get("side"))
-        not in current_keys
+        if (candidate["ticker"], candidate["model_name"], candidate.get("side")) not in current_keys
     ]
     threshold_only_additional = [
         candidate
         for candidate in suggested_threshold_only
-        if (candidate["ticker"], candidate["model_name"], candidate.get("side"))
-        not in current_keys
+        if (candidate["ticker"], candidate["model_name"], candidate.get("side")) not in current_keys
     ]
     duplicate_blocked = sum(1 for candidate in additional if candidate["duplicate_trade"])
     position_blocked = sum(1 for candidate in additional if candidate["position_limited"])
@@ -1038,9 +1019,7 @@ def _advisor_to_dict(advisor: ThresholdAdvisor) -> dict[str, Any]:
         "recommended_min_edge": decimal_to_str(advisor.recommended_min_edge),
         "recommended_min_score": decimal_to_str(advisor.recommended_min_score),
         "expected_additional_paper_trades": advisor.expected_additional_paper_trades,
-        "candidates_passing_current_thresholds": (
-            advisor.candidates_passing_current_thresholds
-        ),
+        "candidates_passing_current_thresholds": (advisor.candidates_passing_current_thresholds),
         "candidates_passing_suggested_thresholds": (
             advisor.candidates_passing_suggested_thresholds
         ),
@@ -1048,12 +1027,8 @@ def _advisor_to_dict(advisor: ThresholdAdvisor) -> dict[str, Any]:
         "duplicate_blocked_additional_candidates": (
             advisor.duplicate_blocked_additional_candidates
         ),
-        "position_blocked_additional_candidates": (
-            advisor.position_blocked_additional_candidates
-        ),
-        "safety_blocked_additional_candidates": (
-            advisor.safety_blocked_additional_candidates
-        ),
+        "position_blocked_additional_candidates": (advisor.position_blocked_additional_candidates),
+        "safety_blocked_additional_candidates": (advisor.safety_blocked_additional_candidates),
         "candidate_pool_size": advisor.candidate_pool_size,
         "message": advisor.message,
         "next_action": advisor.next_action,

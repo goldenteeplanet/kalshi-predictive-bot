@@ -25,15 +25,18 @@ def _fixture(tmp_path: Path) -> tuple[dict, Path]:
     rollback.mkdir(parents=True)
     _write(rollback / "cycle.py", "cycle")
     paths = {
-        "backup_path": _write(tmp_path / "backup.json", {
-            "path": "/mnt/backup/exact.db",
-            "size_bytes": 100,
-            "quick_check": "ok",
-            "sha256": "a" * 64,
-            "integrity_check": "ok",
-            "execution_enabled": False,
-            "finished_at": (AS_OF - timedelta(minutes=5)).isoformat(),
-        }),
+        "backup_path": _write(
+            tmp_path / "backup.json",
+            {
+                "path": "/mnt/backup/exact.db",
+                "size_bytes": 100,
+                "quick_check": "ok",
+                "sha256": "a" * 64,
+                "integrity_check": "ok",
+                "execution_enabled": False,
+                "finished_at": (AS_OF - timedelta(minutes=5)).isoformat(),
+            },
+        ),
         "writer_monitor_path": _write(
             tmp_path / "writer.txt",
             "DB writer monitor: CLEAR\nCurrent writer PID: none\n"
@@ -44,23 +47,29 @@ def _fixture(tmp_path: Path) -> tuple[dict, Path]:
             "Database lock diagnostics: CLEAR\n"
             "Safe to start another write job: yes\nOpen DB holders: none visible\n",
         ),
-        "services_path": _write(tmp_path / "services.json", {
-            "bounded_service": "inactive",
-            "bounded_timer": "inactive",
-            "legacy_watcher": "inactive",
-            "legacy_watcher_enabled": False,
-            "other_writer": "inactive",
-        }),
-        "execution_path": _write(tmp_path / "execution.txt", "EXECUTION_ENABLED=false\n"),
-        "cycle_path": _write(tmp_path / "cycle.json", {
-            "after_event_id": 10,
-            "weather_features_inserted": 1,
-            "tickers": {"crypto_v2": ["BTC"], "weather_v2": ["WX"]},
-            "summaries": {
-                "crypto_v2": {"snapshots_scanned": 1, "forecasts_inserted": 1},
-                "weather_v2": {"snapshots_scanned": 1, "forecasts_inserted": 1},
+        "services_path": _write(
+            tmp_path / "services.json",
+            {
+                "bounded_service": "inactive",
+                "bounded_timer": "inactive",
+                "legacy_watcher": "inactive",
+                "legacy_watcher_enabled": False,
+                "other_writer": "inactive",
             },
-        }),
+        ),
+        "execution_path": _write(tmp_path / "execution.txt", "EXECUTION_ENABLED=false\n"),
+        "cycle_path": _write(
+            tmp_path / "cycle.json",
+            {
+                "after_event_id": 10,
+                "weather_features_inserted": 1,
+                "tickers": {"crypto_v2": ["BTC"], "weather_v2": ["WX"]},
+                "summaries": {
+                    "crypto_v2": {"snapshots_scanned": 1, "forecasts_inserted": 1},
+                    "weather_v2": {"snapshots_scanned": 1, "forecasts_inserted": 1},
+                },
+            },
+        ),
         "attribution_path": _write(tmp_path / "attribution.json", _attribution()),
         "rollback_root": rollback,
         "rollback_paths": ["cycle.py"],
@@ -167,9 +176,7 @@ def test_rollback_drift_is_caught_by_certification(tmp_path: Path, monkeypatch) 
     )
     assert report["gates"]["certification_executed"] is True
     assert report["gates"]["certification_passed"] is False
-    assert report["certification"]["gates"][
-        "rollback.files_present_and_hashes_match"
-    ] is False
+    assert report["certification"]["gates"]["rollback.files_present_and_hashes_match"] is False
 
 
 def test_failed_capture_skips_certification(tmp_path: Path) -> None:

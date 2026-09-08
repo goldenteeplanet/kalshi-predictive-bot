@@ -51,4 +51,3 @@ class EnsembleV1Forecaster:
             },
             notes="Simple average of available component model probabilities.",
         )
-

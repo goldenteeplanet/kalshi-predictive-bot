@@ -14,4 +14,3 @@ def test_log_loss() -> None:
 
 def test_accuracy_at_threshold() -> None:
     assert accuracy_at_threshold([1, 0, 1], [0.8, 0.4, 0.49]) == 2 / 3
-

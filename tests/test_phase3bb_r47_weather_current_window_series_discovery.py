@@ -28,9 +28,13 @@ def test_patch_runner_weather_feature_refresh_adds_source_steps() -> None:
 
     assert "ingest-weather --location-key new_york" in patched
     assert "build-weather-features --location-key new_york" in patched
-    assert patched.find("build-weather-features") < patched.find("phase3az-r12-weather-activation-preview")
+    assert patched.find("build-weather-features") < patched.find(
+        "phase3az-r12-weather-activation-preview"
+    )
     assert patched.find("weather_current_catalog_refresh") < patched.find("weather_fast_lane")
-    assert patched == patch_runner_weather_feature_refresh(patched, repaired_block=_repaired_block())
+    assert patched == patch_runner_weather_feature_refresh(
+        patched, repaired_block=_repaired_block()
+    )
 
 
 def test_phase3bb_r47_ready_to_install_when_features_are_stale(tmp_path: Path) -> None:
@@ -92,7 +96,9 @@ def test_phase3bb_r47_cli_help_registered() -> None:
     )
 
     assert result.exit_code == 0
-    assert "phase3bb-r47-weather-current-window-series-discovery-linkability-repair" in result.output
+    assert (
+        "phase3bb-r47-weather-current-window-series-discovery-linkability-repair" in result.output
+    )
     assert "--backup-first" in result.output
 
 
@@ -228,11 +234,14 @@ def _repaired_block() -> str:
             "# cadence_minutes=30 category=weather-catalog",
             (
                 "run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; "
-                ".venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH; "
+                ".venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages "
+                "3 --series-ticker KXTEMPNYCH; "
                 ".venv/bin/kalshi-bot market-legs-parse --refresh --limit 1500; "
                 ".venv/bin/kalshi-bot ingest-weather --location-key new_york; "
                 ".venv/bin/kalshi-bot build-weather-features --location-key new_york; "
-                ".venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 --match-tolerance-hours 3'"
+                ".venv/bin/kalshi-bot phase3az-r12-weather-activation-preview "
+                "--output-dir reports/phase3az_r12_weather --limit 2000 "
+                "--fresh-window-hours 24 --match-tolerance-hours 3'"
             ),
         ]
     )
@@ -262,8 +271,14 @@ run_job() {
 }
 
 # cadence_minutes=30 category=weather-catalog
-run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; .venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit 1500; .venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 --match-tolerance-hours 3'
+run_job weather_current_catalog_refresh true bash -lc 'set -euo pipefail; \
+.venv/bin/kalshi-bot sync-markets --status open --limit 100 --max-pages 3 \
+--series-ticker KXTEMPNYCH; .venv/bin/kalshi-bot market-legs-parse --refresh --limit \
+1500; .venv/bin/kalshi-bot phase3az-r12-weather-activation-preview --output-dir \
+reports/phase3az_r12_weather --limit 2000 --fresh-window-hours 24 \
+--match-tolerance-hours 3'
 
 # cadence_minutes=30 category=weather
-run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane --output-dir reports/phase3bb_r2 --reports-dir reports
+run_job weather_fast_lane true .venv/bin/kalshi-bot phase3bb-r2-weather-fast-lane \
+--output-dir reports/phase3bb_r2 --reports-dir reports
 """

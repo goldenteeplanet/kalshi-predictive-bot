@@ -5,16 +5,18 @@ import subprocess
 from pathlib import Path
 
 
-def certify_fail_closed_harness(script: Path, unit: Path, *, bash: str = "bash") -> dict[str, object]:
+def certify_fail_closed_harness(
+    script: Path, unit: Path, *, bash: str = "bash"
+) -> dict[str, object]:
     text = script.read_text(encoding="utf-8")
     failures: list[str] = []
     required = (
         "systemd-analyze verify /tmp/kalshi-ui-status-collector.service",
-        "install -m 0644 /tmp/kalshi-ui-status-collector.service \"$unit\"",
+        'install -m 0644 /tmp/kalshi-ui-status-collector.service "$unit"',
         "trap 'fail_and_rollback' ERR",
         "trap - ERR",
         "rollback_now",
-        "exit \"$status\"",
+        'exit "$status"',
     )
     for token in required:
         if token not in text:
@@ -50,7 +52,7 @@ def _exercise_err_trap(bash: str) -> dict[str, object]:
     probe = (
         "set -Eeuo pipefail\n"
         "rollback_now() { set +e; echo ROLLBACK; }\n"
-        "fail_and_rollback() { status=$?; trap - ERR; rollback_now; exit \"$status\"; }\n"
+        'fail_and_rollback() { status=$?; trap - ERR; rollback_now; exit "$status"; }\n'
         "trap 'fail_and_rollback' ERR\n"
         "(exit 23)\n"
         "echo CONTINUED\n"

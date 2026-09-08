@@ -59,34 +59,43 @@ def test_prov15_matches_deterministic_golden_report():
         generated_at=NOW,
     )
     golden = json.loads(
-        (__import__("pathlib").Path(__file__).parent / "golden" / "prov15_attribution_report.json")
-        .read_text(encoding="utf-8")
+        (
+            __import__("pathlib").Path(__file__).parent
+            / "golden"
+            / "prov15_attribution_report.json"
+        ).read_text(encoding="utf-8")
     )
     assert report == golden
 
 
 def _event(
-    key, model, version, *, observation_age=60, snapshot_age=10,
-    observation=..., snapshot=...,
+    key,
+    model,
+    version,
+    *,
+    observation_age=60,
+    snapshot_age=10,
+    observation=...,
+    snapshot=...,
 ):
     event_at = NOW
     if observation is ...:
         observation = {
             "table": "crypto_prices" if model == "crypto_v2" else "weather_forecasts",
             "id": 1,
-            "observed_at": (
-                event_at - timedelta(seconds=observation_age)
-            ).isoformat(),
+            "observed_at": (event_at - timedelta(seconds=observation_age)).isoformat(),
         }
     if snapshot is ...:
         snapshot = {
-            "table": "market_snapshots", "id": 2,
-            "captured_at": (
-                event_at - timedelta(seconds=snapshot_age)
-            ).isoformat(),
+            "table": "market_snapshots",
+            "id": 2,
+            "captured_at": (event_at - timedelta(seconds=snapshot_age)).isoformat(),
         }
     return {
-        "event_key": key, "model_name": model, "model_version": version,
-        "event_at": event_at.isoformat(), "source_observation_ref": observation,
+        "event_key": key,
+        "model_name": model,
+        "model_version": version,
+        "event_at": event_at.isoformat(),
+        "source_observation_ref": observation,
         "market_snapshot_ref": snapshot,
     }

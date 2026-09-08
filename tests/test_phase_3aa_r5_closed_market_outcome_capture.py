@@ -93,9 +93,7 @@ def test_phase3aa_r5_writer_and_cli_help(tmp_path) -> None:
     assert artifacts.json_path.exists()
     assert artifacts.markdown_path.exists()
     assert artifacts.rows_path.exists()
-    assert "Closed Market Outcome Capture" in artifacts.markdown_path.read_text(
-        encoding="utf-8"
-    )
+    assert "Closed Market Outcome Capture" in artifacts.markdown_path.read_text(encoding="utf-8")
     assert result.exit_code == 0
     assert "phase3aa-r5-closed-market-outcome-capture" in result.output
 

@@ -225,9 +225,7 @@ def build_phase3az_r12_weather_activation_preview(
     )
     markets = _weather_market_candidates(session, limit=limit)
     links_by_ticker = _latest_links_by_ticker(session, [market.ticker for market in markets])
-    min_confidence = (
-        to_decimal(resolved_settings.weather_v2_min_link_confidence) or Decimal("0.6")
-    )
+    min_confidence = to_decimal(resolved_settings.weather_v2_min_link_confidence) or Decimal("0.6")
     candidate_rows = [
         _candidate_row(
             market,
@@ -497,9 +495,7 @@ def build_phase3az_r12_weather_missing_link_apply(
         "apply": apply,
         "backup_first": backup_first,
         "backup_path": str(backup_path) if backup_path is not None else None,
-        "backup_kind": "LOGICAL_WEATHER_MARKET_LINK_ROWS"
-        if backup_path is not None
-        else None,
+        "backup_kind": "LOGICAL_WEATHER_MARKET_LINK_ROWS" if backup_path is not None else None,
         "active_db_writer_status": writer,
         "status": status,
         "blocked_reason": blocked_reason,
@@ -579,9 +575,7 @@ def _weather_candidate_tickers(session: Session, *, limit: int) -> list[str]:
 
     ticker_family_filters = [
         Market.ticker.like(f"{prefix}%") for prefix in WEATHER_TICKER_PREFIXES
-    ] + [
-        Market.series_ticker.like(f"{prefix}%") for prefix in WEATHER_TICKER_PREFIXES
-    ]
+    ] + [Market.series_ticker.like(f"{prefix}%") for prefix in WEATHER_TICKER_PREFIXES]
     add(
         list(
             session.scalars(
@@ -590,9 +584,7 @@ def _weather_candidate_tickers(session: Session, *, limit: int) -> list[str]:
                 .where(
                     or_(
                         Market.status.is_(None),
-                        ~func.lower(Market.status).in_(
-                            tuple(sorted(INACTIVE_MARKET_STATUSES))
-                        ),
+                        ~func.lower(Market.status).in_(tuple(sorted(INACTIVE_MARKET_STATUSES))),
                     )
                 )
                 .order_by(Market.ticker)
@@ -760,8 +752,7 @@ def _weather_handoff_next_action(summary: dict[str, Any]) -> dict[str, Any]:
         return _handoff_action("RUN_WEATHER_FORECAST", command, writer_safe=writer_safe)
     if summary["snapshot_gap_rows"] > 0:
         command = (
-            "kalshi-bot snapshot --status open --limit 100 --max-pages 3 "
-            "--series-ticker KXTEMPNYCH"
+            "kalshi-bot snapshot --status open --limit 100 --max-pages 3 --series-ticker KXTEMPNYCH"
         )
         return _handoff_action(
             "CAPTURE_TARGETED_WEATHER_SNAPSHOTS",
@@ -1214,8 +1205,7 @@ def _render_handoff_markdown(payload: dict[str, Any]) -> str:
         f"- links_with_snapshots: {summary['links_with_snapshots']}",
         "- links_with_current_weather_forecasts: "
         f"{summary['links_with_current_weather_forecasts']}",
-        "- links_with_current_weather_rankings: "
-        f"{summary['links_with_current_weather_rankings']}",
+        f"- links_with_current_weather_rankings: {summary['links_with_current_weather_rankings']}",
         f"- snapshot_gap_rows: {summary['snapshot_gap_rows']}",
         f"- forecast_gap_rows: {summary['forecast_gap_rows']}",
         f"- ranking_gap_rows: {summary['ranking_gap_rows']}",

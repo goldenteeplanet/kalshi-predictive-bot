@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from kalshi_predictor.benchmarking.export_custody import certify_export_custody
 from kalshi_predictor.benchmarking.export_drift import compare_export_datasets
 from kalshi_predictor.benchmarking.runtime_export_import import import_runtime_export_manifest
-
 
 MIN_BUNDLES = 3
 MAX_BUNDLES = 20
@@ -44,14 +44,20 @@ def analyze_dataset_trend(
     if len(snapshots) < MIN_BUNDLES or len(snapshots) > MAX_BUNDLES:
         return {
             "certified": False,
-            "diagnostics": [f"BUNDLE_COUNT_OUT_OF_RANGE:{len(snapshots)}:{MIN_BUNDLES}-{MAX_BUNDLES}"],
-            "transitions": [], "alerts": [], "recurring_drift": [],
+            "diagnostics": [
+                f"BUNDLE_COUNT_OUT_OF_RANGE:{len(snapshots)}:{MIN_BUNDLES}-{MAX_BUNDLES}"
+            ],
+            "transitions": [],
+            "alerts": [],
+            "recurring_drift": [],
         }
     if len(declared) != len(snapshots) - 1:
         return {
             "certified": False,
             "diagnostics": ["DECLARATION_TRANSITION_COUNT_MISMATCH"],
-            "transitions": [], "alerts": [], "recurring_drift": [],
+            "transitions": [],
+            "alerts": [],
+            "recurring_drift": [],
         }
     transitions = [
         compare_export_datasets(snapshots[index], snapshots[index + 1], declared[index])
@@ -69,17 +75,26 @@ def analyze_dataset_trend(
             alert = _alert_for_change(change, recurrence[signature])
             alert["transition_index"] = transition_index
             alerts.append(alert)
-    alerts.sort(key=lambda row: (-SEVERITY_ORDER[row["severity"]], row["transition_index"], row["change_id"]))
+    alerts.sort(
+        key=lambda row: (
+            -SEVERITY_ORDER[row["severity"]],
+            row["transition_index"],
+            row["change_id"],
+        )
+    )
     recurring = [
         {"signature": signature, "occurrences": count}
-        for signature, count in sorted(recurrence.items()) if count >= 2
+        for signature, count in sorted(recurrence.items())
+        if count >= 2
     ]
     diagnostics = [
         f"TRANSITION_{index}:{diagnostic}"
         for index, transition in enumerate(transitions)
         for diagnostic in transition["diagnostics"]
     ]
-    canonical = json.dumps({"transitions": transitions, "alerts": alerts}, sort_keys=True, separators=(",", ":")).encode()
+    canonical = json.dumps(
+        {"transitions": transitions, "alerts": alerts}, sort_keys=True, separators=(",", ":")
+    ).encode()
     return {
         "certified": not diagnostics,
         "diagnostics": diagnostics,
@@ -115,10 +130,14 @@ def build_export_drift_trend_preview(manifest_path: Path) -> dict[str, Any]:
         observed_timestamps.append(timestamp)
         custody_path = (root / str(spec.get("custody", ""))).resolve()
         custody = certify_export_custody(custody_path)
-        custody_rows.append({
-            "index": index, "observed_at": timestamp,
-            "certified": custody["certified"], "chain_digest": custody["chain_digest"],
-        })
+        custody_rows.append(
+            {
+                "index": index,
+                "observed_at": timestamp,
+                "certified": custody["certified"],
+                "chain_digest": custody["chain_digest"],
+            }
+        )
         if not custody["certified"] or custody["export_manifest_path"] is None:
             diagnostics.append(f"BUNDLE_CUSTODY_FAILED:{index}")
             continue

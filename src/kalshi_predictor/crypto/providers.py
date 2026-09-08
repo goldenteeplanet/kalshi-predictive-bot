@@ -104,9 +104,7 @@ def _fetch_coinbase(symbols: list[str], *, timeout_seconds: float) -> CryptoFetc
             normalized = normalize_symbol(symbol)
             try:
                 product = coinbase_product_for_symbol(normalized)
-                response = client.get(
-                    f"https://api.coinbase.com/v2/prices/{product}/spot"
-                )
+                response = client.get(f"https://api.coinbase.com/v2/prices/{product}/spot")
                 response.raise_for_status()
                 quotes.append(parse_coinbase_spot_response(normalized, response.json()))
             except Exception as exc:

@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 STAGES = {
     "UI-OBS-2D": Path("ui_obs2d/ui_obs2d_incident_resolution_preview.json"),
     "UI-OBS-2E": Path("ui_obs2e/ui_obs2e_notification_routing_preview.json"),
@@ -45,7 +44,8 @@ def build_notification_pipeline_bundle(reports_root: Path) -> dict[str, Any]:
         g_summary = g.get("summary") or {}
         expected_attempts = sum(
             len(item.get("channels") or [])
-            for item in e_decisions if item.get("action") in {"DELIVER_NOW", "TIMELINE_ONLY"}
+            for item in e_decisions
+            if item.get("action") in {"DELIVER_NOW", "TIMELINE_ONLY"}
         )
         critical_channels = sum(
             len(item.get("channels") or [])
@@ -54,22 +54,38 @@ def build_notification_pipeline_bundle(reports_root: Path) -> dict[str, Any]:
         )
         checks = {
             "incident_to_routing_count": d_total == len(e_decisions),
-            "routing_to_delivery_attempts": expected_attempts == int((f.get("summary") or {}).get("attempts") or -1),
-            "delivery_receipts_to_audit": len(f_receipts) == int(g_summary.get("actual_receipts") or -1),
-            "critical_channel_count": critical_channels == int(g_summary.get("critical_channels_expected") or -1),
+            "routing_to_delivery_attempts": expected_attempts
+            == int((f.get("summary") or {}).get("attempts") or -1),
+            "delivery_receipts_to_audit": len(f_receipts)
+            == int(g_summary.get("actual_receipts") or -1),
+            "critical_channel_count": critical_channels
+            == int(g_summary.get("critical_channels_expected") or -1),
             "critical_coverage_complete": g_summary.get("critical_coverage_complete") is True,
             "reconciliation_passed": g_summary.get("reconciliation_passed") is True,
-            "no_actual_notifications": f.get("actual_notifications_sent") == 0 and f.get("actual_audio_played") is False,
-            "no_external_services": e.get("external_services_contacted") is False and f.get("external_services_contacted") is False and g.get("external_services_contacted") is False,
-            "no_network": e.get("network_access") is False and f.get("network_access") is False and g.get("network_access") is False,
-            "no_database_writes": all((payload.get("database_writes") == 0) for payload in payloads.values()),
-            "execution_unchanged": all((payload.get("execution_changed") is False) for payload in payloads.values()),
+            "no_actual_notifications": f.get("actual_notifications_sent") == 0
+            and f.get("actual_audio_played") is False,
+            "no_external_services": e.get("external_services_contacted") is False
+            and f.get("external_services_contacted") is False
+            and g.get("external_services_contacted") is False,
+            "no_network": e.get("network_access") is False
+            and f.get("network_access") is False
+            and g.get("network_access") is False,
+            "no_database_writes": all(
+                (payload.get("database_writes") == 0) for payload in payloads.values()
+            ),
+            "execution_unchanged": all(
+                (payload.get("execution_changed") is False) for payload in payloads.values()
+            ),
         }
-        diagnostics.extend(f"CROSS_STAGE_CHECK_FAILED:{name}" for name, passed in checks.items() if not passed)
+        diagnostics.extend(
+            f"CROSS_STAGE_CHECK_FAILED:{name}" for name, passed in checks.items() if not passed
+        )
     else:
         checks = {}
     artifacts.sort(key=lambda item: item["phase"])
-    canonical = json.dumps({"artifacts": artifacts, "checks": checks}, sort_keys=True, separators=(",", ":")).encode()
+    canonical = json.dumps(
+        {"artifacts": artifacts, "checks": checks}, sort_keys=True, separators=(",", ":")
+    ).encode()
     return {
         "schema_version": 1,
         "phases": list(STAGES),

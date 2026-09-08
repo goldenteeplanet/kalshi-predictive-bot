@@ -550,8 +550,7 @@ def _summary(
         and not writer_after_stop.get("current_writer_pid"),
         "old_writer_pid_cleared": old_pid is None
         or _int_or_none(writer_after_stop.get("current_writer_pid")) != old_pid,
-        "target_r5_pid_cleared_after_restart": target_pid is None
-        or target_pid not in running_pids,
+        "target_r5_pid_cleared_after_restart": target_pid is None or target_pid not in running_pids,
         "running_r5_watchers_after_restart": len(running_pids),
         "running_r5_pids_after_restart": running_pids,
         "exactly_one_r5_watcher_running": len(running_pids) == 1,

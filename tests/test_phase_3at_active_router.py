@@ -274,9 +274,7 @@ def test_phase3at_diagnostic_classifies_current_forecast_missing_ranking(tmp_pat
 
     assert payload["summary"]["current_forecasts"] == 1
     assert payload["summary"]["current_rankings"] == 0
-    assert payload["current_rows"][0]["first_hard_blocker"] == (
-        "CURRENT_FORECAST_MISSING_RANKING"
-    )
+    assert payload["current_rows"][0]["first_hard_blocker"] == ("CURRENT_FORECAST_MISSING_RANKING")
     assert payload["blocked_forecast_rows"][0]["ticker"] == ticker
 
 
@@ -380,7 +378,7 @@ def test_phase3at_handoff_report_generates_all_artifacts(tmp_path) -> None:
     assert artifacts.json_path.exists()
     assert expected.issubset({path.name for path in output_dir.iterdir()})
     snapshot_join = output_dir / "current_snapshot_join_diagnostic.json"
-    assert "\"db_fingerprint\"" in snapshot_join.read_text(encoding="utf-8")
+    assert '"db_fingerprint"' in snapshot_join.read_text(encoding="utf-8")
 
 
 def test_phase3at_handoff_reconciles_with_r5_ev_not_positive_truth(tmp_path) -> None:
@@ -407,13 +405,9 @@ def test_phase3at_handoff_reconciles_with_r5_ev_not_positive_truth(tmp_path) -> 
     funnel = json.loads((output_dir / "opportunity_funnel.json").read_text(encoding="utf-8"))
     next_actions = (output_dir / "NEXT_ACTIONS.md").read_text(encoding="utf-8")
 
-    assert diagnostic["summary"]["raw_first_hard_blocker"] == (
-        "CURRENT_FORECAST_MISSING_RANKING"
-    )
+    assert diagnostic["summary"]["raw_first_hard_blocker"] == ("CURRENT_FORECAST_MISSING_RANKING")
     assert diagnostic["summary"]["first_hard_blocker"] == "EV_NOT_POSITIVE"
-    assert funnel["summary"]["raw_first_hard_blocker"] == (
-        "CURRENT_FORECAST_MISSING_RANKING"
-    )
+    assert funnel["summary"]["raw_first_hard_blocker"] == ("CURRENT_FORECAST_MISSING_RANKING")
     assert funnel["summary"]["first_hard_blocker"] == "EV_NOT_POSITIVE"
     assert funnel["next_action"] == "kalshi-bot phase3bc-r5-status --output-dir reports/phase3bc_r5"
     assert "kalshi-bot phase3bc-r5-status --output-dir reports/phase3bc_r5" in next_actions

@@ -67,20 +67,24 @@ def diagnose_weather_snapshot_eligibility(
         eligible = not reasons
         for reason in reasons:
             reason_counts[reason] = reason_counts.get(reason, 0) + 1
-        rows.append({
-            "ticker": ticker,
-            "eligible": eligible,
-            "exclusion_reasons": reasons,
-            "market_status": market_status,
-            "snapshot_status": snapshot_status,
-            "market_close_time": (
-                market.close_time.isoformat() if market and market.close_time else None
-            ),
-            "snapshot_id": snapshot.id if snapshot else None,
-            "snapshot_captured_at": snapshot.captured_at.isoformat() if snapshot else None,
-            "location_key": link.location_key if link else None,
-            "link_target_time": link.target_time.isoformat() if link and link.target_time else None,
-        })
+        rows.append(
+            {
+                "ticker": ticker,
+                "eligible": eligible,
+                "exclusion_reasons": reasons,
+                "market_status": market_status,
+                "snapshot_status": snapshot_status,
+                "market_close_time": (
+                    market.close_time.isoformat() if market and market.close_time else None
+                ),
+                "snapshot_id": snapshot.id if snapshot else None,
+                "snapshot_captured_at": snapshot.captured_at.isoformat() if snapshot else None,
+                "location_key": link.location_key if link else None,
+                "link_target_time": link.target_time.isoformat()
+                if link and link.target_time
+                else None,
+            }
+        )
 
     return {
         "as_of": cutoff.isoformat(),

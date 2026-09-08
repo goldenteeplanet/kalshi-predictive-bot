@@ -137,7 +137,9 @@ def write_phase3bb_r40_cloud_scheduler_runtime_monitor_report(
 
     executive_summary_path.write_text(_render_executive_summary(payload), encoding="utf-8")
     markdown_path.write_text(_render_markdown(payload), encoding="utf-8")
-    json_path.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    json_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     _write_probe_csv(probe_csv_path, payload["remote_probe_results"])
     _write_rows_csv(checks_csv_path, payload["runtime_checks"])
     _write_rows_csv(cycle_csv_path, payload["scheduler_cycles"])
@@ -307,18 +309,32 @@ def _build_remote_probes(
     runner_script_path = _shell_quote(f"{target.app_path.rstrip('/')}/scripts/{RUNNER_SCRIPT_NAME}")
     return [
         RemoteProbe("remote_time_utc", "date -u +%Y-%m-%dT%H:%M:%SZ", timeout_seconds),
-        RemoteProbe("scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_timer_enabled", f"systemctl is-enabled {timer} || true", timeout_seconds),
-        RemoteProbe("scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds),
-        RemoteProbe("scheduler_timer_list", f"systemctl list-timers --all {timer} --no-pager || true", timeout_seconds),
+        RemoteProbe(
+            "scheduler_timer_active", f"systemctl is-active {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_timer_enabled", f"systemctl is-enabled {timer} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_service_active", f"systemctl is-active {service} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "scheduler_timer_list",
+            f"systemctl list-timers --all {timer} --no-pager || true",
+            timeout_seconds,
+        ),
         RemoteProbe(
             "scheduler_service_systemd",
-            f"systemctl show {service} --property=LoadState,ActiveState,SubState,ExecMainPID,Result,NRestarts || true",
+            f"systemctl show {service} --property=LoadState,Ac"
+            f"tiveState,SubState,ExecMainPID,Result,NRestarts "
+            f"|| true",
             timeout_seconds,
         ),
         RemoteProbe(
             "scheduler_timer_systemd",
-            f"systemctl show {timer} --property=LoadState,ActiveState,SubState,UnitFileState,LastTriggerUSec,NextElapseUSecRealtime || true",
+            f"systemctl show {timer} --property=LoadState,Acti"
+            f"veState,SubState,UnitFileState,LastTriggerUSec,N"
+            f"extElapseUSecRealtime || true",
             timeout_seconds,
         ),
         RemoteProbe(
@@ -326,18 +342,33 @@ def _build_remote_probes(
             f"journalctl -u {service} -n {int(journal_lines)} --no-pager || true",
             timeout_seconds,
         ),
-        RemoteProbe("scheduler_runner_script", f"test -r {runner_script_path} && sed -n '1,260p' {runner_script_path} || true", timeout_seconds),
-        RemoteProbe("ui_service_active", f"systemctl is-active {ui_service} || true", timeout_seconds),
-        RemoteProbe("r5_service_active", f"systemctl is-active {r5_service} || true", timeout_seconds),
         RemoteProbe(
-            "r5_service_systemd",
-            f"systemctl show {r5_service} --property=LoadState,ActiveState,SubState,ExecMainPID,Result,NRestarts || true",
+            "scheduler_runner_script",
+            f"test -r {runner_script_path} && sed -n '1,260p' {runner_script_path} || true",
             timeout_seconds,
         ),
-        RemoteProbe("tailscale_serve_status", "tailscale serve status 2>/dev/null || true", timeout_seconds),
+        RemoteProbe(
+            "ui_service_active", f"systemctl is-active {ui_service} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "r5_service_active", f"systemctl is-active {r5_service} || true", timeout_seconds
+        ),
+        RemoteProbe(
+            "r5_service_systemd",
+            f"systemctl show {r5_service} --property=LoadState"
+            f",ActiveState,SubState,ExecMainPID,Result,NRestar"
+            f"ts || true",
+            timeout_seconds,
+        ),
+        RemoteProbe(
+            "tailscale_serve_status", "tailscale serve status 2>/dev/null || true", timeout_seconds
+        ),
         RemoteProbe(
             "ui_local_http",
-            "curl -fsS -m 8 -o /dev/null -w '%{http_code} %{content_type}' http://127.0.0.1:8080/ || true",
+            (
+                "curl -fsS -m 8 -o /dev/null -w '%{http_code} %{content_type}' "
+                "http://127.0.0.1:8080/ || true"
+            ),
             timeout_seconds,
         ),
         RemoteProbe(
@@ -362,8 +393,8 @@ def _build_remote_probes(
             "latest_reports",
             (
                 f"cd {app} && for p in {report_list}; do "
-                "if [ -e \"$p\" ]; then stat -c '%n|%Y|%s' \"$p\"; "
-                "else echo \"$p|MISSING|0\"; fi; done"
+                'if [ -e "$p" ]; then stat -c \'%n|%Y|%s\' "$p"; '
+                'else echo "$p|MISSING|0"; fi; done'
             ),
             timeout_seconds,
         ),
@@ -392,7 +423,7 @@ def _build_remote_probes(
                 "phase3bb-r60-weather-next-window-lead-time-scheduler-repair "
                 "phase3bb-r3-free-source-inventory "
                 "phase3bc-r5-status; do "
-                ".venv/bin/kalshi-bot \"$cmd\" --help >/dev/null || exit 30; "
+                '.venv/bin/kalshi-bot "$cmd" --help >/dev/null || exit 30; '
                 "done; echo COMMAND_REGISTRY_OK"
             ),
             timeout_seconds,
@@ -424,9 +455,9 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
     r5_pids = [_to_int(pid) for pid in (r5_process or {}).get("phase3bc_r5_pids") or []]
     r5_pids = [pid for pid in r5_pids if pid is not None]
     r5_service_pid = _to_int(r5_service_systemd.get("ExecMainPID"))
-    r5_systemd_running = (r5_service_active or r5_service_systemd.get("ActiveState")) == "active" and bool(
-        r5_service_pid
-    )
+    r5_systemd_running = (
+        r5_service_active or r5_service_systemd.get("ActiveState")
+    ) == "active" and bool(r5_service_pid)
     if r5_systemd_running and r5_service_pid:
         r5_pids = [r5_service_pid]
     elif not r5_pids:
@@ -436,7 +467,9 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
     writer_gate_skips = _parse_writer_gate_skips(journal_text)
     latest_reports = _parse_latest_reports(_stdout(by_name.get("latest_reports")))
     traceback_count = len(re.findall(r"\bTraceback \(most recent call last\):", journal_text))
-    failed_count = len(re.findall(r"\bfailed\b|Failed with result", journal_text, flags=re.IGNORECASE))
+    failed_count = len(
+        re.findall(r"\bfailed\b|Failed with result", journal_text, flags=re.IGNORECASE)
+    )
     return {
         "remote_time_utc": _first_line(_stdout(by_name.get("remote_time_utc"))),
         "scheduler_timer_active_state": timer_active or timer_systemd.get("ActiveState"),
@@ -449,28 +482,48 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         "scheduler_timer_systemd": timer_systemd,
         "scheduler_cycles": scheduler_cycles,
         "scheduler_job_runs": scheduler_job_runs,
-        "scheduler_cycle_started_count": sum(1 for row in scheduler_cycles if row["event"] == "STARTED"),
+        "scheduler_cycle_started_count": sum(
+            1 for row in scheduler_cycles if row["event"] == "STARTED"
+        ),
         "scheduler_cycle_finished_count": sum(
             1 for row in scheduler_cycles if row["event"] in {"FINISHED", "CRYPTO_STATUS_COMPLETE"}
         ),
         "scheduler_traceback_count": traceback_count,
         "scheduler_failed_log_count": failed_count,
-        "scheduler_runner_has_weather_catalog_hook": "weather_current_catalog_refresh" in runner_text,
-        "scheduler_runner_weather_catalog_before_fast_lane": _runner_hook_before_fast_lane(runner_text),
+        "scheduler_runner_has_weather_catalog_hook": "weather_current_catalog_refresh"
+        in runner_text,
+        "scheduler_runner_weather_catalog_before_fast_lane": _runner_hook_before_fast_lane(
+            runner_text
+        ),
         "weather_catalog_hook_job_run_count": sum(
             1
             for row in scheduler_job_runs
-            if row.get("event") == "JOB_STARTED" and row.get("job_id") == "weather_current_catalog_refresh"
+            if row.get("event") == "JOB_STARTED"
+            and row.get("job_id") == "weather_current_catalog_refresh"
         ),
         "weather_fast_lane_job_run_count": sum(
-            1 for row in scheduler_job_runs if row.get("event") == "JOB_STARTED" and row.get("job_id") == "weather_fast_lane"
+            1
+            for row in scheduler_job_runs
+            if row.get("event") == "JOB_STARTED" and row.get("job_id") == "weather_fast_lane"
         ),
-        "weather_catalog_sync_event_count": sum(1 for row in scheduler_job_runs if row.get("event") == "WEATHER_CATALOG_SYNCED"),
-        "weather_catalog_parse_event_count": sum(1 for row in scheduler_job_runs if row.get("event") == "WEATHER_CATALOG_PARSED"),
-        "weather_catalog_preview_event_count": sum(1 for row in scheduler_job_runs if row.get("event") == "WEATHER_CATALOG_PREVIEW_WRITTEN"),
-        "weather_source_ingest_event_count": sum(1 for row in scheduler_job_runs if row.get("event") == "WEATHER_SOURCE_INGESTED"),
-        "weather_feature_build_event_count": sum(1 for row in scheduler_job_runs if row.get("event") == "WEATHER_FEATURES_BUILT"),
-        "weather_fast_lane_complete_event_count": sum(1 for row in scheduler_job_runs if row.get("event") == "WEATHER_FAST_LANE_WRITTEN"),
+        "weather_catalog_sync_event_count": sum(
+            1 for row in scheduler_job_runs if row.get("event") == "WEATHER_CATALOG_SYNCED"
+        ),
+        "weather_catalog_parse_event_count": sum(
+            1 for row in scheduler_job_runs if row.get("event") == "WEATHER_CATALOG_PARSED"
+        ),
+        "weather_catalog_preview_event_count": sum(
+            1 for row in scheduler_job_runs if row.get("event") == "WEATHER_CATALOG_PREVIEW_WRITTEN"
+        ),
+        "weather_source_ingest_event_count": sum(
+            1 for row in scheduler_job_runs if row.get("event") == "WEATHER_SOURCE_INGESTED"
+        ),
+        "weather_feature_build_event_count": sum(
+            1 for row in scheduler_job_runs if row.get("event") == "WEATHER_FEATURES_BUILT"
+        ),
+        "weather_fast_lane_complete_event_count": sum(
+            1 for row in scheduler_job_runs if row.get("event") == "WEATHER_FAST_LANE_WRITTEN"
+        ),
         "weather_catalog_runtime_order_ok": _job_started_before(
             scheduler_job_runs,
             before_job="weather_current_catalog_refresh",
@@ -495,36 +548,104 @@ def _parse_probe_outputs(results: list[RemoteProbeResult]) -> dict[str, Any]:
         or bool(r5_pids),
         "r5_pids": r5_pids,
         "duplicate_r5": len(r5_pids) > 1,
-        "r5_pid": _to_int(r5_status.get("pid")) if isinstance(r5_status, dict) else (r5_pids[0] if r5_pids else None),
+        "r5_pid": _to_int(r5_status.get("pid"))
+        if isinstance(r5_status, dict)
+        else (r5_pids[0] if r5_pids else None),
         "r5_guard_status": (r5_guard or {}).get("status"),
         "r5_guard_should_stop": bool((r5_guard or {}).get("should_stop")),
-        "r5_watch_state": r5_status.get("latest_watch_state") if isinstance(r5_status, dict) else None,
+        "r5_watch_state": r5_status.get("latest_watch_state")
+        if isinstance(r5_status, dict)
+        else None,
         "positive_ev_rows": (latest_summary or {}).get("positive_ev_rows"),
         "paper_ready_candidates": (latest_summary or {}).get("paper_ready_candidates"),
         "db_writer_monitor": writer,
         "writer_status": writer.get("status") if isinstance(writer, dict) else "UNKNOWN",
-        "writer_safe_to_start_write": bool(writer.get("safe_to_start_write")) if isinstance(writer, dict) else False,
+        "writer_safe_to_start_write": bool(writer.get("safe_to_start_write"))
+        if isinstance(writer, dict)
+        else False,
         "latest_reports": latest_reports,
         "missing_report_count": sum(1 for row in latest_reports if row["status"] == "MISSING"),
-        "command_registry_ok": bool(by_name.get("command_registry") and by_name["command_registry"].ok),
+        "command_registry_ok": bool(
+            by_name.get("command_registry") and by_name["command_registry"].ok
+        ),
     }
 
 
 def _runtime_checks(parsed: dict[str, Any]) -> list[dict[str, Any]]:
     return [
-        _check("scheduler_timer_active", parsed.get("scheduler_timer_active_state") == "active", f"Timer state is {parsed.get('scheduler_timer_active_state')}."),
-        _check("scheduler_timer_enabled", parsed.get("scheduler_timer_enabled_state") == "enabled", f"Timer enabled state is {parsed.get('scheduler_timer_enabled_state')}."),
-        _check("scheduler_service_runtime_state_valid", parsed.get("scheduler_service_active_state") in {"active", "activating", "inactive"}, f"Service state is {parsed.get('scheduler_service_active_state')}."),
-        _check("scheduler_cycles_seen", parsed.get("scheduler_cycle_finished_count", 0) > 0 or bool(parsed.get("scheduler_timer_last")), f"Finished cycles in journal window: {parsed.get('scheduler_cycle_finished_count')}; timer last={parsed.get('scheduler_timer_last')}."),
-        _check("scheduler_service_not_failed", parsed.get("scheduler_service_result") in {"", "success", None}, f"Service result is {parsed.get('scheduler_service_result')}."),
-        _check("weather_catalog_hook_in_runner", bool(parsed.get("scheduler_runner_has_weather_catalog_hook")), f"weather_current_catalog_refresh present={parsed.get('scheduler_runner_has_weather_catalog_hook')}."),
-        _check("weather_catalog_hook_before_fast_lane", bool(parsed.get("scheduler_runner_weather_catalog_before_fast_lane")), f"hook_before_fast_lane={parsed.get('scheduler_runner_weather_catalog_before_fast_lane')}."),
-        _check("r5_running_single", bool(parsed.get("r5_running")) and not parsed.get("duplicate_r5"), f"R5 PIDs: {parsed.get('r5_pids')}; service={parsed.get('r5_service_active_state')}."),
-        _check("r5_guard_not_overrunning", (bool(parsed.get("r5_systemd_running")) or parsed.get("r5_guard_status") == "RUNNING") and parsed.get("r5_guard_should_stop") is False, f"guard={parsed.get('r5_guard_status')} should_stop={parsed.get('r5_guard_should_stop')} service={parsed.get('r5_service_active_state')}."),
-        _check("ui_service_active", parsed.get("ui_service_active_state") == "active", f"UI service state is {parsed.get('ui_service_active_state')}."),
-        _check("ui_local_http_ok", bool(parsed.get("ui_local_http_ok")), f"Local UI probe: {parsed.get('ui_local_http')}."),
-        _check("tailscale_private_access_ok", bool(parsed.get("tailscale_private_access_ok")), f"Tailscale URL: {parsed.get('tailscale_private_url')}."),
-        _check("command_registry_ok", bool(parsed.get("command_registry_ok")), "R40 CLI help is registered on the cloud host."),
+        _check(
+            "scheduler_timer_active",
+            parsed.get("scheduler_timer_active_state") == "active",
+            f"Timer state is {parsed.get('scheduler_timer_active_state')}.",
+        ),
+        _check(
+            "scheduler_timer_enabled",
+            parsed.get("scheduler_timer_enabled_state") == "enabled",
+            f"Timer enabled state is {parsed.get('scheduler_timer_enabled_state')}.",
+        ),
+        _check(
+            "scheduler_service_runtime_state_valid",
+            parsed.get("scheduler_service_active_state") in {"active", "activating", "inactive"},
+            f"Service state is {parsed.get('scheduler_service_active_state')}.",
+        ),
+        _check(
+            "scheduler_cycles_seen",
+            parsed.get("scheduler_cycle_finished_count", 0) > 0
+            or bool(parsed.get("scheduler_timer_last")),
+            f"Finished cycles in journal window: "
+            f"{parsed.get('scheduler_cycle_finished_count')}; "
+            f"timer last={parsed.get('scheduler_timer_last')}.",
+        ),
+        _check(
+            "scheduler_service_not_failed",
+            parsed.get("scheduler_service_result") in {"", "success", None},
+            f"Service result is {parsed.get('scheduler_service_result')}.",
+        ),
+        _check(
+            "weather_catalog_hook_in_runner",
+            bool(parsed.get("scheduler_runner_has_weather_catalog_hook")),
+            f"weather_current_catalog_refresh present="
+            f"{parsed.get('scheduler_runner_has_weather_catalog_hook')}.",
+        ),
+        _check(
+            "weather_catalog_hook_before_fast_lane",
+            bool(parsed.get("scheduler_runner_weather_catalog_before_fast_lane")),
+            "hook_before_fast_lane="
+            f"{parsed.get('scheduler_runner_weather_catalog_before_fast_lane')}.",
+        ),
+        _check(
+            "r5_running_single",
+            bool(parsed.get("r5_running")) and not parsed.get("duplicate_r5"),
+            f"R5 PIDs: {parsed.get('r5_pids')}; service={parsed.get('r5_service_active_state')}.",
+        ),
+        _check(
+            "r5_guard_not_overrunning",
+            (bool(parsed.get("r5_systemd_running")) or parsed.get("r5_guard_status") == "RUNNING")
+            and parsed.get("r5_guard_should_stop") is False,
+            f"guard={parsed.get('r5_guard_status')} should_sto"
+            f"p={parsed.get('r5_guard_should_stop')} service="
+            f"{parsed.get('r5_service_active_state')}.",
+        ),
+        _check(
+            "ui_service_active",
+            parsed.get("ui_service_active_state") == "active",
+            f"UI service state is {parsed.get('ui_service_active_state')}.",
+        ),
+        _check(
+            "ui_local_http_ok",
+            bool(parsed.get("ui_local_http_ok")),
+            f"Local UI probe: {parsed.get('ui_local_http')}.",
+        ),
+        _check(
+            "tailscale_private_access_ok",
+            bool(parsed.get("tailscale_private_access_ok")),
+            f"Tailscale URL: {parsed.get('tailscale_private_url')}.",
+        ),
+        _check(
+            "command_registry_ok",
+            bool(parsed.get("command_registry_ok")),
+            "R40 CLI help is registered on the cloud host.",
+        ),
     ]
 
 
@@ -541,7 +662,9 @@ def _runtime_decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> d
         reason = (
             "Scheduler, R5, UI, and private access are running, but writer-gated "
             f"weather work skipped {writer_skips} time(s) and "
-            f"{parsed.get('scheduler_traceback_count')} old/new traceback marker(s) exist in the journal window."
+            f"{parsed.get('scheduler_traceback_count')} old/ne"
+            f"w traceback marker(s) exist in the journal windo"
+            f"w."
         )
         next_step = "Phase 3BB-R41 - Writer Gate Normalization / Weather Fast-Lane Unblock"
     else:
@@ -557,7 +680,8 @@ def _runtime_decision(checks: list[dict[str, Any]], parsed: dict[str, Any]) -> d
         "overnight_safe_to_leave_running": not failed,
         "will_create_paper_trades": False,
         "will_submit_live_or_demo_orders": False,
-        "will_continue_scheduler_cycles": not failed and parsed.get("scheduler_timer_active_state") == "active",
+        "will_continue_scheduler_cycles": not failed
+        and parsed.get("scheduler_timer_active_state") == "active",
         "will_continue_r5_watch": bool(parsed.get("r5_running")) and not parsed.get("duplicate_r5"),
         "paper_ready_candidates": paper_ready,
         "positive_ev_rows": parsed.get("positive_ev_rows"),
@@ -608,7 +732,13 @@ def _parse_scheduler_job_runs(text: str) -> list[dict[str, Any]]:
                 }
             )
         elif "Market leg parse summary" in line:
-            rows.append({"event": "WEATHER_CATALOG_PARSED", "job_id": "weather_current_catalog_refresh", "line": line[:500]})
+            rows.append(
+                {
+                    "event": "WEATHER_CATALOG_PARSED",
+                    "job_id": "weather_current_catalog_refresh",
+                    "line": line[:500],
+                }
+            )
         elif re.search(r"\bInserted\s+\d+\s+weather forecast row\(s\)", line):
             count_match = re.search(r"\bInserted\s+(\d+)\s+weather forecast row\(s\)", line)
             rows.append(
@@ -630,9 +760,21 @@ def _parse_scheduler_job_runs(text: str) -> list[dict[str, Any]]:
                 }
             )
         elif "Wrote JSON: reports/phase3az_r12_weather/weather_activation_preview.json" in line:
-            rows.append({"event": "WEATHER_CATALOG_PREVIEW_WRITTEN", "job_id": "weather_current_catalog_refresh", "line": line[:500]})
+            rows.append(
+                {
+                    "event": "WEATHER_CATALOG_PREVIEW_WRITTEN",
+                    "job_id": "weather_current_catalog_refresh",
+                    "line": line[:500],
+                }
+            )
         elif "Wrote JSON: reports/phase3bb_r2/weather_funnel.json" in line:
-            rows.append({"event": "WEATHER_FAST_LANE_WRITTEN", "job_id": "weather_fast_lane", "line": line[:500]})
+            rows.append(
+                {
+                    "event": "WEATHER_FAST_LANE_WRITTEN",
+                    "job_id": "weather_fast_lane",
+                    "line": line[:500],
+                }
+            )
     return rows[-200:]
 
 
@@ -785,10 +927,14 @@ def _render_executive_summary(payload: dict[str, Any]) -> str:
             f"- Timer active state: `{parsed.get('scheduler_timer_active_state')}`",
             f"- Timer next: `{parsed.get('scheduler_timer_next')}`",
             f"- Service active state: `{parsed.get('scheduler_service_active_state')}`",
-            f"- Finished scheduler cycles in window: `{parsed.get('scheduler_cycle_finished_count')}`",
-            f"- Weather catalog hook runs in window: `{decision.get('weather_catalog_hook_job_run_count')}`",
-            f"- Weather fast-lane runs in window: `{decision.get('weather_fast_lane_job_run_count')}`",
-            f"- Weather catalog before fast-lane: `{decision.get('weather_catalog_runtime_order_ok')}`",
+            f"- Finished scheduler cycles in window: `"
+            f"{parsed.get('scheduler_cycle_finished_count')}`",
+            f"- Weather catalog hook runs in window: `"
+            f"{decision.get('weather_catalog_hook_job_run_count')}`",
+            f"- Weather fast-lane runs in window: `"
+            f"{decision.get('weather_fast_lane_job_run_count')}`",
+            f"- Weather catalog before fast-lane: `"
+            f"{decision.get('weather_catalog_runtime_order_ok')}`",
             f"- Writer-gate skips in window: `{decision['writer_gate_skip_count']}`",
             f"- Scheduler tracebacks in window: `{decision['scheduler_traceback_count']}`",
             "",
@@ -845,15 +991,23 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     )
     for row in payload["runtime_checks"]:
         lines.append(f"| `{row['check']}` | `{row['passed']}` | {row['detail']} |")
-    lines.extend(["", "## Latest Reports", "", "| Path | Status | Mtime | Size |", "|---|---|---:|---:|"])
+    lines.extend(
+        ["", "## Latest Reports", "", "| Path | Status | Mtime | Size |", "|---|---|---:|---:|"]
+    )
     for row in payload["latest_reports"]:
         lines.append(
-            f"| `{row['path']}` | `{row['status']}` | `{row['mtime_epoch']}` | `{row['size_bytes']}` |"
+            f"| `{row['path']}` | `{row['status']}` | `"
+            f"{row['mtime_epoch']}` | `{row['size_bytes']}` |"
         )
-    lines.extend(["", "## Scheduler Jobs", "", "| Event | Job | Count | Line |", "|---|---|---:|---|"])
+    lines.extend(
+        ["", "## Scheduler Jobs", "", "| Event | Job | Count | Line |", "|---|---|---:|---|"]
+    )
     for row in payload["scheduler_job_runs"][-40:]:
         lines.append(
-            f"| `{row.get('event')}` | `{row.get('job_id', '')}` | `{row.get('count', '')}` | {row.get('line', '')} |"
+            f"| `{row.get('event')}` | `"
+            f"{row.get('job_id', '')}` | `"
+            f"{row.get('count', '')}` | {row.get('line', '')} "
+            f"|"
         )
     lines.extend(["", "## Writer Gate Skips", ""])
     if payload["writer_gate_skips"]:
@@ -895,8 +1049,14 @@ def _render_next_actions(payload: dict[str, Any]) -> str:
                 "",
                 "## Overnight Note",
                 "",
-                "- It is safe to leave the scheduler and R5 watcher running in paper/read-only mode.",
-                "- The bot will keep refreshing reports/status, but it will not create paper or live trades.",
+                (
+                    "- It is safe to leave the scheduler and R5 watcher running in "
+                    "paper/read-only mode."
+                ),
+                (
+                    "- The bot will keep refreshing reports/status, but it will not create "
+                    "paper or live trades."
+                ),
             ]
         )
     return "\n".join(lines) + "\n"
@@ -916,11 +1076,23 @@ def _render_operator_command(payload: dict[str, Any]) -> str:
 
 
 def _write_probe_csv(path: Path, rows: list[dict[str, Any]]) -> None:
-    fieldnames = ["name", "ok", "exit_code", "duration_seconds", "timed_out", "stdout_excerpt", "stderr_excerpt"]
-    _write_rows_csv(path, [{name: row.get(name) for name in fieldnames} for row in rows], fieldnames=fieldnames)
+    fieldnames = [
+        "name",
+        "ok",
+        "exit_code",
+        "duration_seconds",
+        "timed_out",
+        "stdout_excerpt",
+        "stderr_excerpt",
+    ]
+    _write_rows_csv(
+        path, [{name: row.get(name) for name in fieldnames} for row in rows], fieldnames=fieldnames
+    )
 
 
-def _write_rows_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None) -> None:
+def _write_rows_csv(
+    path: Path, rows: list[dict[str, Any]], fieldnames: list[str] | None = None
+) -> None:
     if fieldnames is None:
         keys: list[str] = []
         for row in rows:

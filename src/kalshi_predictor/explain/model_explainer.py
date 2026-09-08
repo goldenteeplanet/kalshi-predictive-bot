@@ -37,8 +37,7 @@ def explain_model(
 
     if name == "weather_v2":
         return (
-            "weather_v2 starts from market prices and applies bounded weather feature "
-            "adjustments."
+            "weather_v2 starts from market prices and applies bounded weather feature adjustments."
         )
 
     if name == "economic_v1":

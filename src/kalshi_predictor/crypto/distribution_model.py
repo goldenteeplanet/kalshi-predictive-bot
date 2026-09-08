@@ -29,9 +29,7 @@ def threshold_probability(
         return None
     sigma = max(
         1e-9,
-        inputs.volatility_per_minute
-        * math.sqrt(inputs.horizon_minutes)
-        * inputs.volatility_scale,
+        inputs.volatility_per_minute * math.sqrt(inputs.horizon_minutes) * inputs.volatility_scale,
     )
     mean_log_return = inputs.drift_per_minute * inputs.horizon_minutes
 

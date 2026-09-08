@@ -852,8 +852,7 @@ def _league_breakdown(
     games: list[SportsGame],
 ) -> list[dict[str, Any]]:
     leagues = sorted(
-        {link.league for link in partial_links + verified_links}
-        | {game.league for game in games}
+        {link.league for link in partial_links + verified_links} | {game.league for game in games}
     )
     rows: list[dict[str, Any]] = []
     for league in leagues:

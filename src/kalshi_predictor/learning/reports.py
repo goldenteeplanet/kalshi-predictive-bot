@@ -103,8 +103,7 @@ def render_learning_report(dashboard: dict[str, Any]) -> str:
         f"- Settled paper trades: {status['settled_paper_trades']} / "
         f"{status['target_settled_trades']}",
         f"- Progress: {status['progress_percent']}",
-        f"- Daily paper trades: {status['daily_paper_trades']} / "
-        f"{status['daily_paper_trade_cap']}",
+        f"- Daily paper trades: {status['daily_paper_trades']} / {status['daily_paper_trade_cap']}",
         f"- Forecasts Evaluated: {status['forecasts_evaluated']}",
         f"- Trade generation health: {status['trade_generation_health']['label']}",
         f"- Expected completion: {status['expected_completion']}",
@@ -128,9 +127,7 @@ def render_learning_report(dashboard: dict[str, Any]) -> str:
     ]
     if dashboard["category_breakdown"]:
         for row in dashboard["category_breakdown"]:
-            lines.append(
-                f"| {row['category']} | {row['targets']} | {row['opportunities']} |"
-            )
+            lines.append(f"| {row['category']} | {row['targets']} | {row['opportunities']} |")
     else:
         lines.append("| _No category data yet_ |  |  |")
     lines.extend(
@@ -255,7 +252,7 @@ def _blocked_opportunities(cycles: list[dict[str, Any] | None]) -> list[dict[str
     }
     for cycle in cycles[:5]:
         summary = (cycle or {}).get("summary_json") or {}
-        paper_run = ((summary.get("steps") or {}).get("paper_run") or {})
+        paper_run = (summary.get("steps") or {}).get("paper_run") or {}
         totals["Below learning edge"] += int(paper_run.get("skipped_due_to_edge") or 0)
         totals["Risk or position cap"] += int(paper_run.get("skipped_due_to_risk_limits") or 0)
         totals["Duplicate forecast"] += int(paper_run.get("duplicates_skipped") or 0)

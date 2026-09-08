@@ -282,8 +282,7 @@ def _decision(
         )
         next_step = "Phase 3BB-R29 - Operator-Approved Cloud UI Private Access Install Handoff"
         operator_command = (
-            "Review reports/phase3bb_r28/"
-            "OPERATOR_APPROVED_INSTALL_HANDOFF_PREVIEW.md"
+            "Review reports/phase3bb_r28/OPERATOR_APPROVED_INSTALL_HANDOFF_PREVIEW.md"
         )
     return {
         "status": status,

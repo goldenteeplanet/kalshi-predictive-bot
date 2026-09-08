@@ -44,15 +44,11 @@ def test_fixed_routes_are_registered_before_parameterized_routes(tmp_path) -> No
     router = create_router(session_factory=_session_factory(tmp_path), settings=Settings())
     route_paths = [route.path for route in router.routes]
 
-    assert route_paths.index("/opportunities") < route_paths.index(
-        "/opportunities/{ticker}"
-    )
+    assert route_paths.index("/opportunities") < route_paths.index("/opportunities/{ticker}")
     assert route_paths.index("/opportunities/best-payouts") < route_paths.index(
         "/opportunities/{ticker}"
     )
-    assert route_paths.index("/reports/best-payouts") < route_paths.index(
-        "/reports/{report_name}"
-    )
+    assert route_paths.index("/reports/best-payouts") < route_paths.index("/reports/{report_name}")
     assert route_paths.index("/research") < route_paths.index("/research/opportunity/{ticker}")
     assert route_paths.index("/signals") < route_paths.index("/signals/{signal_name}")
 
@@ -109,8 +105,7 @@ def test_execution_review_renders_unsupported_multileg_as_structure(tmp_path) ->
 
     assert response.status_code == 200
     assert (
-        "Sports multi-leg: Mexico wins by more than 1.5 goals; "
-        "Morocco wins by more than 1.5 goals"
+        "Sports multi-leg: Mexico wins by more than 1.5 goals; Morocco wins by more than 1.5 goals"
     ) in response.text
     assert "Unsupported multi-leg market (2 options)" in response.text
     assert "Kalshi lookup title" in response.text
@@ -120,8 +115,7 @@ def test_execution_review_renders_unsupported_multileg_as_structure(tmp_path) ->
     assert "Copy component tickers" in response.text
     assert "Copy exact ticker; open Kalshi search" not in response.text
     assert (
-        "If the exact API returns 404, this local ticker is not currently exposed"
-        in response.text
+        "If the exact API returns 404, this local ticker is not currently exposed" in response.text
     )
     assert "Direct Kalshi web-search links are disabled" in response.text
     assert (
@@ -132,8 +126,7 @@ def test_execution_review_renders_unsupported_multileg_as_structure(tmp_path) ->
     assert 'data-copy-text="UI-MULTI"' in response.text
     assert "https://kalshi.com/search?query=UI-MULTI" not in response.text
     expected_headline = (
-        "<h1>Mexico wins by more than 1.5 goals "
-        "and Morocco wins by more than 1.5 goals</h1>"
+        "<h1>Mexico wins by more than 1.5 goals and Morocco wins by more than 1.5 goals</h1>"
     )
     assert expected_headline in response.text
     assert "Contract YES Side" in response.text
@@ -260,10 +253,7 @@ def _seed_opportunity(session_factory) -> None:
 def _seed_multileg_opportunity(session_factory) -> None:
     with session_factory() as session:
         captured_at = utc_now()
-        title = (
-            "yes Mexico wins by more than 1.5 goals,yes Morocco wins by more "
-            "than 1.5 goals"
-        )
+        title = "yes Mexico wins by more than 1.5 goals,yes Morocco wins by more than 1.5 goals"
         insert_market_snapshot(
             session,
             {

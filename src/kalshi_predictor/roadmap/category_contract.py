@@ -49,9 +49,7 @@ def certify_category_pipeline(
 ) -> dict[str, Any]:
     generated_at = _parse_time(evidence.generated_at)
     age_minutes = (
-        max(0.0, (datetime.now(UTC) - generated_at).total_seconds() / 60)
-        if generated_at
-        else None
+        max(0.0, (datetime.now(UTC) - generated_at).total_seconds() / 60) if generated_at else None
     )
     checks = {
         "known_category": evidence.category in CATEGORY_NAMES,
@@ -71,9 +69,7 @@ def certify_category_pipeline(
     }
     passed = all(checks.values())
     live_scope_valid = (
-        passed
-        and evidence.category in LIVE_V1_CATEGORIES
-        and evidence.live_v1_allowed
+        passed and evidence.category in LIVE_V1_CATEGORIES and evidence.live_v1_allowed
     )
     return {
         "schema_version": "category-pipeline-certification-v1",

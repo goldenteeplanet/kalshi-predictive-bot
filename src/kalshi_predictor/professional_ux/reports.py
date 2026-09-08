@@ -40,4 +40,3 @@ def phase_3x_card(
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     return phase_3x_status_card(session, settings=settings or get_settings())
-

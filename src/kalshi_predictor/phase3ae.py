@@ -322,8 +322,7 @@ def run_verified_sports_schedule_connector(
                     link,
                     status="NO_VERIFIED_MATCH",
                     reason=(
-                        "Verified schedules exist, but no team/time/type match "
-                        "cleared threshold."
+                        "Verified schedules exist, but no team/time/type match cleared threshold."
                     ),
                     candidate_count=len(candidate_games),
                 )
@@ -520,9 +519,7 @@ def run_verified_sports_schedule_connector(
         "max_schedule_delta_hours": max_schedule_delta_hours,
         "candidate_game_keys": sorted(normalized_candidate_game_keys),
         "roster_evidence_path": str(roster_evidence_path) if roster_evidence_path else None,
-        "team_alias_review_path": str(team_alias_review_path)
-        if team_alias_review_path
-        else None,
+        "team_alias_review_path": str(team_alias_review_path) if team_alias_review_path else None,
         "manual_disambiguation_path": str(manual_disambiguation_path)
         if manual_disambiguation_path
         else None,
@@ -656,16 +653,12 @@ def _connector_provenance_snapshot(
     verified_count = max(0, total_links - kalshi_count - partial_count)
     partial_tickers = set(
         session.scalars(
-            select(SportsMarketLink.ticker)
-            .where(~kalshi_condition & partial_condition)
-            .distinct()
+            select(SportsMarketLink.ticker).where(~kalshi_condition & partial_condition).distinct()
         )
     )
     upgraded_tickers = set(
         session.scalars(
-            select(SportsMarketLink.ticker)
-            .where(kalshi_condition | ~partial_condition)
-            .distinct()
+            select(SportsMarketLink.ticker).where(kalshi_condition | ~partial_condition).distinct()
         )
     )
     return {
@@ -751,9 +744,7 @@ def _partial_links_without_verified_link(
     kalshi_condition = _kalshi_event_link_condition()
     partial_condition = _partial_market_link_condition()
     verified_ticker_subquery = (
-        select(SportsMarketLink.ticker)
-        .where(~kalshi_condition & ~partial_condition)
-        .distinct()
+        select(SportsMarketLink.ticker).where(~kalshi_condition & ~partial_condition).distinct()
     )
     query = (
         select(SportsMarketLink)
@@ -1174,9 +1165,7 @@ def _apply_team_alias_evidence_score(
         return confidence, reason, matched_terms, []
     boosted = min(confidence + extra_score, Decimal("1.00")).quantize(Decimal("0.0001"))
     updated_reason = f"{reason} Approved team alias evidence matched."
-    updated_terms = sorted(
-        set([*matched_terms, TEAM_ALIAS_EVIDENCE_SOURCE, *alias_terms])
-    )
+    updated_terms = sorted(set([*matched_terms, TEAM_ALIAS_EVIDENCE_SOURCE, *alias_terms]))
     return boosted, updated_reason, updated_terms, alias_payloads
 
 
@@ -1230,9 +1219,7 @@ def _load_roster_evidence(path: Path | None) -> list[VerifiedRosterEvidence]:
         return []
     payload = json.loads(path.read_text(encoding="utf-8"))
     rows = (
-        payload.get("verified_roster_evidence", payload)
-        if isinstance(payload, dict)
-        else payload
+        payload.get("verified_roster_evidence", payload) if isinstance(payload, dict) else payload
     )
     evidence_rows: list[VerifiedRosterEvidence] = []
     for row in rows if isinstance(rows, list) else []:
@@ -1461,9 +1448,7 @@ def _match_candidate_rows(
             {
                 "game_key": game.game_key,
                 "league": game.league,
-                "scheduled_at": game.scheduled_at.isoformat()
-                if game.scheduled_at
-                else "",
+                "scheduled_at": game.scheduled_at.isoformat() if game.scheduled_at else "",
                 "home_team": _team_label(game.home_team_key, teams=teams),
                 "away_team": _team_label(game.away_team_key, teams=teams),
                 "market_type": match.market_type,
@@ -1786,18 +1771,14 @@ def _performance_payload(
 ) -> dict[str, Any]:
     elapsed = stage_seconds.get("total", sum(stage_seconds.values()))
     stage_only = {key: value for key, value in stage_seconds.items() if key != "total"}
-    slowest_stage = (
-        max(stage_only.items(), key=lambda item: item[1])[0] if stage_only else "none"
-    )
+    slowest_stage = max(stage_only.items(), key=lambda item: item[1])[0] if stage_only else "none"
     return {
         "elapsed_seconds": round(elapsed, 3),
         "links_per_second": round(processed_links / elapsed, 3) if elapsed > 0 else None,
         "processed_links": processed_links,
         "verified_games_seen": verified_games_seen,
         "slowest_stage": slowest_stage,
-        "stage_seconds": {
-            key: round(value, 3) for key, value in sorted(stage_seconds.items())
-        },
+        "stage_seconds": {key: round(value, 3) for key, value in sorted(stage_seconds.items())},
     }
 
 

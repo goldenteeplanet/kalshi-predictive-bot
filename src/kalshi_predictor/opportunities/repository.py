@@ -12,7 +12,9 @@ from kalshi_predictor.utils.time import utc_now
 
 
 def insert_market_ranking(
-    session: Session, ranking: Mapping[str, Any], *,
+    session: Session,
+    ranking: Mapping[str, Any],
+    *,
     attribution_enabled: bool | None = None,
 ) -> MarketRanking:
     record = MarketRanking(
@@ -50,7 +52,10 @@ def insert_market_ranking(
     from kalshi_predictor.provenance.dual_write import capture_ranking_provenance
 
     capture_ranking_provenance(
-        session, record, ranking, enabled=attribution_enabled,
+        session,
+        record,
+        ranking,
+        enabled=attribution_enabled,
     )
     from kalshi_predictor.memory.capture import capture_market_ranking
 
