@@ -244,19 +244,31 @@ def _execution_context(
     series_payload = _captured_payload(
         contexts[rule["series_original_sha256"]], "series-original-v1", at, max_age
     )
+    event_payload = _captured_payload(
+        contexts[rule["event_original_sha256"]], "event-original-v1", at, max_age
+    )
     market, series = market_payload["market"], series_payload["series"]
+    event = event_payload["event"]
     if (
         market["ticker"] != anchor["ticker"]
         or market["event_ticker"] != anchor["event_id"]
         or market["status"] not in {"open", "active"}
         or not at < aware(market["close_time"])
         or series["ticker"] != rule["series_ticker"]
+        or event["event_ticker"] != anchor["event_id"]
+        or event["series_ticker"] != series["ticker"]
+        # Event overrides supersede series fees; unsupported overrides must
+        # never silently inherit the series formula (including zero/empty).
+        or event.get("fee_type_override") is not None
+        or event.get("fee_multiplier_override") is not None
         or ("series_ticker" in market and market["series_ticker"] != series["ticker"])
         or series["fee_type"] != "quadratic"
         or contexts[rule["market_original_sha256"]]["request_url"]
         != f"{PUBLIC_BASE}/markets/{anchor['ticker']}"
         or contexts[rule["series_original_sha256"]]["request_url"]
         != f"{PUBLIC_BASE}/series/{rule['series_ticker']}"
+        or contexts[rule["event_original_sha256"]]["request_url"]
+        != f"{PUBLIC_BASE}/events/{anchor['event_id']}"
         or snapshot["request_url"] != f"{PUBLIC_BASE}/markets/{anchor['ticker']}/orderbook"
         or snapshot["clock_basis"] != "public_rest_receipt"
         or not isinstance(snapshot["provider_payload"], dict)
@@ -445,7 +457,7 @@ def _weather_receipt(
     ):
         raise ValueError("TOURNAMENT_WEATHER_CAPTURE_CLOCK_INVALID")
     rule = contexts[anchor["rule_sha256"]]
-    for key in ("market_original_sha256", "series_original_sha256"):
+    for key in ("market_original_sha256", "series_original_sha256", "event_original_sha256"):
         wrapper = contexts[rule[key]]
         capture_hash = wrapper["capture_envelope_sha256"]
         capture = contexts[capture_hash]

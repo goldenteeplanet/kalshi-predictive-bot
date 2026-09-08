@@ -87,6 +87,7 @@ def test_weather_receipt_replay_checks_rehashed_semantic_mutations(strict_weathe
     for key, section, field in (
         ("market_original_sha256", "market", "volume_fp"),
         ("series_original_sha256", "series", "title"),
+        ("event_original_sha256", "event", "title"),
     ):
         rule = old_rule.decode()
         old_wrapper = next(x for x in original.context_originals if x.sha256 == rule[key])
@@ -234,6 +235,8 @@ def pair(day, *, cluster=None, probability=0.75, result="yes"):
                 request_url=(
                     f"{PUBLIC_BASE}/markets/T-{day}"
                     if kind == "market-original-v1"
+                    else f"{PUBLIC_BASE}/events/E-{day}"
+                    if kind == "event-original-v1"
                     else f"{PUBLIC_BASE}/series/SERIES"
                 ),
                 received_at=clock.isoformat(),
@@ -245,6 +248,9 @@ def pair(day, *, cluster=None, probability=0.75, result="yes"):
 
     market = captured("market-original-v1", market_payload)
     series = captured("series-original-v1", series_payload)
+    event = captured(
+        "event-original-v1", {"event": {"event_ticker": f"E-{day}", "series_ticker": "SERIES"}}
+    )
     rule = artifact(
         dict(
             ticker=f"T-{day}",
@@ -254,6 +260,7 @@ def pair(day, *, cluster=None, probability=0.75, result="yes"):
             series_ticker="SERIES",
             market_original_sha256=market.sha256,
             series_original_sha256=series.sha256,
+            event_original_sha256=event.sha256,
         )
     )
     anchor = artifact(
@@ -348,7 +355,17 @@ def pair(day, *, cluster=None, probability=0.75, result="yes"):
         on,
         outcome,
         (feature,),
-        (snapshot, model(), rule, market, series, execution_policy(), fee_document(), source),
+        (
+            snapshot,
+            model(),
+            rule,
+            market,
+            series,
+            execution_policy(),
+            fee_document(),
+            event,
+            source,
+        ),
     )
 
 
@@ -366,6 +383,66 @@ def changed_market(original, changes, *, omit_series=False):
     market = artifact(row)
     rule = artifact(old_rule.decode() | dict(market_original_sha256=market.sha256))
     return rebind(original, dict(rule_sha256=rule.sha256), ((old_market, market), (old_rule, rule)))
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"event_ticker": "OTHER"},
+        {"series_ticker": "OTHER"},
+        {"fee_type_override": "quadratic"},
+        {"fee_type_override": ""},
+        {"fee_multiplier_override": 0},
+        {"fee_multiplier_override": 1},
+        {"fee_multiplier_override": 2},
+        {"fee_multiplier_override": False},
+    ],
+)
+def test_event_fee_overrides_and_identity_fail_closed(changes):
+    assert evaluate([changed_event(pair(3), changes), pair(4)]).status == "INVALID_EVIDENCE"
+
+
+def changed_event(original, changes, **wrapper_changes):
+    old_rule = original.context_originals[2]
+    old_event = next(
+        item
+        for item in original.context_originals
+        if item.sha256 == old_rule.decode()["event_original_sha256"]
+    )
+    row = old_event.decode()
+    row["provider_payload"]["event"].update(changes)
+    row["provider_payload_sha256"] = canonical_hash(row["provider_payload"])
+    event = artifact(row | wrapper_changes)
+    rule = artifact(old_rule.decode() | {"event_original_sha256": event.sha256})
+    return rebind(original, {"rule_sha256": rule.sha256}, ((old_event, event), (old_rule, rule)))
+
+
+def test_null_event_overrides_preserve_series_fees():
+    changed = changed_event(pair(3), {"fee_type_override": None, "fee_multiplier_override": None})
+    assert evaluate([changed, pair(4)]).status == evaluate([pair(3), pair(4)]).status
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"received_at": (at(3) - timedelta(seconds=61)).isoformat()},
+        {"available_at": (at(3) + timedelta(seconds=1)).isoformat()},
+        {"request_url": f"{PUBLIC_BASE}/events/OTHER"},
+        {"kind": "series-original-v1"},
+    ],
+)
+def test_event_capture_must_be_fresh_and_exact(changes):
+    assert evaluate([changed_event(pair(3), {}, **changes), pair(4)]).status == "INVALID_EVIDENCE"
+
+
+def test_event_original_cannot_be_omitted():
+    original = pair(3)
+    missing = original.context_originals[2].decode()["event_original_sha256"]
+    changed = replace(
+        original,
+        context_originals=tuple(x for x in original.context_originals if x.sha256 != missing),
+    )
+    assert evaluate([changed, pair(4)]).status == "INVALID_EVIDENCE"
 
 
 @pytest.mark.parametrize(

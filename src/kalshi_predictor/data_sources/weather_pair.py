@@ -105,9 +105,10 @@ def _build(
 
     market = wrapper(f"{PUBLIC_BASE}/markets/{live.ticker}", "market-original-v1")
     market_row = market.decode()["provider_payload"]["market"]
-    event = envelopes[f"{PUBLIC_BASE}/events/{market_row['event_ticker']}"].decode()["body"][
-        "event"
-    ]
+    event_original = wrapper(
+        f"{PUBLIC_BASE}/events/{market_row['event_ticker']}", "event-original-v1"
+    )
+    event = event_original.decode()["provider_payload"]["event"]
     series = wrapper(f"{PUBLIC_BASE}/series/{event['series_ticker']}", "series-original-v1")
     book_url = f"{PUBLIC_BASE}/markets/{live.ticker}/orderbook"
     book_capture = envelopes[book_url].decode()
@@ -148,6 +149,7 @@ def _build(
             available_at=market.decode()["available_at"],
             market_original_sha256=market.sha256,
             series_original_sha256=series.sha256,
+            event_original_sha256=event_original.sha256,
             settlement_certified=False,
             version_basis="CAPTURED_RULE_TEXT_SHA256",
         )
@@ -224,6 +226,7 @@ def _build(
             snapshot,
             market,
             series,
+            event_original,
             rule,
             source,
             execution_policy,
