@@ -122,7 +122,10 @@ def run_discovery(
         archive_root, max_requests=max_pages + 2 * max_book_requests + 80, seconds=timeout_seconds
     )
     now = datetime.now(UTC)
-    settings = Settings(_env_file=None)
+    # BaseSettings accepts this runtime override; the generated field-only mypy
+    # constructor signature does not include inherited settings control keywords.
+    settings_overrides: dict[str, Any] = {"_env_file": None}
+    settings = Settings(**settings_overrides)
     payload: dict[str, Any] = {
         "generated_at": now.isoformat(),
         "archive_root": str(archive_root),
@@ -143,8 +146,9 @@ def run_discovery(
     inherited_receipts = []
     if resume_from:
         prior = json.loads((resume_from / "universe.json").read_text(encoding="utf-8"))
-        window_start = parse_datetime(
-            prior.get("coverage", {}).get("window_start") or prior["generated_at"]
+        window_start = _required_time(
+            prior.get("coverage", {}).get("window_start") or prior["generated_at"],
+            "resume_window_start",
         )
         cursor = str(prior["coverage"].get("resume_cursor") or "")
         complete = prior["coverage"]["pagination_complete"]
@@ -260,7 +264,7 @@ def run_discovery(
         ]
         for category in sorted(SUPPORTED_CATEGORIES)
     }
-    selected = []
+    selected: list[dict[str, Any]] = []
     while any(queues.values()) and len(selected) < max_book_requests:
         for queue in queues.values():
             if queue and len(selected) < max_book_requests:
@@ -268,7 +272,9 @@ def run_discovery(
     crypto_sources: dict[str, Any] = {}
     for row in selected:
         try:
-            if parse_datetime(row["raw_market"].get("close_time")) <= datetime.now(UTC):
+            if _required_time(row["raw_market"].get("close_time"), "close_time") <= datetime.now(
+                UTC
+            ):
                 row["first_blocker"] = "MARKET_CLOSED_DURING_SCAN"
                 continue
             event_data = public.get("/events/" + quote(row["event"], safe=""))
@@ -357,8 +363,17 @@ def run_discovery(
     return payload
 
 
+def _required_time(value: Any, field: str) -> datetime:
+    parsed = parse_datetime(value)
+    if parsed is None:
+        raise ValueError(f"MISSING_OR_INVALID_TIMESTAMP:{field}")
+    return parsed
+
+
 def candidate_row(raw: dict[str, Any], series: dict[str, Any], now: datetime) -> dict[str, Any]:
-    eta = parse_datetime(raw.get("expected_expiration_time") or raw.get("close_time"))
+    eta = _required_time(
+        raw.get("expected_expiration_time") or raw.get("close_time"), "settlement_eta"
+    )
     hours = (eta - now).total_seconds() / 3600
     row = {
         "ticker": raw["ticker"],
@@ -373,7 +388,10 @@ def candidate_row(raw: dict[str, Any], series: dict[str, Any], now: datetime) ->
         "close_time": raw.get("close_time"),
         "latest_expiration_time": raw.get("latest_expiration_time"),
         "max_settlement_delay_hours": (
-            (parse_datetime(raw["latest_expiration_time"]) - now).total_seconds() / 3600
+            (
+                _required_time(raw["latest_expiration_time"], "latest_expiration_time") - now
+            ).total_seconds()
+            / 3600
             if raw.get("latest_expiration_time")
             else None
         ),
@@ -471,7 +489,7 @@ def add_crypto_research(row: dict[str, Any], source: dict[str, Any], now: dateti
         "candle_age_seconds": (now - latest).total_seconds() if latest else None,
         "gate_status": "NOT_CERTIFIED_FOR_SETTLEMENT",
     }
-    horizon = (parse_datetime(raw.get("close_time")) - now).total_seconds() / 60
+    horizon = (_required_time(raw.get("close_time"), "close_time") - now).total_seconds() / 60
     inputs = inputs_from_features(source["features"], horizon_minutes=horizon)
     comparator = {
         "greater": "ABOVE",

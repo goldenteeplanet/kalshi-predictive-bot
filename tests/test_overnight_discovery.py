@@ -68,6 +68,24 @@ def test_discovery_candidate_never_claims_ready_from_market_text():
     assert row["paper_readiness"] == "PAPER_NOT_READY"
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"expected_expiration_time": None},
+        {"expected_expiration_time": "malformed"},
+        {"latest_expiration_time": "malformed"},
+    ],
+)
+def test_malformed_required_candidate_clocks_fail_closed(overrides):
+    raw = {"ticker": "KXBTC-T1", "expected_expiration_time": "2026-09-08T01:00:00Z"}
+    with pytest.raises(ValueError, match="MISSING_OR_INVALID_TIMESTAMP"):
+        candidate_row(
+            raw | overrides,
+            {"ticker": "KXBTC", "category": "Crypto"},
+            datetime(2026, 9, 8, tzinfo=UTC),
+        )
+
+
 def test_resume_preserves_cursor_and_frozen_window(tmp_path, monkeypatch):
     prior = tmp_path / "prior"
     prior.mkdir()
