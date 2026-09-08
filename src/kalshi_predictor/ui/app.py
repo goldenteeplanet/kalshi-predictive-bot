@@ -14,6 +14,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.overnight_paper.dashboard import create_router as create_paper_live_router
+from kalshi_predictor.ui.data_sources import create_router as create_data_sources_router
+from kalshi_predictor.ui.provider_research import create_router as create_provider_research_router
 from kalshi_predictor.ui.routes import create_router
 
 logger = logging.getLogger("kalshi_predictor.ui.audit")
@@ -114,6 +116,8 @@ def create_app(
         )
     )
     app.include_router(create_paper_live_router())
+    app.include_router(create_provider_research_router())
+    app.include_router(create_data_sources_router())
     # Starlette otherwise assembles this lazily inside the first request.
     # Finalize it here so concurrent cold readers all see the same route stack.
     app.middleware_stack = app.build_middleware_stack()
