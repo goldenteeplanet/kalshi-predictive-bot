@@ -158,13 +158,30 @@ class FREDResearchClient:
     def remaining_requests(self) -> int:
         return self.__remaining
 
-    def _get(self, path: str, params: dict[str, str | int]) -> FREDResponse:
+    def _get(
+        self, path: str, params: dict[str, str | int], *, initial_claims: bool = False
+    ) -> FREDResponse:
         allowed = {"series_id", "file_type", "realtime_start", "realtime_end"}
         if path == "/fred/series/observations":
             allowed |= {"observation_start", "observation_end", "limit", "sort_order"}
+        if initial_claims:
+            allowed |= {"output_type", "units", "offset"}
+            if (
+                path != "/fred/series/observations"
+                or params.keys() != allowed
+                or params.get("series_id") != "ICSA"
+                or params.get("output_type") != 4
+                or params.get("units") != "lin"
+                or params.get("offset") != 0
+                or params.get("sort_order") != "asc"
+            ):
+                raise FREDError("FRED_CLAIMS_QUERY_INVALID")
         if path not in _PATHS or not params.keys() <= allowed:
             raise FREDError("FRED_ENDPOINT_NOT_ALLOWED")
-        if params.get("series_id") not in _SERIES or params.get("file_type") != "json":
+        series_allowed = params.get("series_id") in _SERIES
+        if initial_claims:
+            series_allowed = params.get("series_id") == "ICSA"
+        if not series_allowed or params.get("file_type") != "json":
             raise FREDError("FRED_SERIES_NOT_ALLOWED")
         with self.__lock:
             if self.__closed or self.__halted:
@@ -233,6 +250,50 @@ class FREDResearchClient:
             except httpx.HTTPError:
                 pass
             raise FREDError("FRED_TRANSPORT_FAILED")
+
+    def initial_claims_releases(
+        self,
+        *,
+        observation_start: str,
+        observation_end: str,
+        as_of: str,
+        limit: int = 100,
+    ) -> FREDResponse:
+        """Fixed ICSA initial releases, not a historical receipt or DOL certification.
+
+        The real-time interval starts at the first requested reference date and
+        ends at as_of. Initial releases in that interval are requested explicitly;
+        no revised output-type-1 snapshot is relabeled as an initial release.
+        Archive the returned original before calling build_initial_claims_panel;
+        a schema rejection must not discard the provider's response evidence.
+        """
+        _window(observation_start, observation_end)
+        _window(observation_end, as_of)
+        if (
+            date.fromisoformat(observation_end) - date.fromisoformat(observation_start)
+        ).days > 6999:
+            raise FREDError("FRED_CLAIMS_WINDOW_TOO_LARGE")
+        if as_of > datetime.now(UTC).date().isoformat():
+            raise FREDError("FRED_FUTURE_VINTAGE_INVALID")
+        if type(limit) is not int or not 1 <= limit <= 1_000:
+            raise FREDError("FRED_LIMIT_INVALID")
+        return self._get(
+            "/fred/series/observations",
+            {
+                "series_id": "ICSA",
+                "file_type": "json",
+                "observation_start": observation_start,
+                "observation_end": observation_end,
+                "realtime_start": observation_start,
+                "realtime_end": as_of,
+                "limit": limit,
+                "sort_order": "asc",
+                "output_type": 4,
+                "units": "lin",
+                "offset": 0,
+            },
+            initial_claims=True,
+        )
 
     def observations(
         self,

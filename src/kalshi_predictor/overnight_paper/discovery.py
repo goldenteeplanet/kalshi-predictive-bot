@@ -591,6 +591,9 @@ def _crypto_diagnostic_inputs(source: dict[str, Any], close: Any, now: datetime)
 def add_crypto_research(row: dict[str, Any], source: dict[str, Any], now: datetime) -> None:
     terms = row["crypto_terms"]
     raw = row["raw_market"]
+    observed: datetime | None
+    latest: datetime | None
+    diagnostic_now: datetime | None
     try:
         observed = _crypto_aware_time(source["ticker"].get("time"), "ticker_provider_at")
         latest = _crypto_aware_time(source.get("latest_closed_candle_at"), "candle_cutoff_at")
