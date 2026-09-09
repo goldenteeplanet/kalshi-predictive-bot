@@ -10,6 +10,48 @@ import typer
 
 
 def register_commands(app: typer.Typer) -> None:
+    @app.command("positive-ev-report")
+    def positive_ev_report(
+        artifact: Annotated[Path, typer.Option(help="Archived qualified_scan JSON; read only.")],
+        limit: Annotated[int, typer.Option(min=1, max=50)] = 10,
+        json_output: Annotated[
+            bool, typer.Option("--json", help="Print JSON instead of text.")
+        ] = False,
+    ) -> None:
+        """Recompute archived economics; no current qualification or execution authority."""
+        from .positive_ev_report import read_positive_ev_report, render_positive_ev_report
+
+        try:
+            result = read_positive_ev_report(artifact, limit=limit)
+        except (OSError, ValueError, RecursionError) as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        typer.echo(
+            json.dumps(result, indent=2) if json_output else render_positive_ev_report(result)
+        )
+
+    @app.command("positive-ev-funnel")
+    def positive_ev_funnel(
+        artifact: Annotated[Path, typer.Option(help="Archived qualified_scan JSON; read only.")],
+    ) -> None:
+        """Show archived category economics and unverified gate counts as JSON."""
+        from .positive_ev_report import read_positive_ev_report
+
+        try:
+            result = read_positive_ev_report(artifact)
+        except (OSError, ValueError, RecursionError) as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        typer.echo(
+            json.dumps(
+                {
+                    key: value
+                    for key, value in result.items()
+                    if key
+                    not in ("rows", "top_frozen_candidates", "near_misses_to_recorded_threshold")
+                },
+                indent=2,
+            )
+        )
+
     @app.command("qualified-candidate-scan")
     def qualified_candidate_scan(
         archive_root: Annotated[Path, typer.Option(help="New isolated scan evidence directory.")],

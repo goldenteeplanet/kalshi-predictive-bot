@@ -20,6 +20,7 @@ from .discovery import PublicArchive
 from .evaluation_dataset import evaluate_dataset, read_records
 from .gate_context import QualificationContext, verify_context_gate
 from .provenance import Artifact
+from .scan_diagnostics import frozen_economics, summarize_funnel
 from .source_health import aware
 from .timing import verify_settlement_horizon
 
@@ -105,6 +106,7 @@ def shortlist_candidates(
             continue
         item = choices[0]
         decision = item.decision
+        row.update(frozen_economics(decision), preparation_present=True)
         row.update(category=decision.get("category"), model=decision.get("model_name"))
         rule = rule_verifier.verify_settlement_rule(
             decision=decision,
@@ -141,6 +143,7 @@ def shortlist_candidates(
         if evaluated_models != {(decision.get("model_name"), decision.get("model_version"))}:
             row["first_blocker"] = "MODEL_EVALUATION_IDENTITY_MISMATCH"
             continue
+        row["model_evaluation_verified"] = True
         if policy.event_id in used_events:
             row["first_blocker"] = "RELATED_EVENT_ALREADY_SELECTED"
             continue
@@ -149,11 +152,38 @@ def shortlist_candidates(
             continue
         used_events.add(policy.event_id)
         row["forecast_status"] = "MODEL_EVALUATION_VERIFIED"
+        row["selected_for_book_refresh"] = True
         selected.append((item, row))
+    # Uncertified supplied candidates still deserve an exact diagnostic row.
+    pinned_tickers = {policy.ticker for policy in policies}
+    for ticker, choices in sorted(by_ticker.items()):
+        if ticker in pinned_tickers:
+            continue
+        row = dict.fromkeys(OUTPUT_FIELDS)
+        row.update(
+            ticker=ticker,
+            rule_status="UNVERIFIED",
+            book_status="NOT_FETCHED",
+            forecast_status="NOT_PREPARED",
+            first_blocker="AMBIGUOUS_PREPARATION",
+        )
+        if len(choices) == 1:
+            decision = choices[0].decision
+            row.update(
+                frozen_economics(decision),
+                preparation_present=True,
+                event=decision.get("event_id"),
+                category=decision.get("category"),
+                model=decision.get("model_name"),
+                first_blocker="NO_UNAMBIGUOUS_CERTIFIED_RULE",
+            )
+        rows.append(row)
     return {
         "status": "NO_CERTIFIED_FAMILY" if not policies else "PREPARATION_REVIEWED",
         "coverage": "PINNED_POLICY_TICKERS_ONLY",
+        "diagnostic_coverage": "PINNED_POLICY_AND_SUPPLIED_PREPARATION_TICKERS",
         "rows": rows,
+        "funnel": summarize_funnel(rows),
         "selected": selected,
     }
 
@@ -233,5 +263,6 @@ def run_qualified_scan(
                 break
         finally:
             result["network_requests"] = len(public.receipts)
+    result["funnel"] = summarize_funnel(result["rows"])
     (archive_root / "qualified_scan.json").write_text(json.dumps(result, indent=2))
     return result
