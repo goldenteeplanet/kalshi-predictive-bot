@@ -1,0 +1,7 @@
+{% macro report_link(href, label) -%}
+  {% if report_available(href) %}
+    <a href="{{ href }}">{{ label }}</a>
+  {% else %}
+    <span class="report-unavailable">{{ label }} <small>Unavailable</small></span>
+  {% endif %}
+{%- endmacro %}

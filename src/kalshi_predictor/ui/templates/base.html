@@ -124,32 +124,31 @@
           {% endfor %}
         </nav>
         <details class="side-report-links">
+          {% from "report_link.html" import report_link %}
           <summary>Reports</summary>
           <a href="/evidence">Acceleration &amp; training evidence</a>
           <a href="/system/evidence">Certification evidence</a>
           <a href="/opportunities/best-payouts">Best payouts</a>
-          <a href="/reports/research_report.md">Research report</a>
-          <a href="/reports/link_coverage_report.md">Link coverage</a>
-          <a href="/reports/signal_report.md">Signal report</a>
-          <a href="/reports/news_report.md">News report</a>
-          <a href="/reports/sports_report.md">Sports report</a>
-          <a href="/reports/microstructure_report.md">Microstructure report</a>
-          <a href="/reports/meta_report.md">Meta model</a>
-          <a href="/reports/learning_report.md">Learning report</a>
-          <a href="/reports/learning_diagnostics.md">Learning diagnostics</a>
-          <a href="/reports/self_evaluation_journal.md">Self-evaluation</a>
-          <a href="/reports/tonight_report.md">Tonight report</a>
-          <a href="/reports/market_memory_report.md">Memory report</a>
-          <a href="/reports/institutional_dashboard.md">Institutional report</a>
+          {{ report_link("/reports/research_report.md", "Research report") }}
+          {{ report_link("/reports/link_coverage_report.md", "Link coverage") }}
+          {{ report_link("/reports/signal_report.md", "Signal report") }}
+          {{ report_link("/reports/news_report.md", "News report") }}
+          {{ report_link("/reports/sports_report.md", "Sports report") }}
+          {{ report_link("/reports/microstructure_report.md", "Microstructure report") }}
+          {{ report_link("/reports/meta_report.md", "Meta model") }}
+          {{ report_link("/reports/learning_report.md", "Learning report") }}
+          {{ report_link("/reports/learning_diagnostics.md", "Learning diagnostics") }}
+          {{ report_link("/reports/self_evaluation_journal.md", "Self-evaluation") }}
+          {{ report_link("/reports/tonight_report.md", "Tonight report") }}
+          {{ report_link("/reports/market_memory_report.md", "Memory report") }}
+          {{ report_link("/reports/institutional_dashboard.md", "Institutional report") }}
           <a href="/research/providers">Provider research captures</a>
           <a href="/data-sources">Data source value</a>
           <a href="/research/crypto-cohort">Crypto cohort progress</a>
-          <a href="/reports/live_readiness_report.md">Live readiness</a>
-          <a href="/reports/system_certification/system_certification_report.md">
-            System certification
-          </a>
-          <a href="/reports/personal_trader_brief.md">Personal trader</a>
-          <a href="/reports/portfolio_summary.md">Portfolio report</a>
+          {{ report_link("/reports/live_readiness_report.md", "Live readiness") }}
+          {{ report_link("/reports/system_certification/system_certification_report.md", "System certification") }}
+          {{ report_link("/reports/personal_trader_brief.md", "Personal trader") }}
+          {{ report_link("/reports/portfolio_summary.md", "Portfolio report") }}
         </details>
       </aside>
       <main id="main-content" tabindex="-1">
