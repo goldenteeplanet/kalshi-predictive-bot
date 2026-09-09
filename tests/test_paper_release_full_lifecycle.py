@@ -114,6 +114,10 @@ def _run_lifecycle(repository, database):
             patch.setattr(assembly_fixture, "datetime", Clock)
             patch.setattr(preparation_fixture, "datetime", Clock)
             patch.setattr(preparation, "utc_now", lambda instant=at: instant)
+            patch.setattr("kalshi_predictor.weather.repository.utc_now", lambda instant=at: instant)
+            patch.setattr(
+                "kalshi_predictor.forecasting.weather_v2.utc_now", lambda instant=at: instant
+            )
             patch.setattr(
                 assembly_fixture,
                 "Settings",

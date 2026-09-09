@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -274,12 +274,19 @@ def get_latest_weather_features(
     location_key: str,
     *,
     target_time: datetime | None = None,
+    as_of: datetime | None = None,
 ) -> WeatherFeature | None:
     location = normalize_location_key(location_key)
+    statement = select(WeatherFeature).where(WeatherFeature.location_key == location)
+    if as_of is not None:
+        as_of = _aware_cutoff(as_of)
+        statement = statement.where(
+            WeatherFeature.generated_at <= as_of,
+            WeatherFeature.created_at <= as_of,
+        )
     if target_time is None:
         return session.scalar(
-            select(WeatherFeature)
-            .where(WeatherFeature.location_key == location)
+            statement
             .order_by(
                 desc(WeatherFeature.generated_at),
                 desc(WeatherFeature.target_time),
@@ -291,9 +298,8 @@ def get_latest_weather_features(
     if requested_target is None:
         return None
     return session.scalar(
-        select(WeatherFeature)
+        statement
         .where(
-            WeatherFeature.location_key == location,
             WeatherFeature.target_time == requested_target,
         )
         .order_by(
@@ -381,13 +387,23 @@ def insert_weather_market_link(
 def get_latest_weather_link_for_ticker(
     session: Session,
     ticker: str,
+    *,
+    as_of: datetime | None = None,
 ) -> WeatherMarketLink | None:
+    statement = select(WeatherMarketLink).where(WeatherMarketLink.ticker == ticker)
+    if as_of is not None:
+        statement = statement.where(WeatherMarketLink.detected_at <= _aware_cutoff(as_of))
     return session.scalar(
-        select(WeatherMarketLink)
-        .where(WeatherMarketLink.ticker == ticker)
+        statement
         .order_by(desc(WeatherMarketLink.detected_at), desc(WeatherMarketLink.id))
         .limit(1)
     )
+
+
+def _aware_cutoff(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("WEATHER_INPUT_CUTOFF_TIMEZONE_REQUIRED")
+    return value.astimezone(UTC)
 
 
 def get_weather_links(

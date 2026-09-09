@@ -105,6 +105,10 @@ def _prepare_lifecycle(repository, database):
             patch.setattr(assembly_fixture, "datetime", Clock)
             patch.setattr(preparation_fixture, "datetime", Clock)
             patch.setattr(preparation, "utc_now", lambda instant=at: instant)
+            patch.setattr("kalshi_predictor.weather.repository.utc_now", lambda instant=at: instant)
+            patch.setattr(
+                "kalshi_predictor.forecasting.weather_v2.utc_now", lambda instant=at: instant
+            )
             patch.setattr(
                 assembly_fixture,
                 "Settings",
@@ -305,6 +309,8 @@ def _run_driver_lifecycle(repository, database):
             (supervisor, "_now"),
         ):
             patch.setattr(module, name, lambda: simulated[0])
+        patch.setattr("kalshi_predictor.weather.repository.utc_now", lambda: simulated[0])
+        patch.setattr("kalshi_predictor.forecasting.weather_v2.utc_now", lambda: simulated[0])
         patch.setattr(discovery.time, "sleep", lambda _: None)
         patch.setattr(
             discovery.httpx,
