@@ -19,7 +19,11 @@ import httpx
 from kalshi_predictor.active_universe import is_active_market_status
 from kalshi_predictor.config import Settings
 from kalshi_predictor.crypto.assets import supported_crypto_asset, symbol_from_event_ticker
-from kalshi_predictor.crypto.distribution_model import inputs_from_features, threshold_probability
+from kalshi_predictor.crypto.distribution_model import (
+    DistributionInputs,
+    inputs_from_features,
+    threshold_probability,
+)
 from kalshi_predictor.crypto.features import calculate_crypto_features
 from kalshi_predictor.crypto.semantics import parse_crypto_market_terms
 from kalshi_predictor.data.schema import CryptoPrice, Market
@@ -549,26 +553,15 @@ def _crypto_diagnostic_inputs(source: dict[str, Any], close: Any, now: datetime)
     decision_at = _crypto_aware_time(now, "decision_at")
     ticker = source["ticker"]
     if source.get("symbol") == "BTC" or source.get("analytical_source") is not None:
-        from .crypto_source import verify_coinbase_source
+        from .btc_fixed_model import verified_btc_features
 
-        verified = verify_coinbase_source(
+        verified, checked_features = verified_btc_features(
             source["analytical_source"],
-            decision_at=decision_at,
-            now=decision_at,
+            computed_at=decision_at,
         )
         view = verified["inputs"]
-        checked_prices = [
-            CryptoPrice(
-                symbol="BTC",
-                source="coinbase_closed_1m_candles",
-                observed_at=datetime.fromtimestamp(item[0] + 60, UTC),
-                price_usd=str(item[4]),
-                raw_json=json.dumps(item),
-            )
-            for item in view["closed_candles"]
-        ]
         if (
-            source["features"] != calculate_crypto_features(checked_prices, window_minutes=1440)
+            source["features"] != checked_features
             or Decimal(str(ticker["price"])) != Decimal(view["spot"])
             or _crypto_aware_time(ticker["time"], "ticker_provider_at")
             != _crypto_aware_time(view["trade_at"], "original_trade_at")
@@ -615,7 +608,17 @@ def _crypto_diagnostic_inputs(source: dict[str, Any], close: Any, now: datetime)
         if value is not None and (isinstance(value, bool) or not math.isfinite(float(value))):
             raise ValueError("CRYPTO_DIAGNOSTIC_INVALID_HISTORICAL_FEATURE:" + name)
     horizon = (close_at - origin).total_seconds() / 60
-    inputs = inputs_from_features(features, horizon_minutes=horizon)
+    inputs: DistributionInputs | None
+    if source.get("symbol") == "BTC" or source.get("analytical_source") is not None:
+        from .btc_fixed_model import prepare_btc_inputs
+
+        inputs = prepare_btc_inputs(
+            source["analytical_source"],
+            horizon_end_at=close_at,
+            computed_at=decision_at,
+        ).distribution
+    else:
+        inputs = inputs_from_features(features, horizon_minutes=horizon)
     if inputs is None:
         raise ValueError("CRYPTO_DIAGNOSTIC_INSUFFICIENT_CANDLE_HISTORY")
     return inputs, {
@@ -702,6 +705,7 @@ def add_crypto_research(row: dict[str, Any], source: dict[str, Any], now: dateti
     row["forecast"] = probability
     row["research_forecast_artifact"] = None
     if probability is not None and source.get("analytical_source") is not None:
+        from .btc_fixed_model import model_specification
         from .crypto_source import bind_coinbase_forecast_inputs
 
         original_source = source["analytical_source"]
@@ -713,6 +717,11 @@ def add_crypto_research(row: dict[str, Any], source: dict[str, Any], now: dateti
         row["research_forecast_artifact"] = bind_coinbase_forecast_inputs(
             {
                 "kind": "crypto-research-diagnostic-v1",
+                "model_specification": model_specification(),
+                "execution_entrypoint": (
+                    "kalshi_predictor.overnight_paper.discovery:add_crypto_research"
+                ),
+                "horizon_role": "MARKET_CLOSE_RESEARCH_PROXY_NOT_VERIFIED_PAYOFF_TIME",
                 "probability": str(probability),
                 "generated_at": _crypto_aware_time(now, "decision_at").isoformat(),
                 "source_hashes": [source_hash],
