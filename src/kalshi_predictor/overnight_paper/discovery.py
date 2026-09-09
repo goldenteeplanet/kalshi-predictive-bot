@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import time
 from collections import Counter
@@ -499,21 +500,125 @@ def collect_crypto_source(public: PublicArchive, symbol: str) -> dict[str, Any]:
     }
 
 
+CRYPTO_DIAGNOSTIC_TICKER_MAX_AGE_SECONDS = 60
+CRYPTO_DIAGNOSTIC_CANDLE_MAX_AGE_SECONDS = 1800
+
+
+def _crypto_aware_time(value: Any, label: str) -> datetime:
+    try:
+        parsed = (
+            datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if isinstance(value, str)
+            else value
+        )
+        if not isinstance(parsed, datetime) or parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError
+        return parsed.astimezone(UTC)
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError("CRYPTO_DIAGNOSTIC_INVALID_CLOCK:" + label) from exc
+
+
+def _crypto_diagnostic_inputs(source: dict[str, Any], close: Any, now: datetime):
+    """Bind current spot and horizon to one provider clock; candle history stays separate."""
+    decision_at = _crypto_aware_time(now, "decision_at")
+    ticker = source["ticker"]
+    origin = _crypto_aware_time(ticker.get("time"), "ticker_provider_at")
+    receipt = _crypto_aware_time(source["ticker_evidence"].get("received_at"), "ticker_received_at")
+    cutoff = _crypto_aware_time(source.get("latest_closed_candle_at"), "candle_cutoff_at")
+    candles_received = _crypto_aware_time(
+        source["candles_evidence"].get("received_at"), "candles_received_at"
+    )
+    collected = _crypto_aware_time(source.get("collected_at"), "collected_at")
+    close_at = _crypto_aware_time(close, "close_time")
+    if not origin <= receipt <= decision_at:
+        raise ValueError("CRYPTO_DIAGNOSTIC_TICKER_VISIBILITY_INVALID")
+    if (decision_at - origin).total_seconds() > CRYPTO_DIAGNOSTIC_TICKER_MAX_AGE_SECONDS:
+        raise ValueError("CRYPTO_DIAGNOSTIC_TICKER_STALE")
+    if (
+        not cutoff <= origin
+        or not cutoff <= candles_received <= collected <= decision_at
+        or receipt > collected
+    ):
+        raise ValueError("CRYPTO_DIAGNOSTIC_CANDLE_VISIBILITY_INVALID")
+    if (decision_at - cutoff).total_seconds() > CRYPTO_DIAGNOSTIC_CANDLE_MAX_AGE_SECONDS:
+        raise ValueError("CRYPTO_DIAGNOSTIC_CANDLE_HISTORY_STALE")
+    if type(source.get("closed_candle_count")) is not int or source["closed_candle_count"] < 3:
+        raise ValueError("CRYPTO_DIAGNOSTIC_INSUFFICIENT_CANDLE_HISTORY")
+    if isinstance(ticker.get("price"), bool):
+        raise ValueError("CRYPTO_DIAGNOSTIC_INVALID_TICKER_PRICE")
+    try:
+        spot = float(ticker["price"])
+    except (ValueError, TypeError, KeyError, OverflowError) as exc:
+        raise ValueError("CRYPTO_DIAGNOSTIC_INVALID_TICKER_PRICE") from exc
+    if not math.isfinite(spot) or spot <= 0:
+        raise ValueError("CRYPTO_DIAGNOSTIC_INVALID_TICKER_PRICE")
+    if close_at <= decision_at:
+        raise ValueError("CRYPTO_DIAGNOSTIC_MARKET_CLOSED")
+    features = dict(source["features"])
+    features["price"] = spot
+    # Reject nonfinite supplied historical inputs before distribution clamping.
+    for name in ("volatility_1h", "volatility_4h", "volatility_24h", "return_1h"):
+        value = features.get(name)
+        if value is not None and (isinstance(value, bool) or not math.isfinite(float(value))):
+            raise ValueError("CRYPTO_DIAGNOSTIC_INVALID_HISTORICAL_FEATURE:" + name)
+    horizon = (close_at - origin).total_seconds() / 60
+    inputs = inputs_from_features(features, horizon_minutes=horizon)
+    if inputs is None:
+        raise ValueError("CRYPTO_DIAGNOSTIC_INSUFFICIENT_CANDLE_HISTORY")
+    return inputs, {
+        "spot": str(ticker["price"]),
+        "spot_basis": "COINBASE_TICKER_PROVIDER_TIME",
+        "spot_provider_at": origin.isoformat(),
+        "spot_received_at": receipt.isoformat(),
+        "decision_at": decision_at.isoformat(),
+        "horizon_start_at": origin.isoformat(),
+        "horizon_minutes": horizon,
+        "candle_feature_cutoff_at": cutoff.isoformat(),
+        "candle_features_received_at": candles_received.isoformat(),
+        "historical_candle_spot": source["features"].get("price"),
+        "volatility_per_minute": inputs.volatility_per_minute,
+        "drift_per_minute": inputs.drift_per_minute,
+        "historical_inputs": {
+            key: source["features"].get(key)
+            for key in ("volatility_1h", "volatility_4h", "volatility_24h", "return_1h")
+        },
+        "ticker_evidence": dict(source["ticker_evidence"]),
+        "candles_evidence": dict(source["candles_evidence"]),
+        "execution_authority": False,
+    }
+
+
 def add_crypto_research(row: dict[str, Any], source: dict[str, Any], now: datetime) -> None:
     terms = row["crypto_terms"]
     raw = row["raw_market"]
-    observed = parse_datetime(source["ticker"].get("time"))
-    latest = parse_datetime(source.get("latest_closed_candle_at"))
+    try:
+        observed = _crypto_aware_time(source["ticker"].get("time"), "ticker_provider_at")
+        latest = _crypto_aware_time(source.get("latest_closed_candle_at"), "candle_cutoff_at")
+        diagnostic_now = _crypto_aware_time(now, "decision_at")
+    except (ValueError, TypeError, KeyError):
+        observed = latest = diagnostic_now = None
     # Existing execution/source gates still required; these are diagnostic source clocks.
     row["source_freshness"] = {
         "ticker_provider_time": observed.isoformat() if observed else None,
-        "ticker_age_seconds": (now - observed).total_seconds() if observed else None,
+        "ticker_age_seconds": (diagnostic_now - observed).total_seconds()
+        if observed and diagnostic_now
+        else None,
         "latest_closed_candle_at": source.get("latest_closed_candle_at"),
-        "candle_age_seconds": (now - latest).total_seconds() if latest else None,
+        "candle_age_seconds": (diagnostic_now - latest).total_seconds()
+        if latest and diagnostic_now
+        else None,
         "gate_status": "NOT_CERTIFIED_FOR_SETTLEMENT",
     }
-    horizon = (_required_time(raw.get("close_time"), "close_time") - now).total_seconds() / 60
-    inputs = inputs_from_features(source["features"], horizon_minutes=horizon)
+    inputs = None
+    diagnostic_blocker = None
+    row["forecast_inputs"] = None
+    try:
+        inputs, row["forecast_inputs"] = _crypto_diagnostic_inputs(
+            source, raw.get("close_time"), now
+        )
+    except (ValueError, TypeError, KeyError, OverflowError) as exc:
+        diagnostic_blocker = str(exc)
+    row["forecast_diagnostic_blocker"] = diagnostic_blocker
     comparator = {
         "greater": "ABOVE",
         "less": "BELOW",
@@ -542,7 +647,7 @@ def add_crypto_research(row: dict[str, Any], source: dict[str, Any], now: dateti
     row["model_readiness"] = (
         "CONTRACT_SPECIFIC_NO_LEAKAGE_CALIBRATION_MISSING"
         if probability is not None
-        else "EXPLICIT_THRESHOLD_OR_SUFFICIENT_HISTORY_MISSING"
+        else diagnostic_blocker or "EXPLICIT_THRESHOLD_OR_SUFFICIENT_HISTORY_MISSING"
     )
     row["model_scope_warning"] = (
         "Terminal spot distribution is not validated for CF benchmark averaging or directional "
