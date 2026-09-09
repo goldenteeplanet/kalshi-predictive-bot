@@ -325,6 +325,9 @@ def test_actual_collector_probability_and_forecast_artifact_bridge(tmp_path, mon
         def get(self, path, params=None):
             name = "candles" if path.endswith("/candles") else "ticker"
             item = bundle["body"][name]
+            if name == "candles":
+                assert params == cs.coinbase_candle_window(NOW)
+                item = item | {"params": params}
             raw = bytes.fromhex(item["payload_hex"])
             file = tmp_path / (name + ".json")
             file.write_bytes(raw)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -42,7 +42,7 @@ def _number(value: Any, *, positive: bool = True) -> Decimal:
 
 
 def _original(
-    item: dict[str, Any], url: str, params: dict[str, int], at: datetime, now: datetime
+    item: dict[str, Any], url: str, params: dict[str, Any], at: datetime, now: datetime
 ) -> Any:
     _need(
         isinstance(item, dict)
@@ -80,6 +80,55 @@ def _original(
     return json.loads(raw, object_pairs_hook=unique, parse_constant=nonfinite)
 
 
+def coinbase_candle_window(at: datetime, *, minutes: int = 180) -> dict[str, Any]:
+    """Explicit closed-minute request range; does not relax response validation."""
+    _need(type(minutes) is int and 3 <= minutes <= 300, "COINBASE_WINDOW_MINUTES")
+    end = aware(at).astimezone(UTC).replace(second=0, microsecond=0)
+    return {
+        "granularity": 60,
+        "start": (end - timedelta(minutes=minutes)).isoformat(),
+        "end": end.isoformat(),
+    }
+
+
+def _candle_window(item: dict[str, Any]) -> tuple[dict[str, Any], datetime | None, datetime | None]:
+    _need(isinstance(item, dict), "COINBASE_EXACT_ORIGINAL_ENDPOINT_REQUIRED")
+    params = item.get("params")
+    if not isinstance(params, dict):
+        raise ValueError("COINBASE_EXACT_ORIGINAL_ENDPOINT_REQUIRED")
+    if (
+        isinstance(params, dict)
+        and params == {"granularity": 60}
+        and type(params["granularity"]) is int
+    ):
+        return params, None, None
+    _need(
+        isinstance(params, dict)
+        and set(params) == {"granularity", "start", "end"}
+        and type(params["granularity"]) is int
+        and params["granularity"] == 60,
+        "COINBASE_EXACT_ORIGINAL_ENDPOINT_REQUIRED",
+    )
+    _need(
+        all(isinstance(params[k], str) and len(params[k]) <= 64 for k in ("start", "end")),
+        "COINBASE_CANDLE_WINDOW_CLOCK",
+    )
+    start, end = aware(params["start"]), aware(params["end"])
+    _need(
+        all(
+            t.utcoffset() == timedelta(0) and t.second == 0 and t.microsecond == 0
+            for t in (start, end)
+        ),
+        "COINBASE_CANDLE_WINDOW_GRID",
+    )
+    _need(
+        timedelta(minutes=3) <= end - start <= timedelta(minutes=300)
+        and end <= aware(item["received_at"]),
+        "COINBASE_CANDLE_WINDOW_BOUNDS",
+    )
+    return params, start, end
+
+
 def verify_coinbase_source(
     source: dict[str, Any], *, decision_at: datetime, now: datetime
 ) -> dict[str, Any]:
@@ -107,7 +156,8 @@ def verify_coinbase_source(
         "COINBASE_ORIGINAL_PAIR_REQUIRED",
     )
     ticker = _original(body["ticker"], TICKER_URL, {}, at, current)
-    candles = _original(body["candles"], CANDLES_URL, {"granularity": 60}, at, current)
+    candle_params, requested_start, requested_end = _candle_window(body["candles"])
+    candles = _original(body["candles"], CANDLES_URL, candle_params, at, current)
     received = max(aware(body[key]["received_at"]) for key in ("ticker", "candles"))
     _need(
         aware(source["received_at"]) == aware(source["available_at"]) == received,
@@ -125,6 +175,7 @@ def verify_coinbase_source(
     seen = set()
     selected = []
     excluded = []
+    excluded_outside_window = []
     for index, row in enumerate(candles):
         _need(
             isinstance(row, list)
@@ -142,7 +193,13 @@ def verify_coinbase_source(
         start = datetime.fromtimestamp(row[0], tz=trade_at.tzinfo)
         end = start + timedelta(seconds=60)
         _need(start <= aware(body["candles"]["received_at"]), "COINBASE_FUTURE_CANDLE")
-        if end <= trade_at and end <= aware(body["candles"]["received_at"]):
+        if (
+            requested_start is not None
+            and requested_end is not None
+            and not (requested_start <= start and end <= requested_end)
+        ):
+            excluded_outside_window.append(index)
+        elif end <= trade_at and end <= aware(body["candles"]["received_at"]):
             selected.append(row)
         else:
             excluded.append(index)
@@ -162,6 +219,12 @@ def verify_coinbase_source(
         ),
         original_hashes=[body[key]["sha256"] for key in ("ticker", "candles")],
     )
+    if requested_start is not None and requested_end is not None:
+        view.update(
+            requested_start_at=requested_start.isoformat(),
+            requested_end_at=requested_end.isoformat(),
+            excluded_outside_request_row_indices=excluded_outside_window,
+        )
     return {"inputs": view, "input_sha256": _hash(view), "available_at": received.isoformat()}
 
 

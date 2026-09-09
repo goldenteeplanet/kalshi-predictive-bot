@@ -475,7 +475,12 @@ def collect_crypto_source(public: PublicArchive, symbol: str) -> dict[str, Any]:
     """Closed Coinbase candles are analytical evidence, never CF settlement truth."""
     ticker = public.get(f"/products/{symbol}-USD/ticker")
     ticker_receipt = dict(public.receipts[-1])
-    candles = public.get(f"/products/{symbol}-USD/candles", {"granularity": 60})
+    candle_params = {"granularity": 60}
+    if symbol == "BTC":
+        from .crypto_source import coinbase_candle_window
+
+        candle_params = coinbase_candle_window(datetime.now(UTC))
+    candles = public.get(f"/products/{symbol}-USD/candles", candle_params)
     captured = datetime.now(UTC)
     analytical_source = None
     analytical_inputs = None
