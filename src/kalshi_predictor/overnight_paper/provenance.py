@@ -72,6 +72,11 @@ def validate_source_visibility(
     if not source.get("url") or not source.get("body"):
         raise ValueError("ORIGINAL_SOURCE_PAYLOAD_REQUIRED")
     basis = source.get("clock_basis", "provider")
+    if basis == "coinbase-btc-trade-closed-candles-v1":
+        from .crypto_source import verify_coinbase_source
+
+        verify_coinbase_source(source, decision_at=at, now=reference)
+        return
     if basis == "public_rest_receipt":
         url = source["url"]
         kalshi = isinstance(url, str) and re.fullmatch(
@@ -282,6 +287,10 @@ def verify_full_provenance(
                 raise ValueError("FUTURE_OR_INCONSISTENT_ARTIFACT_VISIBILITY:" + role)
         for source in sources:
             validate_source_visibility(source, decision_at=at, now=reference)
+            if source.get("clock_basis") == "coinbase-btc-trade-closed-candles-v1":
+                from .crypto_source import verify_coinbase_binding
+
+                verify_coinbase_binding(source, decision=decision, now=reference, forecast=forecast)
         if not model.get("code_sha256") or (
             model_kind == "trained" and not model.get("training_dataset_hashes")
         ):
@@ -330,9 +339,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
     "kalshi_predictor.advanced_risk.service": (
         "2c92a375a6db6c2bbea6a966c7d5aec52d46850a95c3e27916b1d99ec1e65b49"
     ),
-    "kalshi_predictor.config": (
-        "42d3c364142f296fa8447c365e77707b382b7b13ae4223ba6d5fdf7bbf4e0770"
-    ),
+    "kalshi_predictor.config": ("42d3c364142f296fa8447c365e77707b382b7b13ae4223ba6d5fdf7bbf4e0770"),
     "kalshi_predictor.data.repositories": (
         "af405031cec92008cbaab0d381096d4ac456bc60cc46fb33692838ef6abdf2db"
     ),
@@ -349,7 +356,10 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "7e8647e9cf73874dbcc9df4c7b324b86fbaaca21a4f9981c3c71b9a85227e6e8"
     ),
     "kalshi_predictor.overnight_paper.boundary_gate": (
-        "af459e744aef011830d438707fa44f1bd544e9cdabbff64b62929f5439cfba0b"
+        "20a91e63a471ac7b9e52535391e843c7043a874fdef2fd83cf885f4e05cf33db"
+    ),
+    "kalshi_predictor.overnight_paper.crypto_source": (
+        "79868e4f373cbc4a57753dd5d9704f4f6f3ab256dfea0a70de6ba6fa947fc9d2"
     ),
     "kalshi_predictor.overnight_paper.coordinator": (
         "4cccb4c099d27605a5b3a2b9b7990b766c369daa36ea628427daa05d2cc57e88"
@@ -370,13 +380,13 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "b03fc26ef422cdf29e845a08c9dfd4a7a1c4cd5a1a7b750ff3b04812ddd1254a"
     ),
     "kalshi_predictor.overnight_paper.provenance_gate": (
-        "971645b68b27c8045bfb7d17aad7ee0432cc63f85a10e6d59d12cc975ed7c023"
+        "cb5a7fcfb8ffe943a29415d4474bcca6e883876c2a2d0eb679790a303cdf57b5"
     ),
     "kalshi_predictor.overnight_paper.qualification": (
-        "df833a0dd08a8de5a418f03637a257744dbee79a3ec69ba8d24b7be6cc122a81"
+        "6a23eb6a174b4d824557845d925792176ca006ac4fdab1a563136ccdf0785640"
     ),
     "kalshi_predictor.overnight_paper.release_typing": (
-        "f603f8fea379380bcfd83e1a305a704d8d4076fa7b53db48ef07b6e3e788ff7d"
+        "e0c737e8a2f3e79ab4f64f78d2b2305be7ffbc638c7433022ed2a143c6db08cb"
     ),
     "kalshi_predictor.overnight_paper.rule_verifier": (
         "66c87dcc2c014601f12d3c67e5b7b696a820e56ef6649da97873edbec69449aa"

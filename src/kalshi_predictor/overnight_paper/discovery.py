@@ -473,6 +473,30 @@ def collect_crypto_source(public: PublicArchive, symbol: str) -> dict[str, Any]:
     ticker_receipt = dict(public.receipts[-1])
     candles = public.get(f"/products/{symbol}-USD/candles", {"granularity": 60})
     captured = datetime.now(UTC)
+    analytical_source = None
+    analytical_inputs = None
+    feature_candles = candles
+    if symbol == "BTC":
+        from .crypto_source import MAX_ORIGINAL_BYTES, build_coinbase_source, verify_coinbase_source
+
+        with Path(ticker_receipt["path"]).open("rb") as original:
+            ticker_raw = original.read(MAX_ORIGINAL_BYTES + 1)
+        candle_receipt = dict(public.receipts[-1])
+        with Path(candle_receipt["path"]).open("rb") as original:
+            candle_raw = original.read(MAX_ORIGINAL_BYTES + 1)
+        analytical_source = build_coinbase_source(
+            ticker_payload=ticker_raw,
+            ticker_receipt=ticker_receipt,
+            candle_payload=candle_raw,
+            candle_receipt=candle_receipt,
+            decision_at=captured,
+        )
+        analytical_inputs = verify_coinbase_source(
+            analytical_source,
+            decision_at=captured,
+            now=captured,
+        )
+        feature_candles = analytical_inputs["inputs"]["closed_candles"]
     prices = [
         CryptoPrice(
             symbol=symbol,
@@ -481,13 +505,15 @@ def collect_crypto_source(public: PublicArchive, symbol: str) -> dict[str, Any]:
             price_usd=str(item[4]),
             raw_json=json.dumps(item),
         )
-        for item in candles
+        for item in feature_candles
         if float(item[0]) + 60 <= captured.timestamp()
     ]
     features = calculate_crypto_features(prices, window_minutes=1440)
     latest = max((price.observed_at for price in prices), default=None)
     return {
         "role": "ANALYTICAL_SOURCE",
+        "analytical_source": analytical_source,
+        "analytical_inputs": analytical_inputs,
         "symbol": symbol,
         "ticker": ticker,
         "ticker_evidence": ticker_receipt,
@@ -522,6 +548,33 @@ def _crypto_diagnostic_inputs(source: dict[str, Any], close: Any, now: datetime)
     """Bind current spot and horizon to one provider clock; candle history stays separate."""
     decision_at = _crypto_aware_time(now, "decision_at")
     ticker = source["ticker"]
+    if source.get("symbol") == "BTC" or source.get("analytical_source") is not None:
+        from .crypto_source import verify_coinbase_source
+
+        verified = verify_coinbase_source(
+            source["analytical_source"],
+            decision_at=decision_at,
+            now=decision_at,
+        )
+        view = verified["inputs"]
+        checked_prices = [
+            CryptoPrice(
+                symbol="BTC",
+                source="coinbase_closed_1m_candles",
+                observed_at=datetime.fromtimestamp(item[0] + 60, UTC),
+                price_usd=str(item[4]),
+                raw_json=json.dumps(item),
+            )
+            for item in view["closed_candles"]
+        ]
+        if (
+            source["features"] != calculate_crypto_features(checked_prices, window_minutes=1440)
+            or Decimal(str(ticker["price"])) != Decimal(view["spot"])
+            or _crypto_aware_time(ticker["time"], "ticker_provider_at")
+            != _crypto_aware_time(view["trade_at"], "original_trade_at")
+            or source.get("analytical_inputs") != verified
+        ):
+            raise ValueError("COINBASE_DIAGNOSTIC_ORIGINAL_INPUT_MISMATCH")
     origin = _crypto_aware_time(ticker.get("time"), "ticker_provider_at")
     receipt = _crypto_aware_time(source["ticker_evidence"].get("received_at"), "ticker_received_at")
     cutoff = _crypto_aware_time(source.get("latest_closed_candle_at"), "candle_cutoff_at")
@@ -647,6 +700,28 @@ def add_crypto_research(row: dict[str, Any], source: dict[str, Any], now: dateti
     )
     row["model"] = "crypto.distribution_model (research only; uncalibrated for this contract)"
     row["forecast"] = probability
+    row["research_forecast_artifact"] = None
+    if probability is not None and source.get("analytical_source") is not None:
+        from .crypto_source import bind_coinbase_forecast_inputs
+
+        original_source = source["analytical_source"]
+        source_hash = hashlib.sha256(
+            json.dumps(
+                original_source, sort_keys=True, separators=(",", ":"), allow_nan=False
+            ).encode()
+        ).hexdigest()
+        row["research_forecast_artifact"] = bind_coinbase_forecast_inputs(
+            {
+                "kind": "crypto-research-diagnostic-v1",
+                "probability": str(probability),
+                "generated_at": _crypto_aware_time(now, "decision_at").isoformat(),
+                "source_hashes": [source_hash],
+                "forecast_inputs": row["forecast_inputs"],
+                "scope": "ANALYTICAL_DIAGNOSTIC_NOT_MODEL_RELEASE",
+            },
+            original_source,
+            decision_at=now,
+        )
     row["model_readiness"] = (
         "CONTRACT_SPECIFIC_NO_LEAKAGE_CALIBRATION_MISSING"
         if probability is not None

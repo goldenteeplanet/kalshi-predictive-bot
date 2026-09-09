@@ -169,16 +169,21 @@ def test_methods_of_typed_project_argument_are_reviewed(tmp_path):
     assert not audit(root).passed
 
 
-def test_missing_fee_module_pin_fails_before_runtime_verification(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "module", ["kalshi_predictor.paper.fees", "kalshi_predictor.overnight_paper.crypto_source"]
+)
+def test_missing_required_module_pin_fails_before_runtime_verification(
+    tmp_path, monkeypatch, module
+):
     from kalshi_predictor.overnight_paper import provenance
 
     manifest = dict(provenance.AUDITED_BOUNDARY_SHA256)
-    assert "kalshi_predictor.paper.fees" in manifest
-    manifest.pop("kalshi_predictor.paper.fees")
+    assert module in manifest
+    manifest.pop(module)
     monkeypatch.setattr(provenance, "AUDITED_BOUNDARY_SHA256", manifest)
 
     def unexpected_runtime_call(**kwargs):
-        raise AssertionError("Incomplete fee boundary must fail before Git/runtime verification")
+        raise AssertionError("Incomplete boundary must fail before Git/runtime verification")
 
     monkeypatch.setattr(provenance, "verify_local_boundary", unexpected_runtime_call)
     result = verify_coordinator_boundary(repository=tmp_path, code_sha="0" * 40, settings={})

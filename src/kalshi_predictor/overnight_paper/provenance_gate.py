@@ -122,7 +122,10 @@ def verify_complete_provenance(
             raise ValueError("SOURCE_TIMESTAMP_BINDING_MISMATCH")
         for source in sources.values():
             validate_source_visibility(source, decision_at=at, now=reference)
-            if source.get("clock_basis") == "public_rest_receipt":
+            if source.get("clock_basis") in {
+                "public_rest_receipt",
+                "coinbase-btc-trade-closed-candles-v1",
+            }:
                 continue
             if any(
                 not 0
@@ -136,10 +139,31 @@ def verify_complete_provenance(
         records = features.get("records")
         if not isinstance(records, list) or not records:
             raise ValueError("ORIGINAL_FEATURE_RECORDS_REQUIRED")
+        coinbase_hashes = {
+            sha
+            for sha, value in sources.items()
+            if value.get("clock_basis") == "coinbase-btc-trade-closed-candles-v1"
+        }
+        if any(
+            sum(record.get("source_sha256") == sha for record in records) != 1
+            for sha in coinbase_hashes
+        ):
+            raise ValueError("COINBASE_FEATURE_RECORD_REQUIRED")
         clocks = []
         for record in records:
             source = sources[record["source_sha256"]]
             observed, visible = aware(record["observed_at"]), aware(record["available_at"])
+            if source.get("clock_basis") == "coinbase-btc-trade-closed-candles-v1":
+                from .crypto_source import verify_coinbase_source
+
+                coinbase = verify_coinbase_source(source, decision_at=at, now=reference)
+                if (
+                    record.get("name") != "coinbase_btc_inputs"
+                    or record.get("value") != coinbase["inputs"]
+                    or observed != aware(coinbase["inputs"]["trade_at"])
+                    or visible != aware(coinbase["available_at"])
+                ):
+                    raise ValueError("COINBASE_FEATURE_ORIGINAL_BINDING")
             if not (
                 record.get("name")
                 and "value" in record

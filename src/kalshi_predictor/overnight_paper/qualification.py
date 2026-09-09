@@ -121,7 +121,12 @@ class GateEvidence:
     def _semantically_verified(self, report: dict, inputs: dict, as_of: datetime | None) -> bool:
         # Gates without an audited semantic implementation cannot be manufactured
         # by choosing a verifier name or filling an attestation with PASS strings.
-        if SEMANTIC_VERIFIERS.get(self.gate) != self.verifier:
+        expected_verifier = SEMANTIC_VERIFIERS.get(self.gate)
+        if self.gate == 4 and self.category == "Crypto":
+            from .crypto_source import VERIFIER
+
+            expected_verifier = VERIFIER
+        if expected_verifier != self.verifier:
             return False
         if decision_fingerprint(inputs) != self.decision_id:
             return False
@@ -194,6 +199,16 @@ class GateEvidence:
                 )
             )
         if self.gate == 4:
+            if self.category == "Crypto":
+                from .crypto_source import CLOCK_BASIS, verify_coinbase_binding
+
+                sources = [item for item in envelopes if item.get("clock_basis") == CLOCK_BASIS]
+                if len(sources) != 1:
+                    return False
+                if market.get("event_ticker") != inputs.get("event_id"):
+                    return False
+                verify_coinbase_binding(sources[0], decision=inputs, now=at)
+                return True
             return self._fresh_nws_source(by_url, inputs, at, market)
         if self.gate == 5:
             return self._executable_book(by_url, envelopes, inputs, at, market)

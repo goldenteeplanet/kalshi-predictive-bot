@@ -394,6 +394,7 @@ def verify_coordinator_boundary(
         "kalshi_predictor.overnight_paper.boundary_gate",
         "kalshi_predictor.memory.repository",
         "kalshi_predictor.paper.fees",
+        "kalshi_predictor.overnight_paper.crypto_source",
     }
     if not required.issubset(AUDITED_BOUNDARY_SHA256):
         return Verification(False, ("COORDINATOR_AUDIT_MANIFEST_INCOMPLETE",), scope=scope)
