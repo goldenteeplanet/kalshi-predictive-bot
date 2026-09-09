@@ -11,7 +11,7 @@ import hashlib
 import math
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from decimal import ROUND_CEILING, Decimal
+from decimal import Decimal
 from typing import Any
 
 from kalshi_predictor.config import Settings
@@ -24,6 +24,7 @@ from kalshi_predictor.overnight_paper.books import qualify_book
 from kalshi_predictor.overnight_paper.provenance import Artifact, canonical_hash
 from kalshi_predictor.overnight_paper.qualification import PUBLIC_BASE, compute_net_ev
 from kalshi_predictor.overnight_paper.source_health import aware
+from kalshi_predictor.paper.fees import single_buy_fees
 
 _COHORT_KEYS = (
     "event_id",
@@ -74,17 +75,7 @@ def conservative_single_fill_fees(price: Decimal, multiplier: Decimal) -> dict[s
         or multiplier < 0
     ):
         raise ValueError("TOURNAMENT_FEE_INPUT_INVALID")
-    trade_fee = (DEFAULT_TAKER_RATE * multiplier * price * (1 - price)).quantize(
-        Decimal("0.000001"), rounding=ROUND_CEILING
-    )
-    debit = (price + trade_fee).quantize(Decimal("0.01"), rounding=ROUND_CEILING)
-    rounding = debit - price - trade_fee
-    return dict(
-        trade_fee=trade_fee,
-        rounding_allowance=rounding,
-        estimated_fee=debit - price,
-        total_debit=debit,
-    )
+    return single_buy_fees(price, multiplier, DEFAULT_TAKER_RATE)
 
 
 @dataclass(frozen=True)

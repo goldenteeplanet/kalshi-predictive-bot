@@ -106,6 +106,7 @@ def prepare_weather_candidate(
     settings: Settings,
     slippage_allowance: Decimal,
     uncertainty_buffer: Decimal,
+    fee_evidence: dict[str, Any] | None = None,
 ) -> WeatherPreparationResult:
     """Compute one real-model diagnostic from original captured public inputs.
 
@@ -361,6 +362,8 @@ def prepare_weather_candidate(
             or _latest_snapshot_id(session, ticker) != snapshot.id
         ):
             raise ValueError("SNAPSHOT_SELECTION_MISMATCH")
+        from kalshi_predictor.paper.fees import CONTRACT_KEY, build_fee_quote
+
         alternatives = []
         for side, key, probability in (
             (BUY_YES, "YES", output.yes_probability),
@@ -369,17 +372,31 @@ def prepare_weather_candidate(
             if side == BUY_NO and not settings.paper_allow_buy_no:
                 continue
             if book["sides"][key]["executable"]:
+                quote = (
+                    None
+                    if fee_evidence is None
+                    else build_fee_quote(
+                        evidence=fee_evidence,
+                        ticker=ticker,
+                        side=side,
+                        price=Decimal(book["sides"][key]["ask"]),
+                        simulator_floor=settings.paper_default_fee_per_contract,
+                        now=utc_now(),
+                    )
+                )
                 ev = compute_net_ev(
                     model_probability=probability,
                     executable_price=Decimal(book["sides"][key]["ask"]),
-                    estimated_fee=settings.paper_default_fee_per_contract,
+                    estimated_fee=settings.paper_default_fee_per_contract
+                    if quote is None
+                    else quote.charge,
                     slippage_allowance=slippage_allowance,
                     uncertainty_buffer=uncertainty_buffer,
                 )
-                alternatives.append((ev.net_ev, side, ev))
+                alternatives.append((ev.net_ev, side, ev, quote))
         if not alternatives:
             raise ValueError("NO_ALLOWED_EXECUTABLE_SIDE")
-        _, side, ev = max(alternatives, key=lambda item: item[0])
+        _, side, ev, fee_quote = max(alternatives, key=lambda item: item[0])
         decision = PaperDecision(
             ticker,
             forecast.id,
@@ -391,6 +408,7 @@ def prepare_weather_candidate(
             ev.gross_edge,
             1,
             "Computed diagnostic; independent release gates required",
+            {} if fee_quote is None else {CONTRACT_KEY: fee_quote.decode()},
         )
         decision_at = utc_now()
         sizing = size_paper_decision(
@@ -405,7 +423,17 @@ def prepare_weather_candidate(
         )
         risk = AdvancedRiskEngine(AdvancedRiskConfig.from_settings(settings)).decide(request)
         risk_log = insert_advanced_risk_decision(
-            session, risk, request, ticker=ticker, position_sizing_decision_id=sizing.record_id
+            session,
+            risk,
+            request,
+            ticker=ticker,
+            position_sizing_decision_id=sizing.record_id,
+            raw={}
+            if fee_quote is None
+            else {
+                "guarded_fee_quote_sha256": fee_quote.sha256,
+                "estimated_round_trip_fees": str(request.estimated_round_trip_fees),
+            },
         )
         if (
             _latest_snapshot_id(session, ticker, at=generated_at) != snapshot.id
@@ -422,12 +450,15 @@ def prepare_weather_candidate(
             risk=risk.as_dict(),
             risk_id=risk_log.id,
             risk_request=asdict(request),
+            fee_contract=None if fee_quote is None else fee_quote.decode(),
             model_kind="fixed_heuristic",
         )
         blockers = [
             "SETTLEMENT_RULE_QUALIFICATION_REQUIRED",
             "MODEL_LINEAGE_AND_EVALUATION_REQUIRED",
         ]
+        if fee_quote is None:
+            blockers.append("FEE_EVIDENCE_REQUIRED_LEGACY_CONFIGURED_DIAGNOSTIC")
         if ev.net_ev <= settings.paper_min_edge:
             blockers.append("POSITIVE_NET_EV")
         if sizing.decision.live_candidate_contracts < 1:

@@ -50,6 +50,7 @@ from kalshi_predictor.overnight_paper.release_typing import verify_typing_eviden
 from kalshi_predictor.overnight_paper.store import aware, digest, encode
 from kalshi_predictor.overnight_paper.timing import verify_settlement_horizon
 from kalshi_predictor.overnight_paper.watcher import verified_settled_tickers
+from kalshi_predictor.paper.fees import CONTRACT_KEY, decision_fee_quote
 from kalshi_predictor.paper.ledger import create_paper_order
 from kalshi_predictor.paper.models import BUY_NO, BUY_YES, PaperDecision
 from kalshi_predictor.paper.simulator import simulate_immediate_fill
@@ -195,6 +196,14 @@ def _validate_engine_records(
         ):
             raise ValueError("ENGINE_RECORD_IDENTITY_OR_REUSE")
         payload = json.loads(record.raw_json)
+        if key == "advanced_risk_decision_id":
+            quote = args["decision_inputs"][CONTRACT_KEY]
+            if payload.get("raw", {}).get("guarded_fee_quote_sha256") != decision_fingerprint(
+                quote
+            ) or Decimal(str(payload.get("raw", {}).get("estimated_round_trip_fees"))) != Decimal(
+                quote["simulated_charge"]
+            ):
+                raise ValueError("PERSISTED_ENGINE_FEE_INPUT_MISMATCH")
         subset = {key: payload.get(key) for key in expected.as_dict()}
         if decision_fingerprint(subset) != decision_fingerprint(expected.as_dict()):
             raise ValueError("ENGINE_OUTPUT_CHANGED_AFTER_SHADOW")
@@ -346,6 +355,19 @@ def _revalidate_engines(
         decision_timestamp=now,
     )
     risk = AdvancedRiskEngine(AdvancedRiskConfig.from_settings(settings)).decide(request)
+    if (
+        request.estimated_round_trip_fees
+        != Decimal(args["decision_inputs"][CONTRACT_KEY]["simulated_charge"])
+        or Decimal(
+            str(
+                args["decision_inputs"]["original_engine_inputs"]["risk_request"][
+                    "estimated_round_trip_fees"
+                ]
+            )
+        )
+        != request.estimated_round_trip_fees
+    ):
+        raise ValueError("ENGINE_FEE_REVALIDATION_REQUIRES_NEW_SHADOW")
     if decision_fingerprint(sized.as_dict()) != decision_fingerprint(
         args["phase3m"].as_dict()
     ) or decision_fingerprint(risk.as_dict()) != decision_fingerprint(args["phase3n"].as_dict()):
@@ -398,6 +420,23 @@ def activate_local_paper(
         raise ValueError("AUTHORIZATION_DATABASE_PATH_MISMATCH")
     expected_authorization = authorization_fingerprint(authorization)
     args = dict(qualification_args)
+    fee_quote = decision_fee_quote(
+        decision.raw_decision_json,
+        ticker=decision.ticker,
+        side=decision.side,
+        quantity=decision.quantity,
+        price=decision.limit_price,
+        simulator_floor=settings.paper_default_fee_per_contract,
+        now=now,
+        required=True,
+    )
+    assert fee_quote is not None
+    if (
+        args.get("decision_inputs", {}).get(CONTRACT_KEY) != fee_quote.decode()
+        or args.get("ev") is None
+        or args["ev"].estimated_fee != fee_quote.charge
+    ):
+        raise ValueError("ADMISSION_FEE_EVIDENCE_MISMATCH")
     if args.get("decision_inputs", {}).get("authorization_sha256") != expected_authorization:
         raise ValueError("QUALIFIED_AUTHORIZATION_BINDING_MISMATCH")
     if args.get("decision_inputs", {}).get("code_sha") != release.sha:
@@ -493,12 +532,13 @@ def activate_local_paper(
             _validate_engine_records(session, decision, args)
             model_release = verify_model_release(session, args["decision_inputs"], now)
             if not model_release.passed or not model_release.model_calibration_verified:
-                raise ValueError(
-                    "MODEL_RELEASE_REQUIRED:" + ",".join(model_release.blockers)
-                )
+                raise ValueError("MODEL_RELEASE_REQUIRED:" + ",".join(model_release.blockers))
             monitored = verify_monitoring(
-                session, monitoring_permit, database_path=path,
-                database_id=authorization.database_id, code_sha=release.sha,
+                session,
+                monitoring_permit,
+                database_path=path,
+                database_id=authorization.database_id,
+                code_sha=release.sha,
                 shadow_id=shadow_id,
             )
             if not monitored.passed:
@@ -513,11 +553,16 @@ def activate_local_paper(
             ):
                 raise ValueError("LOCAL_LEDGER_CHANGED_DECISION")
             _validate_engine_records(session, decision, args, expected_order_id=order.id)
-            fill = simulate_immediate_fill(session, order, settings=settings)
+            fill = simulate_immediate_fill(session, order, settings=settings, fee_quote=fee_quote)
             if fill is not None and not isinstance(fill, PaperFill):
                 raise ValueError("LOCAL_SIMULATOR_FILL_TYPE_MISMATCH")
             if fill is not None and (
-                fill.quantity != 1 or Decimal(fill.price) != decision.limit_price
+                fill.quantity != 1
+                or Decimal(fill.price) != decision.limit_price
+                or Decimal(fill.fee) != fee_quote.charge
+                or json.loads(fill.raw_fill_json).get("fee_quote_sha256") != fee_quote.sha256
+                or json.loads(fill.raw_fill_json).get("fee_contract") != fee_quote.decode()
+                or json.loads(fill.raw_fill_json).get("fee_provenance") != "GUARDED_FEE_EVIDENCE_V1"
             ):
                 raise ValueError("LOCAL_SIMULATOR_CHANGED_FILL")
             session.execute(

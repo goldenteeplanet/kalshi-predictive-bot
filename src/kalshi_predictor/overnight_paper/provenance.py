@@ -328,7 +328,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "7a6736e9a419cb65acd04f0aa499bec17ec620d2d2e50f33fbe675a1a9f5d163"
     ),
     "kalshi_predictor.advanced_risk.service": (
-        "109cd3737149e21197a60bf1d47adfad0c4fa432d20b5e21d1611fd17ed1ea53"
+        "2c92a375a6db6c2bbea6a966c7d5aec52d46850a95c3e27916b1d99ec1e65b49"
     ),
     "kalshi_predictor.config": (
         "42d3c364142f296fa8447c365e77707b382b7b13ae4223ba6d5fdf7bbf4e0770"
@@ -343,16 +343,16 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "cd39dc72aeac3bdbb7e9df05f6a244496f7384b02b5f6c1f1882872c655de989"
     ),
     "kalshi_predictor.overnight_paper.activation": (
-        "8f0520fcb3903a78a41d480c766898e34365bccae9dbaf10a2ac1bc18abc8840"
+        "1729a0b041458ba267704cfe06c94169a98a0b27a5a9227ffb179d041d74bc2f"
     ),
     "kalshi_predictor.overnight_paper.boundary": (
         "7e8647e9cf73874dbcc9df4c7b324b86fbaaca21a4f9981c3c71b9a85227e6e8"
     ),
     "kalshi_predictor.overnight_paper.boundary_gate": (
-        "82186a95cf59e4acf8884883e416553229cf295ade716a7074bd04f56627b1bc"
+        "af459e744aef011830d438707fa44f1bd544e9cdabbff64b62929f5439cfba0b"
     ),
     "kalshi_predictor.overnight_paper.coordinator": (
-        "450dc2991b62e48f26afc9a775e9e0455a23819cd5907d01a7f687a73d795a3a"
+        "4cccb4c099d27605a5b3a2b9b7990b766c369daa36ea628427daa05d2cc57e88"
     ),
     "kalshi_predictor.overnight_paper.dataset_store": (
         "37237c7e0f4f19c21d1b221e1a86be4b188fc90ab6bf732bbef101c1ce19e9e5"
@@ -376,7 +376,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "df833a0dd08a8de5a418f03637a257744dbee79a3ec69ba8d24b7be6cc122a81"
     ),
     "kalshi_predictor.overnight_paper.release_typing": (
-        "9ded17727d8a7e35bccfd152d9b0d49e9e886d652637b3dd6389854dfacb3aaa"
+        "f603f8fea379380bcfd83e1a305a704d8d4076fa7b53db48ef07b6e3e788ff7d"
     ),
     "kalshi_predictor.overnight_paper.rule_verifier": (
         "66c87dcc2c014601f12d3c67e5b7b696a820e56ef6649da97873edbec69449aa"
@@ -400,16 +400,19 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "4f08a822106e0faf6f7fd6cec05baebe56eea27a5bdbd31928269a3b261d4522"
     ),
     "kalshi_predictor.overnight_paper.watcher": (
-        "9a99656ded4c276037d5e2f834b4da250772ad353ac60c8ad859ab6cb35fbaf6"
+        "2db9a1acecaf976efd4188abb2a38ae679f766ffae3df4c40f65bebbf6171a2d"
+    ),
+    "kalshi_predictor.paper.fees": (
+        "80ea757283fe2e7b54bdfb282155d13f8e08a95cdab5e5e9b6cfee7bad4aa2fa"
     ),
     "kalshi_predictor.paper.ledger": (
-        "3364db4a75ab625b6f6101c103e00ab099784eea1985e381edec058074243509"
+        "4bf8db1f301c1f3ace3bf7baa535c5f3dd0a08c17474da3761f91837eeee1ff9"
     ),
     "kalshi_predictor.paper.models": (
         "eed1d4e355d1508aa34688079feb2dc8f1b8ee5a98840d53987409ff14f4d305"
     ),
     "kalshi_predictor.paper.simulator": (
-        "6696993adcf16db25ea3a2352d736d1e311f05ad63135568ed357f2609cb4282"
+        "873217a66565092504c82d19226448f9c43e4ad8ee3b84f4660c82acb199d65d"
     ),
     "kalshi_predictor.position_sizing.repository": (
         "14c72d6a4267b268869abfaec8c25a8212c2dba7d4e0695bf25c8772d25a38dc"

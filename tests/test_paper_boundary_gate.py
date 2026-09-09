@@ -167,3 +167,20 @@ def test_methods_of_typed_project_argument_are_reviewed(tmp_path):
         helpers=("import httpx\nclass Client:\n def send(self):\n  return httpx.post('url')\n"),
     )
     assert not audit(root).passed
+
+
+def test_missing_fee_module_pin_fails_before_runtime_verification(tmp_path, monkeypatch):
+    from kalshi_predictor.overnight_paper import provenance
+
+    manifest = dict(provenance.AUDITED_BOUNDARY_SHA256)
+    assert "kalshi_predictor.paper.fees" in manifest
+    manifest.pop("kalshi_predictor.paper.fees")
+    monkeypatch.setattr(provenance, "AUDITED_BOUNDARY_SHA256", manifest)
+
+    def unexpected_runtime_call(**kwargs):
+        raise AssertionError("Incomplete fee boundary must fail before Git/runtime verification")
+
+    monkeypatch.setattr(provenance, "verify_local_boundary", unexpected_runtime_call)
+    result = verify_coordinator_boundary(repository=tmp_path, code_sha="0" * 40, settings={})
+    assert not result.passed
+    assert result.blockers == ("COORDINATOR_AUDIT_MANIFEST_INCOMPLETE",)

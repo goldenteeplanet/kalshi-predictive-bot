@@ -21,9 +21,29 @@ from decimal import Decimal
 from pathlib import Path
 
 
+def _fixture_git_env(repository: Path) -> dict[str, str]:
+    """Trust this exact synthetic checkout only, including nested Git reads."""
+    environment = os.environ.copy()
+    raw_count = environment.get("GIT_CONFIG_COUNT", "0")
+    if not raw_count.isdecimal() or not 0 <= int(raw_count) < 100:
+        raise ValueError("INVALID_INHERITED_GIT_CONFIG_COUNT")
+    count = int(raw_count)
+    for index in range(count):
+        if (
+            f"GIT_CONFIG_KEY_{index}" not in environment
+            or f"GIT_CONFIG_VALUE_{index}" not in environment
+        ):
+            raise ValueError("INCOMPLETE_INHERITED_GIT_CONFIG")
+    environment["GIT_CONFIG_COUNT"] = str(count + 1)
+    environment[f"GIT_CONFIG_KEY_{count}"] = "safe.directory"
+    environment[f"GIT_CONFIG_VALUE_{count}"] = repository.resolve(strict=True).as_posix()
+    return environment
+
+
 def _git(repository: Path, *arguments: str) -> str:
     return subprocess.check_output(
         ["git", "-C", str(repository), *arguments],
+        env=_fixture_git_env(repository),
         text=True,
         stderr=subprocess.STDOUT,
         timeout=120,
@@ -60,6 +80,7 @@ def _prepare_committed_fixture(repository: Path) -> None:
         "kalshi_predictor.overnight_paper.coordinator",
         "kalshi_predictor.overnight_paper.boundary_gate",
         "kalshi_predictor.memory.repository",
+        "kalshi_predictor.paper.fees",
     ):
         reviewed[module] = ""
     for module in reviewed:
@@ -354,7 +375,7 @@ def _run_all_gates(repository: Path) -> None:
 def test_all_twelve_gates_pass_real_verifiers_on_committed_synthetic_fixture(tmp_path):
     repository = tmp_path / "committed-fixture"
     _prepare_committed_fixture(repository)
-    environment = os.environ.copy()
+    environment = _fixture_git_env(repository)
     environment["PYTHONPATH"] = os.pathsep.join(
         (str(repository / "src"), str(repository / "tests"))
     )

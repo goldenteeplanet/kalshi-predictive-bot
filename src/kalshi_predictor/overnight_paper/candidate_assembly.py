@@ -327,6 +327,20 @@ def assemble_weather_candidate(
         phase3n=_artifact(risk.as_dict()),
     )
     costs = records["ev"]
+    from kalshi_predictor.paper.fees import CONTRACT_KEY, decision_fee_quote
+
+    fee_quote = decision_fee_quote(
+        paper.raw_decision_json, ticker=paper.ticker, side=paper.side,
+        quantity=paper.quantity, price=paper.limit_price,
+        simulator_floor=settings.paper_default_fee_per_contract, now=now, required=True,
+    )
+    assert fee_quote is not None
+    if (fee_quote.decode()["event_id"] != identity["event_id"]
+            or fee_quote.decode()["series"] != identity["series"]
+            or records.get("fee_contract") != fee_quote.decode()
+            or Decimal(str(costs["estimated_fee"])) != fee_quote.charge
+            or request.estimated_round_trip_fees != fee_quote.charge):
+        raise ValueError("PREPARATION_FEE_EVIDENCE_OR_RISK_MISMATCH")
     ev = compute_net_ev(
         model_probability=paper.probability if paper.side == "BUY_YES" else 1 - paper.probability,
         executable_price=paper.limit_price,
@@ -372,6 +386,7 @@ def assemble_weather_candidate(
             forecast_probability=str(paper.probability),
             executable_price=str(paper.limit_price),
             estimated_fee=str(ev.estimated_fee),
+            guarded_fee_contract=fee_quote.decode(),
             slippage=str(ev.slippage_allowance),
             uncertainty=str(ev.uncertainty_buffer),
             source_hashes=source_hashes,
@@ -551,6 +566,7 @@ def assemble_weather_candidate(
         else None
     )
     original_decision = dict(paper.raw_decision_json)
+    original_decision[CONTRACT_KEY] = fee_quote.decode()
     for key, value in (
         ("position_sizing_decision_id", records["sizing_id"]),
         ("advanced_risk_decision_id", records["risk_id"]),

@@ -8,6 +8,7 @@ its own atomic transaction after the immutable shadow is committed.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -157,6 +158,29 @@ def _existing_order(
         or Decimal(fill.fee) < 0
     ):
         raise ValueError("EXISTING_FILL_RECONCILIATION_FAILED")
+    from kalshi_predictor.paper.fees import CONTRACT_KEY, historical_fee_quote
+
+    contract = candidate.shadow_payload.get("qualification_inputs", {}).get(CONTRACT_KEY)
+    order_contract = json.loads(order.raw_decision_json).get(CONTRACT_KEY)
+    if contract != order_contract or decision.raw_decision_json.get(CONTRACT_KEY) != contract:
+        raise ValueError("EXISTING_ORDER_FEE_LINEAGE_MISMATCH")
+    if contract is not None:
+        quote = historical_fee_quote(
+            contract,
+            ticker=order.ticker,
+            side=order.side,
+            quantity=order.quantity,
+            price=Decimal(order.limit_price),
+        )
+        if fill is not None:
+            raw = json.loads(fill.raw_fill_json)
+            if (
+                Decimal(fill.fee) != quote.charge
+                or raw.get("fee_contract") != contract
+                or raw.get("fee_quote_sha256") != quote.sha256
+                or raw.get("fee_provenance") != "GUARDED_FEE_EVIDENCE_V1"
+            ):
+                raise ValueError("EXISTING_FILL_FEE_LINEAGE_MISMATCH")
     return CoordinatorResult(
         "EXISTING_EXPERIMENT",
         candidate.qualification_args["decision_id"],

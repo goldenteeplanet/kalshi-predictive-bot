@@ -264,3 +264,21 @@ def test_after_execution_settings_change_rolls_back(cycle, real_model_bundle, mo
         assert (
             session.execute(text("SELECT count(*) FROM overnight_sprint_cycles")).scalar_one() == 0
         )
+
+
+def test_fee_contract_survives_durable_preparation_replay(cycle, monkeypatch):
+    from test_paper_release_preparation import fee_ready_inputs
+
+    ticker, sources, _, evidence = fee_ready_inputs(monkeypatch)
+    cycle.update(ticker=ticker, source_envelopes=sources, fee_evidence=evidence)
+    first = run_weather_preparation_cycle(**cycle)
+    assert first["state"] == "COMPUTED_UNQUALIFIED", first["blockers"]
+    contract = first["records"]["fee_contract"]
+    assert contract is not None
+    assert Decimal(first["records"]["ev"]["estimated_fee"]) == Decimal(contract["simulated_charge"])
+    assert Decimal(first["records"]["risk_request"]["estimated_round_trip_fees"]) == Decimal(
+        contract["simulated_charge"]
+    )
+    assert run_weather_preparation_cycle(**cycle) == first
+    with cycle["session_factory"]() as session:
+        assert session.execute(text("SELECT count(*) FROM paper_fills")).scalar_one() == 0

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.schema import PaperOrder
+from kalshi_predictor.paper.fees import FeeQuote, decision_fee_quote
 from kalshi_predictor.paper.ledger import (
     create_paper_order,
     insert_paper_fill,
@@ -21,6 +22,7 @@ def simulate_immediate_fill(
     order: PaperOrder,
     *,
     settings: Settings | None = None,
+    fee_quote: FeeQuote | None = None,
 ) -> object | None:
     resolved_settings = settings or get_settings()
     if order.status != ORDER_OPEN:
@@ -30,8 +32,29 @@ def simulate_immediate_fill(
     if price is None:
         return None
     quantity = int(order.quantity)
-    fee = resolved_settings.paper_default_fee_per_contract * Decimal(quantity)
     filled_at = utc_now()
+    import json
+
+    checked_quote = decision_fee_quote(
+        json.loads(order.raw_decision_json or "{}"),
+        ticker=order.ticker,
+        side=order.side,
+        quantity=quantity,
+        price=price,
+        simulator_floor=resolved_settings.paper_default_fee_per_contract,
+        now=filled_at,
+    )
+    if (
+        (checked_quote is None) != (fee_quote is None)
+        or checked_quote is not None
+        and checked_quote != fee_quote
+    ):
+        raise ValueError("SIMULATOR_FEE_CONTRACT_REQUIRED_OR_MISMATCH")
+    fee = (
+        resolved_settings.paper_default_fee_per_contract * Decimal(quantity)
+        if checked_quote is None
+        else checked_quote.charge
+    )
     fill = insert_paper_fill(
         session,
         order=order,
@@ -39,6 +62,7 @@ def simulate_immediate_fill(
         quantity=quantity,
         fee=fee,
         filled_at=filled_at,
+        fee_quote=checked_quote,
     )
     mark_order_filled(session, order, filled_at)
     update_position_for_fill(session, fill)

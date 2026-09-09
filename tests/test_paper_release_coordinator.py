@@ -194,3 +194,36 @@ def test_restart_refuses_changed_fill(admission):
         session.commit()
     with pytest.raises(ValueError, match="EXISTING_FILL_RECONCILIATION_FAILED"):
         coordinator.admit_prepared_candidate(**admission, entries_enabled=True)
+
+
+def test_fee_expiry_does_not_recharge_existing_experiment(admission):
+    from datetime import timedelta
+
+    first = coordinator.admit_prepared_candidate(**admission, entries_enabled=True)
+    admission["now"] += timedelta(days=2)
+    replay = coordinator.admit_prepared_candidate(**admission, entries_enabled=True)
+    assert replay.state == "EXISTING_EXPERIMENT"
+    assert replay.order_id == first.order_id
+    with admission["session_factory"]() as session:
+        assert session.execute(text("SELECT count(*) FROM paper_fills")).scalar_one() == 1
+        assert session.execute(text("SELECT fee FROM paper_fills")).scalar_one() == "0.02"
+
+
+def test_replay_rejects_guarded_fill_provenance_label_tamper(admission):
+    coordinator.admit_prepared_candidate(**admission, entries_enabled=True)
+    with admission["session_factory"]() as session:
+        raw = json.loads(
+            session.execute(text("SELECT raw_fill_json FROM paper_fills")).scalar_one()
+        )
+        raw["fee_provenance"] = "LEGACY_CONFIGURED_NONCERTIFIED"
+        session.execute(text("UPDATE paper_fills SET raw_fill_json=:raw"), {"raw": json.dumps(raw)})
+        session.commit()
+        before = session.execute(text("SELECT count(*) FROM overnight_sprint_cycles")).scalar_one()
+    with pytest.raises(ValueError, match="EXISTING_FILL_FEE_LINEAGE_MISMATCH"):
+        coordinator.admit_prepared_candidate(**admission, entries_enabled=True)
+    with admission["session_factory"]() as session:
+        assert session.execute(text("SELECT count(*) FROM paper_fills")).scalar_one() == 1
+        assert (
+            session.execute(text("SELECT count(*) FROM overnight_sprint_cycles")).scalar_one()
+            == before
+        )

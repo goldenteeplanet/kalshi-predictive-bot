@@ -224,6 +224,7 @@ def _run_weather_preparation_live_cycle(
     slippage_allowance: Decimal,
     uncertainty_buffer: Decimal,
     frozen_execution: FrozenWeatherExecution | None = None,
+    fee_evidence: dict[str, Any] | None = None,
 ) -> PreparationCycle:
     """Compute once and preserve rejection or computation on the same ledger.
 
@@ -250,6 +251,7 @@ def _run_weather_preparation_live_cycle(
         "settings": settings.model_dump(mode="json"),
         "slippage_allowance": str(slippage_allowance),
         "uncertainty_buffer": str(uncertainty_buffer),
+        "fee_evidence": fee_evidence,
         "preparation_source_sha256": hashlib.sha256(
             Path(preparation.__file__).read_bytes()
         ).hexdigest(),
@@ -286,6 +288,7 @@ def _run_weather_preparation_live_cycle(
             settings=settings,
             slippage_allowance=slippage_allowance,
             uncertainty_buffer=uncertainty_buffer,
+            fee_evidence=fee_evidence,
         )
         execution_finished = utc_now()
         execution_receipt = None
@@ -351,6 +354,7 @@ def run_weather_preparation_live_cycle(
     uncertainty_buffer: Decimal,
     runtime_owner: RuntimeOwner | None = None,
     frozen_execution: FrozenWeatherExecution | None = None,
+    fee_evidence: dict[str, Any] | None = None,
 ) -> PreparationCycle:
     """Own the ledger or validate an already-held same-process driver owner."""
     assert_public_only_settings(settings)
@@ -373,6 +377,7 @@ def run_weather_preparation_live_cycle(
             slippage_allowance=slippage_allowance,
             uncertainty_buffer=uncertainty_buffer,
             frozen_execution=frozen_execution,
+            fee_evidence=fee_evidence,
         )
 
 
@@ -388,6 +393,7 @@ def run_weather_preparation_cycle(
     uncertainty_buffer: Decimal,
     runtime_owner: RuntimeOwner | None = None,
     frozen_execution: FrozenWeatherExecution | None = None,
+    fee_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Historical journal API; replay never reconstructs current engine objects."""
     return run_weather_preparation_live_cycle(
@@ -401,4 +407,5 @@ def run_weather_preparation_cycle(
         uncertainty_buffer=uncertainty_buffer,
         runtime_owner=runtime_owner,
         frozen_execution=frozen_execution,
+        fee_evidence=fee_evidence,
     ).record

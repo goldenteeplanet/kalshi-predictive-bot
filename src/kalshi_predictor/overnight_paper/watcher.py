@@ -355,6 +355,23 @@ def verified_paper_marker(
     ):
         raise ValueError("PAPER_SHADOW_EVALUATION_RECONCILIATION_FAILED")
     fees = Decimal(marker["actual_simulated_fees"])
+    from kalshi_predictor.paper.fees import CONTRACT_KEY, historical_fee_quote
+
+    contract = shadow_payload.get("qualification_inputs", {}).get(CONTRACT_KEY)
+    if contract is not None:
+        quote = historical_fee_quote(
+            contract,
+            ticker=paper_order["ticker"],
+            side=paper_order["side"],
+            quantity=paper_order["quantity"],
+            price=Decimal(str(paper_order["limit_price"])),
+        )
+        if (
+            fees != quote.charge
+            or marker.get("fee_quote_sha256") != quote.sha256
+            or marker.get("fee_provenance") != "GUARDED_FEE_EVIDENCE_V1"
+        ):
+            raise ValueError("PAPER_MARKER_FEE_LINEAGE_MISMATCH")
     won = (paper_order["side"] == BUY_YES) == (final["result"] == "yes")
     calculated = Decimal(won) - Decimal(str(paper_order["limit_price"])) - fees
     if not fees.is_finite() or fees < 0 or calculated != Decimal(marker["realized_paper_pnl"]):
@@ -472,6 +489,29 @@ def _evaluate_paper(
     fee = Decimal(fills[0].fee)
     if not fee.is_finite() or fee < 0:
         raise ValueError("PAPER_FEE_INVALID")
+    from kalshi_predictor.paper.fees import CONTRACT_KEY, historical_fee_quote
+
+    contract = payload.get("qualification_inputs", {}).get(CONTRACT_KEY)
+    order_contract = json.loads(order.raw_decision_json).get(CONTRACT_KEY)
+    if contract != order_contract:
+        raise ValueError("PAPER_FEE_SHADOW_ORDER_MISMATCH")
+    fee_quote = None
+    if contract is not None:
+        fee_quote = historical_fee_quote(
+            contract,
+            ticker=order.ticker,
+            side=order.side,
+            quantity=order.quantity,
+            price=fill_price,
+        )
+        fill_raw = json.loads(fills[0].raw_fill_json)
+        if (
+            fee != fee_quote.charge
+            or fill_raw.get("fee_contract") != contract
+            or fill_raw.get("fee_quote_sha256") != fee_quote.sha256
+            or fill_raw.get("fee_provenance") != "GUARDED_FEE_EVIDENCE_V1"
+        ):
+            raise ValueError("PAPER_FEE_FILL_LINEAGE_MISMATCH")
     realized = calculate_settled_pnl(position, final["result"], fees=fee)
     if realized is None or not realized.is_finite():
         raise ValueError("PAPER_PNL_UNDEFINED")
@@ -516,6 +556,10 @@ def _evaluate_paper(
         "paper_pnl_id": pnl.id,
         "realized_paper_pnl": str(realized),
         "actual_simulated_fees": str(fee),
+        "fee_provenance": (
+            "GUARDED_FEE_EVIDENCE_V1" if fee_quote is not None else "LEGACY_CONFIGURED_NONCERTIFIED"
+        ),
+        "fee_quote_sha256": None if fee_quote is None else fee_quote.sha256,
         "final": final,
         "evaluation": evaluation,
     }

@@ -128,6 +128,18 @@ def prepared(tmp_path, baseline_template, monkeypatch):
         market_snapshot=replace(request.market_snapshot, captured_at=now),
     )
     risk = AdvancedRiskEngine(_config()).decide(request)
+    from test_guarded_fee_contract import synthetic_evidence
+
+    from kalshi_predictor.paper.fees import CONTRACT_KEY, build_fee_quote
+
+    fee_quote = build_fee_quote(
+        evidence=synthetic_evidence(monkeypatch, now, "BTC-TEST"),
+        ticker="BTC-TEST",
+        side=BUY_YES,
+        price=Decimal("0.21"),
+        simulator_floor=settings.paper_default_fee_per_contract,
+        now=now,
+    )
     book = {"yes": [[20, 100]], "no": [[79, 100]]}
     with factory() as session:
         session.add(
@@ -170,7 +182,15 @@ def prepared(tmp_path, baseline_template, monkeypatch):
             order_correlation_id=None,
         )
         risk_row = insert_advanced_risk_decision(
-            session, risk, request, ticker="BTC-TEST", position_sizing_decision_id=size_row.id
+            session,
+            risk,
+            request,
+            ticker="BTC-TEST",
+            position_sizing_decision_id=size_row.id,
+            raw={
+                "guarded_fee_quote_sha256": fee_quote.sha256,
+                "estimated_round_trip_fees": str(fee_quote.charge),
+            },
         )
         decision = PaperDecision(
             "BTC-TEST",
@@ -183,9 +203,14 @@ def prepared(tmp_path, baseline_template, monkeypatch):
             Decimal("0.49"),
             1,
             "synthetic fixture",
-            {"position_sizing_decision_id": size_row.id, "advanced_risk_decision_id": risk_row.id},
+            {
+                "position_sizing_decision_id": size_row.id,
+                "advanced_risk_decision_id": risk_row.id,
+                CONTRACT_KEY: fee_quote.decode(),
+            },
         )
         inputs = dict(
+            guarded_fee_contract=fee_quote.decode(),
             ticker="BTC-TEST",
             category="crypto",
             code_sha="a" * 40,
@@ -348,7 +373,8 @@ def prepared(tmp_path, baseline_template, monkeypatch):
     monkeypatch.setattr(activation, "_revalidate_engines", lambda *args: None)
     # Mechanics-only fixture; real same-ledger evaluation has separate tests.
     monkeypatch.setattr(
-        activation, "verify_model_release",
+        activation,
+        "verify_model_release",
         lambda *args: Mock(passed=True, model_calibration_verified=True),
     )
     # This fixture isolates ledger mechanics, not operational monitoring evidence.
@@ -374,7 +400,7 @@ def count(prepared):
 def test_real_local_simulator_and_shadow_link(prepared):
     result = activation.activate_local_paper(**prepared)
     assert result.fill_created
-    assert result.actual_simulated_fee == prepared["settings"].paper_default_fee_per_contract
+    assert result.actual_simulated_fee == Decimal("0.02")
     assert count(prepared) == 1
     with pytest.raises(ValueError, match="SHADOW_ALREADY_ACTIVATED"):
         activation.activate_local_paper(**prepared)
@@ -583,6 +609,7 @@ def test_marker_database_id_change_invalidates_authorization(prepared):
         activation.activate_local_paper(**prepared)
     assert count(prepared) == 0
 
+
 @pytest.mark.parametrize(
     "field,value,blocker",
     [
@@ -640,6 +667,62 @@ def test_actual_monitor_guard_rejects_absent_permit_before_order(prepared, monke
     assert count(prepared) == 0
     with prepared["session_factory"]() as session:
         assert session.execute(text("SELECT count(*) FROM paper_fills")).scalar_one() == 0
+        assert (
+            session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
+            is None
+        )
+
+
+def test_charged_fee_mismatch_rolls_back_everything(prepared, monkeypatch):
+    original = activation.simulate_immediate_fill
+
+    def wrong_fee(*args, **kwargs):
+        fill = original(*args, **kwargs)
+        fill.fee = "0"
+        return fill
+
+    monkeypatch.setattr(activation, "simulate_immediate_fill", wrong_fee)
+    with pytest.raises(ValueError, match="CHANGED_FILL"):
+        activation.activate_local_paper(**prepared)
+    with prepared["session_factory"]() as session:
+        for table in ("paper_orders", "paper_fills", "paper_positions"):
+            assert session.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0
+        assert (
+            session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
+            is None
+        )
+
+
+def test_stripped_contract_cannot_use_legacy_default(prepared):
+    raw = dict(prepared["decision"].raw_decision_json)
+    raw.pop("guarded_fee_contract")
+    prepared["decision"] = replace(prepared["decision"], raw_decision_json=raw)
+    with pytest.raises(ValueError, match="EVIDENCE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+@pytest.mark.parametrize(
+    "field,value", [("fee_contract", {}), ("fee_provenance", "LEGACY_CONFIGURED_NONCERTIFIED")]
+)
+def test_fill_lineage_substitution_rolls_back_even_with_correct_fee_and_hash(
+    prepared, monkeypatch, field, value
+):
+    original = activation.simulate_immediate_fill
+
+    def changed_lineage(*args, **kwargs):
+        fill = original(*args, **kwargs)
+        raw = json.loads(fill.raw_fill_json)
+        raw[field] = value
+        fill.raw_fill_json = json.dumps(raw)
+        return fill
+
+    monkeypatch.setattr(activation, "simulate_immediate_fill", changed_lineage)
+    with pytest.raises(ValueError, match="LOCAL_SIMULATOR_CHANGED_FILL"):
+        activation.activate_local_paper(**prepared)
+    with prepared["session_factory"]() as session:
+        for table in ("paper_orders", "paper_fills", "paper_positions"):
+            assert session.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0
         assert (
             session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
             is None

@@ -245,3 +245,69 @@ def test_primary_rule_hour_must_match_exact_ticker_time(session):
     result = compute(session, rule_offset=1)
     assert result.blockers == ("PRIMARY_RULE_OBSERVATION_TIME_MISMATCH",)
     assert session.scalar(select(func.count()).select_from(MarketSnapshot)) == 0
+
+
+def fee_ready_inputs(monkeypatch):
+    """Synthetic explicit fee metadata; never enrich an operational capture."""
+    import hashlib
+    import json
+
+    from test_guarded_fee_contract import synthetic_evidence
+
+    ticker, envelopes, receipt = original_inputs()
+    evidence = synthetic_evidence(monkeypatch, receipt, ticker)
+    adjusted, captures = [], []
+    for source in envelopes:
+        row = json.loads(source.payload)
+        body = row["body"]
+        if "event" in body:
+            body["event"].update(fee_type_override=None, fee_multiplier_override=None)
+        if "series" in body:
+            body["series"].update(fee_type="quadratic", fee_multiplier="1")
+        raw = json.dumps(row).encode()
+        sha = hashlib.sha256(raw).hexdigest()
+        adjusted.append(EvidenceReference(source.artifact, sha, raw))
+        if any(key in body for key in ("market", "event", "series")):
+            captures.append(dict(payload_hex=raw.hex(), sha256=sha))
+    evidence["captures"] = captures
+    return ticker, tuple(adjusted), receipt, evidence
+
+
+def test_fee_evidence_flows_through_side_selection_and_phase3n(session, monkeypatch):
+    from kalshi_predictor.paper.fees import CONTRACT_KEY, single_buy_fees
+
+    ticker, envelopes, _, evidence = fee_ready_inputs(monkeypatch)
+    settings = Settings(
+        _env_file=None,
+        execution_enabled=False,
+        execution_dry_run=True,
+        execution_kill_switch=True,
+        execution_gateway_mode="disabled",
+        autopilot_enabled=False,
+        learning_mode=False,
+        dynamic_position_sizing_mode="shadow",
+        advanced_risk_engine_mode="shadow",
+        weather_v2_knyc_observation_enabled=False,
+        paper_default_fee_per_contract=Decimal(".04"),
+    )
+    result = prepare_weather_candidate(
+        session,
+        ticker=ticker,
+        source_envelopes=envelopes,
+        settings=settings,
+        slippage_allowance=Decimal(".01"),
+        uncertainty_buffer=Decimal(".01"),
+        fee_evidence=evidence,
+    )
+    assert result.state == "COMPUTED_UNQUALIFIED", result.blockers
+    contract = result.decision.raw_decision_json[CONTRACT_KEY]
+    expected = max(
+        Decimal(".04"),
+        single_buy_fees(result.decision.limit_price, Decimal(1), Decimal(".07"))["estimated_fee"],
+    )
+    assert Decimal(contract["simulated_charge"]) == expected
+    assert result.records["ev"]["estimated_fee"] == expected
+    assert result.risk_request.estimated_round_trip_fees == expected
+    assert contract["side"] == result.decision.side
+    assert contract["price"] == str(result.decision.limit_price)
+    assert "FEE_EVIDENCE_REQUIRED_LEGACY_CONFIGURED_DIAGNOSTIC" not in result.blockers

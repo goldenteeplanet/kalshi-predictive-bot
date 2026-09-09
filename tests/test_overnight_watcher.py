@@ -179,3 +179,47 @@ def test_real_losing_position_books_negative_pnl(prepared):
     assert report.realized_paper_pnl == -Decimal("0.21") - activated.actual_simulated_fee
     assert report.rows[0]["evaluation"]["brier"] == "0.49"
     assert report.rows[0]["evaluation"]["forecast_correct"] is False
+
+
+def test_guarded_fill_fee_tamper_blocks_settlement(prepared):
+    activation.activate_local_paper(**prepared)
+    with prepared["session_factory"]() as session:
+        session.execute(text("UPDATE paper_fills SET fee='0'"))
+        session.commit()
+    before = counts(prepared)
+    with pytest.raises(ValueError, match="PAPER_FEE_FILL_LINEAGE_MISMATCH"):
+        run(prepared)
+    assert counts(prepared) == before
+    with prepared["session_factory"]() as session:
+        assert (
+            session.execute(
+                text(
+                    "SELECT count(*) FROM overnight_sprint_cycles "
+                    "WHERE id LIKE 'paper-evaluation:%'"
+                )
+            ).scalar_one()
+            == 0
+        )
+
+
+def test_settlement_rejects_guarded_fill_provenance_label_tamper(prepared):
+    activation.activate_local_paper(**prepared)
+    with prepared["session_factory"]() as session:
+        raw = json.loads(
+            session.execute(text("SELECT raw_fill_json FROM paper_fills")).scalar_one()
+        )
+        raw["fee_provenance"] = "LEGACY_CONFIGURED_NONCERTIFIED"
+        session.execute(text("UPDATE paper_fills SET raw_fill_json=:raw"), {"raw": json.dumps(raw)})
+        session.commit()
+        marker_count = session.execute(
+            text("SELECT count(*) FROM overnight_sprint_cycles")
+        ).scalar_one()
+    before = counts(prepared)
+    with pytest.raises(ValueError, match="PAPER_FEE_FILL_LINEAGE_MISMATCH"):
+        run(prepared)
+    assert counts(prepared) == before
+    with prepared["session_factory"]() as session:
+        assert (
+            session.execute(text("SELECT count(*) FROM overnight_sprint_cycles")).scalar_one()
+            == marker_count
+        )

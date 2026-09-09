@@ -16,8 +16,8 @@ import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 from test_overnight_provenance import artifact
-from test_paper_release_all_gates import _git, _prepare_committed_fixture
-from test_paper_release_preparation import original_inputs
+from test_paper_release_all_gates import _fixture_git_env, _git, _prepare_committed_fixture
+from test_paper_release_preparation import fee_ready_inputs
 from test_paper_release_rules_timing import fixture
 
 from kalshi_predictor.config import Settings
@@ -35,8 +35,8 @@ from kalshi_predictor.overnight_paper.qualification import EvidenceReference, qu
 from kalshi_predictor.overnight_paper.store import REQUIRED_DECISION
 
 
-def assembly_inputs(session, repository):
-    ticker, sources, receipt = original_inputs()
+def assembly_inputs(session, repository, monkeypatch):
+    ticker, sources, receipt, fee_evidence = fee_ready_inputs(monkeypatch)
     settings = Settings(
         _env_file=None,
         kalshi_api_key_id=None,
@@ -67,6 +67,7 @@ def assembly_inputs(session, repository):
         settings=settings,
         slippage_allowance=Decimal("0.01"),
         uncertainty_buffer=Decimal("0.01"),
+        fee_evidence=fee_evidence,
     )
     assert prep.state == "COMPUTED_UNQUALIFIED", prep.blockers
     rows = {
@@ -129,7 +130,7 @@ def assembled_inputs(monkeypatch):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as session:
-        args, policy = assembly_inputs(session, Path(__file__).resolve().parents[1])
+        args, policy = assembly_inputs(session, Path(__file__).resolve().parents[1], monkeypatch)
         monkeypatch.setattr(rule_verifier, "CERTIFIED_RULE_POLICIES", (policy,))
         yield args, session
         session.rollback()
@@ -140,6 +141,11 @@ def test_actual_preparation_assembles_originals_and_all_nonrelease_gates(assembl
     args, session = assembled_inputs
     args = args | {"model_evaluation_head_sha256": "e" * 64}
     candidate = assemble_weather_candidate(**args)
+    fee_contract = candidate.qualification_args["decision_inputs"]["guarded_fee_contract"]
+    assert fee_contract == candidate.decision.raw_decision_json["guarded_fee_contract"]
+    assert candidate.qualification_args["ev"].estimated_fee == Decimal(
+        fee_contract["simulated_charge"]
+    )
     result = qualify_candidate(**candidate.qualification_args)
     assert all(passed for name, passed in result.gates if name != "NO_EXCHANGE_PATH"), (
         result.blockers
@@ -228,7 +234,8 @@ def _run_committed_assembly(repository):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as session:
-        args, policy = assembly_inputs(session, repository)
+        monkeypatch = pytest.MonkeyPatch()
+        args, policy = assembly_inputs(session, repository, monkeypatch)
         rule_verifier.CERTIFIED_RULE_POLICIES = (policy,)
         candidate = assemble_weather_candidate(**args)
         result = qualify_candidate(**candidate.qualification_args)
@@ -244,11 +251,15 @@ def test_actual_assembly_passes_all12_in_committed_isolated_release(tmp_path):
     repository = tmp_path / "assembly-release"
     _prepare_committed_fixture(repository)
     source = Path(__file__).parent
-    for name in ("test_candidate_assembly.py", "test_paper_release_preparation.py"):
+    for name in (
+        "test_candidate_assembly.py",
+        "test_paper_release_preparation.py",
+        "test_guarded_fee_contract.py",
+    ):
         shutil.copyfile(source / name, repository / "tests" / name)
     _git(repository, "add", "tests")
     _git(repository, "commit", "--quiet", "-m", "Synthetic actual preparation assembly fixture")
-    environment = os.environ.copy()
+    environment = _fixture_git_env(repository)
     environment["PYTHONPATH"] = os.pathsep.join(
         (str(repository / "src"), str(repository / "tests"))
     )
@@ -269,3 +280,13 @@ def test_actual_assembly_passes_all12_in_committed_isolated_release(tmp_path):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert json.loads(result.stdout.strip().splitlines()[-1])["all12"]
+
+
+def test_assembly_rejects_scalar_fee_that_disagrees_with_original_quote(assembled_inputs):
+    args, _ = assembled_inputs
+    prep = args["preparation"]
+    records = dict(prep.records)
+    records["ev"] = dict(records["ev"], estimated_fee="0")
+    changed = replace(prep, records=records)
+    with pytest.raises(ValueError, match="FEE_EVIDENCE_OR_RISK_MISMATCH"):
+        assemble_weather_candidate(**(args | {"preparation": changed}))
