@@ -406,7 +406,7 @@ def _historical_replay_duplicate_helpers(root: Path) -> list[dict[str, Any]]:
         and (
             path.name.startswith("phase3aa")
             or any(
-                keyword in path.name.lower() or keyword in str(path.parent).lower()
+                keyword in path.relative_to(root).as_posix().lower()
                 for keyword in HISTORICAL_REPLAY_KEYWORDS
             )
         )
