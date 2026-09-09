@@ -1,7 +1,39 @@
 import json
+import sqlite3
 from pathlib import Path
 
+import pytest
+from sqlalchemy import event
+
+from kalshi_predictor import phase_prov5
 from kalshi_predictor.phase_prov5 import write_prov5_certification
+
+
+def test_backfill_failure_closes_engine_and_preserves_clone(tmp_path, monkeypatch) -> None:
+    connections = []
+    original_create_engine = phase_prov5.create_engine
+
+    def capture_engine(*args, **kwargs):
+        engine = original_create_engine(*args, **kwargs)
+        event.listen(engine, "connect", lambda connection, record: connections.append(connection))
+        return engine
+
+    def fail_backfill(path):
+        raise RuntimeError("injected backfill failure")
+
+    monkeypatch.setattr(phase_prov5, "create_engine", capture_engine)
+    monkeypatch.setattr(phase_prov5, "_backfill", fail_backfill)
+    with pytest.raises(RuntimeError, match="injected backfill failure"):
+        write_prov5_certification(
+            prov3_report=_prov3(tmp_path / "prov3.json"),
+            output_dir=tmp_path / "out",
+            volume_rows=1,
+        )
+    assert (tmp_path / "out/prov5_disposable_schema_clone.db").is_file()
+    assert connections
+    for connection in connections:
+        with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+            connection.execute("SELECT 1")
 
 
 def _prov3(path: Path) -> Path:
