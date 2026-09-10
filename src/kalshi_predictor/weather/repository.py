@@ -21,6 +21,16 @@ def normalize_location_key(location_key: str) -> str:
     return "_".join(part for part in normalized.split("_") if part)
 
 
+def weather_forecast_clock_consistent(forecast: WeatherForecast) -> bool:
+    """Reject legacy SQLite wall-clock timestamps that disagree with NOAA originals."""
+    raw = decode_json(forecast.raw_json)
+    if "startTime" not in raw:
+        return True
+    original = parse_datetime(raw.get("startTime"))
+    stored = parse_datetime(forecast.forecast_time)
+    return original is not None and stored is not None and original == stored
+
+
 def insert_weather_observation(
     session: Session,
     *,
@@ -145,8 +155,12 @@ def insert_weather_forecast(
     forecast = WeatherForecast(
         location_key=normalize_location_key(location_key),
         source=source,
-        forecast_generated_at=forecast_generated_at,
-        forecast_time=forecast_time,
+        forecast_generated_at=forecast_generated_at.astimezone(UTC)
+        if forecast_generated_at.tzinfo
+        else forecast_generated_at.replace(tzinfo=UTC),
+        forecast_time=forecast_time.astimezone(UTC)
+        if forecast_time.tzinfo
+        else forecast_time.replace(tzinfo=UTC),
         latitude=decimal_to_str(latitude),
         longitude=decimal_to_str(longitude),
         temperature_f=decimal_to_str(temperature_f),
@@ -176,6 +190,8 @@ def insert_weather_forecast_if_missing(
     forecast_time = parse_datetime(values["forecast_time"])
     if forecast_generated_at is None or forecast_time is None:
         raise ValueError("forecast_generated_at and forecast_time are required")
+    forecast_generated_at = forecast_generated_at.astimezone(UTC)
+    forecast_time = forecast_time.astimezone(UTC)
     existing = session.scalar(
         select(WeatherForecast)
         .where(
@@ -187,7 +203,7 @@ def insert_weather_forecast_if_missing(
         .order_by(desc(WeatherForecast.id))
         .limit(1)
     )
-    if existing is not None:
+    if existing is not None and weather_forecast_clock_consistent(existing):
         return existing, False
     return (
         insert_weather_forecast(

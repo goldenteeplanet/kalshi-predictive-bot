@@ -8,7 +8,12 @@ from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.repositories import decode_json
-from kalshi_predictor.data.schema import MarketSnapshot, WeatherFeature, WeatherMarketLink
+from kalshi_predictor.data.schema import (
+    MarketSnapshot,
+    WeatherFeature,
+    WeatherForecast,
+    WeatherMarketLink,
+)
 from kalshi_predictor.forecasting.base import ForecastOutput
 from kalshi_predictor.forecasting.skip_log import log_forecast_skip
 from kalshi_predictor.utils.decimals import midpoint, to_decimal
@@ -24,6 +29,7 @@ from kalshi_predictor.weather.observation_shadow import evaluate_knyc_observatio
 from kalshi_predictor.weather.repository import (
     get_latest_weather_features,
     get_latest_weather_link_for_ticker,
+    weather_forecast_clock_consistent,
 )
 from kalshi_predictor.weather.temperature_contracts import (
     parse_point_temperature_ticker,
@@ -80,6 +86,21 @@ class WeatherV2Forecaster:
                 available={"link": True, "location_key": location_key},
             )
             return None
+        reference = _feature_source_reference(features)
+        if reference and reference.get("table") == "weather_forecasts":
+            original = session.get(WeatherForecast, reference.get("id"))
+            if (
+                original is None
+                or not weather_forecast_clock_consistent(original)
+                or _utc(features.target_time) != _utc(original.forecast_time)
+            ):
+                _skip(
+                    session,
+                    snapshot,
+                    "weather source target timestamp mismatch",
+                    available={"feature_id": features.id, "source_reference": reference},
+                )
+                return None
         source_age = _forecast_age_hours(features, as_of=input_cutoff)
         if source_age < 0:
             _skip(session, snapshot, "future weather source", available={"feature_id": features.id})
