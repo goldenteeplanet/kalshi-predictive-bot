@@ -120,7 +120,7 @@ def prepare_btc_inputs(
 
 
 def _positive(value: Any) -> float:
-    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+    if isinstance(value, bool) or not isinstance(value, str | int | float | Decimal):
         raise ValueError("BTC_INVALID_STRIKE")
     try:
         number = Decimal(str(value))

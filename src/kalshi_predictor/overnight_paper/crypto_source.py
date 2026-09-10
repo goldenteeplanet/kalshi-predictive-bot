@@ -32,7 +32,7 @@ def _need(condition: bool, reason: str) -> None:
 
 def _number(value: Any, *, positive: bool = True) -> Decimal:
     _need(
-        not isinstance(value, bool) and isinstance(value, (str, int, float)), "COINBASE_NUMBER_TYPE"
+        not isinstance(value, bool) and isinstance(value, str | int | float), "COINBASE_NUMBER_TYPE"
     )
     result = Decimal(str(value))
     _need(
@@ -187,7 +187,7 @@ def verify_coinbase_source(
         )
         _need(row[0] not in seen, "COINBASE_DUPLICATE_CANDLE")
         seen.add(row[0])
-        low, high, opened, close = [_number(v) for v in row[1:5]]
+        low, high, opened, close = (_number(v) for v in row[1:5])
         _number(row[5], positive=False)
         _need(low <= opened <= high and low <= close <= high, "COINBASE_CANDLE_OHLC")
         start = datetime.fromtimestamp(row[0], tz=trade_at.tzinfo)

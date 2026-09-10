@@ -192,13 +192,18 @@ def test_partial_columns_added_and_stronger_lineage_recorded():
     engine.dispose()
 
 
-def test_lane_check_preserves_unnamed_check_unique_index_and_rows():
+@pytest.mark.parametrize("expression", [
+    "length(payload)>0",
+    "length(payload)>0 AND payload != 'CHECK(fake))'",
+    "(length(payload)>0) /* CHECK(ignored) */",
+])
+def test_lane_check_preserves_unnamed_check_unique_index_and_rows(expression):
     engine = sa.create_engine("sqlite://")
     with engine.begin() as connection:
         connection.execute(
             sa.text(
                 "CREATE TABLE canonical_evaluations (id INTEGER PRIMARY KEY, "
-                "source_lane TEXT NOT NULL, payload TEXT UNIQUE, CHECK(length(payload)>0))"
+                f"source_lane TEXT NOT NULL, payload TEXT UNIQUE, CHECK({expression}))"
             )
         )
         connection.execute(

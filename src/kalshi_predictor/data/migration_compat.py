@@ -61,8 +61,14 @@ def ensure_compatible_column(
         with operations.batch_alter_table(table) as batch:
             batch.add_column(column)
         return {"table": table, "column": column.name, "action": "ADDED"}
+    if column.server_default is not None and not isinstance(
+        column.server_default, sa.DefaultClause
+    ):
+        raise ValueError("MIGRATION_UNSUPPORTED_EXPECTED_DEFAULT")
     expected_default = (
-        None if column.server_default is None else _default(column.server_default.arg)
+        _default(column.server_default.arg)
+        if isinstance(column.server_default, sa.DefaultClause)
+        else None
     )
     actual_default = _default(existing.get("default"))
     defaults = {expected_default}
@@ -106,6 +112,70 @@ def _check_expression(value: str) -> str:
     )
 
 
+def _sqlite_check_expressions(ddl: str) -> list[str]:
+    """Read balanced CHECK bodies from original DDL, ignoring quoted SQL tokens."""
+    tokens = list(re.finditer(
+        r"--[^\n]*|/\*[\s\S]*?\*/|'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|"
+        r"`(?:``|[^`])*`|\[[^\]]*\]|[A-Za-z_][A-Za-z_0-9]*|[^\s]",
+        ddl,
+    ))
+    expressions = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token.group().upper() != "CHECK":
+            index += 1
+            continue
+        index += 1
+        while index < len(tokens) and tokens[index].group().startswith(("--", "/*")):
+            index += 1
+        if index == len(tokens) or tokens[index].group() != "(":
+            raise ValueError("MIGRATION_UNSUPPORTED_CHECK_DDL")
+        start = tokens[index].end()
+        depth = 1
+        index += 1
+        while index < len(tokens) and depth:
+            value = tokens[index].group()
+            depth += (value == "(") - (value == ")")
+            if depth == 0:
+                expressions.append(ddl[start:tokens[index].start()])
+            index += 1
+        if depth:
+            raise ValueError("MIGRATION_UNBALANCED_CHECK_DDL")
+    return expressions
+
+
+def _sqlite_original_checks(bind: Any, table: str, checks: list) -> dict[str, str]:
+    # SQLAlchemy 2.0.0's SQLite reflection can include the table's closing ')'
+    # in a CHECK body. Only repair that exact discrepancy against original DDL.
+    ddl = bind.execute(
+        sa.text("SELECT sql FROM sqlite_master WHERE type='table' AND name=:name"),
+        {"name": table},
+    ).scalar_one()
+    remaining = _sqlite_check_expressions(ddl)
+    replacements = {}
+    for check in checks:
+        reflected = check.get("sqltext") or ""
+        normalized = _check_expression(reflected)
+        matches = [
+            expression for expression in remaining
+            if normalized == _check_expression(expression)
+            or (
+                normalized.startswith(_check_expression(expression))
+                and set(normalized[len(_check_expression(expression)):]) == {")"}
+            )
+        ]
+        if len(set(matches)) != 1:
+            raise ValueError("MIGRATION_UNVERIFIED_CHECK_REFLECTION")
+        original = matches[0]
+        remaining.remove(original)
+        replacements[reflected] = original
+        check["sqltext"] = original
+    if remaining:
+        raise ValueError("MIGRATION_UNREFLECTED_TABLE_CHECK")
+    return replacements
+
+
 def ensure_canonical_lane_check(operations: Any) -> dict[str, Any]:
     bind = operations.get_bind()
     inspector = sa.inspect(bind)
@@ -113,6 +183,9 @@ def ensure_canonical_lane_check(operations: Any) -> dict[str, Any]:
     if not inspector.has_table(table):
         raise ValueError("MIGRATION_REQUIRED_TABLE_MISSING:" + table)
     checks = inspector.get_check_constraints(table)
+    replacements = (
+        _sqlite_original_checks(bind, table, checks) if bind.dialect.name == "sqlite" else {}
+    )
     expected = _check_expression(LANE_CHECK_SQL)
     equivalent = []
     for check in checks:
@@ -137,6 +210,12 @@ def ensure_canonical_lane_check(operations: Any) -> dict[str, Any]:
     # default reflected-batch path deliberately drops. Refuse unreflected objects.
     reflected = sa.Table(table, sa.MetaData(), autoload_with=bind)
     if bind.dialect.name == "sqlite":
+        for constraint in reflected.constraints:
+            if isinstance(constraint, sa.CheckConstraint):
+                original = replacements.get(str(constraint.sqltext))
+                if original is None:
+                    raise ValueError("MIGRATION_UNVERIFIED_CHECK_REFLECTION")
+                constraint.sqltext = sa.text(original)
         triggers = bind.execute(
             sa.text("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=:table"),
             {"table": table},

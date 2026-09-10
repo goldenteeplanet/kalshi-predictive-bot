@@ -125,7 +125,7 @@ def _run_lifecycle(repository, database):
                     **kwargs, paper_order_creation_enabled=True, paper_order_kill_switch=False
                 ),
             )
-            args, policy = assembly_fixture.assembly_inputs(session, repository)
+            args, policy = assembly_fixture.assembly_inputs(session, repository, patch)
             if model is None:
                 model = args["model"]
             args.update(

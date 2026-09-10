@@ -184,7 +184,9 @@ def summarize_funnel(rows: list[dict[str, Any]]) -> dict[str, Any]:
             {
                 "stage": stage,
                 "count": count,
-                "conversion_from_previous": None if previous in (None, 0) else count / previous,
+                "conversion_from_previous": (
+                    None if previous is None or previous == 0 else count / previous
+                ),
             }
         )
         previous = count

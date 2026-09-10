@@ -16,10 +16,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    for column in (
+    columns: tuple[sa.Column, ...] = (
         sa.Column("settlement_hash", sa.String(length=64), nullable=True),
         sa.Column("settlement_updated_at", sa.DateTime(timezone=True), nullable=True),
-    ):
+    )
+    for column in columns:
         ensure_compatible_column(
             op, "prospective_pair_evaluations", column, allow_stronger_not_null=True
         )

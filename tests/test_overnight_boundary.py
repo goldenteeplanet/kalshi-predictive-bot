@@ -150,6 +150,8 @@ def test_existing_fill_simulator_has_only_local_ledger_calls():
         "insert_paper_fill",
         "mark_order_filled",
         "update_position_for_fill",
+        "decision_fee_quote",
+        "ValueError",
     }
     assert not any(
         isinstance(node, ast.Attribute)
