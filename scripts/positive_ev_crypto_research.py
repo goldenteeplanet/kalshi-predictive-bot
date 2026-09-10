@@ -13,6 +13,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
+from kalshi_predictor.crypto.named_research_baselines import (
+    BASELINE_MODULES,
+    capture_named_baselines,
+    select_exact_receipt,
+)
 from kalshi_predictor.crypto.research_provenance import (
     freeze_code,
     freeze_prediction,
@@ -39,6 +44,7 @@ def main(output: Path, *, sol_history: bool = False) -> None:
         "kalshi_predictor.forecasting.crypto_v3_independent",
         "kalshi_predictor.crypto.distribution_model",
         "kalshi_predictor.crypto.research_provenance",
+        *BASELINE_MODULES,
     ):
         expected = repo / "src" / Path(*module_name.split(".")).with_suffix(".py")
         actual = Path(sys.modules[module_name].__file__).resolve()
@@ -52,11 +58,39 @@ def main(output: Path, *, sol_history: bool = False) -> None:
             "src/kalshi_predictor/forecasting/crypto_v3_independent.py",
             "src/kalshi_predictor/crypto/distribution_model.py",
             "src/kalshi_predictor/crypto/research_provenance.py",
+            *("src/" + name.replace(".", "/") + ".py" for name in BASELINE_MODULES),
         ),
     )
     (output / "code_provenance.json").write_text(json.dumps(code_proof, indent=2))
     receipts, rows, errors, inputs = [], [], [], {}
     count = 0
+
+    def named_baselines(ticker, market_sha, as_of, book_sha=None):
+        market_receipt = next(r for r in receipts if r["sha256"] == market_sha)
+        book_receipt = (
+            select_exact_receipt(
+                receipts,
+                sha256=book_sha,
+                request_url=f"{BASE}/markets/{ticker}/orderbook?depth=5",
+            )
+            if book_sha is not None
+            else None
+        )
+        return capture_named_baselines(
+            ticker=ticker,
+            market_original=(output / market_receipt["path"]).read_bytes(),
+            market_sha256=market_sha,
+            market_received_at=datetime.fromisoformat(market_receipt["received_at"]),
+            model_input_as_of=as_of,
+            orderbook_original=(output / book_receipt["path"]).read_bytes()
+            if book_receipt
+            else None,
+            orderbook_sha256=book_sha,
+            orderbook_received_at=datetime.fromisoformat(book_receipt["received_at"])
+            if book_receipt
+            else None,
+            orderbook_url=book_receipt["url"] if book_receipt else None,
+        )
 
     def get(url, label):
         nonlocal count
@@ -177,11 +211,13 @@ def main(output: Path, *, sol_history: bool = False) -> None:
             for _, market, target in selection:
                 forecast = forecast_independent(prices, target, decision_at=decision)
                 ticker = market["ticker"]
+                baselines = named_baselines(ticker, book_sha, decision)
                 prediction = dict(
                     prices=[asdict(p) for p in prices],
                     target=asdict(target),
                     model_input_as_of=decision,
                     forecast=forecast,
+                    named_baselines=baselines,
                     market_receipt_sha256=book_sha,
                     code_provenance=code_proof,
                     selection=selection_proof,
@@ -230,6 +266,7 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                             first_blocker="SETTLEMENT_ALIGNMENT_AND_MODEL_RELEASE_MISSING",
                             status="PROXY_SHADOW_UNQUALIFIED",
                             model_comparisons=forecast["comparisons"],
+                            named_baselines=baselines,
                             paper_eligible=False,
                             calibrated=False,
                             listing_received_at=book_received.isoformat(),
@@ -259,6 +296,7 @@ def main(output: Path, *, sol_history: bool = False) -> None:
             target = CryptoTarget(**saved["target"])
             decision = NOW()
             forecast = forecast_independent(prices, target, decision_at=decision)
+            baselines = named_baselines(ticker, saved["market_receipt_sha256"], decision, sha)
             view = book.get("orderbook_fp", book.get("orderbook", {}))
             verify_unchanged(repo, code_proof)
             frozen = freeze_prediction(
@@ -267,6 +305,7 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                     prices=saved["prices"],
                     target=saved["target"],
                     forecast=forecast,
+                    named_baselines=baselines,
                     book_receipt_sha256=sha,
                     market_receipt_sha256=saved["market_receipt_sha256"],
                     code_provenance=code_proof,
@@ -294,6 +333,7 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                 row["prediction_sha256"] = frozen["prediction_sha256"]
                 row["forecast_input_sha256"] = forecast["input_sha256"]
                 row["model_comparisons"] = forecast["comparisons"]
+                row["named_baselines"] = baselines
                 row["book_received_at"] = received.isoformat()
                 row["book_receipt_sha256"] = sha
                 row["independent_probability"] = (
@@ -308,6 +348,7 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                     row["quote_status"] = "NO_ONE_CONTRACT_OPPOSITE_DEPTH"
             saved["final_decision_at"] = frozen["decision_at"]
             saved["final_forecast"] = forecast
+            saved["final_named_baselines"] = baselines
             saved["final_prediction_receipt"] = frozen
         except (OSError, ValueError, KeyError, TypeError) as exc:
             errors.append(dict(ticker=ticker, error=str(exc)))
