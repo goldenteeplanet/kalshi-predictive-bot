@@ -51,11 +51,11 @@ def _run_lifecycle(repository, database):
     from kalshi_predictor.overnight_paper.qualification import EvidenceReference, qualify_candidate
     from kalshi_predictor.overnight_paper.runtime_owner import acquire_runtime_owner
     from kalshi_predictor.overnight_paper.store import initialize_store
-    from kalshi_predictor.paper import fees, simulator
     from kalshi_predictor.overnight_paper.watcher import (
         PublicMarketObservation,
         reconcile_public_settlements,
     )
+    from kalshi_predictor.paper import fees, simulator
 
     for module in provenance.AUDITED_BOUNDARY_SHA256:
         importlib.import_module(module)
