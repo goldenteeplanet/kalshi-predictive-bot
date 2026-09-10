@@ -91,6 +91,8 @@ def discover_quoted_market_tickers(
         )
         selected = already_selected
         for market in list(payload.get("markets") or [])[:max_markets_per_series]:
+            if not isinstance(market, dict):
+                continue
             ticker = str(market.get("ticker") or "").strip()
             if not ticker or ticker in selected_tickers:
                 continue
