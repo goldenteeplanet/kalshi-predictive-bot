@@ -13,7 +13,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
-from kalshi_predictor.crypto.research_provenance import freeze_code, verify_unchanged
+from kalshi_predictor.crypto.research_provenance import (
+    freeze_code,
+    freeze_prediction,
+    verify_unchanged,
+)
 from kalshi_predictor.forecasting.crypto_v3_independent import (
     CryptoTarget,
     PriceObservation,
@@ -40,12 +44,16 @@ def main(output: Path, *, sol_history: bool = False) -> None:
         actual = Path(sys.modules[module_name].__file__).resolve()
         if actual != expected.resolve():
             raise ValueError("IMPORTED_MODEL_SOURCE_MISMATCH")
-    code_proof = freeze_code(repo, output / "code", (
-        "scripts/positive_ev_crypto_research.py",
-        "src/kalshi_predictor/forecasting/crypto_v3_independent.py",
-        "src/kalshi_predictor/crypto/distribution_model.py",
-        "src/kalshi_predictor/crypto/research_provenance.py",
-    ))
+    code_proof = freeze_code(
+        repo,
+        output / "code",
+        (
+            "scripts/positive_ev_crypto_research.py",
+            "src/kalshi_predictor/forecasting/crypto_v3_independent.py",
+            "src/kalshi_predictor/crypto/distribution_model.py",
+            "src/kalshi_predictor/crypto/research_provenance.py",
+        ),
+    )
     (output / "code_provenance.json").write_text(json.dumps(code_proof, indent=2))
     receipts, rows, errors, inputs = [], [], [], {}
     count = 0
@@ -97,25 +105,32 @@ def main(output: Path, *, sol_history: bool = False) -> None:
             for page in range(4 if sol_history else 1):
                 end = anchor - page * 300 * 60
                 start = end - 300 * 60
-                query = urlencode({"granularity": 60,
-                                   "start": datetime.fromtimestamp(start, UTC).isoformat(),
-                                   "end": datetime.fromtimestamp(end, UTC).isoformat()})
+                query = urlencode(
+                    {
+                        "granularity": 60,
+                        "start": datetime.fromtimestamp(start, UTC).isoformat(),
+                        "end": datetime.fromtimestamp(end, UTC).isoformat(),
+                    }
+                )
                 candles, received, sha = get(
                     f"https://api.exchange.coinbase.com/products/{symbol}-USD/candles?{query}",
                     f"{symbol}-candles-{page}",
                 )
                 # Half-open windows prevent boundary duplicates; missing bars fail model validation.
-                closed = [r for r in candles if start <= r[0] < end
-                          and r[0] + 60 <= received.timestamp()]
-                prices.extend(PriceObservation(
-                    float(r[4]),
-                    datetime.fromtimestamp(r[0] + 60, UTC),
-                    received,
-                    "coinbase_closed_1m_candles",
-                    sha,
-                    symbol,
+                closed = [
+                    r for r in candles if start <= r[0] < end and r[0] + 60 <= received.timestamp()
+                ]
+                prices.extend(
+                    PriceObservation(
+                        float(r[4]),
+                        datetime.fromtimestamp(r[0] + 60, UTC),
+                        received,
+                        "coinbase_closed_1m_candles",
+                        sha,
+                        symbol,
+                    )
+                    for r in closed
                 )
-                for r in closed)
             prices.sort(key=lambda price: price.observed_at)
             listing, book_received, book_sha = get(
                 f"{BASE}/markets?series_ticker={series}&status=open&limit=100", symbol + "-markets"
@@ -153,15 +168,37 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                     candidates.append((abs(float(strike) / prices[-1].price - 1), market, target))
                 except (ValueError, KeyError, TypeError):
                     continue
-            for _, market, target in sorted(candidates, key=lambda item: item[0])[:2]:
+            selection = sorted(candidates, key=lambda item: (item[0], item[1]["ticker"]))[:2]
+            selection_proof = {
+                "method": "FIRST_PAGE_OPEN_VALID_HORIZON_NEAREST_STRIKE_THEN_TICKER_TOP_2",
+                "ordered_tickers": [item[1]["ticker"] for item in selection],
+                "selected_as_of": decision.isoformat(),
+            }
+            for _, market, target in selection:
                 forecast = forecast_independent(prices, target, decision_at=decision)
                 ticker = market["ticker"]
-                inputs[ticker] = dict(
+                prediction = dict(
                     prices=[asdict(p) for p in prices],
                     target=asdict(target),
-                    decision_at=decision,
+                    model_input_as_of=decision,
                     forecast=forecast,
                     market_receipt_sha256=book_sha,
+                    code_provenance=code_proof,
+                    selection=selection_proof,
+                )
+                verify_unchanged(repo, code_proof)
+                frozen = freeze_prediction(
+                    output
+                    / "predictions"
+                    / (hashlib.sha256(ticker.encode()).hexdigest() + "-listing"),
+                    prediction,
+                    model_input_as_of=decision,
+                    input_received_at=max(book_received, *(p.received_at for p in prices)),
+                    model_committed_at=datetime.fromisoformat(code_proof["commit_recorded_at"]),
+                    target_at=target.observation_at,
+                )
+                inputs[ticker] = dict(
+                    prediction, prediction_receipt=frozen, decision_at=frozen["decision_at"]
                 )
                 for side in ("YES", "NO"):
                     p = forecast["probability"] if side == "YES" else 1 - forecast["probability"]
@@ -197,6 +234,10 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                             calibrated=False,
                             listing_received_at=book_received.isoformat(),
                             forecast_input_sha256=forecast["input_sha256"],
+                            model_input_as_of=frozen["model_input_as_of"],
+                            prediction_recorded_at=frozen["prediction_recorded_at"],
+                            prediction_sha256=frozen["prediction_sha256"],
+                            decision_at=frozen["decision_at"],
                         )
                     )
         except (OSError, ValueError, KeyError, TypeError) as exc:
@@ -219,6 +260,26 @@ def main(output: Path, *, sol_history: bool = False) -> None:
             decision = NOW()
             forecast = forecast_independent(prices, target, decision_at=decision)
             view = book.get("orderbook_fp", book.get("orderbook", {}))
+            verify_unchanged(repo, code_proof)
+            frozen = freeze_prediction(
+                output / "predictions" / (hashlib.sha256(ticker.encode()).hexdigest() + "-book"),
+                dict(
+                    prices=saved["prices"],
+                    target=saved["target"],
+                    forecast=forecast,
+                    book_receipt_sha256=sha,
+                    market_receipt_sha256=saved["market_receipt_sha256"],
+                    code_provenance=code_proof,
+                    selection={
+                        "method": "INDICATIVE_GROSS_DESC_FIRST_2_DISTINCT_TICKERS",
+                        "ordered_tickers": selected,
+                    },
+                ),
+                model_input_as_of=decision,
+                input_received_at=max(received, *(p.received_at for p in prices)),
+                model_committed_at=datetime.fromisoformat(code_proof["commit_recorded_at"]),
+                target_at=target.observation_at,
+            )
             for row in (r for r in rows if r["ticker"] == ticker):
                 opposite = "no" if row["side"] == "YES" else "yes"
                 levels = view.get(opposite + "_dollars", [])
@@ -227,7 +288,10 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                     for price, quantity in levels
                     if 0 < float(price) < 1 and float(quantity) >= 1
                 ]
-                row["decision_at"] = decision.isoformat()
+                row["decision_at"] = frozen["decision_at"]
+                row["model_input_as_of"] = frozen["model_input_as_of"]
+                row["prediction_recorded_at"] = frozen["prediction_recorded_at"]
+                row["prediction_sha256"] = frozen["prediction_sha256"]
                 row["forecast_input_sha256"] = forecast["input_sha256"]
                 row["model_comparisons"] = forecast["comparisons"]
                 row["book_received_at"] = received.isoformat()
@@ -242,9 +306,18 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                     row["quote_status"] = "OBSERVED_ONE_CONTRACT_DEPTH_NOT_FILL_GUARANTEE"
                 else:
                     row["quote_status"] = "NO_ONE_CONTRACT_OPPOSITE_DEPTH"
-            saved["final_decision_at"], saved["final_forecast"] = decision, forecast
+            saved["final_decision_at"] = frozen["decision_at"]
+            saved["final_forecast"] = forecast
+            saved["final_prediction_receipt"] = frozen
         except (OSError, ValueError, KeyError, TypeError) as exc:
             errors.append(dict(ticker=ticker, error=str(exc)))
+            for row in (r for r in rows if r["ticker"] == ticker):
+                row["status"] = "RESEARCH_BOOK_CAPTURE_INCOMPLETE"
+                row["first_blocker"] = str(exc)
+                row["executable_price"] = None
+                row["gross_edge"] = None
+                row["net_ev"] = None
+                row["paper_eligible"] = False
     verify_unchanged(repo, code_proof)
     manifest = dict(
         schema="prospective-crypto-cohort-v1",
