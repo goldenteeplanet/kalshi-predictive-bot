@@ -126,10 +126,29 @@ class GateEvidence:
             from .crypto_source import VERIFIER
 
             expected_verifier = VERIFIER
+        if (
+            self.gate == 4 and self.category == "Climate and Weather"
+            and inputs.get("series") == "KXTEMPMIAH"
+        ):
+            from .miami_source_gate import VERIFIER
+
+            expected_verifier = VERIFIER
         if expected_verifier != self.verifier:
             return False
         if decision_fingerprint(inputs) != self.decision_id:
             return False
+        if self.gate == 4 and self.verifier == "miami-canonical-original-replay-v1":
+            from .miami_source_gate import MiamiGateContext, verify_miami_gate4
+
+            at = aware(as_of) if as_of is not None else aware(inputs["decision_at"])
+            if inputs.get("ticker") != self.ticker or inputs.get("category") != self.category:
+                return False
+            if not aware(report["validated_at"]) <= at < aware(report["valid_until"]):
+                return False
+            return isinstance(self.context, MiamiGateContext) and verify_miami_gate4(
+                self.context, inputs=inputs,
+                sources=tuple((source.sha256, source.payload) for source in self.sources), now=at,
+            )
         if self.gate in {3, 9, 12}:
             from kalshi_predictor.overnight_paper.gate_context import (
                 QualificationContext,
