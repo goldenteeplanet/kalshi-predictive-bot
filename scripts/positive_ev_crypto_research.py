@@ -11,6 +11,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
+from kalshi_predictor.crypto.research_provenance import freeze_code, verify_unchanged
 from kalshi_predictor.forecasting.crypto_v3_independent import (
     CryptoTarget,
     PriceObservation,
@@ -27,6 +28,23 @@ BASE = "https://api.elections.kalshi.com/trade-api/v2"
 
 def main(output: Path) -> None:
     output.mkdir(parents=True, exist_ok=False)
+    repo = Path(__file__).resolve().parents[1]
+    for module_name in (
+        "kalshi_predictor.forecasting.crypto_v3_independent",
+        "kalshi_predictor.crypto.distribution_model",
+        "kalshi_predictor.crypto.research_provenance",
+    ):
+        expected = repo / "src" / Path(*module_name.split(".")).with_suffix(".py")
+        actual = Path(sys.modules[module_name].__file__).resolve()
+        if actual != expected.resolve():
+            raise ValueError("IMPORTED_MODEL_SOURCE_MISMATCH")
+    code_proof = freeze_code(repo, output / "code", (
+        "scripts/positive_ev_crypto_research.py",
+        "src/kalshi_predictor/forecasting/crypto_v3_independent.py",
+        "src/kalshi_predictor/crypto/distribution_model.py",
+        "src/kalshi_predictor/crypto/research_provenance.py",
+    ))
+    (output / "code_provenance.json").write_text(json.dumps(code_proof, indent=2))
     receipts, rows, errors, inputs = [], [], [], {}
     count = 0
 
@@ -217,12 +235,14 @@ def main(output: Path) -> None:
             saved["final_decision_at"], saved["final_forecast"] = decision, forecast
         except (OSError, ValueError, KeyError, TypeError) as exc:
             errors.append(dict(ticker=ticker, error=str(exc)))
+    verify_unchanged(repo, code_proof)
     manifest = dict(
         schema="prospective-crypto-cohort-v1",
         generated_at=NOW(),
         inputs=inputs,
         receipts=receipts,
         outcomes=None,
+        code_provenance=code_proof,
         promotion_authority=False,
     )
     encoded = json.dumps(manifest, indent=2, default=str, allow_nan=False).encode()
