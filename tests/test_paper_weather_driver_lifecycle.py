@@ -271,7 +271,7 @@ def _run_driver_lifecycle(repository, database):
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(supervisor, "admit_prepared_candidate", observed_admit)
         patch.setattr(preparation_fixture, "datetime", Clock)
-        ticker, originals, _ = preparation_fixture.original_inputs()
+        ticker, originals, _, fee_evidence = preparation_fixture.fee_ready_inputs(patch)
         bodies = {json.loads(s.payload)["url"]: json.loads(s.payload)["body"] for s in originals}
         market_url = discovery.BASE + "/markets/" + ticker
         market = bodies[market_url]["market"]
@@ -311,6 +311,7 @@ def _run_driver_lifecycle(repository, database):
             patch.setattr(module, name, lambda: simulated[0])
         patch.setattr("kalshi_predictor.weather.repository.utc_now", lambda: simulated[0])
         patch.setattr("kalshi_predictor.forecasting.weather_v2.utc_now", lambda: simulated[0])
+        patch.setattr("kalshi_predictor.paper.simulator.utc_now", lambda: simulated[0])
         patch.setattr(discovery.time, "sleep", lambda _: None)
         patch.setattr(
             discovery.httpx,
@@ -332,6 +333,7 @@ def _run_driver_lifecycle(repository, database):
             model_code=args["model_code"],
             rule_documents=args["rule_documents"],
             model_evaluation_head_sha256=context["head"],
+            fee_evidence=fee_evidence,
             entries_enabled=True,
             monitoring_cycles=1,
         )

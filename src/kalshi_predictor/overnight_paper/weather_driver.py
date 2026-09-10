@@ -63,6 +63,7 @@ def run_weather_driver(
     entries_enabled: bool = False,
     monitoring_cycles: int = 1,
     model_evaluation_head_sha256: str | None = None,
+    fee_evidence: dict[str, Any] | None = None,
 ) -> WeatherDriverReport:
     """No reconstructed engines or supplied PASS; one owner spans every write.
 
@@ -120,6 +121,20 @@ def run_weather_driver(
                 for s in sources
             ]
             validate_runtime_owner(owner, path)
+            # Bind fee calculation to this acquisition, never caller-supplied
+            # market/series captures. The fee verifier still checks the policy
+            # registry, original documents, exact identities and freshness.
+            current_fee_evidence = None
+            if fee_evidence is not None:
+                current_fee_evidence = dict(fee_evidence)
+                current_fee_evidence["captures"] = [
+                    dict(payload_hex=source.payload.hex(), sha256=source.sha256)
+                    for source in sources
+                    if any(
+                        key in json.loads(source.payload)["body"]
+                        for key in ("market", "event", "series")
+                    )
+                ]
             cycle = run_weather_preparation_live_cycle(
                 session_factory=factory,
                 database_path=path,
@@ -130,6 +145,7 @@ def run_weather_driver(
                 slippage_allowance=settings.advanced_risk_estimated_slippage_per_contract,
                 uncertainty_buffer=settings.advanced_risk_gap_tail_buffer_per_contract,
                 runtime_owner=owner,
+                fee_evidence=current_fee_evidence,
             )
             preparation_checkpoint = "weather-preparation:" + owner.generation
             preparation_state = cycle.record["state"]

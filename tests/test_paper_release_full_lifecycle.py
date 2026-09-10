@@ -51,6 +51,7 @@ def _run_lifecycle(repository, database):
     from kalshi_predictor.overnight_paper.qualification import EvidenceReference, qualify_candidate
     from kalshi_predictor.overnight_paper.runtime_owner import acquire_runtime_owner
     from kalshi_predictor.overnight_paper.store import initialize_store
+    from kalshi_predictor.paper import fees, simulator
     from kalshi_predictor.overnight_paper.watcher import (
         PublicMarketObservation,
         reconcile_public_settlements,
@@ -126,6 +127,7 @@ def _run_lifecycle(repository, database):
                 ),
             )
             args, policy = assembly_fixture.assembly_inputs(session, repository, patch)
+            final_fee_policies = fees.CERTIFIED_FEE_POLICIES
             if model is None:
                 model = args["model"]
             args.update(
@@ -260,6 +262,8 @@ def _run_lifecycle(repository, database):
 
     with ExitStack() as owned:
         clock = owned.enter_context(pytest.MonkeyPatch.context())
+        clock.setattr(fees, "CERTIFIED_FEE_POLICIES", final_fee_policies)
+        clock.setattr(simulator, "utc_now", lambda: current)
         clock.setattr(monitoring, "_now", lambda: current)
         clock.setattr(settlement_runner, "datetime", Clock)
         clock.setattr(
