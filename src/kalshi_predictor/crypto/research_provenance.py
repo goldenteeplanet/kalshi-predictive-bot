@@ -25,7 +25,7 @@ def freeze_code(repo: Path, output: Path, paths: tuple[str, ...]) -> dict[str, A
     frozen = datetime.now(UTC)
     if committed > frozen:
         raise ValueError("FUTURE_COMMIT_TIME")
-    files = []
+    files: list[dict[str, Any]] = []
     for relative in paths:
         path = (repo / relative).resolve(strict=True)
         if not path.is_relative_to(repo) or path.is_symlink():
