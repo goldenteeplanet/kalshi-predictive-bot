@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import sys
@@ -10,6 +11,7 @@ import urllib.request
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlencode
 
 from kalshi_predictor.crypto.research_provenance import freeze_code, verify_unchanged
 from kalshi_predictor.forecasting.crypto_v3_independent import (
@@ -26,7 +28,7 @@ def NOW():
 BASE = "https://api.elections.kalshi.com/trade-api/v2"
 
 
-def main(output: Path) -> None:
+def main(output: Path, *, sol_history: bool = False) -> None:
     output.mkdir(parents=True, exist_ok=False)
     repo = Path(__file__).resolve().parents[1]
     for module_name in (
@@ -51,7 +53,7 @@ def main(output: Path) -> None:
     def get(url, label):
         nonlocal count
         count += 1
-        if count > 12:
+        if count > (7 if sol_history else 12):
             raise RuntimeError("REQUEST_BUDGET")
         started = NOW()
         req = urllib.request.Request(url, headers={"User-Agent": "Dejoia-readonly-research/1"})
@@ -81,24 +83,31 @@ def main(output: Path) -> None:
             raise ValueError(f"HTTP_{status}")
         return json.loads(data), received, sha
 
-    for symbol, series in (
+    universe = (
         ("BTC", "KXBTC"),
         ("ETH", "KXETH"),
         ("SOL", "KXSOLE"),
         ("XRP", "KXXRP"),
         ("DOGE", "KXDOGE"),
-    ):
+    )
+    for symbol, series in (("SOL", "KXSOLE"),) if sol_history else universe:
         try:
-            candles, received, sha = get(
-                f"https://api.exchange.coinbase.com/products/{symbol}-USD/candles?granularity=60",
-                symbol + "-candles",
-            )
-            # Each Coinbase array is [start, low, high, open, close, volume].
-            closed = sorted(
-                (r for r in candles if r[0] + 60 <= received.timestamp()), key=lambda r: r[0]
-            )[-300:]
-            prices = [
-                PriceObservation(
+            prices = []
+            anchor = int(NOW().timestamp() // 60) * 60
+            for page in range(4 if sol_history else 1):
+                end = anchor - page * 300 * 60
+                start = end - 300 * 60
+                query = urlencode({"granularity": 60,
+                                   "start": datetime.fromtimestamp(start, UTC).isoformat(),
+                                   "end": datetime.fromtimestamp(end, UTC).isoformat()})
+                candles, received, sha = get(
+                    f"https://api.exchange.coinbase.com/products/{symbol}-USD/candles?{query}",
+                    f"{symbol}-candles-{page}",
+                )
+                # Half-open windows prevent boundary duplicates; missing bars fail model validation.
+                closed = [r for r in candles if start <= r[0] < end
+                          and r[0] + 60 <= received.timestamp()]
+                prices.extend(PriceObservation(
                     float(r[4]),
                     datetime.fromtimestamp(r[0] + 60, UTC),
                     received,
@@ -106,8 +115,8 @@ def main(output: Path) -> None:
                     sha,
                     symbol,
                 )
-                for r in closed
-            ]
+                for r in closed)
+            prices.sort(key=lambda price: price.observed_at)
             listing, book_received, book_sha = get(
                 f"{BASE}/markets?series_ticker={series}&status=open&limit=100", symbol + "-markets"
             )
@@ -220,6 +229,7 @@ def main(output: Path) -> None:
                 ]
                 row["decision_at"] = decision.isoformat()
                 row["forecast_input_sha256"] = forecast["input_sha256"]
+                row["model_comparisons"] = forecast["comparisons"]
                 row["book_received_at"] = received.isoformat()
                 row["book_receipt_sha256"] = sha
                 row["independent_probability"] = (
@@ -244,6 +254,8 @@ def main(output: Path) -> None:
         outcomes=None,
         code_provenance=code_proof,
         promotion_authority=False,
+        capture_scope="SOL_1200_MINUTES" if sol_history else "FIVE_ASSET_300_MINUTES",
+        event_independence="REPEATED_EVENT_CAPTURES_ARE_NOT_INDEPENDENT_SAMPLES",
     )
     encoded = json.dumps(manifest, indent=2, default=str, allow_nan=False).encode()
     (output / "cohort.json").write_bytes(encoded)
@@ -270,4 +282,8 @@ def main(output: Path) -> None:
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("output", type=Path)
+    parser.add_argument("--sol-history", action="store_true")
+    args = parser.parse_args()
+    main(args.output, sol_history=args.sol_history)
