@@ -186,3 +186,61 @@ def test_direct_capture_cannot_bypass_normal_quorum(contributors):
 def test_boolean_range_bound_rejected():
     with pytest.raises(ValueError, match="INVALID_RANGE"):
         empirical_probability([1.0, 2.0, 3.0], comparator="RANGE", lower_f=True, upper_f=2.0)
+
+
+def shifted_capture(delta):
+    c = capture()
+    return replace(c, points=tuple(replace(p, event_at=p.event_at + delta) for p in c.points),
+        index_received_at=c.index_received_at + delta,
+        calibrations_received_at=c.calibrations_received_at + delta,
+        available_at=c.available_at + delta)
+
+
+def test_grid30_exact_minute_matching_and_separate_model_identity():
+    from kalshi_predictor.weather.miami_half_hour_forecast import forecast_miami_prior_day_grid30
+
+    delta = timedelta(hours=2, minutes=30)
+    c = shifted_capture(delta)
+    result = forecast_miami_prior_day_grid30([c], origin_at=ORIGIN + delta,
+        model_input_as_of=AS_OF + delta, horizon_minutes=60)
+    assert result["models"]["prior_day_increment_empirical"]["samples_f"] == [81, 82, 83]
+    assert result["target_at"] == "2026-09-11T00:30:00+00:00"
+    assert result["model"] == "miami_prior_day_increment_grid30_v1"
+    assert all(datetime.fromisoformat(t["origin_at"]).minute == 30 for t in result["training"])
+    with pytest.raises(ValueError, match="EXACT_LOCAL_HOUR"):
+        forecast_miami_prior_day([c], origin_at=ORIGIN + delta,
+            model_input_as_of=AS_OF + delta, horizon_minutes=60)
+
+
+def test_grid30_missing_exact_training_endpoint_is_not_filled():
+    from kalshi_predictor.weather.miami_half_hour_forecast import forecast_miami_prior_day_grid30
+
+    delta = timedelta(minutes=30)
+    c = shifted_capture(delta)
+    missing = ORIGIN + delta - timedelta(days=1) + timedelta(minutes=60)
+    c = replace(c, points=tuple(p for p in c.points if p.event_at != missing))
+    with pytest.raises(ValueError, match="INSUFFICIENT_PRIOR_DAY"):
+        forecast_miami_prior_day_grid30([c], origin_at=ORIGIN + delta,
+            model_input_as_of=AS_OF + delta, horizon_minutes=60)
+
+
+def test_grid30_rejects_off_grid_and_local_date_boundary():
+    from kalshi_predictor.weather.miami_half_hour_forecast import forecast_miami_prior_day_grid30
+
+    for delta, error in ((timedelta(minutes=15), "HALF_HOUR_GRID"),
+                         (timedelta(hours=6, minutes=30), "SAME_DAY")):
+        c = shifted_capture(delta)
+        with pytest.raises(ValueError, match=error):
+            forecast_miami_prior_day_grid30([c], origin_at=ORIGIN + delta,
+                model_input_as_of=AS_OF + delta, horizon_minutes=60)
+
+
+def test_grid30_on_hour_has_identical_hourly_numerics():
+    from kalshi_predictor.weather.miami_half_hour_forecast import forecast_miami_prior_day_grid30
+
+    hourly = forecast()
+    grid = forecast_miami_prior_day_grid30([capture()], origin_at=ORIGIN,
+        model_input_as_of=AS_OF, horizon_minutes=60)
+    assert grid["models"] == hourly["models"]
+    assert grid["training"] == hourly["training"]
+    assert hourly["model"] == "miami_prior_day_increment_v1"
