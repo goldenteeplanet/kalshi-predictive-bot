@@ -178,7 +178,7 @@ def summarize_funnel(rows: list[dict[str, Any]]) -> dict[str, Any]:
         retained = [row for row in retained if predicate(row)]
         stages.append((stage, len(retained)))
     output = []
-    previous = None
+    previous: int | None = None
     for stage, count in stages:
         output.append(
             {

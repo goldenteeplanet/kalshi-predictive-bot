@@ -335,6 +335,7 @@ def test_actual_weather_semantic_lifecycle(tmp_path):
     _prepare_committed_fixture(repository)
     for name in (
         "test_candidate_assembly.py",
+        "test_guarded_fee_contract.py",
         "test_paper_release_preparation.py",
         "test_paper_release_full_lifecycle.py",
     ):
