@@ -13,7 +13,7 @@ from kalshi_predictor.ingest.websocket_orderbooks import (
     adapter_from_settings,
 )
 from kalshi_predictor.kalshi.client import KalshiClient
-from kalshi_predictor.utils.time import utc_now
+from kalshi_predictor.utils.time import parse_datetime, utc_now
 
 DEFAULT_WATCH_SERIES = (
     "KXBTC",
@@ -59,6 +59,8 @@ def discover_quoted_market_tickers(
             market = client.get_market(ticker)
         except Exception:
             market = None
+        if _market_closed(market):
+            continue
         yes_levels, no_levels = _book_levels(orderbook)
         rows.append(
             {
@@ -90,6 +92,8 @@ def discover_quoted_market_tickers(
             ticker = str(market.get("ticker") or "").strip()
             if not ticker or ticker in selected_tickers:
                 continue
+            if _market_closed(market):
+                continue
             orderbook = client.get_orderbook(ticker)
             yes_levels, no_levels = _book_levels(orderbook)
             if not yes_levels and not no_levels:
@@ -109,6 +113,15 @@ def discover_quoted_market_tickers(
             if selected >= max_quoted_per_series:
                 break
     return rows
+
+
+def _market_closed(market: dict[str, Any] | None) -> bool:
+    if not market:
+        return False
+    if str(market.get("status") or "").lower() in {"closed", "settled", "finalized"}:
+        return True
+    close_time = parse_datetime(market.get("close_time"))
+    return close_time is not None and close_time <= utc_now()
 
 
 def load_actionable_tickers(path: Path, *, limit: int = 40) -> list[str]:

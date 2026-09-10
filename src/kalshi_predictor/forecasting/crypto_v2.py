@@ -18,15 +18,14 @@ from kalshi_predictor.crypto.semantics import (
     explicit_directional_price_comparator,
     parse_crypto_market_terms,
     select_compatible_crypto_feature,
+    select_compatible_crypto_feature_from_rows,
     terms_from_link_payload,
-    validate_crypto_feature,
 )
 from kalshi_predictor.data.repositories import decode_json
 from kalshi_predictor.data.schema import CryptoFeature, Market, MarketLeg, MarketSnapshot
 from kalshi_predictor.forecasting.base import ForecastOutput
 from kalshi_predictor.forecasting.skip_log import log_forecast_skip
 from kalshi_predictor.utils.decimals import midpoint, to_decimal
-from kalshi_predictor.utils.time import parse_datetime
 
 
 class CryptoV2Forecaster:
@@ -428,26 +427,13 @@ def _select_compatible_crypto_feature_from_rows(
     max_age_minutes: int = DEFAULT_FEATURE_MAX_AGE_MINUTES,
     future_skew_seconds: int = DEFAULT_FUTURE_SKEW_SECONDS,
 ) -> FeatureCompatibility:
-    cutoff = parse_datetime(forecast_cutoff)
-    if cutoff is None:
-        return FeatureCompatibility(False, "invalid_forecast_cutoff")
-    if not rows:
-        return FeatureCompatibility(False, "no_feature_at_or_before_cutoff")
-    latest_reason = "no_compatible_feature"
-    latest_details: dict[str, object] = {}
-    for feature in rows:
-        compatibility = validate_crypto_feature(
-            feature,
-            terms=terms,
-            forecast_cutoff=cutoff,
-            max_age_minutes=max_age_minutes,
-            future_skew_seconds=future_skew_seconds,
-        )
-        if compatibility.ok:
-            return compatibility
-        latest_reason = compatibility.reason
-        latest_details = compatibility.details or {}
-    return FeatureCompatibility(False, latest_reason, details=latest_details)
+    return select_compatible_crypto_feature_from_rows(
+        rows,
+        terms=terms,
+        forecast_cutoff=forecast_cutoff,
+        max_age_minutes=max_age_minutes,
+        future_skew_seconds=future_skew_seconds,
+    )
 
 
 def _feature_missing_reason(

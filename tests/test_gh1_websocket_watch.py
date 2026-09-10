@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from kalshi_predictor.config import Settings
@@ -55,6 +56,42 @@ def test_discovery_keeps_bounded_quoted_books_per_series() -> None:
         "KXTEMPNYCH-EMPTY",
         "KXTEMPNYCH-QUOTED",
     ]
+
+
+def test_expired_preferred_and_fallback_books_do_not_take_current_slots(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "kalshi_predictor.ingest.websocket_watch.utc_now",
+        lambda: datetime(2026, 9, 10, 17, 5, tzinfo=UTC),
+    )
+
+    class RolloverClient(_FakeClient):
+        def get_market(self, ticker):
+            return {"ticker": ticker, "status": "open", "close_time": "2026-09-10T17:00:00Z"}
+
+        def get_markets(self, **kwargs):
+            return {
+                "markets": [
+                    self.get_market("KXTEMPMIAH-EXPIRED"),
+                    {"ticker": "KXTEMPMIAH-CLOSED", "status": "closed"},
+                    {
+                        "ticker": "KXTEMPMIAH-CURRENT",
+                        "status": "open",
+                        "close_time": "2026-09-10T18:00:00Z",
+                    },
+                ]
+            }
+
+    client = RolloverClient()
+    rows = discover_quoted_market_tickers(
+        client=client,
+        series=["KXTEMPMIAH"],
+        max_markets_per_series=3,
+        max_quoted_per_series=1,
+        preferred_tickers=["KXTEMPMIAH-OLD-RANKING"],
+    )
+    assert [row["ticker"] for row in rows] == ["KXTEMPMIAH-CURRENT"]
+    assert "KXTEMPMIAH-EXPIRED" not in client.orderbook_calls
+    assert "KXTEMPMIAH-CLOSED" not in client.orderbook_calls
 
 
 def test_discovery_prioritizes_ranked_manifest_books(tmp_path: Path) -> None:

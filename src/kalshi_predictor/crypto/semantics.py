@@ -320,10 +320,30 @@ def select_compatible_crypto_feature(
             .limit(25)
         )
     )
+    return select_compatible_crypto_feature_from_rows(
+        rows,
+        terms=terms,
+        forecast_cutoff=cutoff,
+        max_age_minutes=max_age_minutes,
+        future_skew_seconds=future_skew_seconds,
+    )
+
+
+def select_compatible_crypto_feature_from_rows(
+    rows: list[CryptoFeature],
+    *,
+    terms: CryptoMarketTerms,
+    forecast_cutoff: Any,
+    max_age_minutes: int = DEFAULT_FEATURE_MAX_AGE_MINUTES,
+    future_skew_seconds: int = DEFAULT_FUTURE_SKEW_SECONDS,
+) -> FeatureCompatibility:
+    cutoff = parse_datetime(forecast_cutoff)
+    if cutoff is None:
+        return FeatureCompatibility(False, "invalid_forecast_cutoff")
     if not rows:
         return FeatureCompatibility(False, "no_feature_at_or_before_cutoff")
-    latest_reason = "no_compatible_feature"
-    latest_details: dict[str, Any] = {}
+    first_failure = None
+    current_failure = None
     for feature in rows:
         compatibility = validate_crypto_feature(
             feature,
@@ -334,9 +354,19 @@ def select_compatible_crypto_feature(
         )
         if compatibility.ok:
             return compatibility
-        latest_reason = compatibility.reason
-        latest_details = compatibility.details or {}
-    return FeatureCompatibility(False, latest_reason, details=latest_details)
+        if first_failure is None:
+            first_failure = compatibility
+        if current_failure is None and compatibility.reason not in {
+            "future_feature",
+            "stale_feature",
+            "post_settlement_feature",
+            "future_source_timestamp",
+            "invalid_feature_or_cutoff_time",
+        }:
+            current_failure = compatibility
+    failure = current_failure or first_failure
+    assert failure is not None
+    return FeatureCompatibility(False, failure.reason, details=failure.details)
 
 
 def validate_crypto_feature(

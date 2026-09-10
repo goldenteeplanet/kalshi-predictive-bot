@@ -1,10 +1,15 @@
 """Regression derived from public KXBTC15M-26SEP072215-15, captured 2026-09-08."""
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from kalshi_predictor.crypto.semantics import parse_crypto_market_terms, validate_crypto_feature
+from kalshi_predictor.crypto.semantics import (
+    parse_crypto_market_terms,
+    select_compatible_crypto_feature_from_rows,
+    validate_crypto_feature,
+)
 from kalshi_predictor.data.schema import CryptoFeature, Market
+from kalshi_predictor.forecasting.crypto_v2 import _select_compatible_crypto_feature_from_rows
 
 
 def cf_market():
@@ -59,3 +64,33 @@ def test_legacy_coinbase_explicit_source_preserved():
     terms = parse_crypto_market_terms(market)
     assert terms.reference_price_source == "coinbase"
     assert terms.components[0].comparator == "ABOVE"
+
+
+def test_current_source_mismatch_is_not_hidden_by_old_feature_age():
+    now = datetime(2026, 9, 8, 2, 7, tzinfo=UTC)
+    current = CryptoFeature(symbol="BTC", source="coinbase", generated_at=now, raw_json="{}")
+    rows = [
+        CryptoFeature(
+            symbol="BTC", source="coinbase", generated_at=now + timedelta(minutes=2), raw_json="{}"
+        ),
+        current,
+        CryptoFeature(
+            symbol="BTC", source="coinbase", generated_at=now - timedelta(days=2), raw_json="{}"
+        ),
+    ]
+    for select_rows in (
+        select_compatible_crypto_feature_from_rows,
+        _select_compatible_crypto_feature_from_rows,
+    ):
+        result = select_rows(
+            rows, terms=parse_crypto_market_terms(cf_market()), forecast_cutoff=now
+        )
+        assert not result.ok
+        assert result.reason == "incompatible_reference_price_source"
+        assert result.details["required_source"] == "cf_benchmarks"
+    current.source = "cf_benchmarks"
+    result = select_compatible_crypto_feature_from_rows(
+        rows, terms=parse_crypto_market_terms(cf_market()), forecast_cutoff=now
+    )
+    assert result.ok
+    assert result.feature is current
