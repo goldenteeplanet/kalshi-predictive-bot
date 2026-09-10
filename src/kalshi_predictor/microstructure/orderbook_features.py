@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -14,6 +14,7 @@ from kalshi_predictor.microstructure.dislocation import detect_dislocation_event
 from kalshi_predictor.microstructure.imbalance import calculate_imbalance, detect_imbalance_events
 from kalshi_predictor.microstructure.late_moves import detect_late_move_events, late_move_score
 from kalshi_predictor.microstructure.liquidity_tracker import detect_liquidity_events
+from kalshi_predictor.microstructure.provenance import FeatureBuildContext, bound_close_time
 from kalshi_predictor.microstructure.repository import (
     insert_microstructure_event,
     insert_microstructure_feature,
@@ -170,8 +171,18 @@ def compute_microstructure_feature(
     *,
     lookback_minutes: int,
     settings: Settings | None = None,
+    context: FeatureBuildContext | None = None,
 ) -> dict[str, Any]:
     resolved_settings = settings or get_settings()
+    lineage = None
+    ensemble_probability = None
+    if context is not None:
+        lineage, ensemble = context.bind(session, snapshots, lookback_minutes, resolved_settings)
+        ensemble_probability = to_decimal(ensemble.yes_probability)
+        if ensemble_probability is None or not ensemble_probability.is_finite():
+            raise ValueError("INVALID_BOUND_ENSEMBLE_PROBABILITY")
+        if not Decimal("0") <= ensemble_probability <= Decimal("1"):
+            raise ValueError("INVALID_BOUND_ENSEMBLE_PROBABILITY")
     rows = [snapshot_microstructure(snapshot) for snapshot in snapshots]
     current = rows[-1]
     first = rows[0]
@@ -182,7 +193,12 @@ def compute_microstructure_feature(
     liquidity_change = _change(current["liquidity"], first["liquidity"])
     velocity = _change(midpoints[-1], midpoints[0]) if len(midpoints) >= 2 else None
     acceleration = _acceleration(midpoints)
-    minutes_to_close = _minutes_to_close(session, current["ticker"], current["raw_market"])
+    minutes_to_close = _minutes_to_close(
+        session,
+        current["ticker"],
+        current["raw_market"],
+        reference_at=context.reference_at if context else None,
+    )
     feature: dict[str, Any] = {
         "created_at": utc_now(),
         "ticker": current["ticker"],
@@ -223,12 +239,25 @@ def compute_microstructure_feature(
     feature["late_move_score"] = late_move_score(feature, minutes_to_close=minutes_to_close)
     feature["dislocation_score"] = dislocation_score(
         market_midpoint=current["midpoint"],
-        model_probability=_latest_probability(session, current["ticker"], "ensemble_v2"),
+        model_probability=(
+            ensemble_probability
+            if context
+            else _latest_probability(session, current["ticker"], "ensemble_v2")
+        ),
         recent_velocity=velocity,
     )
     feature["smart_money_score"] = smart_money_score(feature)
     feature["microstructure_confidence"] = _confidence(feature, resolved_settings)
     feature["raw_json"]["minutes_to_close"] = decimal_to_str(minutes_to_close)
+    if lineage is not None and context is not None:
+        completed = utc_now()
+        if completed < context.model_input_as_of:
+            raise ValueError("FEATURE_COMPLETION_BEFORE_INPUT_CUTOFF")
+        if completed >= bound_close_time(current["raw_market"]):
+            raise ValueError("EXPIRED_FEATURE_COMPLETION")
+        feature["created_at"] = completed
+        lineage["feature_created_at"] = completed.isoformat()
+        feature["raw_json"]["prospective_lineage"] = lineage
     return feature
 
 
@@ -329,8 +358,16 @@ def _minutes_to_close(
     session: Session,
     ticker: str,
     raw_market: dict[str, Any],
+    *,
+    reference_at: datetime | None = None,
 ) -> Decimal | None:
     close_time = parse_datetime(raw_market.get("close_time"))
+    if reference_at is not None:
+        close_time = bound_close_time(raw_market)
+        remaining = Decimal(str((close_time - reference_at).total_seconds() / 60))
+        if remaining <= 0:
+            raise ValueError("EXPIRED_FEATURE_TARGET")
+        return remaining
     if close_time is None:
         market = session.get(Market, ticker)
         close_time = market.close_time if market is not None else None
