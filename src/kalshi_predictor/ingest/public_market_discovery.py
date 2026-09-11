@@ -22,6 +22,37 @@ from kalshi_predictor.ingest.public_book_stage import (
 )
 from kalshi_predictor.opportunities.window_eligibility import current_market_window_status
 
+CRYPTO_EVENT_SERIES = frozenset({"KXBTC", "KXETH", "KXSOLE", "KXXRP", "KXDOGE"})
+
+
+def event_markets(catalog, family):
+    """Validate bounded nested market membership before applying entry gates."""
+    events = catalog["events"]
+    if not isinstance(events, list) or len(events) > 2:
+        raise ValueError("EVENT_ROW_CAP")
+    rows = []
+    for event in events:
+        ticker = event["event_ticker"]
+        markets = event["markets"]
+        if (
+            event["series_ticker"] != family
+            or not isinstance(ticker, str)
+            or not re.fullmatch(r"[A-Z0-9.-]{1,100}", ticker)
+            or not ticker.startswith(family + "-")
+            or not isinstance(markets, list)
+            or len(markets) > 400 - len(rows)
+        ):
+            raise ValueError("EVENT_MEMBERSHIP_OR_ROW_CAP")
+        for market in markets:
+            if (
+                not isinstance(market, dict)
+                or market.get("event_ticker") != ticker
+                or not str(market.get("ticker", "")).startswith(ticker + "-")
+            ):
+                raise ValueError("MARKET_EVENT_MEMBERSHIP")
+        rows.extend(markets)
+    return rows
+
 
 def eligible_tickers(markets, series, *, as_of, settings=None, excluded_windows=None):
     """Prioritize near-midpoint quotes inside the earliest upcoming close window."""
@@ -89,7 +120,7 @@ def discover_and_stage(
                 at=clock().isoformat(),
                 series=families,
                 max_gets=len(families) + 12,
-                max_catalog_rows=100 * len(families),
+                max_catalog_rows=sum(400 if f in CRYPTO_EVENT_SERIES else 100 for f in families),
                 max_selected=6,
                 retry=False,
                 minimum_minutes_to_close=str(settings.opportunity_min_time_to_close_minutes),
@@ -116,6 +147,21 @@ def discover_and_stage(
                 )
             )
         )
+        crypto_events = family in CRYPTO_EVENT_SERIES
+        if crypto_events:
+            url = (
+                BASE
+                + "/events?"
+                + urlencode(
+                    dict(
+                        series_ticker=family,
+                        status="open",
+                        with_nested_markets="true",
+                        limit=2,
+                        min_close_ts=math.floor(cutoff.timestamp()),
+                    )
+                )
+            )
         try:
             requests += 1
             raw, status = get(url)
@@ -140,8 +186,8 @@ def discover_and_stage(
             ):
                 raise ValueError("CATALOG_RESPONSE_INVALID")
             catalog = json.loads(raw)
-            markets = catalog["markets"]
-            if not isinstance(markets, list) or len(markets) > 100:
+            markets = event_markets(catalog, family) if crypto_events else catalog["markets"]
+            if not isinstance(markets, list) or len(markets) > (400 if crypto_events else 100):
                 raise ValueError("CATALOG_ROW_CAP")
             excluded_windows = []
             pools.append(
@@ -156,6 +202,7 @@ def discover_and_stage(
             catalogs.append(
                 dict(
                     series=family,
+                    catalog_kind="OPEN_EVENTS_WITH_MARKETS" if crypto_events else "MARKETS",
                     rows=len(markets),
                     partial=bool(catalog.get("cursor")),
                     selection_as_of=received.isoformat(),

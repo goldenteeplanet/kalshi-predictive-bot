@@ -123,13 +123,29 @@ def test_discovery_breaks_empty_manifest_dependency_and_preserves_partial_catalo
     def get(url):
         calls.append(url)
         family = "KXTEMP" if "KXTEMP" in url else "KXBTC"
+        if family == "KXBTC":
+            event = "KXBTC-EVENT"
+            return json.dumps(
+                dict(
+                    events=[
+                        dict(
+                            series_ticker=family,
+                            event_ticker=event,
+                            markets=[
+                                dict(market(f"{event}-{i}"), event_ticker=event) for i in range(8)
+                            ],
+                        )
+                    ],
+                    cursor="more",
+                )
+            ).encode(), 200
         return json.dumps(
             dict(markets=[market(f"{family}-{i}") for i in range(8)], cursor="more")
         ).encode(), 200
 
     def stage(**kwargs):
         assert len(kwargs["tickers"]) == 6
-        assert kwargs["tickers"][:2] == ["KXTEMP-0", "KXBTC-0"]
+        assert kwargs["tickers"][:2] == ["KXTEMP-0", "KXBTC-EVENT-0"]
         return dict(status="COMPLETE", requests=12, staged=[], errors=[])
 
     monkeypatch.setattr(discovery, "stage_public_books", stage)
@@ -153,6 +169,58 @@ def test_discovery_breaks_empty_manifest_dependency_and_preserves_partial_catalo
             clock=lambda: NOW,
         )
     assert len(calls) == 2
+
+
+def test_crypto_event_discovery_covers_more_than_one_market_page(tmp_path, monkeypatch):
+    event = "KXBTC-EVENT"
+
+    def get(url):
+        query = parse_qs(urlparse(url).query)
+        assert urlparse(url).path.endswith("/events")
+        assert query["status"] == ["open"] and query["limit"] == ["2"]
+        assert query["with_nested_markets"] == ["true"]
+        rows = [
+            dict(market(f"{event}-{i:03}", bid="0.99", ask="1"), event_ticker=event)
+            for i in range(188)
+        ]
+        rows[-1].update(yes_bid_dollars="0.45", yes_ask_dollars="0.55")
+        return json.dumps(
+            dict(events=[dict(event_ticker=event, series_ticker="KXBTC", markets=rows)], cursor="")
+        ).encode(), 200
+
+    def stage(**kwargs):
+        assert kwargs["tickers"][0] == "KXBTC-EVENT-187"
+        return dict(requests=12, staged=[], errors=[])
+
+    monkeypatch.setattr(discovery, "stage_public_books", stage)
+    r = discovery.discover_and_stage(
+        series=["KXBTC"],
+        staging_dir=tmp_path / "stage",
+        evidence_dir=tmp_path / "out",
+        get=get,
+        clock=lambda: NOW,
+    )
+    assert r["requests"] == 13 and r["catalogs"][0]["rows"] == 188
+    assert r["catalogs"][0]["partial"] is False
+
+
+@pytest.mark.parametrize("mutation", ["wrong_series", "wrong_event", "oversize", "too_many_events"])
+def test_event_membership_and_caps(mutation):
+    event = dict(
+        event_ticker="KXBTC-E",
+        series_ticker="KXBTC",
+        markets=[dict(market("KXBTC-E-1"), event_ticker="KXBTC-E")],
+    )
+    if mutation == "wrong_series":
+        event["series_ticker"] = "KXETH"
+    elif mutation == "wrong_event":
+        event["markets"][0]["event_ticker"] = "KXBTC-OTHER"
+    elif mutation == "oversize":
+        event["markets"] *= 401
+    with pytest.raises(ValueError):
+        discovery.event_markets(
+            dict(events=[event] * (3 if mutation == "too_many_events" else 1)), "KXBTC"
+        )
 
 
 def test_invalid_scope_refused_before_network_or_output(tmp_path):
