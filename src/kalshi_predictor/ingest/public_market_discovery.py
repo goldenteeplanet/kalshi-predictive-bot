@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import math
 import re
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -97,8 +98,24 @@ def discover_and_stage(
     )
     requests, pools, catalogs, errors = 0, [], [], []
     for index, family in enumerate(families):
-        url = BASE + "/markets?" + urlencode(dict(series_ticker=family, status="open", limit=100))
         requested = clock()
+        # Kalshi permits close-time bounds with status omitted, not status=open.
+        # Still enforce lifecycle and the exact cutoff locally after receipt.
+        cutoff = requested + timedelta(
+            minutes=max(0, float(settings.opportunity_min_time_to_close_minutes))
+        )
+        url = (
+            BASE
+            + "/markets?"
+            + urlencode(
+                dict(
+                    series_ticker=family,
+                    limit=100,
+                    min_close_ts=math.floor(cutoff.timestamp()),
+                    max_close_ts=math.ceil((requested + timedelta(hours=72)).timestamp()),
+                )
+            )
+        )
         try:
             requests += 1
             raw, status = get(url)

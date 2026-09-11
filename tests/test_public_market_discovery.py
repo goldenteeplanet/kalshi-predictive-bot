@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
@@ -57,6 +58,34 @@ def test_near_close_catalog_does_not_spend_book_requests(tmp_path):
     assert len(calls) == result["requests"] == 1
     assert result["selected"] == []
     assert result["catalogs"][0]["excluded_windows"][0]["window_status"] == "MARKET_CLOSE_TOO_NEAR"
+
+
+def test_catalog_request_filters_entry_window_before_pagination(tmp_path, monkeypatch):
+    def get(url):
+        query = parse_qs(urlparse(url).query)
+        assert "status" not in query
+        assert query["min_close_ts"] == [str(int((NOW + timedelta(minutes=45)).timestamp()))]
+        assert query["max_close_ts"] == [str(int((NOW + timedelta(hours=72)).timestamp()))]
+        assert query["limit"] == ["100"]
+        rows = [market("KXTEMP-NEXT", hours=2), market("KXTEMP-NEAR", hours=0.5)]
+        rows.append(dict(market("KXTEMP-SETTLED", hours=2), status="settled"))
+        return json.dumps(dict(markets=rows)).encode(), 200
+
+    def stage(**kwargs):
+        assert kwargs["tickers"] == ["KXTEMP-NEXT"]
+        return dict(requests=2, staged=[], errors=[])
+
+    monkeypatch.setattr(discovery, "stage_public_books", stage)
+    result = discovery.discover_and_stage(
+        series=["KXTEMP"],
+        staging_dir=tmp_path / "stage",
+        evidence_dir=tmp_path / "out",
+        get=get,
+        clock=lambda: NOW,
+        settings=SimpleNamespace(opportunity_min_time_to_close_minutes=Decimal("45")),
+    )
+    assert result["selected"] == ["KXTEMP-NEXT"]
+    assert result["requests"] == 3
 
 
 def market(ticker, *, bid="0.45", ask="0.55", hours=1):
