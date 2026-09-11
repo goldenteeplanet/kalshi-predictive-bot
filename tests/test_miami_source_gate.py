@@ -277,10 +277,10 @@ def grid_context(context, request):
     recording["prediction_recorded_at"] = (
         fixtures.CUTOFF + delta + timedelta(seconds=1)
     ).isoformat()
-    market, event, series = [
+    market, event, series = (
         replace(o, received_at=o.received_at + delta)
         for o in (context.market, context.event, context.series)
-    ]
+    )
     return replace(
         context,
         frozen_prediction=prediction,
