@@ -48,6 +48,17 @@ GRID30_REPLAY_CODE_HASHES = {
     ),
 }
 
+# Reviewed Git/Linux closure. Original Windows bytes remain a distinct profile;
+# no runtime normalization or per-file mixing can grant source authority.
+GRID30_LF_REPLAY_CODE_HASHES = GRID30_REPLAY_CODE_HASHES | {
+    "scripts/positive_ev_miami_half_hour_research.py": (
+        "86f66fd98458abd6a47968e9e2ccbf6827f4c2d3c46d74ddfd481bedee692eb7"
+    ),
+    "src/kalshi_predictor/weather/miami_half_hour_forecast.py": (
+        "175aa435b60911cf3223fb69be1f0fae495fd8c715c17279e12c3114533e2eb7"
+    ),
+}
+
 
 @dataclass(frozen=True)
 class MiamiCaptureEvidence:
@@ -121,10 +132,13 @@ def verify_miami_gate4(
 ) -> bool:
     """Recompute source truth; typed context and PASS strings alone are insufficient."""
     model = inputs.get("model_name")
+    code_profiles: tuple[dict[str, str], ...]
     if model == "miami_prior_day_increment_v1":
-        code_hashes, origin_grid = REPLAY_CODE_HASHES, 60
+        code_profiles, origin_grid = (REPLAY_CODE_HASHES,), 60
     elif model == "miami_prior_day_increment_grid30_v1":
-        code_hashes, origin_grid = GRID30_REPLAY_CODE_HASHES, 30
+        code_profiles, origin_grid = (
+            GRID30_REPLAY_CODE_HASHES, GRID30_LF_REPLAY_CODE_HASHES
+        ), 30
     else:
         return False
     if (
@@ -151,7 +165,8 @@ def verify_miami_gate4(
 
     if any(hashlib.sha256(a.payload).hexdigest() != a.sha256 for a in artifacts):
         return False
-    if dict((path, a.sha256) for path, a in context.code_originals) != code_hashes:
+    code_hashes = dict((path, a.sha256) for path, a in context.code_originals)
+    if code_hashes not in code_profiles:
         return False
     if len(context.code_originals) != len(code_hashes):
         return False

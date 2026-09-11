@@ -216,11 +216,28 @@ def test_refreshed_current_pair_cannot_replace_frozen_original(context):
     assert not evidence.verified(inputs)
 
 
-@pytest.fixture
-def grid_context(context):
-    from kalshi_predictor.overnight_paper.miami_source_gate import GRID30_REPLAY_CODE_HASHES
+@pytest.fixture(params=["windows", "linux"])
+def grid_context(context, request):
+    from kalshi_predictor.overnight_paper.miami_source_gate import (
+        GRID30_LF_REPLAY_CODE_HASHES,
+        GRID30_REPLAY_CODE_HASHES,
+    )
     from kalshi_predictor.weather.miami_half_hour_forecast import forecast_miami_prior_day_grid30
     from kalshi_predictor.weather.miami_index import decode_miami_index
+
+    code_hashes = (GRID30_REPLAY_CODE_HASHES if request.param == "windows"
+                   else GRID30_LF_REPLAY_CODE_HASHES)
+
+    def archived_bytes(path, sha):
+        # Reconstruct the two reviewed original encodings for portable fixtures.
+        # Production compares supplied raw bytes and never normalizes evidence.
+        raw = (Path(__file__).resolve().parents[1] / path).read_bytes()
+        if "half_hour" in path:
+            raw = raw.replace(b"\r\n", b"\n")
+            if request.param == "windows":
+                raw = raw.replace(b"\n", b"\r\n")
+        assert hashlib.sha256(raw).hexdigest() == sha
+        return raw
 
     delta = timedelta(minutes=30)
     pair = context.captures[0]
@@ -252,7 +269,7 @@ def grid_context(context):
         )
     ]
     saved["prediction"]["code_proof"]["files"] = [
-        {"path": p, "sha256": sha} for p, sha in GRID30_REPLAY_CODE_HASHES.items()
+        {"path": p, "sha256": sha} for p, sha in code_hashes.items()
     ]
     prediction = artifact(saved)
     recording = context.recording_receipt.decode()
@@ -264,7 +281,6 @@ def grid_context(context):
         replace(o, received_at=o.received_at + delta)
         for o in (context.market, context.event, context.series)
     ]
-    repo = Path(__file__).resolve().parents[1]
     return replace(
         context,
         frozen_prediction=prediction,
@@ -275,8 +291,8 @@ def grid_context(context):
         series=series,
         catalog_receipts=tuple(receipt(o) for o in (market, event, series)),
         code_originals=tuple(
-            (p, Artifact(sha, (repo / p).read_bytes()))
-            for p, sha in GRID30_REPLAY_CODE_HASHES.items()
+            (p, Artifact(sha, archived_bytes(p, sha)))
+            for p, sha in code_hashes.items()
         ),
     )
 
@@ -395,3 +411,44 @@ def test_grid30_health_preserves_clock_and_date_checks(grid_context, change):
     else:
         kwargs["target_at"] += timedelta(days=1)
     assert not verify_miami_source(**kwargs).source_healthy
+
+@pytest.mark.parametrize('mixed_proof', [False, True])
+def test_grid30_rejects_mixed_encoding_closure_even_with_matching_proof(grid_context, mixed_proof):
+    path = 'scripts/positive_ev_miami_half_hour_research.py'
+    changed_code = []
+    for name, source in grid_context.code_originals:
+        if name == path:
+            raw = source.payload
+            raw = raw.replace(b'\r\n', b'\n') if b'\r\n' in raw else raw.replace(b'\n', b'\r\n')
+            source = Artifact(hashlib.sha256(raw).hexdigest(), raw)
+        changed_code.append((name, source))
+    changed = replace(grid_context, code_originals=tuple(changed_code))
+    if mixed_proof:
+        saved = changed.frozen_prediction.decode()
+        saved['prediction']['code_proof']['files'] = [
+            {'path': p, 'sha256': a.sha256} for p, a in changed_code]
+        prediction = artifact(saved)
+        rec = changed.recording_receipt.decode()
+        rec['prediction_sha256'] = prediction.sha256
+        changed = replace(changed, frozen_prediction=prediction, recording_receipt=artifact(rec))
+    inputs, evidence = grid_candidate(changed)
+    assert not evidence.verified(inputs)
+
+
+def test_grid30_rejects_other_complete_profile_proof(grid_context):
+    from kalshi_predictor.overnight_paper.miami_source_gate import (
+        GRID30_LF_REPLAY_CODE_HASHES,
+        GRID30_REPLAY_CODE_HASHES,
+    )
+    current = {p: a.sha256 for p, a in grid_context.code_originals}
+    other = (GRID30_REPLAY_CODE_HASHES if current == GRID30_LF_REPLAY_CODE_HASHES
+             else GRID30_LF_REPLAY_CODE_HASHES)
+    saved = grid_context.frozen_prediction.decode()
+    saved['prediction']['code_proof']['files'] = [
+        {'path': p, 'sha256': sha} for p, sha in other.items()]
+    prediction = artifact(saved)
+    rec = grid_context.recording_receipt.decode()
+    rec['prediction_sha256'] = prediction.sha256
+    changed = replace(grid_context, frozen_prediction=prediction, recording_receipt=artifact(rec))
+    inputs, evidence = grid_candidate(changed)
+    assert not evidence.verified(inputs)
