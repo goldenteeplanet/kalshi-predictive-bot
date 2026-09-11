@@ -69,6 +69,13 @@ def series_metadata(series_id: str) -> BLSSeriesMetadata:
 class BLSError(RuntimeError):
     """Fixed code without original HTTP exceptions or response messages."""
 
+    def __init__(self, code: str, *, http_status: int | None = None):
+        super().__init__(code)
+        # Retain only a bounded numeric status, never response/request objects.
+        self.http_status = (
+            http_status if type(http_status) is int and 100 <= http_status <= 599 else None
+        )
+
 
 @dataclass(frozen=True)
 class BLSOriginal:
@@ -244,7 +251,7 @@ class BLSResearchClient:
                             403: "ACCESS_DENIED",
                             429: "RATE_OR_QUOTA_LIMITED",
                         }.get(status, "HTTP_FAILURE")
-                        raise BLSError("BLS_" + code)
+                        raise BLSError("BLS_" + code, http_status=status)
                     if response.headers.get("content-encoding", "identity").lower() != "identity":
                         raise BLSError("BLS_ENCODING_REJECTED")
                     content_type = response.headers.get("content-type", "").split(";")[0]

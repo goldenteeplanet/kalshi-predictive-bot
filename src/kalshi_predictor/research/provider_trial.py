@@ -178,6 +178,8 @@ def capture(provider: str, key_file: Path, output: Path, *, limit: int = 5) -> d
             }
     except (OddpoolError, UnusualWhalesError, SynopticError, FREDError, BLSError) as exc:
         result.update(state="PROVIDER_ERROR", error_code=str(exc))
+        if isinstance(exc, BLSError):
+            result["http_status"] = exc.http_status
     result["completed_at"] = datetime.now(UTC).isoformat()
     encoded = json.dumps(result, indent=2, ensure_ascii=False)
     if key in encoded or (original is not None and key.encode() in original.payload):

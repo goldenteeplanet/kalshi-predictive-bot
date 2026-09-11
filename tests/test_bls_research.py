@@ -11,6 +11,40 @@ KEY = "a" * 32
 ARGS = {"series_id": "CUUR0000SA0", "year": 2025}
 
 
+@pytest.mark.parametrize("status", [403, 429, 500, 503])
+def test_numeric_failure_status_without_response_or_retry(status):
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(status, text=KEY)
+
+    with BLSResearchClient(KEY, request_budget=1, transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(BLSError) as failure:
+            client.observations(**ARGS)
+        assert failure.value.http_status == status
+        assert vars(failure.value) == {"http_status": status}
+        assert KEY not in repr(failure.value)
+        assert failure.value.__context__ is None
+        with pytest.raises(BLSError):
+            client.observations(**ARGS)
+        assert len(calls) == 1
+
+
+def test_no_status_invented_for_transport_or_format_failure():
+    assert BLSError("BLS_KEY_FORMAT_INVALID").http_status is None
+
+    def handler(request):
+        raise httpx.ConnectError(KEY, request=request)
+
+    with BLSResearchClient(KEY, request_budget=1, transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(BLSError, match="BLS_TRANSPORT_FAILED") as failure:
+            client.observations(**ARGS)
+        assert failure.value.http_status is None
+        assert failure.value.__context__ is None
+        assert KEY not in repr(failure.value)
+
+
 def payload(value="123.0001"):
     return {
         "status": "REQUEST_SUCCEEDED",

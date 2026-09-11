@@ -9,6 +9,39 @@ from kalshi_predictor.research.bls import BLSResearchClient
 from kalshi_predictor.research.oddpool import OddpoolResearchClient
 
 
+@pytest.mark.parametrize("status", [503, None])
+def test_bls_failure_summary_preserves_only_safe_status(tmp_path, monkeypatch, status):
+    secret = "a" * 32
+    key_file = tmp_path / "key.txt"
+    key_file.write_text(secret)
+    calls = []
+
+    def serve(request):
+        calls.append(request)
+        if status is None:
+            raise httpx.ConnectError(secret, request=request)
+        return httpx.Response(status, text=secret + " private provider detail")
+
+    monkeypatch.setattr(
+        provider_trial,
+        "BLSResearchClient",
+        partial(BLSResearchClient, transport=httpx.MockTransport(serve)),
+    )
+    output = tmp_path / "captures"
+    result = provider_trial.capture("bls", key_file, output)
+    assert result["state"] == "PROVIDER_ERROR"
+    assert result["http_status"] == status
+    assert result["error_code"] == (
+        "BLS_HTTP_FAILURE" if status == 503 else "BLS_TRANSPORT_FAILED"
+    )
+    assert len(calls) == 1
+    assert not list(output.glob("*.original.json"))
+    stored = json.loads(next(output.glob("*.summary.json")).read_text())
+    assert stored["http_status"] == status
+    assert secret not in json.dumps(stored)
+    assert "private provider detail" not in json.dumps(stored)
+
+
 def test_capture_archives_original_and_keeps_key_out_of_outputs(tmp_path, monkeypatch):
     secret = "x" * 32  # Deliberately dummy credential, used only with MockTransport.
     key_file = tmp_path / "key.txt"
