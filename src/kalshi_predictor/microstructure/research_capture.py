@@ -1,6 +1,6 @@
-"""Fixed public capture of a market-only ensemble and microstructure challenger.
+"""Fixed book capture with optional supplied independent crypto price history.
 
-An isolated research protocol, not production replay or independent alpha.
+An isolated unqualified research protocol; the market ensemble stays market-only.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ from kalshi_predictor.crypto.research_provenance import (
     freeze_prediction,
     verify_unchanged,
 )
+from kalshi_predictor.crypto.shared_capture import SharedCryptoInputs
 from kalshi_predictor.data.repositories import insert_forecast, insert_market_snapshot
 from kalshi_predictor.data.schema import (
     Base,
@@ -36,6 +37,7 @@ from kalshi_predictor.data.schema import (
     MicrostructureFeature,
     ModelWeight,
 )
+from kalshi_predictor.forecasting.crypto_v3_independent import forecast_independent
 from kalshi_predictor.forecasting.ensemble_v2 import EnsembleV2Forecaster
 from kalshi_predictor.forecasting.microstructure_v1 import MicrostructureV1Forecaster
 from kalshi_predictor.forecasting.registry_helpers import MarketImpliedSnapshotForecaster
@@ -181,6 +183,7 @@ def run(
     ticker: str,
     *,
     settings: Settings,
+    crypto_inputs: SharedCryptoInputs | None = None,
     get: Callable[[str], tuple[bytes, int]] = acquire,
     clock: Callable[[], datetime] = now,
     monotonic: Callable[[], float] = time.monotonic,
@@ -192,6 +195,8 @@ def run(
         raise ValueError("FIXED_THREE_SAMPLE_PROTOCOL_REQUIRES_CONFIGURED_QUORUM_THREE")
     if settings.microstructure_lookback_minutes < 1:
         raise ValueError("POSITIVE_LOOKBACK_REQUIRED")
+    if crypto_inputs is not None:
+        crypto_inputs.prices(aware(clock()))  # Fail before output creation or acquisition.
     settings = settings.model_copy(deep=True)
     output.mkdir(parents=True, exist_ok=False)
     # freeze_code rejects dirty dependencies. No request before reviewed/committed source.
@@ -225,15 +230,51 @@ def run(
         "isolated_weights": "EMPTY_BY_PROTOCOL_NOT_PRODUCTION_ABSENCE",
         "component_models": ["market_implied_v1"],
         "independent_alpha": False,
+        "independent_forecast_present": crypto_inputs is not None,
         "production_replay": False,
         "release_certified": False,
         "execution_authority": False,
     }
+    if crypto_inputs is not None:
+        protocol["scope"] = "SHARED_CUTOFF_CRYPTO_AND_MARKET_RESEARCH"
     write_new(output / "protocol.json", encoded(protocol))
     artifact_hashes = {
         name: digest((output / name).read_bytes())
         for name in ("protocol.json", "settings.json", "code-proof.json")
     }
+    if crypto_inputs is not None:
+        from dataclasses import asdict
+
+        # Separate extension declares supplied candle provenance and unchanged ensemble.
+        extension = {
+            "schema": "shared-crypto-extension-v1",
+            "target": asdict(crypto_inputs.target),
+            "scope": protocol["scope"],
+            "same_input_cutoff": True,
+            "ensemble_components_unchanged": ["market_implied_v1"],
+            "settlement_alignment": "TERMINAL_PRICE_PROXY_UNVERIFIED",
+            "v2_status": "UNAVAILABLE_COMPATIBLE_CF_FEATURES_AND_LINK_LINEAGE",
+        }
+        artifact_hashes["crypto-extension.json"] = write_new(
+            output / "crypto-extension.json", encoded(extension)
+        )
+        for index, original in enumerate(crypto_inputs.originals):
+            name = f"crypto-candles-{index}.json"
+            artifact_hashes[name] = write_new(output / name, original.raw)
+            name += ".receipt.json"
+            artifact_hashes[name] = write_new(
+                output / name,
+                encoded(
+                    {
+                        "url": original.url,
+                        "sha256": original.sha256,
+                        "status": original.status,
+                        "received_at": original.received_at,
+                        "archived_at": aware(clock()),
+                        "clock_authority": "SUPPLIED_LOCAL_RECEIPT",
+                    }
+                ),
+            )
     last_clock = aware(clock())
     started = monotonic()
     target: datetime | None = None
@@ -344,6 +385,8 @@ def run(
                 if fixed_metadata is not None and metadata != fixed_metadata:
                     raise ValueError("CONTRACT_METADATA_CHANGED")
                 fixed_metadata = metadata
+                if crypto_inputs is not None:
+                    crypto_inputs.bind_market(market)
                 close = bound_close_time(market)
                 if target is not None and close != target:
                     raise ValueError("TARGET_METADATA_CHANGED")
@@ -462,6 +505,16 @@ def run(
             )
             if result is None:
                 raise ValueError("STRICT_MICROSTRUCTURE_UNAVAILABLE")
+            independent = None
+            if crypto_inputs is not None:
+                independent = forecast_independent(
+                    crypto_inputs.prices(cutoff), crypto_inputs.target, decision_at=cutoff
+                )
+                independent = {
+                    **independent,
+                    "actual_computed_at": check().isoformat(),
+                    "timing_status": "CUTOFF_REFERENCE_NOT_COMPUTATION_CLOCK",
+                }
             check()
             verify_unchanged(repo, proof)
             if not set(runtime_sources(repo)).issubset({p["path"] for p in proof["files"]}):
@@ -499,7 +552,14 @@ def run(
                     "yes_probability": str(result.yes_probability),
                     "feature_json": result.feature_json,
                 },
+                "shared_crypto": independent,
+                "crypto_v2": {
+                    "model_invoked": False,
+                    "probability": None,
+                    "status": "UNAVAILABLE_COMPATIBLE_CF_FEATURES_AND_LINK_LINEAGE",
+                },
                 "independent_alpha": False,
+                "independent_forecast_present": crypto_inputs is not None,
                 "release_certified": False,
                 "execution_authority": False,
             }
@@ -525,6 +585,7 @@ def run(
                 "prediction_sha256": frozen["prediction_sha256"],
                 "decision_at": frozen["decision_at"],
                 "independent_alpha": False,
+                "independent_forecast_present": crypto_inputs is not None,
                 "production_replay": False,
                 "certified_tournament_n": 0,
                 "execution_authority": False,
