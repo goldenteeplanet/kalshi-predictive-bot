@@ -57,10 +57,10 @@ def safe(path: Path) -> Path:
     return path
 
 
-def read(path: Path) -> bytes:
+def read(path: Path, limit: int = SMALL) -> bytes:
     with safe(path).open("rb") as stream:
-        raw = stream.read(SMALL + 1)
-    if len(raw) > SMALL:
+        raw = stream.read(limit + 1)
+    if len(raw) > limit:
         raise ValueError("ARTIFACT_BOUND")
     return raw
 
@@ -75,8 +75,16 @@ def slot_view(base: Path, control: Path, index: int, registered: dict, now: date
         plan = decode(plan_raw)
         start, end, target = (clock(plan[k]) for k in ("not_before", "not_after", "target_at"))
         result.update(event=plan["event_ticker"], target=plan["target_at"])
-        if not start < end < target or plan["schema"] != "cf-average-prospective-slot-v1":
+        routed = plan["schema"] == "cf-average-prospective-slot-v2"
+        if not start < end < target or plan["schema"] not in {
+            "cf-average-prospective-slot-v1",
+            "cf-average-prospective-slot-v2",
+        }:
             raise ValueError("PROTOCOL")
+        if routed and plan.get("research_route") != "crypto_v3/settlement_average":
+            raise ValueError("EXACT_RESEARCH_ROUTE")
+        if not routed and "research_route" in plan:
+            raise ValueError("LEGACY_ROUTE_CLAIM")
         if safe(capture / "failure.json").exists():
             result["status"] = "FAILED_CAPTURE"
             return result
@@ -124,7 +132,7 @@ def slot_view(base: Path, control: Path, index: int, registered: dict, now: date
         selected = decode(originals["selection.json"])["selected"]
         hypotheses = {"LEFT_CLOSED_RIGHT_OPEN", "LEFT_OPEN_RIGHT_CLOSED"}
         if (
-            pins["schema"] != "cf-shadow-pins-v1"
+            pins["schema"] != ("cf-shadow-pins-v2" if routed else "cf-shadow-pins-v1")
             or pins["event"] != plan["event_ticker"]
             or pins["target"] != plan["target_at"]
             or len(pins["decisions"]) != 4
@@ -137,6 +145,24 @@ def slot_view(base: Path, control: Path, index: int, registered: dict, now: date
             or not start <= clock(receipt["recorded_at"]) <= completed
         ):
             raise ValueError("COHORT_IDENTITY")
+        route_sources = {}
+        proof = {}
+        if routed:
+            from kalshi_predictor.crypto import research_shadow as S
+
+            proof_raw = read(capture / "source.originals.json", 2_000_000)
+            if digest(proof_raw) != files["source.originals.json"]:
+                raise ValueError("ROUTE_SOURCE_MANIFEST")
+            proof = decode(proof_raw)
+            if not S.same(plan["source_sha256"], {k: v["sha256"] for k, v in proof.items()}):
+                raise ValueError("REGISTERED_ROUTE_SOURCE_CLOSURE")
+            for source in proof.values():
+                S.original(source)
+            route_sources = {
+                k.removeprefix("route."): v for k, v in proof.items() if k.startswith("route.")
+            }
+        elif any("route_sha256" in p or "route_completion_sha256" in p for p in pins["decisions"]):
+            raise ValueError("LEGACY_ROUTE_CLAIM")
         journal = safe(capture / "research.db")
         with closing(
             sqlite3.connect(journal.resolve().as_uri() + "?mode=ro", uri=True, timeout=1)
@@ -174,7 +200,8 @@ def slot_view(base: Path, control: Path, index: int, registered: dict, now: date
                     or c[1] != pin["completion_sha256"]
                 ):
                     raise ValueError("JOURNAL_HASH")
-                decision, committed = decode(item[0])["decision"], decode(c[0])
+                stored, committed = decode(item[0]), decode(c[0])
+                decision = stored["decision"]
                 if (
                     decision["decision_id"] != pin["decision_id"]
                     or decision["event"] != pins["event"]
@@ -193,6 +220,44 @@ def slot_view(base: Path, control: Path, index: int, registered: dict, now: date
                     or decision["execution_authority"] is not False
                 ):
                     raise ValueError("DECISION_BINDING")
+                route_fields = {}
+                if routed:
+                    from kalshi_predictor.forecasting.crypto_average_shadow_route import (
+                        validate_route_receipt,
+                    )
+
+                    identity = pin["decision_id"]
+                    if len(identity) != 64 or any(c not in "0123456789abcdef" for c in identity):
+                        raise ValueError("ROUTE_IDENTITY")
+                    writer_sources = stored["source_originals"]
+                    if not writer_sources or any(
+                        not S.same(source, proof.get(name))
+                        for name, source in writer_sources.items()
+                    ):
+                        raise ValueError("WRITER_SOURCE_NOT_PLANNED")
+                    route_raw = read(capture / f"route-{identity}.json")
+                    route_completion = read(capture / f"route_completion-{identity}.json")
+                    if (
+                        digest(route_raw) != pin["route_sha256"]
+                        or digest(route_raw) != files[f"route-{identity}.json"]
+                        or digest(route_completion) != pin["route_completion_sha256"]
+                        or digest(route_completion) != files[f"route_completion-{identity}.json"]
+                    ):
+                        raise ValueError("ROUTE_PIN_BINDING")
+                    linked = validate_route_receipt(
+                        route_raw,
+                        route_completion,
+                        decision=dict(decision, journal_completion=committed),
+                        payload_sha=item[1],
+                        completion_sha=c[1],
+                        source_originals=route_sources,
+                        as_of=completed,
+                    )
+                    if clock(linked["route_receipt"]["invoked_at"]) < start:
+                        raise ValueError("ROUTE_PRECEDES_PLAN")
+                    route_fields = dict(
+                        research_route=linked["route"], route_sha256=pin["route_sha256"]
+                    )
                 p = decision["forecast"]["probability"]
                 if type(p) not in (int, float) or not math.isfinite(p) or not 0 <= p <= 1:
                     raise ValueError("PROBABILITY")
@@ -207,6 +272,7 @@ def slot_view(base: Path, control: Path, index: int, registered: dict, now: date
                         quotes=decision.get("rows"),
                         decision_id=pin["decision_id"],
                         recorded_at=committed["original_committed_before"],
+                        **route_fields,
                     )
                 )
         if (capture / "failure.json").exists():
@@ -281,6 +347,8 @@ def render_cohort(report: dict) -> str:
                 )
             body += "descriptive only; no calibration or promotion.</p>"
         for row in slot["rows"]:
+            if "research_route" in row:
+                body += f"<p>Verified research route: {text(row['research_route'])}</p>"
             body += (
                 f"<p>{text(row['ticker'])} Â· {text(row['hypothesis'])} Â· P(YES) "
                 f"{text(row['probability'])} Â· durable {text(row['recorded_at'])}</p>"
