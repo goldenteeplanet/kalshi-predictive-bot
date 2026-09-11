@@ -123,6 +123,19 @@ def create_router() -> APIRouter:
                 render_cohort(read_cohort(Path(cohort), Path(control)))
                 + "<section id='research-snapshot'>",
             )
+        event_root = os.environ.get("POSITIVE_EV_ROUTED_EVENT_ROOT")
+        event_control = os.environ.get("POSITIVE_EV_ROUTED_EVENT_CONTROL_ROOT")
+        if event_root and event_control:
+            from kalshi_predictor.ui.routed_single_event import (
+                read_single_event,
+                render_single_event,
+            )
+
+            html = html.replace(
+                "<section id='research-snapshot'>",
+                render_single_event(read_single_event(Path(event_root), Path(event_control)))
+                + "<section id='research-snapshot'>",
+            )
         return HTMLResponse(html)
 
     return router
