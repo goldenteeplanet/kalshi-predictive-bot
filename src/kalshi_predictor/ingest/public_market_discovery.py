@@ -6,8 +6,10 @@ import re
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from itertools import zip_longest
+from types import SimpleNamespace
 from urllib.parse import urlencode
 
+from kalshi_predictor.config import get_settings
 from kalshi_predictor.ingest.public_book_stage import (
     BASE,
     LIMIT,
@@ -17,10 +19,12 @@ from kalshi_predictor.ingest.public_book_stage import (
     stage_public_books,
     write,
 )
+from kalshi_predictor.opportunities.window_eligibility import current_market_window_status
 
 
-def eligible_tickers(markets, series, *, as_of):
+def eligible_tickers(markets, series, *, as_of, settings=None, excluded_windows=None):
     """Prioritize near-midpoint quotes inside the earliest upcoming close window."""
+    settings = settings if settings is not None else get_settings()
     ranked = []
     for market in markets:
         try:
@@ -34,6 +38,28 @@ def eligible_tickers(markets, series, *, as_of):
                 or not as_of < close <= as_of + timedelta(hours=72)
             ):
                 continue
+            window = current_market_window_status(
+                SimpleNamespace(
+                    **{
+                        key: market.get(key)
+                        for key in (
+                            "ticker",
+                            "status",
+                            "close_time",
+                            "expected_expiration_time",
+                            "expiration_time",
+                            "settlement_ts",
+                            "result",
+                        )
+                    }
+                ),
+                settings=settings,
+                now=as_of,
+            )
+            if not window["current_window_eligible"]:
+                if excluded_windows is not None:
+                    excluded_windows.append(dict(ticker=ticker, **window))
+                continue
             distance = Decimal(2)
             bid = Decimal(str(market.get("yes_bid_dollars")))
             ask = Decimal(str(market.get("yes_ask_dollars")))
@@ -45,12 +71,15 @@ def eligible_tickers(markets, series, *, as_of):
     return list(dict.fromkeys(ticker for _, _, ticker in sorted(ranked)))
 
 
-def discover_and_stage(*, series, staging_dir, evidence_dir, get=public_get, clock=now):
+def discover_and_stage(
+    *, series, staging_dir, evidence_dir, get=public_get, clock=now, settings=None
+):
     families = list(dict.fromkeys(series))
     if not 1 <= len(families) <= 6 or any(
         not isinstance(s, str) or not re.fullmatch(r"[A-Z0-9]{1,40}", s) for s in families
     ):
         raise ValueError("BOUNDED_SERIES_REQUIRED")
+    settings = settings if settings is not None else get_settings()
     evidence_dir.mkdir(parents=True, exist_ok=False)
     write(
         evidence_dir / "reservation.json",
@@ -62,6 +91,7 @@ def discover_and_stage(*, series, staging_dir, evidence_dir, get=public_get, clo
                 max_catalog_rows=100 * len(families),
                 max_selected=6,
                 retry=False,
+                minimum_minutes_to_close=str(settings.opportunity_min_time_to_close_minutes),
             )
         ),
     )
@@ -96,9 +126,24 @@ def discover_and_stage(*, series, staging_dir, evidence_dir, get=public_get, clo
             markets = catalog["markets"]
             if not isinstance(markets, list) or len(markets) > 100:
                 raise ValueError("CATALOG_ROW_CAP")
-            pools.append(eligible_tickers(markets, family, as_of=received))
+            excluded_windows = []
+            pools.append(
+                eligible_tickers(
+                    markets,
+                    family,
+                    as_of=received,
+                    settings=settings,
+                    excluded_windows=excluded_windows,
+                )
+            )
             catalogs.append(
-                dict(series=family, rows=len(markets), partial=bool(catalog.get("cursor")))
+                dict(
+                    series=family,
+                    rows=len(markets),
+                    partial=bool(catalog.get("cursor")),
+                    selection_as_of=received.isoformat(),
+                    excluded_windows=excluded_windows,
+                )
             )
         except (OSError, ValueError, KeyError, TypeError) as exc:
             errors.append(dict(series=family, error=type(exc).__name__))

@@ -1,11 +1,62 @@
 import json
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
 from kalshi_predictor.ingest import public_market_discovery as discovery
 
 NOW = datetime(2026, 9, 11, 12, tzinfo=UTC)
+
+
+def test_entry_cutoff_excludes_exact_boundary_and_uses_configured_value():
+    rows = [market("KXTEMP-NEAR", hours=0.5), market("KXTEMP-NEXT", hours=1)]
+    excluded = []
+    settings = SimpleNamespace(opportunity_min_time_to_close_minutes=Decimal("30"))
+    assert discovery.eligible_tickers(
+        rows, "KXTEMP", as_of=NOW, settings=settings, excluded_windows=excluded
+    ) == ["KXTEMP-NEXT"]
+    assert excluded[0]["window_status"] == "MARKET_CLOSE_TOO_NEAR"
+    assert excluded[0]["final_entry_cutoff_time"] == NOW.isoformat()
+    assert discovery.eligible_tickers(
+        rows, "KXTEMP", as_of=NOW - timedelta(microseconds=1), settings=settings
+    ) == ["KXTEMP-NEAR", "KXTEMP-NEXT"]
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("result", "yes"),
+        ("settlement_ts", NOW.isoformat()),
+        ("expected_expiration_time", NOW.isoformat()),
+        ("expiration_time", NOW.isoformat()),
+    ],
+)
+def test_open_status_does_not_override_terminal_or_expired_evidence(field, value):
+    row = market("KXTEMP-A")
+    row[field] = value
+    assert discovery.eligible_tickers([row], "KXTEMP", as_of=NOW) == []
+
+
+def test_near_close_catalog_does_not_spend_book_requests(tmp_path):
+    calls = []
+
+    def get(url):
+        calls.append(url)
+        return json.dumps(dict(markets=[market("KXTEMP-A", hours=0.25)])).encode(), 200
+
+    result = discovery.discover_and_stage(
+        series=["KXTEMP"],
+        staging_dir=tmp_path / "stage",
+        evidence_dir=tmp_path / "out",
+        get=get,
+        clock=lambda: NOW,
+        settings=SimpleNamespace(opportunity_min_time_to_close_minutes=Decimal("30")),
+    )
+    assert len(calls) == result["requests"] == 1
+    assert result["selected"] == []
+    assert result["catalogs"][0]["excluded_windows"][0]["window_status"] == "MARKET_CLOSE_TOO_NEAR"
 
 
 def market(ticker, *, bid="0.45", ask="0.55", hours=1):
@@ -98,8 +149,11 @@ def test_watch_discovery_does_not_read_absent_ranking_manifest(tmp_path, monkeyp
 
     monkeypatch.setattr(public_book_watch, "discover_and_stage", discover)
     public_book_watch.run(
-        manifest=None, staging_dir=tmp_path / "stage", output=tmp_path / "watch",
-        cycles=1, discovery_series=["KXTEMP"],
+        manifest=None,
+        staging_dir=tmp_path / "stage",
+        output=tmp_path / "watch",
+        cycles=1,
+        discovery_series=["KXTEMP"],
     )
     assert calls == [["KXTEMP"]]
     assert json.loads((tmp_path / "watch" / "terminal.json").read_text())["status"] == "TERMINAL"
