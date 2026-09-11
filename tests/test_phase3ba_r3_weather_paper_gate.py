@@ -13,6 +13,21 @@ from kalshi_predictor.cli import app
 from kalshi_predictor.opportunities.market_identity import BUILT_FROM_EXACT_CATALOG, VERIFIED
 
 
+def test_summary_retains_exact_catalog_blocker_instead_of_claiming_ready():
+    rows = [{"first_blocker": "LINK_EXACT_CATALOG_URL_UNCONFIRMED"}] * 10
+    assert phase3ba_r3._first_hard_blocker(rows) == "LINK_EXACT_CATALOG_URL_UNCONFIRMED"
+
+
+def test_summary_preserves_future_blocker_codes_and_known_priority():
+    unknown = {"first_blocker": "NEW_SOURCE_IDENTITY_FAILURE"}
+    ready = {"first_blocker": "PAPER_READY"}
+    assert phase3ba_r3._first_hard_blocker([ready, unknown]) == "NEW_SOURCE_IDENTITY_FAILURE"
+    assert phase3ba_r3._first_hard_blocker(
+        [unknown, {"first_blocker": "SNAPSHOT_STALE"}]
+    ) == "SNAPSHOT_STALE"
+    assert phase3ba_r3._first_hard_blocker([ready]) == "PAPER_READY"
+
+
 def _base_row() -> dict:
     return {
         "current_window_eligible": True,

@@ -71,6 +71,7 @@ WEATHER_PAPER_BLOCKERS = (
     "MARKET_WINDOW_INELIGIBLE",
     "RAIN_HORIZON_INCOMPLETE",
     "LINK_UNVERIFIED",
+    "LINK_EXACT_CATALOG_URL_UNCONFIRMED",
     "SNAPSHOT_MISSING",
     "SOURCE_MISSING",
     "MARKET_SOURCE_MISSING",
@@ -1025,6 +1026,10 @@ def _first_hard_blocker(rows: list[dict[str, Any]]) -> str:
     for blocker in WEATHER_PAPER_BLOCKERS:
         if blocker != "PAPER_READY" and any(row["first_blocker"] == blocker for row in rows):
             return blocker
+    # New diagnostic codes must remain blockers even before a priority is assigned.
+    for row in rows:
+        if row["first_blocker"] != "PAPER_READY":
+            return row["first_blocker"]
     return "PAPER_READY"
 
 
