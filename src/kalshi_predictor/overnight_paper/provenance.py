@@ -383,7 +383,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "cb5a7fcfb8ffe943a29415d4474bcca6e883876c2a2d0eb679790a303cdf57b5"
     ),
     "kalshi_predictor.overnight_paper.qualification": (
-        "6a23eb6a174b4d824557845d925792176ca006ac4fdab1a563136ccdf0785640"
+        "37067002202fa235cf45afa5b66afaa76fd855172bc7b97ec59ac83f0618661d"
     ),
     "kalshi_predictor.overnight_paper.release_typing": (
         "e0c737e8a2f3e79ab4f64f78d2b2305be7ffbc638c7433022ed2a143c6db08cb"
@@ -413,7 +413,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "2db9a1acecaf976efd4188abb2a38ae679f766ffae3df4c40f65bebbf6171a2d"
     ),
     "kalshi_predictor.paper.fees": (
-        "80ea757283fe2e7b54bdfb282155d13f8e08a95cdab5e5e9b6cfee7bad4aa2fa"
+        "c0cad33398804e68f83a5ac1ff2cbe5bb0b769bcd5765a3296b81b6d0eddaf8a"
     ),
     "kalshi_predictor.paper.ledger": (
         "4bf8db1f301c1f3ace3bf7baa535c5f3dd0a08c17474da3761f91837eeee1ff9"

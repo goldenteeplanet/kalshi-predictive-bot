@@ -123,16 +123,16 @@ class GateEvidence:
         # by choosing a verifier name or filling an attestation with PASS strings.
         expected_verifier = SEMANTIC_VERIFIERS.get(self.gate)
         if self.gate == 4 and self.category == "Crypto":
-            from .crypto_source import VERIFIER
+            from .crypto_source import VERIFIER as CRYPTO_VERIFIER
 
-            expected_verifier = VERIFIER
+            expected_verifier = CRYPTO_VERIFIER
         if (
             self.gate == 4 and self.category == "Climate and Weather"
             and inputs.get("series") == "KXTEMPMIAH"
         ):
-            from .miami_source_gate import VERIFIER
+            from .miami_source_gate import VERIFIER as MIAMI_VERIFIER
 
-            expected_verifier = VERIFIER
+            expected_verifier = MIAMI_VERIFIER
         if expected_verifier != self.verifier:
             return False
         if decision_fingerprint(inputs) != self.decision_id:
