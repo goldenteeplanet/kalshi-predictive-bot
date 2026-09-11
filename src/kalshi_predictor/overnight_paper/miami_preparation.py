@@ -562,7 +562,10 @@ def verify_miami_preparation_handoff(
         json.loads(persisted["snapshot_id"].raw_orderbook_json)
     ) != canonical_hash(_decode(result.orderbook.artifact)):
         raise ValueError("MIAMI_HANDOFF_SNAPSHOT_CHANGED")
-    for name, value in (("sizing", engines.phase3m), ("risk", engines.phase3n)):
+    engine_records: tuple[tuple[str, PositionSizingDecision | AdvancedRiskDecision], ...] = (
+        ("sizing", engines.phase3m), ("risk", engines.phase3n)
+    )
+    for name, value in engine_records:
         expected = value.as_dict()
         stored = json.loads(persisted[name + "_id"].raw_json)
         if (
