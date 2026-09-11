@@ -13,6 +13,51 @@ from kalshi_predictor.paper import fees
 NOW = datetime(2026, 9, 9, 12, tzinfo=UTC)
 
 
+def test_reviewed_0450_renewal_preserves_historical_policy_identity():
+    old, renewed = fees.CERTIFIED_FEE_POLICIES
+    assert old.version == "b5b74a7948384c1a6275a411eba52c37e6fb4608d10a1204b0f6f36def69cea9"
+    assert renewed.version == "cf8a8559cc8598265bb7cec0d9c78ddf9945763a5f4ba324fbb18513fbeab8fb"
+    assert renewed.policy_id == old.policy_id + "-0450"
+    assert renewed.effective_from == "2026-09-11T04:50:00+00:00"
+    assert renewed.effective_to == "2026-09-11T05:50:00+00:00"
+    assert datetime.fromisoformat(old.effective_to) < datetime.fromisoformat(renewed.effective_from)
+    assert replace(
+        renewed,
+        policy_id=old.policy_id,
+        effective_from=old.effective_from,
+        effective_to=old.effective_to,
+    ) == old
+    assert replace(renewed, effective_to=old.effective_to).version != renewed.version
+
+
+@pytest.mark.parametrize(
+    "index, at, window_valid",
+    [
+        (0, "2026-09-11T03:35:00+00:00", True),
+        (0, "2026-09-11T04:23:28.844889+00:00", False),
+        (0, "2026-09-11T04:50:00+00:00", False),
+        (1, "2026-09-11T04:49:59.999999+00:00", False),
+        (1, "2026-09-11T04:50:00+00:00", True),
+        (1, "2026-09-11T05:49:59.999999+00:00", True),
+        (1, "2026-09-11T05:50:00+00:00", False),
+    ],
+)
+def test_registered_policy_windows_do_not_bypass_original_evidence(index, at, window_valid):
+    # The actual registry resolves the version/window, then still requires originals.
+    # No fabricated authoritative document bytes or successful fee quote are supplied.
+    evidence = {"policy_version": fees.CERTIFIED_FEE_POLICIES[index].version, "documents": []}
+    error = "FEE_ORIGINAL_DOCUMENTS_REQUIRED" if window_valid else "FEE_POLICY_NOT_EFFECTIVE"
+    with pytest.raises(ValueError, match=error):
+        fees.build_fee_quote(
+            evidence=evidence,
+            ticker="KXTEMPMIAH-RESEARCH",
+            side="BUY_YES",
+            price=Decimal(".30"),
+            simulator_floor=Decimal("0"),
+            now=datetime.fromisoformat(at),
+        )
+
+
 def synthetic_evidence(monkeypatch, now=NOW, ticker="M"):
     original = b"SYNTHETIC reviewed rate .07, no settlement fee; not official evidence"
     sha = hashlib.sha256(original).hexdigest()

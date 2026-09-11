@@ -120,6 +120,27 @@ CERTIFIED_FEE_POLICIES: tuple[CertifiedFeePolicy, ...] = (
         event_schema_document_sha256=EVENT_DATA_SCHEMA_SHA256,
         permitted_series=("KXBTC", "KXTEMPMIAH"),
     ),
+    # Separately reviewed renewal; historical policy and identity remain unchanged.
+    CertifiedFeePolicy(
+        policy_id="kxbtc-kxtempmiah-exchange-only-single-buy-20260911-0450",
+        effective_from="2026-09-11T04:50:00+00:00",
+        effective_to="2026-09-11T05:50:00+00:00",
+        taker_rate="0.07",
+        documents=(
+            ("https://kalshi.com/docs/kalshi-fee-schedule.pdf",
+             "c326a69f596a11e8f8be2620402d39a8d4823920c21cc97c93a114d862699601"),
+            (ROUNDING_URL,
+             "6b509a24b136624756bd16d74586f04c3e603ca26544ea28ceb9533afda55608"),
+            (EVENT_SCHEMA_URL, EVENT_DATA_SCHEMA_SHA256),
+        ),
+        rate_document_sha256="c326a69f596a11e8f8be2620402d39a8d4823920c21cc97c93a114d862699601",
+        rounding_document_sha256="6b509a24b136624756bd16d74586f04c3e603ca26544ea28ceb9533afda55608",
+        settlement_document_sha256="c326a69f596a11e8f8be2620402d39a8d4823920c21cc97c93a114d862699601",
+        settlement_fee="0",
+        event_override_interpretation=OPTIONAL_EVENT_OVERRIDE_PROFILE,
+        event_schema_document_sha256=EVENT_DATA_SCHEMA_SHA256,
+        permitted_series=("KXBTC", "KXTEMPMIAH"),
+    ),
 )
 
 

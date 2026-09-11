@@ -424,7 +424,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "a57e3590fd14d7e73bfa993b910ba39924df24ce833422fefafe47e4312184c0"
     ),
     "kalshi_predictor.paper.fees": (
-        "39a36fede7405a5a687bddd2f5594eb53c687c7524e2845e9c6db758440d4569"
+        "349f9c27cdd06cf393414dcfe32befc34d2708569eb2597189a9e259bf090500"
     ),
     "kalshi_predictor.paper.ledger": (
         "4bf8db1f301c1f3ace3bf7baa535c5f3dd0a08c17474da3761f91837eeee1ff9"
