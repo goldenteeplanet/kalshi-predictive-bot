@@ -239,3 +239,62 @@ def test_book_provenance_rejects_port_userinfo_or_fragment(url):
     args["orderbook_url"] = url
     with pytest.raises(ValueError, match="REQUEST_IDENTITY"):
         capture_named_baselines(**args)
+
+
+@pytest.mark.parametrize(
+    "bid,ask,last,label,p,eligible",
+    [
+        ("0", "1", ".2", "LISTING_FULL_RANGE", 0.5, False),
+        (".49", ".51", ".2", "LISTING_TWO_SIDED", 0.5, True),
+        (".8", ".2", ".2", "LISTING_CROSSED", 0.5, False),
+        (None, ".2", ".3", "LAST_TRADE_AGE_UNVERIFIED", 0.3, False),
+        (None, None, None, "NO_BASELINE_PROBABILITY", None, False),
+    ],
+)
+def test_quality_preserves_actual_probability(bid, ask, last, label, p, eligible):
+    args = arguments()
+    args["market_original"], args["market_sha256"] = encoded(
+        dict(
+            markets=[
+                dict(
+                    ticker=TICKER, yes_bid_dollars=bid, yes_ask_dollars=ask, last_price_dollars=last
+                )
+            ]
+        )
+    )
+    baseline = capture_named_baselines(**args)["market_implied_v1"]
+    assert baseline["probability"] == p
+    assert baseline["quote_quality"]["label"] == label
+    assert baseline["quote_quality"]["nonvacuous_midpoint_comparison_eligible"] is eligible
+    assert not baseline["quote_quality"]["book_midpoint_comparison_eligible"]
+    assert not baseline["execution_liquidity_verified"]
+
+
+def test_one_sided_book_keeps_listing_fallback_distinct():
+    args = arguments(book=True)
+    args["orderbook_original"], args["orderbook_sha256"] = encoded(
+        {"orderbook_fp": {"yes_dollars": [[".4", "2"]], "no_dollars": []}}
+    )
+    baseline = capture_named_baselines(**args)["market_implied_v1"]
+    assert baseline["probability"] == 0.25
+    assert baseline["quote_quality"]["book_state"] == "ONE_SIDED"
+    assert baseline["quote_quality"]["label"] == "LISTING_TWO_SIDED"
+    assert not baseline["quote_quality"]["book_midpoint_comparison_eligible"]
+
+
+def test_actual_book_midpoint_quality_does_not_authorize_execution():
+    baseline = capture_named_baselines(**arguments(book=True))["market_implied_v1"]
+    assert baseline["quote_quality"]["book_midpoint_comparison_eligible"]
+    assert baseline["quote_quality"]["label"] == "BOOK_TWO_SIDED"
+    assert not baseline["quote_quality"]["execution_liquidity_verified"]
+
+
+def test_zero_quantity_book_does_not_enter_meaningful_quote_subset():
+    args = arguments(book=True)
+    args["orderbook_original"], args["orderbook_sha256"] = encoded(
+        {"orderbook_fp": {"yes_dollars": [[".4", "0"]], "no_dollars": [[".5", "3"]]}}
+    )
+    baseline = capture_named_baselines(**args)["market_implied_v1"]
+    assert baseline["probability"] == 0.45
+    assert baseline["quote_quality"]["label"] == "BOOK_TWO_SIDED_DEPTH_UNVERIFIED"
+    assert not baseline["quote_quality"]["book_midpoint_comparison_eligible"]

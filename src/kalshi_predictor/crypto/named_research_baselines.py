@@ -6,13 +6,14 @@ import hashlib
 import json
 from collections.abc import Sequence
 from datetime import datetime
-from decimal import InvalidOperation
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import urlparse
 
 from kalshi_predictor.forecasting.base import ForecastInput
 from kalshi_predictor.forecasting.market_implied import MarketImpliedForecaster
 from kalshi_predictor.ingest.public_market_discovery import event_markets
+from kalshi_predictor.kalshi.orderbook import parse_orderbook, usable_bid_ask_book
 
 BASELINE_MODULES = (
     "kalshi_predictor.crypto.named_research_baselines",
@@ -52,6 +53,78 @@ def _original(raw: bytes, digest: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError("BASELINE_ORIGINAL_OBJECT_REQUIRED")
     return parsed
+
+
+def _quote_pair(bid: Any, ask: Any) -> str:
+    values = []
+    for value in (bid, ask):
+        if value is None:
+            values.append(None)
+            continue
+        try:
+            number = Decimal(str(value))
+        except InvalidOperation:
+            return "INVALID"
+        if not number.is_finite() or not 0 <= number <= 1:
+            return "INVALID"
+        values.append(number)
+    bid, ask = values
+    if bid is None and ask is None:
+        return "MISSING"
+    if bid is None or ask is None:
+        return "ONE_SIDED"
+    if bid > ask:
+        return "CROSSED"
+    if bid == 0 and ask == 1:
+        return "FULL_RANGE"
+    return "TWO_SIDED"
+
+
+def baseline_quote_quality(market: dict, book: dict | None, source: str | None) -> dict:
+    """Label evidence without changing the actual named-model probability.
+
+    Eligibility concerns a prospective comparison subset only, never execution.
+    Last-trade age cannot be inferred from an HTTP receipt timestamp.
+    """
+    prices = parse_orderbook(book)
+    depth = usable_bid_ask_book(book, side="YES")
+    positive_depth = (
+        depth.bid_price == prices.best_yes_bid
+        and depth.ask_price == prices.best_yes_ask
+        and depth.bid_depth is not None
+        and depth.ask_depth is not None
+        and depth.bid_depth > 0
+        and depth.ask_depth > 0
+    )
+    listing_state = _quote_pair(market.get("yes_bid_dollars"), market.get("yes_ask_dollars"))
+    book_state = (
+        _quote_pair(prices.best_yes_bid, prices.best_yes_ask)
+        if book is not None
+        else "NOT_CAPTURED"
+    )
+    if source == "orderbook_midpoint":
+        label = "BOOK_" + book_state
+        if book_state == "TWO_SIDED" and not positive_depth:
+            label = "BOOK_TWO_SIDED_DEPTH_UNVERIFIED"
+    elif source == "market_quote_midpoint":
+        label = "LISTING_" + listing_state
+    elif source == "last_price":
+        label = "LAST_TRADE_AGE_UNVERIFIED"
+    else:
+        label = "NO_BASELINE_PROBABILITY"
+    return {
+        "schema": "baseline-quote-quality-v1",
+        "label": label,
+        "listing_state": listing_state,
+        "book_state": book_state,
+        "positive_depth_at_baseline_prices": positive_depth,
+        "nonvacuous_midpoint_comparison_eligible": label in {"BOOK_TWO_SIDED", "LISTING_TWO_SIDED"},
+        "book_midpoint_comparison_eligible": label == "BOOK_TWO_SIDED",
+        "execution_liquidity_verified": False,
+        "caveat": (
+            "Quote evidence only; size, freshness, fees and settlement alignment are separate gates"
+        ),
+    }
 
 
 def capture_named_baselines(
@@ -138,6 +211,9 @@ def capture_named_baselines(
         "source": output.feature_json["source"] if output else None,
         "feature_json": output.feature_json if output else {},
         "input_provenance": provenance,
+        "quote_quality": baseline_quote_quality(
+            market, book, output.feature_json["source"] if output else None
+        ),
         "execution_liquidity_verified": False,
         "caveat": "Named baseline can average zero-size listing quotes; not execution evidence",
     }
