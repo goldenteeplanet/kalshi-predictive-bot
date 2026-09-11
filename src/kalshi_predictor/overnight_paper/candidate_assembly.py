@@ -12,10 +12,13 @@ from dataclasses import asdict, replace
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    from .miami_development import DevelopmentRuleBinding
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.kalshi.orderbook import parse_orderbook
@@ -183,7 +186,8 @@ def _assemble_candidate(
     include_evaluation_observation: bool = True,
     model_evaluation_head_sha256: str | None = None,
     miami_session: Session | None = None,
-) -> PreparedCandidate:
+    _development_rule: DevelopmentRuleBinding | None = None,
+) -> PreparedCandidate | Artifact:
     """Preserve preparation identities and construct verifiable original evidence.
 
     The fixed model must already be frozen against these exact credential-free
@@ -320,12 +324,20 @@ def _assemble_candidate(
     event = originals[f"{PUBLIC_BASE}/events/{market['event_ticker']}"][1]["body"]["event"]
     series = originals[f"{PUBLIC_BASE}/series/{event['series_ticker']}"][1]["body"]["series"]
     identity = dict(ticker=paper.ticker, event_id=event["event_ticker"], series=series["ticker"])
-    policies = [
-        item for item in rule_verifier.CERTIFIED_RULE_POLICIES if item.ticker == paper.ticker
-    ]
-    if len(policies) != 1 or not rule_documents:
-        raise ValueError("NO_UNAMBIGUOUS_CERTIFIED_RULE")
-    policy = policies[0]
+    if _development_rule is not None:
+        from .miami_development import DevelopmentRuleBinding
+
+        if not miami or type(_development_rule) is not DevelopmentRuleBinding:
+            raise ValueError("MIAMI_DEVELOPMENT_RULE_TYPE_REQUIRED")
+        _development_rule.validate(identity, market, rule_documents, at)
+        policy: rule_verifier.CertifiedRulePolicy | DevelopmentRuleBinding = _development_rule
+    else:
+        policies = [
+            item for item in rule_verifier.CERTIFIED_RULE_POLICIES if item.ticker == paper.ticker
+        ]
+        if len(policies) != 1 or not rule_documents:
+            raise ValueError("NO_UNAMBIGUOUS_CERTIFIED_RULE")
+        policy = policies[0]
     analytical = [url for url in originals if url.endswith("/forecast/hourly")]
     if not miami and len(analytical) != 1:
         raise ValueError("EXACT_ANALYTICAL_FORECAST_SOURCE_REQUIRED")
@@ -490,12 +502,14 @@ def _assemble_candidate(
     )
     rule_artifact = _artifact(rule_payload)
     observation_at = aware(policy.observation_time)
-    expected = observation_at + timedelta(seconds=policy.expected_settlement_seconds)
-    if policy.review_extension_seconds is None:
-        raise ValueError("RULE_SETTLEMENT_FINALITY_UNBOUNDED")
-    deadline = observation_at + timedelta(
-        seconds=policy.final_settlement_seconds + policy.review_extension_seconds
-    )
+    expected = deadline = None
+    if isinstance(policy, rule_verifier.CertifiedRulePolicy):
+        expected = observation_at + timedelta(seconds=policy.expected_settlement_seconds)
+        if policy.review_extension_seconds is None:
+            raise ValueError("RULE_SETTLEMENT_FINALITY_UNBOUNDED")
+        deadline = observation_at + timedelta(
+            seconds=policy.final_settlement_seconds + policy.review_extension_seconds
+        )
     inputs = (
         identity
         | common_model
@@ -531,9 +545,9 @@ def _assemble_candidate(
             expected_expiration_time=market.get("expected_expiration_time"),
             latest_expiration_time=market.get("latest_expiration_time"),
             final_settlement_time=None,
-            expected_settlement_time=expected.isoformat(),
-            settlement_deadline=deadline.isoformat(),
-            latest_settlement_at=deadline.isoformat(),
+            expected_settlement_time=None if expected is None else expected.isoformat(),
+            settlement_deadline=None if deadline is None else deadline.isoformat(),
+            latest_settlement_at=None if deadline is None else deadline.isoformat(),
             rule_artifact_sha256=rule_artifact.sha256,
             features_artifact_sha256=features.sha256,
             snapshot_book_hash=canonical_hash(book_row["body"]),
@@ -592,6 +606,22 @@ def _assemble_candidate(
     provenance = ProvenanceContext(
         artifacts, tuple(sources), (), model_code, features, code_sha, policy.version
     )
+    if _development_rule is not None:
+        return build_observation(
+            provenance_args=dict(
+                decision=inputs, decision_id=decision_id, context=provenance,
+                now=now, phase3m=sizing, phase3n=risk,
+            ),
+            independent_event_id=identity["event_id"],
+            event_window_start=aware(market["open_time"]),
+            event_window_end=observation_at,
+            rule_artifact=rule_artifact,
+            market_probability=float(baseline),
+            executable_price=float(ev.executable_price),
+            estimated_fee=float(ev.estimated_fee),
+            slippage=float(ev.slippage_allowance),
+            uncertainty=float(ev.uncertainty_buffer),
+        )
     verified_rule = rule_verifier.verify_settlement_rule(
         decision=inputs, documents=rule_documents, registry=rule_verifier.CERTIFIED_RULE_POLICIES
     )
@@ -668,6 +698,7 @@ def _assemble_candidate(
         mode=ExecutionMode.LOCAL_PAPER,
     )
     qualification = qualify_candidate(**args)
+    assert expected is not None and deadline is not None
     shadow = dict(
         ticker=paper.ticker,
         event_ticker=identity["event_id"],
@@ -757,7 +788,7 @@ def assemble_weather_candidate(
 ) -> PreparedCandidate:
     if type(preparation) is not WeatherPreparationResult:
         raise ValueError("COMPLETED_WEATHER_PREPARATION_REQUIRED")
-    return _assemble_candidate(
+    candidate = _assemble_candidate(
         preparation=preparation,
         model=model,
         model_code=model_code,
@@ -770,6 +801,9 @@ def assemble_weather_candidate(
         include_evaluation_observation=include_evaluation_observation,
         model_evaluation_head_sha256=model_evaluation_head_sha256,
     )
+    if type(candidate) is not PreparedCandidate:
+        raise ValueError("ADMISSION_CANDIDATE_REQUIRED")
+    return candidate
 
 
 def assemble_miami_candidate(
@@ -789,7 +823,7 @@ def assemble_miami_candidate(
 ) -> PreparedCandidate:
     if type(preparation) is not MiamiPreparationResult:
         raise ValueError("COMPLETED_MIAMI_PREPARATION_REQUIRED")
-    return _assemble_candidate(
+    candidate = _assemble_candidate(
         preparation=preparation,
         model=model,
         model_code=model_code,
@@ -803,3 +837,6 @@ def assemble_miami_candidate(
         model_evaluation_head_sha256=model_evaluation_head_sha256,
         miami_session=session,
     )
+    if type(candidate) is not PreparedCandidate:
+        raise ValueError("ADMISSION_CANDIDATE_REQUIRED")
+    return candidate

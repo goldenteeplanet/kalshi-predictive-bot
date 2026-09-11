@@ -13,6 +13,7 @@ POLICY_VERSION = "paper-release-typing-v1"
 TYPING_TARGETS: tuple[str, ...] = (
     "src/kalshi_predictor/crypto/research_provenance.py",
     "src/kalshi_predictor/overnight_paper/miami_binding.py",
+    "src/kalshi_predictor/overnight_paper/miami_development.py",
     "src/kalshi_predictor/overnight_paper/miami_driver.py",
     "src/kalshi_predictor/overnight_paper/miami_preparation.py",
     "src/kalshi_predictor/overnight_paper/miami_preparation_runner.py",

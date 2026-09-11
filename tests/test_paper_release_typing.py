@@ -131,10 +131,12 @@ def test_true_full_global_command_remains_supported(evidence):
     changed(release, report).verify()
 
 
-def test_miami_source_change_invalidates_typing_manifest(evidence):
+@pytest.mark.parametrize("filename", ["miami_driver.py", "miami_development.py"])
+def test_miami_source_change_invalidates_typing_manifest(evidence, filename):
     release, _ = evidence
     required = {
         "src/kalshi_predictor/overnight_paper/miami_driver.py",
+        "src/kalshi_predictor/overnight_paper/miami_development.py",
         "src/kalshi_predictor/overnight_paper/miami_storage.py",
         "src/kalshi_predictor/overnight_paper/miami_preparation.py",
         "src/kalshi_predictor/overnight_paper/miami_preparation_runner.py",
@@ -150,7 +152,7 @@ def test_miami_source_change_invalidates_typing_manifest(evidence):
     assert required <= set(release_typing.TYPING_TARGETS)
     assert len(set(release_typing.TYPING_TARGETS)) == len(release_typing.TYPING_TARGETS)
     release.verify()
-    (release.repository / "src/kalshi_predictor/overnight_paper/miami_driver.py").write_text(
+    (release.repository / "src/kalshi_predictor/overnight_paper" / filename).write_text(
         "# changed after typing evidence\n"
     )
     with pytest.raises(ValueError, match="MYPY_REVIEWED_SOURCE_SCOPE"):
