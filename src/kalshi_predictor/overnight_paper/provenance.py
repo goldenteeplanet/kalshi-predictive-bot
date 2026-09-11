@@ -409,7 +409,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "8920989600f7e2d481493336fb5a0d5b8151024c027373e4421bf34f10e6fdf1"
     ),
     "kalshi_predictor.overnight_paper.settlement": (
-        "d7c75859f9cc33c6ba9c56abb9b3bd6fd353d4eeba2967a5bdadb4af9a5e1ff8"
+        "685842985a39912cb3c2ad1a984f7d610d904c39ba1dbe53b991c88de59bc1ea"
     ),
     "kalshi_predictor.overnight_paper.source_health": (
         "2cfcb5a66f158b35d645753748a17fb219e8aa84511fa6cb140319ad5b0872cc"
@@ -421,7 +421,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "4f08a822106e0faf6f7fd6cec05baebe56eea27a5bdbd31928269a3b261d4522"
     ),
     "kalshi_predictor.overnight_paper.watcher": (
-        "2db9a1acecaf976efd4188abb2a38ae679f766ffae3df4c40f65bebbf6171a2d"
+        "a57e3590fd14d7e73bfa993b910ba39924df24ce833422fefafe47e4312184c0"
     ),
     "kalshi_predictor.paper.fees": (
         "c0cad33398804e68f83a5ac1ff2cbe5bb0b769bcd5765a3296b81b6d0eddaf8a"

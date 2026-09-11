@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -56,6 +57,26 @@ FINAL_MARKER = "OVERNIGHT_PUBLIC_FINAL_V1"
 PAPER_MARKER = "OVERNIGHT_PAPER_EVALUATION_V1"
 MAX_DATASET_RECORDS = 10_000
 MAX_DATASET_BYTES = 64 * 1024 * 1024
+
+
+def _public_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("PUBLIC_MARKET_DUPLICATE_JSON_KEY")
+        result[key] = value
+    return result
+
+
+def _public_json_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError("PUBLIC_MARKET_NONFINITE_JSON_NUMBER")
+    return parsed
+
+
+def _public_json_constant(value: str) -> Any:
+    raise ValueError("PUBLIC_MARKET_NONFINITE_JSON_NUMBER:" + value)
 
 
 def _artifact(row: dict[str, Any]) -> Artifact:
@@ -184,7 +205,12 @@ class PublicMarketObservation:
             or (enforce_fresh and (now - self.captured_at).total_seconds() > 60)
         ):
             raise ValueError("PUBLIC_MARKET_RECEIPT_STALE_OR_INVALID")
-        payload = json.loads(self.payload)
+        payload = json.loads(
+            self.payload,
+            object_pairs_hook=_public_json_object,
+            parse_float=_public_json_float,
+            parse_constant=_public_json_constant,
+        )
         market = payload.get("market") if isinstance(payload, dict) else None
         if not isinstance(market, dict) or market.get("ticker") != self.ticker:
             raise ValueError("PUBLIC_MARKET_IDENTITY_MISMATCH")

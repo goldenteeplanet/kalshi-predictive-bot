@@ -3,7 +3,7 @@
 import hashlib
 import json
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -15,6 +15,41 @@ from kalshi_predictor.overnight_paper.watcher import PublicMarketObservation
 
 baseline_template = activation_fixtures.baseline_template
 prepared = activation_fixtures.prepared
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b'{"market":{"ticker":"T","result":"yes","result":"no"}}',
+        b'{"market":{"ticker":"T","is_provisional":true,"is_provisional":false}}',
+        b'{"market":{"ticker":"WRONG"},"market":{"ticker":"T"}}',
+        b'{"market":{"ticker":"T","nested":{"x":1,"x":2}}}',
+        b'{"market":{"ticker":"T","unused":NaN}}',
+        b'{"market":{"ticker":"T","unused":Infinity}}',
+        b'{"market":{"ticker":"T","unused":-Infinity}}',
+        b'{"market":{"ticker":"T","unused":1e999}}',
+        b'{"market":{"ticker":"T","unused":[-1e999]}}',
+    ],
+)
+def test_original_json_rejects_ambiguous_or_nonfinite_values(raw):
+    now = datetime(2026, 9, 11, tzinfo=UTC)
+    source = PublicMarketObservation(
+        "T", "https://external-api.kalshi.com/trade-api/v2/markets/T", now,
+        hashlib.sha256(raw).hexdigest(), raw,
+    )
+    with pytest.raises(ValueError, match="PUBLIC_MARKET_(DUPLICATE|NONFINITE)"):
+        source.market(now=now)
+
+
+def test_strict_original_json_preserves_valid_number_and_raw_receipt():
+    raw = b'{"market":{"ticker":"T","unused":1.25e2,"is_provisional":null}}'
+    now = datetime(2026, 9, 11, tzinfo=UTC)
+    source = PublicMarketObservation(
+        "T", "https://external-api.kalshi.com/trade-api/v2/markets/T", now,
+        hashlib.sha256(raw).hexdigest(), raw,
+    )
+    assert source.market(now=now)["unused"] == 125.0
+    assert source.payload == raw and source.sha256 == hashlib.sha256(raw).hexdigest()
 
 
 def observation(prepared, **overrides):
@@ -101,6 +136,8 @@ def test_shadow_only_evaluation_does_not_create_paper_order(prepared):
         dict(event_ticker="OTHER"),
         dict(series_ticker="OTHER"),
         dict(is_provisional=True),
+        dict(is_provisional=1),
+        dict(is_provisional="true"),
         dict(settlement_value_dollars="0.5"),
     ],
 )
@@ -109,6 +146,22 @@ def test_identity_or_finality_conflict_rolls_back(prepared, override):
     with pytest.raises(ValueError):
         run(prepared, observation(prepared, **override))
     assert counts(prepared)["settlements"] == counts(prepared)["paper_pnl"] == 0
+
+
+def test_ambiguous_original_result_cannot_write_settlement_or_evaluation(prepared):
+    activation.activate_local_paper(**prepared)
+    original = observation(prepared)
+    raw = original.payload.replace(b'"result": "yes"', b'"result": "no", "result": "yes"')
+    assert raw != original.payload
+    ambiguous = replace(original, payload=raw, sha256=hashlib.sha256(raw).hexdigest())
+    before = counts(prepared)
+    with pytest.raises(ValueError, match="PUBLIC_MARKET_DUPLICATE_JSON_KEY"):
+        run(prepared, ambiguous)
+    assert counts(prepared) == before
+    with prepared["session_factory"]() as session:
+        assert session.execute(
+            text("SELECT count(*) FROM overnight_shadow WHERE evaluation_json IS NOT NULL")
+        ).scalar_one() == 0
 
 
 def test_final_correction_requires_review_without_rewriting_pnl(prepared):

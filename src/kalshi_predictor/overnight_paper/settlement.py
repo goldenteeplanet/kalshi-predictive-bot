@@ -18,10 +18,13 @@ def market_lifecycle(ticker: str, market: dict[str, Any], *, now: datetime) -> d
     """
     if market.get("ticker") != ticker:
         raise ValueError("SETTLEMENT_IDENTITY_MISMATCH")
+    provisional = market.get("is_provisional")
+    if provisional is not None and type(provisional) is not bool:
+        raise ValueError("INVALID_PROVISIONAL_FLAG")
     status = market.get("status")
     result: dict[str, Any] = {"ticker": ticker, "state": "AWAITING_SETTLEMENT", "final": None}
     if status == "finalized":
-        if market.get("is_provisional") is True or market.get("result") not in {"yes", "no"}:
+        if provisional is True or market.get("result") not in {"yes", "no"}:
             raise ValueError("FINAL_BINARY_RESULT_REQUIRED")
         try:
             settled_at = aware(market["settlement_ts"])
