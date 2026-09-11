@@ -1,7 +1,7 @@
 """Reviewed fee evidence for new guarded one-contract, buy-to-settlement orders.
 
-No production policy is certified here. Legacy configured fees are not exchange
-certification. Original documents and the rate interpretation require review.
+Local policy review supplies exchange-fee evidence only, never trading authority.
+Legacy configured fees are not exchange certification.
 """
 
 from __future__ import annotations
@@ -61,10 +61,31 @@ class CertifiedFeePolicy:
     interpretation: str = "quadratic-ceil6dp-cent-buy-zero-accumulator-v1"
     event_override_interpretation: str = LEGACY_EVENT_OVERRIDE_PROFILE
     event_schema_document_sha256: str | None = None
+    permitted_series: tuple[str, ...] | None = None
+
+    def __post_init__(self) -> None:
+        scope = self.permitted_series
+        if scope is not None and (
+            type(scope) is not tuple
+            or not scope
+            or any(
+                not isinstance(item, str)
+                or not item
+                or not item.isascii()
+                or not item.isalnum()
+                or item != item.upper()
+                for item in scope
+            )
+            or tuple(sorted(set(scope))) != scope
+        ):
+            raise ValueError("FEE_EXACT_SERIES_SCOPE_REQUIRED")
 
     @property
     def version(self) -> str:
         fields = asdict(self)
+        if self.permitted_series is None:
+            # An absent restriction preserves previously reviewed policy identities.
+            fields.pop("permitted_series")
         if (
             self.event_override_interpretation == LEGACY_EVENT_OVERRIDE_PROFILE
             and self.event_schema_document_sha256 is None
@@ -75,7 +96,31 @@ class CertifiedFeePolicy:
         return hashlib.sha256(_bytes(fields)).hexdigest()
 
 
-CERTIFIED_FEE_POLICIES: tuple[CertifiedFeePolicy, ...] = ()
+# Reviewed original July 7 schedule, fee-rounding documentation and event schema.
+# One-hour operational review window; not a promise of unchanged future fees.
+# Exchange-only immediate single buy held to settlement; excludes FCM add-ons.
+CERTIFIED_FEE_POLICIES: tuple[CertifiedFeePolicy, ...] = (
+    CertifiedFeePolicy(
+        policy_id="kxbtc-kxtempmiah-exchange-only-single-buy-20260911",
+        effective_from="2026-09-11T03:35:00+00:00",
+        effective_to="2026-09-11T04:23:28.844889+00:00",
+        taker_rate="0.07",
+        documents=(
+            ("https://kalshi.com/docs/kalshi-fee-schedule.pdf",
+             "c326a69f596a11e8f8be2620402d39a8d4823920c21cc97c93a114d862699601"),
+            (ROUNDING_URL,
+             "6b509a24b136624756bd16d74586f04c3e603ca26544ea28ceb9533afda55608"),
+            (EVENT_SCHEMA_URL, EVENT_DATA_SCHEMA_SHA256),
+        ),
+        rate_document_sha256="c326a69f596a11e8f8be2620402d39a8d4823920c21cc97c93a114d862699601",
+        rounding_document_sha256="6b509a24b136624756bd16d74586f04c3e603ca26544ea28ceb9533afda55608",
+        settlement_document_sha256="c326a69f596a11e8f8be2620402d39a8d4823920c21cc97c93a114d862699601",
+        settlement_fee="0",
+        event_override_interpretation=OPTIONAL_EVENT_OVERRIDE_PROFILE,
+        event_schema_document_sha256=EVENT_DATA_SCHEMA_SHA256,
+        permitted_series=("KXBTC", "KXTEMPMIAH"),
+    ),
+)
 
 
 def _strict_event_json(raw: bytes) -> dict[str, Any]:
@@ -358,8 +403,11 @@ def _compute(request: dict[str, Any], *, now: datetime) -> dict[str, Any]:
         }
     series_id = event["series_ticker"]
     series = rows[f"{PUBLIC_BASE}/series/{series_id}"]["series"]
+    if policy.permitted_series is not None and series_id not in policy.permitted_series:
+        raise ValueError("FEE_SERIES_OUTSIDE_REVIEWED_SCOPE")
     if (
         market["ticker"] != ticker
+        or ("series_ticker" in market and market["series_ticker"] != series_id)
         or event["event_ticker"] != event_id
         or series["ticker"] != series_id
         or market["status"] not in {"active", "open"}

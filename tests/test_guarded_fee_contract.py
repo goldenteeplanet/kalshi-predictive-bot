@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -96,6 +97,48 @@ def test_no_production_policy(evidence, monkeypatch):
         quote(evidence)
 
 
+def test_series_scope_is_enforced_and_bound_to_policy(evidence, monkeypatch):
+    legacy = fees.CERTIFIED_FEE_POLICIES[0]
+    allowed = replace(legacy, permitted_series=("S",))
+    denied = replace(legacy, permitted_series=("SOTHER",))
+    assert len({legacy.version, allowed.version, denied.version}) == 3
+    monkeypatch.setattr(fees, "CERTIFIED_FEE_POLICIES", (allowed,))
+    # Existing evidence cannot silently gain a new policy's authority.
+    with pytest.raises(ValueError, match="REVIEWED_FEE_POLICY_REQUIRED"):
+        quote(evidence)
+    evidence["policy_version"] = allowed.version
+    assert quote(evidence).charge == Decimal(".02")
+    monkeypatch.setattr(fees, "CERTIFIED_FEE_POLICIES", (denied,))
+    evidence["policy_version"] = denied.version
+    with pytest.raises(ValueError, match="FEE_SERIES_OUTSIDE_REVIEWED_SCOPE"):
+        quote(evidence)
+
+
+@pytest.mark.parametrize("scope", [(), [], ("S", "S"), ("Z", "S"), ("s",), ("S*",), (1,)])
+def test_series_scope_rejects_ambiguous_or_mutable_values(evidence, scope):
+    with pytest.raises(ValueError, match="FEE_EXACT_SERIES_SCOPE_REQUIRED"):
+        replace(fees.CERTIFIED_FEE_POLICIES[0], permitted_series=scope)
+
+
+def test_absent_scope_preserves_both_previous_policy_hash_profiles(evidence):
+    legacy = fees.CERTIFIED_FEE_POLICIES[0]
+    optional = replace(
+        legacy,
+        event_override_interpretation=fees.OPTIONAL_EVENT_OVERRIDE_PROFILE,
+        event_schema_document_sha256=fees.EVENT_DATA_SCHEMA_SHA256,
+    )
+    for policy in (legacy, optional):
+        old_fields = asdict(policy)
+        old_fields.pop("permitted_series")
+        if policy is legacy:
+            old_fields.pop("event_override_interpretation")
+            old_fields.pop("event_schema_document_sha256")
+        expected = hashlib.sha256(
+            json.dumps(old_fields, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        ).hexdigest()
+        assert policy.version == expected
+
+
 def test_missing_override_is_unknown(evidence):
     capture = evidence["captures"][1]
     row = json.loads(bytes.fromhex(capture["payload_hex"]))
@@ -104,6 +147,20 @@ def test_missing_override_is_unknown(evidence):
     capture.update(payload_hex=raw.hex(), sha256=hashlib.sha256(raw).hexdigest())
     with pytest.raises(ValueError, match="OVERRIDE_INVALID"):
         quote(evidence)
+
+
+@pytest.mark.parametrize("claimed_series", ["S", "SOTHER", None])
+def test_explicit_market_series_must_agree_with_event(evidence, claimed_series):
+    capture = evidence["captures"][0]
+    row = json.loads(bytes.fromhex(capture["payload_hex"]))
+    row["body"]["market"]["series_ticker"] = claimed_series
+    raw = json.dumps(row).encode()
+    capture.update(payload_hex=raw.hex(), sha256=hashlib.sha256(raw).hexdigest())
+    if claimed_series == "S":
+        assert quote(evidence).charge == Decimal(".02")
+    else:
+        with pytest.raises(ValueError, match="FEE_CATALOG_OR_OVERRIDE_INVALID"):
+            quote(evidence)
 
 
 def test_activation_clock_and_historical_lineage(evidence):
@@ -297,6 +354,7 @@ def test_legacy_policy_hash_and_quote_shape_unchanged(evidence):
 
     policy = fees.CERTIFIED_FEE_POLICIES[0]
     legacy = asdict(policy)
+    legacy.pop("permitted_series")
     legacy.pop("event_override_interpretation")
     legacy.pop("event_schema_document_sha256")
     assert policy.version == hashlib.sha256(fees._bytes(legacy)).hexdigest()
