@@ -9,6 +9,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+from uuid import uuid4
 
 BASE = "https://external-api.kalshi.com/trade-api/v2"
 LIMIT = 1_000_000
@@ -108,7 +109,7 @@ def stage_public_books(
                 safety=dict(execution_enabled=False, orders_submitted=0),
             )
             validate_public_stage(payload, as_of=clock())
-            path = staging_dir / f"public-rest-{ticker}-{evidence_dir.name}.json"
+            path = staging_dir / f"public-rest-{ticker}-{uuid4().hex}.json"
             pending = path.with_suffix(".pending")
             write(pending, encode(payload))
             os.link(pending, path)
