@@ -36,9 +36,34 @@ def NOW():
 
 
 BASE = "https://external-api.kalshi.com/trade-api/v2"
+UNIVERSE = (
+    ("BTC", "KXBTC"),
+    ("ETH", "KXETH"),
+    ("SOL", "KXSOLE"),
+    ("XRP", "KXXRP"),
+    ("DOGE", "KXDOGE"),
+)
 
 
-def main(output: Path, *, sol_history: bool = False) -> None:
+def capture_scope(*, sol_history=False, symbol=None, history_pages=1):
+    if type(history_pages) is not int or not 1 <= history_pages <= 4:
+        raise ValueError("BOUNDED_HISTORY_PAGES_REQUIRED")
+    if sol_history:
+        if symbol is not None or history_pages != 1:
+            raise ValueError("CONFLICTING_CAPTURE_SCOPE")
+        symbol, history_pages = "SOL", 4
+    if symbol is not None and symbol not in dict(UNIVERSE):
+        raise ValueError("SUPPORTED_SYMBOL_REQUIRED")
+    if symbol is None and history_pages != 1:
+        raise ValueError("EXTENDED_HISTORY_REQUIRES_ONE_SYMBOL")
+    selected = tuple(pair for pair in UNIVERSE if symbol is None or pair[0] == symbol)
+    return selected, history_pages, len(selected) * (history_pages + 1) + 2
+
+
+def main(output: Path, *, sol_history: bool = False, symbol=None, history_pages=1) -> None:
+    selected_symbols, pages, max_requests = capture_scope(
+        sol_history=sol_history, symbol=symbol, history_pages=history_pages
+    )
     output.mkdir(parents=True, exist_ok=False)
     repo = Path(__file__).resolve().parents[1]
     for module_name in (
@@ -96,7 +121,7 @@ def main(output: Path, *, sol_history: bool = False) -> None:
     def get(url, label):
         nonlocal count
         count += 1
-        if count > (7 if sol_history else 12):
+        if count > max_requests:
             raise RuntimeError("REQUEST_BUDGET")
         started = NOW()
         req = urllib.request.Request(url, headers={"User-Agent": "Dejoia-readonly-research/1"})
@@ -126,18 +151,11 @@ def main(output: Path, *, sol_history: bool = False) -> None:
             raise ValueError(f"HTTP_{status}")
         return json.loads(data), received, sha
 
-    universe = (
-        ("BTC", "KXBTC"),
-        ("ETH", "KXETH"),
-        ("SOL", "KXSOLE"),
-        ("XRP", "KXXRP"),
-        ("DOGE", "KXDOGE"),
-    )
-    for symbol, series in (("SOL", "KXSOLE"),) if sol_history else universe:
+    for symbol, series in selected_symbols:
         try:
             prices = []
             anchor = int(NOW().timestamp() // 60) * 60
-            for page in range(4 if sol_history else 1):
+            for page in range(pages):
                 end = anchor - page * 300 * 60
                 start = end - 300 * 60
                 query = urlencode(
@@ -382,7 +400,16 @@ def main(output: Path, *, sol_history: bool = False) -> None:
         outcomes=None,
         code_provenance=code_proof,
         promotion_authority=False,
-        capture_scope="SOL_1200_MINUTES" if sol_history else "FIVE_ASSET_300_MINUTES",
+        capture_scope=(
+            "FIVE_ASSET_300_MINUTES"
+            if len(selected_symbols) == 5
+            else f"{selected_symbols[0][0]}_{pages * 300}_MINUTES"
+        ),
+        capture_limits=dict(
+            symbols=[s for s, _ in selected_symbols],
+            history_minutes=pages * 300,
+            max_requests=max_requests,
+        ),
         event_independence="REPEATED_EVENT_CAPTURES_ARE_NOT_INDEPENDENT_SAMPLES",
     )
     encoded = json.dumps(manifest, indent=2, default=str, allow_nan=False).encode()
@@ -413,5 +440,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--sol-history", action="store_true")
+    parser.add_argument("--symbol", choices=[s for s, _ in UNIVERSE])
+    parser.add_argument("--history-pages", type=int, default=1)
     args = parser.parse_args()
-    main(args.output, sol_history=args.sol_history)
+    main(
+        args.output,
+        sol_history=args.sol_history,
+        symbol=args.symbol,
+        history_pages=args.history_pages,
+    )
