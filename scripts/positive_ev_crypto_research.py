@@ -60,10 +60,44 @@ def capture_scope(*, sol_history=False, symbol=None, history_pages=1):
     return selected, history_pages, len(selected) * (history_pages + 1) + 2
 
 
-def main(output: Path, *, sol_history: bool = False, symbol=None, history_pages=1) -> None:
+def fixed_target(value, *, symbol, as_of):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if (
+        not isinstance(value, datetime)
+        or value.tzinfo is None
+        or value.utcoffset() is None
+        or value <= as_of
+        or symbol is None
+    ):
+        raise ValueError("FUTURE_AWARE_TARGET_AND_SINGLE_SYMBOL_REQUIRED")
+    return value
+
+
+def select_book_tickers(inputs, rows, *, target_at=None):
+    if target_at is not None:
+        if len(inputs) > 2 or any(
+            item["target"]["observation_at"] != target_at for item in inputs.values()
+        ):
+            raise ValueError("FIXED_TARGET_SELECTION_MISMATCH")
+        return sorted(inputs)
+    ranked = sorted(
+        (r for r in rows if r["indicative_gross_edge"] is not None),
+        key=lambda r: r["indicative_gross_edge"],
+        reverse=True,
+    )
+    return list(dict.fromkeys(r["ticker"] for r in ranked))[:2]
+
+
+def main(
+    output: Path, *, sol_history: bool = False, symbol=None, history_pages=1, target_at=None
+) -> None:
     selected_symbols, pages, max_requests = capture_scope(
         sol_history=sol_history, symbol=symbol, history_pages=history_pages
     )
+    target_at = fixed_target(target_at, symbol=symbol, as_of=NOW())
     output.mkdir(parents=True, exist_ok=False)
     repo = Path(__file__).resolve().parents[1]
     for module_name in (
@@ -205,6 +239,8 @@ def main(output: Path, *, sol_history: bool = False, symbol=None, history_pages=
                     if market.get("status") not in ("active", "open") or market.get("result"):
                         continue
                     close = datetime.fromisoformat(market["close_time"].replace("Z", "+00:00"))
+                    if target_at is not None and close != target_at:
+                        continue
                     horizon = (close - decision).total_seconds()
                     if not 0 < horizon <= min(72 * 3600, len(prices) * 60):
                         continue
@@ -239,6 +275,7 @@ def main(output: Path, *, sol_history: bool = False, symbol=None, history_pages=
                 "catalog_partial": bool(listing.get("cursor")),
                 "ordered_tickers": [item[1]["ticker"] for item in selection],
                 "selected_as_of": decision.isoformat(),
+                "required_target_at": target_at.isoformat() if target_at else None,
             }
             for _, market, target in selection:
                 forecast = forecast_independent(prices, target, decision_at=decision)
@@ -312,12 +349,7 @@ def main(output: Path, *, sol_history: bool = False, symbol=None, history_pages=
         except (OSError, ValueError, KeyError, TypeError) as exc:
             errors.append(dict(symbol=symbol, error=str(exc)))
 
-    ranked = sorted(
-        (r for r in rows if r["indicative_gross_edge"] is not None),
-        key=lambda r: r["indicative_gross_edge"],
-        reverse=True,
-    )
-    selected = list(dict.fromkeys(r["ticker"] for r in ranked))[:2]
+    selected = select_book_tickers(inputs, rows, target_at=target_at)
     for ticker in selected:
         try:
             book, received, sha = get(
@@ -342,7 +374,11 @@ def main(output: Path, *, sol_history: bool = False, symbol=None, history_pages=
                     market_receipt_sha256=saved["market_receipt_sha256"],
                     code_provenance=code_proof,
                     selection={
-                        "method": "INDICATIVE_GROSS_DESC_FIRST_2_DISTINCT_TICKERS",
+                        "method": (
+                            "FIXED_TARGET_ALL_SELECTED_TICKERS_SORTED"
+                            if target_at is not None
+                            else "INDICATIVE_GROSS_DESC_FIRST_2_DISTINCT_TICKERS"
+                        ),
                         "ordered_tickers": selected,
                     },
                 ),
@@ -400,6 +436,7 @@ def main(output: Path, *, sol_history: bool = False, symbol=None, history_pages=
         outcomes=None,
         code_provenance=code_proof,
         promotion_authority=False,
+        required_target_at=target_at,
         capture_scope=(
             "FIVE_ASSET_300_MINUTES"
             if len(selected_symbols) == 5
@@ -442,10 +479,12 @@ if __name__ == "__main__":
     parser.add_argument("--sol-history", action="store_true")
     parser.add_argument("--symbol", choices=[s for s, _ in UNIVERSE])
     parser.add_argument("--history-pages", type=int, default=1)
+    parser.add_argument("--target-at", help="Future aware ISO target; requires one explicit symbol")
     args = parser.parse_args()
     main(
         args.output,
         sol_history=args.sol_history,
         symbol=args.symbol,
         history_pages=args.history_pages,
+        target_at=args.target_at,
     )
