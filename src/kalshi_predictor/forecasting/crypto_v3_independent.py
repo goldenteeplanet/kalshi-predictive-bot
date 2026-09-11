@@ -14,6 +14,7 @@ import statistics
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from fractions import Fraction
 from typing import Any
 
 from kalshi_predictor.crypto.distribution_model import DistributionInputs, threshold_probability
@@ -60,7 +61,7 @@ def _target(target: CryptoTarget) -> None:
         values = [target.threshold]
         if target.lower is not None or target.upper is not None:
             raise ValueError("CONFLICTING_STRIKES")
-    elif target.comparator == "RANGE":
+    elif target.comparator in {"RANGE", "RANGE_CLOSED"}:
         values = [target.lower, target.upper]
         if target.threshold is not None:
             raise ValueError("CONFLICTING_STRIKES")
@@ -68,7 +69,7 @@ def _target(target: CryptoTarget) -> None:
         raise ValueError("UNSUPPORTED_COMPARATOR")
     if any(value is None or not _finite(value) or value <= 0 for value in values):
         raise ValueError("INVALID_STRIKE")
-    if target.comparator == "RANGE" and target.upper <= target.lower:  # type: ignore[operator]
+    if target.comparator in {"RANGE", "RANGE_CLOSED"} and target.upper <= target.lower:  # type: ignore[operator]
         raise ValueError("INVALID_RANGE")
 
 
@@ -142,7 +143,7 @@ def forecast_independent(
         return 0.5 + (math.atan(z) + z / (1 + z * z)) / math.pi
 
     def probability(model: str) -> float:
-        if target.comparator == "RANGE":
+        if target.comparator in {"RANGE", "RANGE_CLOSED"}:
             assert target.upper is not None and target.lower is not None
             return cdf(target.upper, model) - cdf(target.lower, model)
         assert target.threshold is not None
@@ -163,8 +164,10 @@ def forecast_independent(
         ]
 
     def satisfies(value: float) -> bool:
-        if target.comparator == "RANGE":
+        if target.comparator in {"RANGE", "RANGE_CLOSED"}:
             assert target.lower is not None and target.upper is not None
+            if target.comparator == "RANGE_CLOSED":
+                return math.log(target.lower) <= value <= math.log(target.upper)
             return math.log(target.lower) <= value < math.log(target.upper)
         assert target.threshold is not None
         if target.comparator == "ABOVE":
@@ -175,9 +178,27 @@ def forecast_independent(
             return value < math.log(target.threshold)
         return value <= math.log(target.threshold)
 
+    # Closed intervals compare exact decimal representations by cross multiplication.
+    # This preserves endpoint atoms without log/subtract/add roundoff or CF rounding.
+    if target.comparator == "RANGE_CLOSED" and empirical:
+        assert target.lower is not None and target.upper is not None
+        lower, upper, current = (Fraction(str(v)) for v in (target.lower, target.upper, spot))
+        closed_hits = sum(
+            lower * Fraction(str(prices[end - block].price))
+            <= current * Fraction(str(prices[end].price))
+            <= upper * Fraction(str(prices[end - block].price))
+            for end in range(len(prices) - 1, block - 1, -block)
+        )
+    else:
+        closed_hits = None
     comparisons["empirical_matched_horizon"] = {
         "probability": (
-            sum(satisfies(math.log(spot) + r) for r in empirical) / len(empirical)
+            (
+                closed_hits
+                if closed_hits is not None
+                else sum(satisfies(math.log(spot) + r) for r in empirical)
+            )
+            / len(empirical)
             if len(empirical) >= 20
             else None
         ),
@@ -187,7 +208,7 @@ def forecast_independent(
     comparisons["existing_distribution_zero_drift"] = {
         "probability": threshold_probability(
             DistributionInputs(spot, sigma / math.sqrt(cadence / 60), horizon / 60),
-            comparator=target.comparator,
+            comparator="RANGE" if target.comparator == "RANGE_CLOSED" else target.comparator,
             threshold=target.threshold,
             lower=target.lower,
             upper=target.upper,
@@ -204,7 +225,7 @@ def forecast_independent(
     ).hexdigest()
     return {
         "model": MODEL_NAME,
-        "model_version": "1",
+        "model_version": "2-range-closed" if target.comparator == "RANGE_CLOSED" else "1",
         "probability": probability("gaussian_log_returns"),
         "generated_at": decision_at.isoformat(),
         "target": asdict(target),

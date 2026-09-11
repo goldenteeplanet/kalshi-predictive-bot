@@ -1,0 +1,16 @@
+{
+  "url": "https://assets.kalshi.com/contract_terms/DOGE.pdf",
+  "requested_at": "2026-09-11T06:28:43.254973+00:00",
+  "received_at": "2026-09-11T06:28:43.726912+00:00",
+  "status": 200,
+  "sha256": "1cea2170e7b269f335bb76d31421e5bcefe94dc24084525444117fabc7bcd4e3",
+  "bytes": 24855,
+  "headers": {
+    "Content-Type": "application/pdf",
+    "Date": "Fri, 11 Sep 2026 06:28:43 GMT",
+    "Last-Modified": "Mon, 17 Mar 2025 08:35:19 GMT",
+    "ETag": "\"994fd16bbe71536ed2d85cb6f62f8048\"",
+    "Location": null
+  },
+  "series_original_sha256": "493d6716921550544bb625f460dde2cea245bae69054e6f3a93885ba118644b9"
+}

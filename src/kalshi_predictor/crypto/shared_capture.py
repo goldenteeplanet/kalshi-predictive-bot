@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from urllib.parse import parse_qs, urlparse
 
+from kalshi_predictor.crypto.doge_range_evidence import DogeOriginal, DogeRangeProof
 from kalshi_predictor.crypto.doge_strikes import parse_doge_strike
 from kalshi_predictor.forecasting.crypto_v3_independent import (
     CryptoTarget,
@@ -31,9 +32,14 @@ class CandleOriginal:
 class SharedCryptoInputs:
     target: CryptoTarget
     originals: tuple[CandleOriginal, ...]
+    doge_range_proof: DogeRangeProof | None = None
 
     def prices(self, cutoff: datetime) -> tuple[PriceObservation, ...]:
         cutoff = aware(cutoff)
+        if self.target.symbol == "DOGE" and self.target.comparator == "RANGE_CLOSED":
+            if type(self.doge_range_proof) is not DogeRangeProof:
+                raise ValueError("DOGE_ORIGINAL_PROOF_REQUIRED")
+            self.doge_range_proof.validate(cutoff)
         if type(self.originals) is not tuple or not 1 <= len(self.originals) <= 4:
             raise ValueError("BOUNDED_CANDLE_ORIGINALS_REQUIRED")
         rows = []
@@ -96,13 +102,37 @@ class SharedCryptoInputs:
         forecast_independent(rows, self.target, decision_at=cutoff)
         return tuple(rows)
 
-    def bind_market(self, market: dict, *, cutoff: datetime | None = None) -> None:
+    def bind_market(
+        self,
+        market: dict,
+        *,
+        cutoff: datetime | None = None,
+        market_original: DogeOriginal | None = None,
+    ) -> dict | None:
         if self.target.symbol == "DOGE":
             if not isinstance(cutoff, datetime):
                 raise ValueError("DOGE_EXPLICIT_INPUT_CUTOFF_REQUIRED")
             parsed = parse_doge_strike(market, cutoff=cutoff)
             if parsed.operator == "between":
-                raise ValueError("DOGE_RANGE_INCLUSIVITY_AND_CF_PRECISION_UNCERTIFIED")
+                if (
+                    self.target.comparator != "RANGE_CLOSED"
+                    or type(self.doge_range_proof) is not DogeRangeProof
+                ):
+                    raise ValueError("DOGE_RANGE_INCLUSIVITY_AND_CF_PRECISION_UNCERTIFIED")
+                if (
+                    type(self.target.lower) not in (float, int)
+                    or type(self.target.upper) not in (float, int)
+                    or not Decimal(str(self.target.lower)).is_finite()
+                    or not Decimal(str(self.target.upper)).is_finite()
+                    or Decimal(str(self.target.lower)) != parsed.floor
+                    or Decimal(str(self.target.upper)) != parsed.cap
+                    or self.target.threshold is not None
+                    or self.target.observation_at != parsed.close_time
+                ):
+                    raise ValueError("DOGE_TARGET_METADATA_MISMATCH")
+                if type(market_original) is not DogeOriginal:
+                    raise ValueError("DOGE_ACTUAL_MARKET_ORIGINAL_REQUIRED")
+                return self.doge_range_proof.bind_market(market, market_original, cutoff)
             doge_comparator = "ABOVE" if parsed.operator == "greater" else "BELOW"
             strike = parsed.floor if parsed.floor is not None else parsed.cap
             if type(self.target.threshold) not in (int, float):
@@ -122,7 +152,7 @@ class SharedCryptoInputs:
                 or threshold != strike
             ):
                 raise ValueError("DOGE_TARGET_METADATA_MISMATCH")
-            return
+            return None
         prefix = {
             "BTC": "KXBTC",
             "ETH": "KXETH",
@@ -159,3 +189,5 @@ class SharedCryptoInputs:
             strike = floor if floor is not None else cap
             if strike is None or Decimal(str(strike)) != Decimal(str(self.target.threshold)):
                 raise ValueError("CRYPTO_TARGET_STRIKE_MISMATCH")
+
+        return None

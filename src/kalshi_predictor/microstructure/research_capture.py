@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from kalshi_predictor.active_universe import is_active_market_status
 from kalshi_predictor.config import Settings
+from kalshi_predictor.crypto.doge_range_evidence import DogeOriginal
 from kalshi_predictor.crypto.research_provenance import (
     freeze_code,
     freeze_prediction,
@@ -258,6 +259,21 @@ def run(
         artifact_hashes["crypto-extension.json"] = write_new(
             output / "crypto-extension.json", encoded(extension)
         )
+        if crypto_inputs.doge_range_proof is not None:
+            doge_proof = crypto_inputs.doge_range_proof
+            artifact_hashes["doge-range-proof.json"] = write_new(
+                output / "doge-range-proof.json", encoded(doge_proof.validate(aware(clock())))
+            )
+            for role, original_proof in (
+                ("series", doge_proof.series),
+                ("terms", doge_proof.terms),
+            ):
+                for suffix, raw in (
+                    ("original", original_proof.raw),
+                    ("receipt.json", original_proof.receipt_raw),
+                ):
+                    name = f"doge-{role}.{suffix}"
+                    artifact_hashes[name] = write_new(output / name, raw)
         for index, original in enumerate(crypto_inputs.originals):
             name = f"crypto-candles-{index}.json"
             artifact_hashes[name] = write_new(output / name, original.raw)
@@ -299,6 +315,7 @@ def run(
         if requests >= 6:
             raise ValueError("SIX_GET_CAP")
         requests += 1
+        requested = check()
         raw, status = get(url)
         received = check()
         if not isinstance(raw, bytes) or not raw or len(raw) > MAX_BYTES or status != 200:
@@ -309,6 +326,7 @@ def run(
             "url": url,
             "status": status,
             "sha256": sha,
+            "requested_at": requested.isoformat(),
             "received_at": received.isoformat(),
             "recorded_at": recorded.isoformat(),
             "path": name,
@@ -387,9 +405,20 @@ def run(
                     raise ValueError("CONTRACT_METADATA_CHANGED")
                 fixed_metadata = metadata
                 if crypto_inputs is not None:
-                    crypto_inputs.bind_market(
-                        market, cutoff=aware(datetime.fromisoformat(market_receipt["received_at"]))
+                    binding_kwargs = {}
+                    if crypto_inputs.doge_range_proof is not None:
+                        binding_kwargs["market_original"] = DogeOriginal(
+                            (output / market_receipt["path"]).read_bytes(),
+                            (output / (market_receipt["path"] + ".receipt.json")).read_bytes(),
+                        )
+                    range_binding = crypto_inputs.bind_market(
+                        market,
+                        cutoff=aware(datetime.fromisoformat(market_receipt["received_at"])),
+                        **binding_kwargs,
                     )
+                    if range_binding is not None:
+                        name = f"sample-{index}-doge-range-binding.json"
+                        artifact_hashes[name] = write_new(output / name, encoded(range_binding))
                 close = bound_close_time(market)
                 if target is not None and close != target:
                     raise ValueError("TARGET_METADATA_CHANGED")
