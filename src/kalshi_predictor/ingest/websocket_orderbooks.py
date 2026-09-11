@@ -16,8 +16,8 @@ from kalshi_predictor.config import Settings
 from kalshi_predictor.data.locks import db_writer_monitor
 from kalshi_predictor.data.repositories import insert_market_snapshot
 from kalshi_predictor.kalshi.client import KalshiClient
+from kalshi_predictor.kalshi.data_environment import endpoint_environment, matched_environment
 from kalshi_predictor.kalshi.orderbook import LocalOrderbook, OrderbookSequenceGap
-from kalshi_predictor.opportunities.market_identity import kalshi_api_market_url
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
 DEFAULT_WS_URL = "wss://external-api-ws.demo.kalshi.co/trade-api/ws/v2"
@@ -71,6 +71,7 @@ class ReadOnlyOrderbookWebSocketAdapter:
         self.auth_headers = _validated_auth_headers(auth_headers)
         self.staging_dir = staging_dir
         self.rest_client = rest_client
+        self.environment = matched_environment(rest_client.base_url, ws_url)
         self.connector = connector or _default_connector
         self.ws_url = ws_url
         self.persist_every_deltas = max(1, persist_every_deltas)
@@ -166,14 +167,20 @@ class ReadOnlyOrderbookWebSocketAdapter:
         )
 
     def _stage(self, ticker: str, *, reason: str) -> Path:
+        environment = matched_environment(self.rest_client.base_url, self.ws_url)
+        if environment != self.environment:
+            raise ValueError("MARKET_DATA_ENVIRONMENT_CHANGED")
         market = dict(self.rest_client.get_market(ticker))
         market["source"] = "kalshi_rest_market_snapshot"
         market["source_observed_at"] = utc_now().isoformat()
-        market["kalshi_api_url"] = kalshi_api_market_url(ticker)
+        market["kalshi_api_url"] = self.rest_client.base_url.rstrip("/") + "/markets/" + ticker
         book = self.books[ticker]
         payload = {
             "category": "websocket_orderbook_snapshot",
             "version": "gh1_v1",
+            "source_environment": environment,
+            "rest_base_url": self.rest_client.base_url,
+            "websocket_url": self.ws_url,
             "staged_at": utc_now().isoformat(),
             "reason": reason,
             "ticker": ticker,
@@ -276,6 +283,16 @@ def drain_staged_websocket_orderbooks(
             for path in files:
                 payload = json.loads(path.read_text(encoding="utf-8"))
                 if payload.get("category") != "websocket_orderbook_snapshot":
+                    continue
+                try:
+                    environment = matched_environment(
+                        payload["rest_base_url"], payload["websocket_url"]
+                    )
+                    expected = endpoint_environment((settings or Settings()).kalshi_base_url)
+                    if payload.get("source_environment") != environment or environment != expected:
+                        raise ValueError("STAGED_MARKET_DATA_ENVIRONMENT_MISMATCH")
+                except (KeyError, TypeError, ValueError):
+                    errors.append(f"{path.name}: UNVERIFIED_STAGED_MARKET_DATA_ENVIRONMENT")
                     continue
                 market = payload.get("market")
                 orderbook = payload.get("orderbook")

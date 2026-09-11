@@ -65,6 +65,7 @@ def test_adapter_recovers_gap_stages_snapshots_and_never_sends_orders(tmp_path: 
         auth_headers=AUTH,
         staging_dir=tmp_path,
         rest_client=rest,  # type: ignore[arg-type]
+        ws_url="wss://external-api-ws.kalshi.com/trade-api/ws/v2",
         connector=lambda *_args, **_kwargs: _FakeContext(connection),
         persist_every_deltas=1,
     )
@@ -93,6 +94,7 @@ def test_guarded_drain_blocks_then_persists_with_one_writer(tmp_path: Path) -> N
         auth_headers=AUTH,
         staging_dir=staging_dir,
         rest_client=_FakeRestClient(),  # type: ignore[arg-type]
+        ws_url="wss://external-api-ws.kalshi.com/trade-api/ws/v2",
         connector=lambda *_args, **_kwargs: _FakeContext(connection),
     )
     asyncio.run(adapter.run(max_messages=1))
@@ -134,6 +136,7 @@ def test_adapter_wall_clock_timeout_closes_quiet_stream(tmp_path: Path) -> None:
         auth_headers=AUTH,
         staging_dir=tmp_path,
         rest_client=_FakeRestClient(),  # type: ignore[arg-type]
+        ws_url="wss://external-api-ws.kalshi.com/trade-api/ws/v2",
         connector=lambda *_args, **_kwargs: _FakeContext(_QuietConnection()),
     )
 
@@ -145,6 +148,8 @@ def test_adapter_wall_clock_timeout_closes_quiet_stream(tmp_path: Path) -> None:
 
 
 class _FakeRestClient:
+    base_url = "https://external-api.kalshi.com/trade-api/v2"
+
     def get_market(self, ticker: str) -> dict[str, str]:
         return {"ticker": ticker, "series_ticker": "KXTEMPNYCH", "status": "open"}
 
