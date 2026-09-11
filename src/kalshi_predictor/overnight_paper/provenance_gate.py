@@ -11,6 +11,7 @@ from kalshi_predictor.advanced_risk.engine import AdvancedRiskDecision
 from kalshi_predictor.overnight_paper.provenance import (
     Artifact,
     Verification,
+    canonical_hash,
     validate_source_visibility,
     verify_full_provenance,
 )
@@ -166,7 +167,7 @@ def verify_complete_provenance(
                 miami = verify_miami_provenance_source(source, decision_at=at, now=reference)
                 if (
                     record.get("name") != "miami_prior_day_original_forecast"
-                    or record.get("value") != miami["forecast"]
+                    or canonical_hash(record.get("value")) != canonical_hash(miami["forecast"])
                     or observed != aware(miami["observed_at"])
                     or visible != aware(miami["available_at"])
                 ):

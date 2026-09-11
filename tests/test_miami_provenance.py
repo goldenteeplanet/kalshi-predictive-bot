@@ -214,7 +214,7 @@ def test_complete_gate9_miami_path_does_not_certify_rules_or_skill(bundle):
     assert not result.settlement_rules_verified
 
 
-@pytest.mark.parametrize("change", ["value", "missing", "duplicate", "clock"])
+@pytest.mark.parametrize("change", ["value", "missing", "duplicate", "clock", "bool", "float"])
 def test_gate9_rehashed_empirical_feature_tamper_fails(bundle, change):
     from dataclasses import replace
 
@@ -225,7 +225,15 @@ def test_gate9_rehashed_empirical_feature_tamper_fails(bundle, change):
     args = full_gate_args(bundle)
     context = args["context"]
     feature = context.features_artifact.decode()
-    if change == "value":
+    if change == "bool":
+        assert feature["records"][0]["value"]["calibrated"] is False
+        feature["records"][0]["value"]["calibrated"] = 0
+    elif change == "float":
+        model = feature["records"][0]["value"]["models"]["prior_day_increment_empirical"]
+        samples = model["samples_f"]
+        assert type(samples[0]) is float and samples[0] == int(samples[0])
+        samples[0] = int(samples[0])
+    elif change == "value":
         feature["records"][0]["value"]["models"]["prior_day_increment_empirical"]["samples_f"][
             0
         ] += 1
