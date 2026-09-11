@@ -1,7 +1,8 @@
 """Dedicated Miami preparation in isolated SQLite; never paper admission.
 
-The caller owns the in-memory session transaction. Exact originals survive into
-this typed handoff; no NOAA rows, orders, fills, reservations, or commits occur.
+The default API accepts memory sessions only. A dedicated owned-file entry uses
+the same genuine engine path and caller transaction; no NOAA rows, orders, fills,
+reservations, or commits occur inside preparation.
 """
 
 from __future__ import annotations
@@ -47,6 +48,7 @@ from .miami_provenance import (
 )
 from .miami_source import _receipt
 from .miami_source_gate import MiamiGateContext
+from .miami_storage import MiamiOwnedStorage, verify_miami_storage
 from .provenance import Artifact, canonical_hash
 from .qualification import compute_net_ev
 
@@ -75,6 +77,7 @@ class MiamiPreparationResult:
     engine_outputs: MiamiEngineOutputs | None = None
     paper_eligible: bool = False
     execution_authority: bool = False
+    owned_storage: MiamiOwnedStorage | None = None
 
 
 def _snapshot_id(session: Session, ticker: str) -> int | None:
@@ -92,7 +95,9 @@ def _orm_at(value: datetime) -> datetime:
     return _at(value.replace(tzinfo=UTC) if value.tzinfo is None else value)
 
 
-def _isolated_connection(session: Session):
+def _isolated_connection(session: Session, storage: MiamiOwnedStorage | None = None):
+    if storage is not None:
+        return verify_miami_storage(session, storage, now=utc_now())
     if type(session) is not Session or session.get_bind().dialect.name != "sqlite":
         raise ValueError("ISOLATED_SQLITE_SESSION_REQUIRED")
     if session.new or session.dirty or session.deleted:
@@ -117,7 +122,32 @@ def _isolated_connection(session: Session):
     return connection
 
 
-def prepare_miami_candidate(
+def assert_miami_settings(settings: Settings) -> None:
+    if type(settings) is not Settings:
+        raise ValueError("CONCRETE_SETTINGS_REQUIRED")
+    assert_public_only_settings(settings)
+    try:
+        configured_url = urlsplit(settings.kalshi_db_url)
+    except ValueError:
+        raise ValueError("INVALID_CONFIGURED_DATABASE_URL") from None
+    if (
+        configured_url.username is not None
+        or configured_url.password is not None
+        or configured_url.query
+        or configured_url.fragment
+    ):
+        raise ValueError("CREDENTIAL_OR_QUERY_BEARING_DATABASE_URL_FORBIDDEN")
+    if (
+        settings.execution_enabled
+        or not settings.execution_dry_run
+        or not settings.execution_kill_switch
+        or settings.execution_gateway_mode != "disabled"
+        or settings.autopilot_enabled
+    ):
+        raise ValueError("LOCAL_ONLY_SETTINGS_REQUIRED")
+
+
+def _prepare_miami_candidate(
     session: Session,
     *,
     context: MiamiGateContext,
@@ -127,37 +157,20 @@ def prepare_miami_candidate(
     slippage_allowance: Decimal,
     uncertainty_buffer: Decimal,
     fee_evidence: dict[str, Any] | None,
+    _storage: MiamiOwnedStorage | None = None,
 ) -> MiamiPreparationResult:
     """Run actual forecast persistence, sizing and risk after exact replay/book/fees.
 
-    This deliberately accepts only in-memory SQLite, never a canonical database.
+    The public default is memory-only; dedicated storage requires an active
+    owner and exact authorization baseline for an isolated file.
     Successful computation remains unqualified without independent model/rule/
     final-settlement authority; a close/expiry timestamp is not a 72h certificate.
     """
     records: dict[str, Any] = {}
     ticker = ""
     try:
-        connection = _isolated_connection(session)
-        assert_public_only_settings(settings)
-        try:
-            configured_url = urlsplit(settings.kalshi_db_url)
-        except ValueError:
-            raise ValueError("INVALID_CONFIGURED_DATABASE_URL") from None
-        if (
-            configured_url.username is not None
-            or configured_url.password is not None
-            or configured_url.query
-            or configured_url.fragment
-        ):
-            raise ValueError("CREDENTIAL_OR_QUERY_BEARING_DATABASE_URL_FORBIDDEN")
-        if (
-            settings.execution_enabled
-            or not settings.execution_dry_run
-            or not settings.execution_kill_switch
-            or settings.execution_gateway_mode != "disabled"
-            or settings.autopilot_enabled
-        ):
-            raise ValueError("LOCAL_ONLY_SETTINGS_REQUIRED")
+        connection = _isolated_connection(session, _storage)
+        assert_miami_settings(settings)
         if any(
             type(v) is not Decimal or not v.is_finite() or v < 0
             for v in (slippage_allowance, uncertainty_buffer)
@@ -372,6 +385,12 @@ def prepare_miami_candidate(
                 model_kind="fixed_heuristic",
                 settings=settings.model_dump(mode="json"),
             )
+            if _storage is not None:
+                records["owned_storage"] = dict(
+                    database_path=str(_storage.database_path),
+                    database_id=_storage.authorization.database_id,
+                    generation=_storage.owner.generation,
+                )
             risk_payload = json.loads(risk_row.raw_json)
             risk_payload["raw"]["miami_records_sha256"] = canonical_hash(
                 json.loads(encode_json(records))
@@ -390,6 +409,8 @@ def prepare_miami_candidate(
             if risk.action.value != "ALLOW" or risk.hard_blocks:
                 blockers.append("PHASE_3N_ALLOW")
             engines = MiamiEngineOutputs(decision, sizing.decision, risk, request, output)
+            if _storage is not None:
+                verify_miami_storage(session, _storage, now=utc_now())
         return MiamiPreparationResult(
             "COMPUTED_UNQUALIFIED",
             ticker,
@@ -400,6 +421,7 @@ def prepare_miami_candidate(
             orderbook,
             orderbook_receipt,
             engines,
+            owned_storage=_storage,
         )
     except (ValueError, TypeError, KeyError, AttributeError, ArithmeticError) as exc:
         return MiamiPreparationResult("BLOCKED", ticker, (str(exc),), {})
@@ -419,7 +441,9 @@ def verify_miami_preparation_handoff(
         PositionSizingDecisionLog,
     )
 
-    _isolated_connection(session)
+    if type(result) is not MiamiPreparationResult:
+        raise ValueError("COMPLETED_MIAMI_PREPARATION_REQUIRED")
+    _isolated_connection(session, result.owned_storage)
     if type(result) is not MiamiPreparationResult or result.state != "COMPUTED_UNQUALIFIED":
         raise ValueError("COMPLETED_MIAMI_PREPARATION_REQUIRED")
     if (
@@ -433,6 +457,17 @@ def verify_miami_preparation_handoff(
     ):
         raise ValueError("MIAMI_HANDOFF_ORIGINALS_REQUIRED")
     records, engines = result.records, result.engine_outputs
+    if result.owned_storage is not None:
+        storage = result.owned_storage
+        expected_storage = dict(
+            database_path=str(storage.database_path),
+            database_id=storage.authorization.database_id,
+            generation=storage.owner.generation,
+        )
+        if canonical_hash(records.get("owned_storage")) != canonical_hash(expected_storage):
+            raise ValueError("MIAMI_HANDOFF_STORAGE_BINDING")
+    elif "owned_storage" in records:
+        raise ValueError("MIAMI_HANDOFF_STORAGE_REQUIRED")
     at, current = _at(records["decision_at"]), _at(now)
     if not 0 <= (current - at).total_seconds() <= 60:
         raise ValueError("MIAMI_HANDOFF_STALE_OR_FUTURE")
@@ -563,7 +598,8 @@ def verify_miami_preparation_handoff(
     ) != canonical_hash(_decode(result.orderbook.artifact)):
         raise ValueError("MIAMI_HANDOFF_SNAPSHOT_CHANGED")
     engine_records: tuple[tuple[str, PositionSizingDecision | AdvancedRiskDecision], ...] = (
-        ("sizing", engines.phase3m), ("risk", engines.phase3n)
+        ("sizing", engines.phase3m),
+        ("risk", engines.phase3n),
     )
     for name, value in engine_records:
         expected = value.as_dict()
@@ -574,3 +610,54 @@ def verify_miami_preparation_handoff(
             or _at(value.decision_timestamp) != at
         ):
             raise ValueError("MIAMI_HANDOFF_ENGINE_CHANGED")
+
+
+def prepare_miami_candidate(
+    session: Session,
+    *,
+    context: MiamiGateContext,
+    orderbook: MiamiOriginal,
+    orderbook_receipt: Artifact,
+    settings: Settings,
+    slippage_allowance: Decimal,
+    uncertainty_buffer: Decimal,
+    fee_evidence: dict[str, Any] | None,
+) -> MiamiPreparationResult:
+    """Original public API remains memory-only; never writes an arbitrary file."""
+    return _prepare_miami_candidate(
+        session,
+        context=context,
+        orderbook=orderbook,
+        orderbook_receipt=orderbook_receipt,
+        settings=settings,
+        slippage_allowance=slippage_allowance,
+        uncertainty_buffer=uncertainty_buffer,
+        fee_evidence=fee_evidence,
+    )
+
+
+def prepare_owned_miami_candidate(
+    session: Session,
+    *,
+    storage: MiamiOwnedStorage,
+    context: MiamiGateContext,
+    orderbook: MiamiOriginal,
+    orderbook_receipt: Artifact,
+    settings: Settings,
+    slippage_allowance: Decimal,
+    uncertainty_buffer: Decimal,
+    fee_evidence: dict[str, Any] | None,
+) -> MiamiPreparationResult:
+    """Generate actual rows directly in the actively owned authorized file."""
+    verify_miami_storage(session, storage, now=utc_now())
+    return _prepare_miami_candidate(
+        session,
+        context=context,
+        orderbook=orderbook,
+        orderbook_receipt=orderbook_receipt,
+        settings=settings,
+        slippage_allowance=slippage_allowance,
+        uncertainty_buffer=uncertainty_buffer,
+        fee_evidence=fee_evidence,
+        _storage=storage,
+    )
