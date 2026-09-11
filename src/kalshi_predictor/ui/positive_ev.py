@@ -61,13 +61,21 @@ def render_research(report: dict[str, Any]) -> str:
         )
     )
     fields = (
-        ("ticker", "Market"), ("category", "Category"), ("side", "Side"), ("model", "Model"),
+        ("ticker", "Market"),
+        ("category", "Category"),
+        ("side", "Side"),
+        ("model", "Model"),
         ("independent_probability", "Independent probability"),
-        ("executable_price", "Executable price"), ("gross_edge", "Gross edge"),
-        ("fees", "Fees"), ("slippage", "Slippage"), ("uncertainty", "Uncertainty"),
-        ("net_ev", "Net EV"), ("settlement_eta", "Settlement ETA"),
+        ("executable_price", "Executable price"),
+        ("gross_edge", "Gross edge"),
+        ("fees", "Fees"),
+        ("slippage", "Slippage"),
+        ("uncertainty", "Uncertainty"),
+        ("net_ev", "Net EV"),
+        ("settlement_eta", "Settlement ETA"),
         ("student_t_gross_edge", "Student-t gross stress"),
-        ("data_sources", "Data sources"), ("first_blocker", "First blocker"),
+        ("data_sources", "Data sources"),
+        ("first_blocker", "First blocker"),
     )
     header = "".join(f"<th>{label}</th>" for _, label in fields)
     rows = "".join(
@@ -100,6 +108,15 @@ def create_router() -> APIRouter:
     @router.get("/positive-ev", response_class=HTMLResponse)
     def positive_ev() -> HTMLResponse:
         path = Path(os.environ.get("POSITIVE_EV_REPORT_PATH", "reports/positive_ev/current.json"))
-        return HTMLResponse(render_research(read_research(path)))
+        html = render_research(read_research(path))
+        cohort = os.environ.get("POSITIVE_EV_COHORT_ROOT")
+        control = os.environ.get("POSITIVE_EV_CONTROL_ROOT")
+        if cohort and control:
+            from kalshi_predictor.ui.research_journals import read_cohort, render_cohort
+
+            html = html.replace(
+                "</body>", render_cohort(read_cohort(Path(cohort), Path(control))) + "</body>"
+            )
+        return HTMLResponse(html)
 
     return router
