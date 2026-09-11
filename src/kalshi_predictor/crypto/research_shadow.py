@@ -367,8 +367,10 @@ def connect(path: Path, *, readonly: bool = False) -> sqlite3.Connection:
     return db
 
 
-def append_decision(path: Path, request_raw: bytes) -> dict:
+def append_decision(path: Path, request_raw: bytes, *, require_new: bool = False) -> dict:
     """Actual-clock atomic original+forecast append; identical requests are idempotent."""
+    if type(require_new) is not bool:
+        raise ValueError("EXACT_REQUIRE_NEW_FLAG")
     with closing(connect(path)) as db:
         db.execute("BEGIN IMMEDIATE")
         old = db.execute(
@@ -376,6 +378,8 @@ def append_decision(path: Path, request_raw: bytes) -> dict:
             (sha(request_raw),),
         ).fetchone()
         if old:
+            if require_new:
+                raise ValueError("RESEARCH_REQUEST_ALREADY_EXISTS")
             if sha(old[0]) != old[1]:
                 raise ValueError("CORRUPT_RESEARCH_RECORD")
             return _read_decision(db, old[0], old[1])

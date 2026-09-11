@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 
 from kalshi_predictor.crypto.settlement_target import SettlementBenchmarkTarget
 from kalshi_predictor.forecasting.crypto_v3_independent import (
@@ -98,7 +99,7 @@ def analyze_crypto_research(
         prediction_recorded_at=None,
         shadow_decision_written=False,
         blockers=[
-            "SETTLEMENT_AVERAGE_PREDICTIVE_ENGINE_MISSING",
+            "TERMINAL_PROXY_ROUTE_NOT_SETTLEMENT_AVERAGE",
             "BENCHMARK_BASIS_UNCALIBRATED",
             "ORIGINAL_RULE_SEMANTICS_NOT_CERTIFIED",
             "VERIFIED_EXECUTION_COST_EVIDENCE_REQUIRED",
@@ -108,3 +109,21 @@ def analyze_crypto_research(
     return CryptoResearchAnalysis(
         json.dumps(value, sort_keys=True, default=str, allow_nan=False).encode()
     )
+
+
+def record_crypto_average_research(*, journal: Path, request_raw: bytes) -> dict:
+    """Explicit crypto_v3 research-family route; real original-bound average writer.
+
+    The exact average model name is retained. No terminal-price fallback, account,
+    paper admission or cost defaults are supplied by this orchestration entrypoint.
+    """
+    from kalshi_predictor.forecasting.crypto_average_shadow_route import record_average_shadow
+
+    return record_average_shadow(journal=journal, request_raw=request_raw)
+
+
+def crypto_average_research_status(*, journal: Path) -> dict:
+    """Read only route-linked records, separate from unlinked research or paper."""
+    from kalshi_predictor.forecasting.crypto_average_shadow_route import route_status
+
+    return route_status(journal)
