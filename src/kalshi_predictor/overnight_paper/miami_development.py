@@ -19,7 +19,10 @@ from kalshi_predictor.utils.time import utc_now
 
 from .dataset_store import persist_dataset_record
 from .evaluation_dataset import _validate_stored_observation
-from .miami_preparation import MiamiPreparationResult, verify_miami_preparation_handoff
+from .miami_preparation import (
+    MiamiDevelopmentPreparationResult,
+    verify_miami_development_handoff,
+)
 from .miami_storage import MiamiOwnedStorage, verify_miami_storage
 from .provenance import Artifact, canonical_hash
 from .rule_verifier import RuleDocument
@@ -181,7 +184,7 @@ def freeze_miami_development_protocol(
 
 
 def _verify_protocol_record(
-    session: Session, protocol: Artifact, preparation: MiamiPreparationResult
+    session: Session, protocol: Artifact, preparation: MiamiDevelopmentPreparationResult
 ) -> None:
     saved = session.execute(
         text("SELECT captured_at,payload FROM overnight_sprint_cycles WHERE id=:id"),
@@ -211,7 +214,7 @@ def _verify_protocol_record(
 
 
 def _cost_protocol(
-    protocol: Artifact, preparation: MiamiPreparationResult, settings: Settings
+    protocol: Artifact, preparation: MiamiDevelopmentPreparationResult, settings: Settings
 ) -> dict:
     row = _strict(protocol)
     expected = {
@@ -271,7 +274,7 @@ def _cost_protocol(
 
 def append_miami_development(
     *,
-    preparation: MiamiPreparationResult,
+    preparation: MiamiDevelopmentPreparationResult,
     model: Artifact,
     model_code: bytes,
     settings: Settings,
@@ -289,7 +292,10 @@ def append_miami_development(
     """
     from .candidate_assembly import _assemble_candidate
 
-    if type(preparation) is not MiamiPreparationResult or preparation.owned_storage is None:
+    if (
+        type(preparation) is not MiamiDevelopmentPreparationResult
+        or preparation.owned_storage is None
+    ):
         raise ValueError("OWNED_MIAMI_DEVELOPMENT_PREPARATION_REQUIRED")
     storage = preparation.owned_storage
     database_id = storage.authorization.database_id
@@ -302,7 +308,7 @@ def append_miami_development(
             at = utc_now()
             verify_miami_storage(session, storage, now=at)
             _verify_protocol_record(session, cost_protocol, preparation)
-            verify_miami_preparation_handoff(session, preparation, now=at)
+            verify_miami_development_handoff(session, preparation, now=at)
             artifact = _assemble_candidate(
                 preparation=preparation,
                 model=model,

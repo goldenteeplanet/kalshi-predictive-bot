@@ -36,7 +36,9 @@ from kalshi_predictor.overnight_paper.coordinator import (
 from kalshi_predictor.overnight_paper.evaluation_dataset import build_observation
 from kalshi_predictor.overnight_paper.gate_context import QualificationContext
 from kalshi_predictor.overnight_paper.miami_preparation import (
+    MiamiDevelopmentPreparationResult,
     MiamiPreparationResult,
+    verify_miami_development_handoff,
     verify_miami_preparation_handoff,
 )
 from kalshi_predictor.overnight_paper.miami_provenance import (
@@ -195,14 +197,24 @@ def _assemble_candidate(
     as a candidate attestation. Runtime/code and every gate are rechecked by the
     existing qualification implementation; failed readiness remains diagnostic.
     """
-    miami = type(preparation) is MiamiPreparationResult
+    development = type(preparation) is MiamiDevelopmentPreparationResult
+    miami = isinstance(preparation, MiamiPreparationResult)
+    if development != (_development_rule is not None):
+        raise ValueError("EXACT_DEVELOPMENT_ROUTE_REQUIRED")
     if isinstance(preparation, MiamiPreparationResult):
         if miami_session is None:
             raise ValueError("MIAMI_PERSISTED_SESSION_REQUIRED")
-        verify_miami_preparation_handoff(miami_session, preparation, now=now)
+        if type(preparation) is MiamiDevelopmentPreparationResult:
+            verify_miami_development_handoff(miami_session, preparation, now=now)
+        else:
+            verify_miami_preparation_handoff(miami_session, preparation, now=now)
     if (
-        type(preparation) not in (WeatherPreparationResult, MiamiPreparationResult)
-        or preparation.state != "COMPUTED_UNQUALIFIED"
+        type(preparation) not in (
+            WeatherPreparationResult, MiamiPreparationResult, MiamiDevelopmentPreparationResult
+        )
+        or preparation.state != (
+            "DEVELOPMENT_COMPUTED_UNQUALIFIED" if development else "COMPUTED_UNQUALIFIED"
+        )
     ):
         raise ValueError("COMPLETED_WEATHER_PREPARATION_REQUIRED")
     if model is None or not model_code:
@@ -602,6 +614,12 @@ def _assemble_candidate(
         )
     )
     inputs.update({key + "_artifact_sha256": value.sha256 for key, value in artifacts.items()})
+    if development:
+        inputs.update(
+            development_pricing_scope="VISIBLE_ONE_CONTRACT_NOT_ADMISSION_QUALIFIED",
+            admission_book_qualification=records["book_qualification"],
+            development_book_structure=records["development_book_structure"],
+        )
     decision_id = canonical_hash(inputs)
     provenance = ProvenanceContext(
         artifacts, tuple(sources), (), model_code, features, code_sha, policy.version

@@ -80,6 +80,43 @@ class MiamiPreparationResult:
     owned_storage: MiamiOwnedStorage | None = None
 
 
+@dataclass(frozen=True)
+class MiamiDevelopmentPreparationResult(MiamiPreparationResult):
+    """Visible-price research only; never an admission preparation result."""
+
+
+def _development_book_structure(book: dict[str, Any]) -> dict[str, Any]:
+    """Preserve admission results; check actual visible one-contract quotes separately."""
+    if book["tick_status"] != "VERIFIED" or not 0 <= book["receipt_age_seconds"] <= 60:
+        raise ValueError("DEVELOPMENT_FRESH_VALID_TICK_BOOK_REQUIRED")
+    sides = {}
+    for key in ("YES", "NO"):
+        row = book["sides"][key]
+        bid, ask, bid_depth, ask_depth = (
+            Decimal(str(row[field])) for field in ("bid", "ask", "bid_depth", "ask_depth")
+        )
+        if (
+            any(not value.is_finite() for value in (bid, ask, bid_depth, ask_depth))
+            or not 0 < bid <= ask < 1
+            or bid_depth < 1
+            or ask_depth < 1
+        ):
+            raise ValueError("DEVELOPMENT_VISIBLE_ONE_CONTRACT_BOOK_REQUIRED")
+        sides[key] = dict(
+            bid=str(bid),
+            ask=str(ask),
+            bid_depth=str(bid_depth),
+            ask_depth=str(ask_depth),
+            buy_price_source=row["buy_price_source"],
+            visible_one_contract=True,
+        )
+    return dict(
+        scope="VISIBLE_ONE_CONTRACT_RESEARCH_NOT_ADMISSION_QUALIFICATION",
+        admission_qualification_sha256=canonical_hash(book),
+        sides=sides,
+    )
+
+
 def _snapshot_id(session: Session, ticker: str) -> int | None:
     row = session.scalar(
         select(MarketSnapshot)
@@ -158,6 +195,7 @@ def _prepare_miami_candidate(
     uncertainty_buffer: Decimal,
     fee_evidence: dict[str, Any] | None,
     _storage: MiamiOwnedStorage | None = None,
+    _development: bool = False,
 ) -> MiamiPreparationResult:
     """Run actual forecast persistence, sizing and risk after exact replay/book/fees.
 
@@ -168,7 +206,10 @@ def _prepare_miami_candidate(
     """
     records: dict[str, Any] = {}
     ticker = ""
+    result_type = MiamiDevelopmentPreparationResult if _development else MiamiPreparationResult
     try:
+        if _development and _storage is None:
+            raise ValueError("OWNED_DEVELOPMENT_STORAGE_REQUIRED")
         connection = _isolated_connection(session, _storage)
         assert_miami_settings(settings)
         if any(
@@ -205,7 +246,8 @@ def _prepare_miami_candidate(
             ),
             price_ranges=market.get("price_ranges"),
         )
-        if not book["executable"]:
+        structure = _development_book_structure(book) if _development else None
+        if not _development and not book["executable"]:
             raise ValueError("NO_EXECUTABLE_BOOK")
         if fee_evidence is None:
             raise ValueError("ORIGINAL_CERTIFIED_FEE_EVIDENCE_REQUIRED")
@@ -231,7 +273,9 @@ def _prepare_miami_candidate(
         for side, key, p in ((BUY_YES, "YES", probability), (BUY_NO, "NO", 1 - probability)):
             if side == BUY_NO and not settings.paper_allow_buy_no:
                 continue
-            if book["sides"][key]["executable"]:
+            if (structure is not None and structure["sides"][key]["visible_one_contract"]) or (
+                structure is None and book["sides"][key]["executable"]
+            ):
                 quote = build_fee_quote(
                     evidence=fee_evidence,
                     ticker=ticker,
@@ -392,6 +436,8 @@ def _prepare_miami_candidate(
                     database_id=_storage.authorization.database_id,
                     generation=_storage.owner.generation,
                 )
+            if structure is not None:
+                records["development_book_structure"] = structure
             risk_payload = json.loads(risk_row.raw_json)
             risk_payload["raw"]["miami_records_sha256"] = canonical_hash(
                 json.loads(encode_json(records))
@@ -403,6 +449,17 @@ def _prepare_miami_candidate(
                 "CERTIFIED_RULE_AND_72H_FINALITY_REQUIRED",
                 "MIAMI_CANDIDATE_ASSEMBLY_REQUIRED",
             ]
+            if _development:
+                blockers.append("DEVELOPMENT_ONLY_NO_ADMISSION_AUTHORITY")
+                blockers.extend(
+                    sorted(
+                        {
+                            row["first_blocker"]
+                            for row in book["sides"].values()
+                            if row["first_blocker"]
+                        }
+                    )
+                )
             if ev.net_ev <= settings.paper_min_edge:
                 blockers.append("POSITIVE_NET_EV")
             if sizing.decision.live_candidate_contracts < 1:
@@ -412,8 +469,8 @@ def _prepare_miami_candidate(
             engines = MiamiEngineOutputs(decision, sizing.decision, risk, request, output)
             if _storage is not None:
                 verify_miami_storage(session, _storage, now=utc_now())
-        return MiamiPreparationResult(
-            "COMPUTED_UNQUALIFIED",
+        return result_type(
+            "DEVELOPMENT_COMPUTED_UNQUALIFIED" if _development else "COMPUTED_UNQUALIFIED",
             ticker,
             tuple(blockers),
             records,
@@ -425,11 +482,11 @@ def _prepare_miami_candidate(
             owned_storage=_storage,
         )
     except (ValueError, TypeError, KeyError, AttributeError, ArithmeticError) as exc:
-        return MiamiPreparationResult("BLOCKED", ticker, (str(exc),), {})
+        return result_type("BLOCKED", ticker, (str(exc),), {})
 
 
-def verify_miami_preparation_handoff(
-    session: Session, result: MiamiPreparationResult, *, now: datetime
+def _verify_miami_preparation_handoff(
+    session: Session, result: MiamiPreparationResult, *, now: datetime, _development: bool = False
 ) -> None:
     """Verify actual records before a future assembler consumes this typed result.
 
@@ -442,10 +499,12 @@ def verify_miami_preparation_handoff(
         PositionSizingDecisionLog,
     )
 
-    if type(result) is not MiamiPreparationResult:
+    expected_type = MiamiDevelopmentPreparationResult if _development else MiamiPreparationResult
+    if type(result) is not expected_type or (_development and result.owned_storage is None):
         raise ValueError("COMPLETED_MIAMI_PREPARATION_REQUIRED")
     _isolated_connection(session, result.owned_storage)
-    if type(result) is not MiamiPreparationResult or result.state != "COMPUTED_UNQUALIFIED":
+    expected_state = "DEVELOPMENT_COMPUTED_UNQUALIFIED" if _development else "COMPUTED_UNQUALIFIED"
+    if result.state != expected_state:
         raise ValueError("COMPLETED_MIAMI_PREPARATION_REQUIRED")
     if (
         result.engine_outputs is None
@@ -566,10 +625,15 @@ def verify_miami_preparation_handoff(
     )
     if canonical_hash(book) != canonical_hash(records["book_qualification"]):
         raise ValueError("MIAMI_HANDOFF_BOOK_QUALIFICATION_CHANGED")
+    structure = _development_book_structure(book) if _development else None
+    if structure is not None and canonical_hash(structure) != canonical_hash(
+        records.get("development_book_structure")
+    ):
+        raise ValueError("MIAMI_DEVELOPMENT_BOOK_STRUCTURE_CHANGED")
     key = "YES" if engines.decision.side == BUY_YES else "NO"
     if (
         engines.decision.side not in {BUY_YES, BUY_NO}
-        or not book["sides"][key]["executable"]
+        or (structure is None and not book["sides"][key]["executable"])
         or engines.decision.limit_price != Decimal(book["sides"][key]["ask"])
     ):
         raise ValueError("MIAMI_HANDOFF_EXECUTABLE_SIDE_CHANGED")
@@ -614,6 +678,49 @@ def verify_miami_preparation_handoff(
             or _at(value.decision_timestamp) != at
         ):
             raise ValueError("MIAMI_HANDOFF_ENGINE_CHANGED")
+
+
+def verify_miami_preparation_handoff(
+    session: Session, result: MiamiPreparationResult, *, now: datetime
+) -> None:
+    _verify_miami_preparation_handoff(session, result, now=now)
+
+
+def verify_miami_development_handoff(
+    session: Session, result: MiamiDevelopmentPreparationResult, *, now: datetime
+) -> None:
+    _verify_miami_preparation_handoff(session, result, now=now, _development=True)
+
+
+def prepare_owned_miami_development(
+    session: Session,
+    *,
+    storage: MiamiOwnedStorage,
+    context: MiamiGateContext,
+    orderbook: MiamiOriginal,
+    orderbook_receipt: Artifact,
+    settings: Settings,
+    slippage_allowance: Decimal,
+    uncertainty_buffer: Decimal,
+    fee_evidence: dict[str, Any] | None,
+) -> MiamiDevelopmentPreparationResult:
+    """Generate genuine owned development rows; caller commits, no admission result."""
+    verify_miami_storage(session, storage, now=utc_now())
+    result = _prepare_miami_candidate(
+        session,
+        context=context,
+        orderbook=orderbook,
+        orderbook_receipt=orderbook_receipt,
+        settings=settings,
+        slippage_allowance=slippage_allowance,
+        uncertainty_buffer=uncertainty_buffer,
+        fee_evidence=fee_evidence,
+        _storage=storage,
+        _development=True,
+    )
+    if type(result) is not MiamiDevelopmentPreparationResult:
+        raise ValueError("DEVELOPMENT_PREPARATION_TYPE_REQUIRED")
+    return result
 
 
 def prepare_miami_candidate(

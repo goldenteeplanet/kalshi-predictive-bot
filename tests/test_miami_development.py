@@ -3,7 +3,7 @@
 
 import hashlib
 import json
-from dataclasses import replace
+from dataclasses import fields, replace
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -13,12 +13,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from test_miami_owned_preparation import owned_inputs  # noqa: F401
 from test_miami_preparation import prepared_inputs  # noqa: F401
-from test_miami_source_gate import artifact, context, fixtures, grid_context  # noqa: F401
+from test_miami_source_gate import artifact, context, fixtures, grid_context, receipt  # noqa: F401
 from test_overnight_activation import baseline_template  # noqa: F401
 
 from kalshi_predictor.overnight_paper import miami_development as module
 from kalshi_predictor.overnight_paper import miami_preparation as prep
-from kalshi_predictor.overnight_paper import miami_preparation_runner as runner
 from kalshi_predictor.overnight_paper import rule_verifier
 from kalshi_predictor.overnight_paper.candidate_assembly import (
     MIAMI_MODEL_ENTRYPOINT,
@@ -41,6 +40,33 @@ from kalshi_predictor.overnight_paper.watcher import (
 def development(owned_inputs, monkeypatch):
     args, _ = owned_inputs
     args = dict(args, slippage_allowance=Decimal(1), uncertainty_buffer=Decimal(1))
+    ctx = args["context"]
+    market = ctx.market.artifact.decode()
+    market["market"].update(volume_fp="102", open_interest_fp="2", liquidity_dollars="0")
+    market_original = replace(ctx.market, artifact=artifact(market))
+    args["context"] = replace(
+        ctx,
+        market=market_original,
+        catalog_receipts=(receipt(market_original), *ctx.catalog_receipts[1:]),
+    )
+    for capture in args["fee_evidence"]["captures"]:
+        envelope = json.loads(bytes.fromhex(capture["payload_hex"]))
+        if envelope["url"] == ctx.market.url:
+            envelope["body"] = market
+            raw = json.dumps(envelope).encode()
+            capture.update(payload_hex=raw.hex(), sha256=hashlib.sha256(raw).hexdigest())
+    book = replace(
+        args["orderbook"],
+        artifact=artifact(
+            dict(
+                orderbook_fp=dict(
+                    yes_dollars=[[".39", "49"]],
+                    no_dollars=[[".52", "1"]],
+                )
+            )
+        ),
+    )
+    args.update(orderbook=book, orderbook_receipt=receipt(book))
     args["settings"] = args["settings"].model_copy(
         update={"dynamic_position_sizing_external_risk_cap": 0}
     )
@@ -58,8 +84,22 @@ def development(owned_inputs, monkeypatch):
             storage=storage, scenario_total=Decimal("1.01")
         )
         monkeypatch.setattr(module, "utc_now", prep.utc_now)
-        result = runner.run_miami_preparation_live_cycle(**args, runtime_owner=owner).live_result
-        assert result is not None and result.state == "COMPUTED_UNQUALIFIED"
+        prepare_args = {
+            key: args[key]
+            for key in (
+                "context",
+                "orderbook",
+                "orderbook_receipt",
+                "settings",
+                "slippage_allowance",
+                "uncertainty_buffer",
+                "fee_evidence",
+            )
+        }
+        with Session(storage.engine) as session:
+            result = prep.prepare_owned_miami_development(session, storage=storage, **prepare_args)
+            assert result.state == "DEVELOPMENT_COMPUTED_UNQUALIFIED", result.blockers
+            session.commit()
         assert Decimal(str(result.records["ev"]["net_ev"])) < 0
         repository = Path(__file__).resolve().parents[1]
         dependencies, code = miami_model_code_bundle(repository)
@@ -86,7 +126,7 @@ def development(owned_inputs, monkeypatch):
         model = Artifact(hashlib.sha256(raw_model).hexdigest(), raw_model)
         document = RuleDocument(module.TERMS_URL, b"synthetic test-only original terms")
         monkeypatch.setattr(module, "TERMS_SHA256", document.sha256)
-        receipt = artifact(
+        terms_receipt = artifact(
             dict(
                 url=document.url,
                 method="GET",
@@ -97,14 +137,14 @@ def development(owned_inputs, monkeypatch):
                 sha256=document.sha256,
             )
         )
-        monkeypatch.setattr(module, "TERMS_RECEIPT_SHA256", receipt.sha256)
+        monkeypatch.setattr(module, "TERMS_RECEIPT_SHA256", terms_receipt.sha256)
         rule = module.DevelopmentRuleBinding(
             result.ticker,
             result.ticker.rsplit("-", 1)[0],
             "KXTEMPMIAH",
             result.records["observation_time"],
-            receipt.sha256,
-            receipt.payload.hex(),
+            terms_receipt.sha256,
+            terms_receipt.payload.hex(),
         )
         yield dict(
             preparation=result,
@@ -135,6 +175,10 @@ def test_owned_development_appends_without_certified_rule_or_paper(development):
     assert row["decision"]["settlement_deadline"] is None
     assert row["development"]["calibrated"] is False
     assert row["development"]["rule_certified"] is False
+    assert row["decision"]["admission_book_qualification"]["executable"] is False
+    assert row["decision"]["admission_book_qualification"]["liquidity_score"] == "3.67000"
+    assert "THIN_BOOK" in development["preparation"].blockers
+    assert row["decision"]["development_book_structure"]["sides"]["YES"]["ask"] == "0.48"
     assert development["preparation"].engine_outputs.phase3m.live_candidate_contracts == 0
     assert row["decision"]["forecast_probability"] == str(
         development["preparation"].engine_outputs.forecast_output.yes_probability
@@ -142,7 +186,7 @@ def test_owned_development_appends_without_certified_rule_or_paper(development):
     with Session(development["preparation"].owned_storage.engine) as session:
         for table in ("paper_orders", "paper_fills", "overnight_shadow"):
             assert session.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0
-        with pytest.raises(ValueError, match="NO_UNAMBIGUOUS_CERTIFIED_RULE"):
+        with pytest.raises(ValueError, match="COMPLETED_MIAMI_PREPARATION_REQUIRED"):
             assemble_miami_candidate(
                 session=session,
                 preparation=development["preparation"],
@@ -288,3 +332,78 @@ def test_protocol_requires_real_prior_same_ledger_record(development, monkeypatc
     with pytest.raises(ValueError):
         module.append_miami_development(**args)
     assert chain(args) == ()
+
+
+@pytest.mark.parametrize("change", ["stale", "tick", "crossed", "depth", "missing", "original"])
+def test_development_structural_failure_never_creates_new_records(development, change):
+    original = development["preparation"]
+    book = original.orderbook
+    payload = book.artifact.decode()
+    if change == "stale":
+        book = replace(book, received_at=book.received_at - timedelta(minutes=2))
+    elif change == "tick":
+        payload["orderbook_fp"]["yes_dollars"][0][0] = ".395"
+    elif change == "crossed":
+        payload["orderbook_fp"]["yes_dollars"][0][0] = ".80"
+    elif change == "depth":
+        payload["orderbook_fp"]["no_dollars"][0][1] = ".5"
+    elif change == "missing":
+        payload["orderbook_fp"]["no_dollars"] = []
+    book = replace(book, artifact=artifact(payload))
+    if change == "original":
+        book = replace(book, artifact=replace(book.artifact, sha256="0" * 64))
+    with Session(original.owned_storage.engine) as session:
+        before = session.execute(text("SELECT count(*) FROM forecasts")).scalar_one()
+        result = prep.prepare_owned_miami_development(
+            session,
+            storage=original.owned_storage,
+            context=original.original_context,
+            orderbook=book,
+            orderbook_receipt=receipt(book),
+            settings=development["settings"],
+            slippage_allowance=Decimal(1),
+            uncertainty_buffer=Decimal(1),
+            fee_evidence=original.records["fee_contract"]["evidence"],
+        )
+        assert type(result) is prep.MiamiDevelopmentPreparationResult
+        assert result.state == "BLOCKED", result
+        assert session.execute(text("SELECT count(*) FROM forecasts")).scalar_one() == before
+
+
+def test_admission_cannot_relabel_development_or_use_same_thin_book(development):
+    result = development["preparation"]
+    with Session(result.owned_storage.engine) as session:
+        with pytest.raises(ValueError, match="COMPLETED_MIAMI_PREPARATION_REQUIRED"):
+            prep.verify_miami_preparation_handoff(session, result, now=prep.utc_now())
+        normal = prep.prepare_owned_miami_candidate(
+            session,
+            storage=result.owned_storage,
+            context=result.original_context,
+            orderbook=result.orderbook,
+            orderbook_receipt=result.orderbook_receipt,
+            settings=development["settings"],
+            slippage_allowance=Decimal(1),
+            uncertainty_buffer=Decimal(1),
+            fee_evidence=result.records["fee_contract"]["evidence"],
+        )
+        assert normal.state == "BLOCKED" and normal.blockers == ("NO_EXECUTABLE_BOOK",)
+        forged = prep.MiamiPreparationResult(
+            **{
+                field.name: getattr(result, field.name)
+                for field in fields(prep.MiamiPreparationResult)
+            }
+        )
+        forged = replace(forged, state="COMPUTED_UNQUALIFIED")
+        with pytest.raises(ValueError):
+            prep.verify_miami_preparation_handoff(session, forged, now=prep.utc_now())
+        with pytest.raises(ValueError, match="OWNED_MIAMI_DEVELOPMENT_PREPARATION_REQUIRED"):
+            module.append_miami_development(**dict(development, preparation=forged))
+
+
+@pytest.mark.parametrize("key", ["book_qualification", "development_book_structure"])
+def test_handoff_rejects_altered_book_evidence(development, key):
+    result = development["preparation"]
+    result.records[key]["forged"] = True
+    with pytest.raises(ValueError):
+        module.append_miami_development(**development)
+    assert chain(development) == ()
