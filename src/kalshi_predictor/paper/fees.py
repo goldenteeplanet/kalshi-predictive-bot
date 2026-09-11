@@ -18,6 +18,10 @@ CONTRACT_KEY = "guarded_fee_contract"
 CONTRACT_KIND = "guarded-single-buy-fee-v1"
 PUBLIC_BASE = "https://external-api.kalshi.com/trade-api/v2"
 ROUNDING_URL = "https://docs.kalshi.com/getting_started/fee_rounding"
+EVENT_SCHEMA_URL = "https://docs.kalshi.com/openapi.yaml"
+EVENT_DATA_SCHEMA_SHA256 = "11aa0ec82b47bc186a52fb8d8bd1a16cd876edad42dd9749625f2a1b78a92c38"
+LEGACY_EVENT_OVERRIDE_PROFILE = "explicit-null-pair-v1"
+OPTIONAL_EVENT_OVERRIDE_PROFILE = "event-data-optional-pair-v1"
 
 
 def _bytes(value: Any) -> bytes:
@@ -55,13 +59,163 @@ class CertifiedFeePolicy:
     settlement_document_sha256: str
     settlement_fee: str
     interpretation: str = "quadratic-ceil6dp-cent-buy-zero-accumulator-v1"
+    event_override_interpretation: str = LEGACY_EVENT_OVERRIDE_PROFILE
+    event_schema_document_sha256: str | None = None
 
     @property
     def version(self) -> str:
-        return hashlib.sha256(_bytes(asdict(self))).hexdigest()
+        fields = asdict(self)
+        if (
+            self.event_override_interpretation == LEGACY_EVENT_OVERRIDE_PROFILE
+            and self.event_schema_document_sha256 is None
+        ):
+            # Preserve every existing policy hash and historical quote byte contract.
+            fields.pop("event_override_interpretation")
+            fields.pop("event_schema_document_sha256")
+        return hashlib.sha256(_bytes(fields)).hexdigest()
 
 
 CERTIFIED_FEE_POLICIES: tuple[CertifiedFeePolicy, ...] = ()
+
+
+def _strict_event_json(raw: bytes) -> dict[str, Any]:
+    def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("FEE_EVENT_DUPLICATE_JSON_KEY")
+            result[key] = value
+        return result
+
+    def nonfinite(value: str) -> None:
+        raise ValueError("FEE_EVENT_NONFINITE_JSON")
+
+    value = json.loads(raw, object_pairs_hook=unique, parse_constant=nonfinite)
+    if not isinstance(value, dict):
+        raise ValueError("FEE_FULL_EVENT_RESPONSE_REQUIRED")
+    return value
+
+
+def _optional_event_override_state(
+    event: dict[str, Any],
+    *,
+    evidence: dict[str, Any],
+    event_url: str,
+    captured_body: dict[str, Any],
+    market: dict[str, Any],
+    received_at: datetime,
+    quoted_at: datetime,
+    current: datetime,
+    policy: CertifiedFeePolicy,
+    documents: list[tuple[str, str]],
+) -> str:
+    if (
+        policy.event_override_interpretation != OPTIONAL_EVENT_OVERRIDE_PROFILE
+        or policy.event_schema_document_sha256 != EVENT_DATA_SCHEMA_SHA256
+        or (EVENT_SCHEMA_URL, EVENT_DATA_SCHEMA_SHA256) not in documents
+    ):
+        raise ValueError("FEE_REVIEWED_EVENT_SCHEMA_REQUIRED")
+    original = evidence.get("event_original")
+    if not isinstance(original, dict):
+        raise ValueError("FEE_RAW_EVENT_ORIGINAL_REQUIRED")
+    raw = bytes.fromhex(original["payload_hex"])
+    if (
+        not 0 < len(raw) <= 1_000_000
+        or hashlib.sha256(raw).hexdigest() != original.get("sha256")
+        or original.get("url") != event_url
+        or type(original.get("status")) is not int
+        or original["status"] != 200
+        or _at(original["received_at"]) != received_at
+        or not received_at <= quoted_at <= current
+        or not 0 <= (current - received_at).total_seconds() <= 60
+    ):
+        raise ValueError("FEE_RAW_EVENT_ORIGINAL_MISMATCH")
+    body = _strict_event_json(raw)
+    if _bytes(body) != _bytes(captured_body):
+        raise ValueError("FEE_RAW_EVENT_BODY_MAPPING_MISMATCH")
+    if (
+        not isinstance(body.get("event"), dict)
+        or not isinstance(body.get("markets"), list)
+        or any(not isinstance(market, dict) for market in body["markets"])
+    ):
+        raise ValueError("FEE_FULL_EVENT_RESPONSE_REQUIRED")
+    required_strings = (
+        "event_ticker",
+        "series_ticker",
+        "sub_title",
+        "title",
+        "collateral_return_type",
+    )
+    sources = event.get("settlement_sources")
+    if (
+        any(not isinstance(event.get(key), str) for key in required_strings)
+        or not event["event_ticker"]
+        or not event["series_ticker"]
+        or type(event.get("mutually_exclusive")) is not bool
+        or "settlement_sources" not in event
+        or (sources is not None and not isinstance(sources, list))
+    ):
+        raise ValueError("FEE_EVENT_DATA_SCHEMA_REQUIRED_FIELDS")
+    for source in sources or []:
+        if not isinstance(source, dict) or any(
+            key in source and not isinstance(source[key], str) for key in ("name", "url")
+        ):
+            raise ValueError("FEE_EVENT_SETTLEMENT_SOURCE_SCHEMA")
+    keys = {"fee_type_override", "fee_multiplier_override"}
+
+    def reject_unknown_fee_fields(
+        node: Any,
+        *,
+        event_root: bool = False,
+        market_root: bool = False,
+    ) -> None:
+        if isinstance(node, dict):
+            if market_root:
+                market_pair = keys.intersection(node)
+                if market_pair and (
+                    market_pair != keys or any(node[key] is not None for key in keys)
+                ):
+                    raise ValueError("FEE_MARKET_OVERRIDE_UNSUPPORTED")
+                if node.get("fee_waiver_expiration_time") is not None:
+                    raise ValueError("FEE_MARKET_WAIVER_UNSUPPORTED")
+            for key, value in node.items():
+                known_empty_market_field = market_root and key in keys | {
+                    "fee_waiver_expiration_time"
+                }
+                if "fee" in key.lower() and not (
+                    (event_root and key in keys) or known_empty_market_field
+                ):
+                    raise ValueError("FEE_UNKNOWN_EVENT_FEE_FIELD")
+                if event_root and key == "markets":
+                    if not isinstance(value, list) or any(
+                        not isinstance(item, dict) for item in value
+                    ):
+                        raise ValueError("FEE_EVENT_NESTED_MARKETS_SCHEMA")
+                    for item in value:
+                        reject_unknown_fee_fields(item, market_root=True)
+                else:
+                    reject_unknown_fee_fields(value)
+        elif isinstance(node, list):
+            for value in node:
+                reject_unknown_fee_fields(value)
+
+    reject_unknown_fee_fields(market, market_root=True)
+    for key, value in body.items():
+        if "fee" in key.lower():
+            raise ValueError("FEE_UNKNOWN_EVENT_FEE_FIELD")
+        if key == "markets":
+            for item in value:
+                reject_unknown_fee_fields(item, market_root=True)
+        else:
+            reject_unknown_fee_fields(value, event_root=key == "event")
+    present = keys.intersection(event)
+    if not present:
+        return "INHERIT_SERIES_OMITTED_PAIR"
+    if present != keys:
+        raise ValueError("FEE_PARTIAL_EVENT_OVERRIDE_PAIR")
+    if all(event[key] is None for key in keys):
+        return "INHERIT_SERIES_EXPLICIT_NULL_PAIR"
+    raise ValueError("FEE_EVENT_OVERRIDE_UNSUPPORTED")
 
 
 def single_buy_fees(price: Decimal, multiplier: Decimal, rate: Decimal) -> dict[str, Decimal]:
@@ -113,6 +267,12 @@ def _compute(request: dict[str, Any], *, now: datetime) -> dict[str, Any]:
     if len(matches) != 1:
         raise ValueError("REVIEWED_FEE_POLICY_REQUIRED")
     policy = matches[0]
+    optional_event_profile = policy.event_override_interpretation == OPTIONAL_EVENT_OVERRIDE_PROFILE
+    if not optional_event_profile and (
+        policy.event_override_interpretation != LEGACY_EVENT_OVERRIDE_PROFILE
+        or policy.event_schema_document_sha256 is not None
+    ):
+        raise ValueError("FEE_EVENT_OVERRIDE_PROFILE_UNSUPPORTED")
     if not _at(policy.effective_from) <= at <= current < _at(policy.effective_to):
         raise ValueError("FEE_POLICY_NOT_EFFECTIVE")
     if (
@@ -153,11 +313,12 @@ def _compute(request: dict[str, Any], *, now: datetime) -> dict[str, Any]:
     if not isinstance(captures, list) or len(captures) != 3:
         raise ValueError("EXACT_MARKET_EVENT_SERIES_FEE_ORIGINALS_REQUIRED")
     rows = {}
+    received_times = {}
     for original in captures:
         raw = bytes.fromhex(original["payload_hex"])
         if not 0 < len(raw) <= 1_000_000 or hashlib.sha256(raw).hexdigest() != original["sha256"]:
             raise ValueError("FEE_CAPTURE_HASH_MISMATCH")
-        row = json.loads(raw)
+        row = _strict_event_json(raw) if optional_event_profile else json.loads(raw)
         if (
             row["url"] in rows
             or _at(row["received_at"]) > at
@@ -165,10 +326,36 @@ def _compute(request: dict[str, Any], *, now: datetime) -> dict[str, Any]:
         ):
             raise ValueError("FEE_CAPTURE_AMBIGUOUS_OR_STALE")
         rows[row["url"]] = row["body"]
+        received_times[row["url"]] = _at(row["received_at"])
     ticker = request["ticker"]
     market = rows[f"{PUBLIC_BASE}/markets/{ticker}"]["market"]
     event_id = market["event_ticker"]
-    event = rows[f"{PUBLIC_BASE}/events/{event_id}"]["event"]
+    event_url = f"{PUBLIC_BASE}/events/{event_id}"
+    event_body = rows[event_url]
+    if optional_event_profile and (
+        not isinstance(event_body, dict) or not isinstance(event_body.get("event"), dict)
+    ):
+        raise ValueError("FEE_FULL_EVENT_RESPONSE_REQUIRED")
+    event = event_body["event"]
+    optional_fields = {}
+    if optional_event_profile:
+        override_state = _optional_event_override_state(
+            event,
+            evidence=evidence,
+            event_url=event_url,
+            captured_body=event_body,
+            market=market,
+            received_at=received_times[event_url],
+            quoted_at=at,
+            current=current,
+            policy=policy,
+            documents=originals,
+        )
+        optional_fields = {
+            "event_override_state": override_state,
+            "event_override_interpretation": policy.event_override_interpretation,
+            "event_schema_document_sha256": policy.event_schema_document_sha256,
+        }
     series_id = event["series_ticker"]
     series = rows[f"{PUBLIC_BASE}/series/{series_id}"]["series"]
     if (
@@ -178,16 +365,22 @@ def _compute(request: dict[str, Any], *, now: datetime) -> dict[str, Any]:
         or market["status"] not in {"active", "open"}
         or not current < _at(market["close_time"])
         or series["fee_type"] != "quadratic"
-        or "fee_type_override" not in event
-        or "fee_multiplier_override" not in event
-        or event["fee_type_override"] is not None
-        or event.get("fee_multiplier_override") is not None
+        or (
+            not optional_event_profile
+            and (
+                "fee_type_override" not in event
+                or "fee_multiplier_override" not in event
+                or event["fee_type_override"] is not None
+                or event.get("fee_multiplier_override") is not None
+            )
+        )
     ):
         raise ValueError("FEE_CATALOG_OR_OVERRIDE_INVALID")
     price, floor = _decimal(request["price"]), _decimal(request["simulator_floor"])
     fees = single_buy_fees(price, _decimal(series["fee_multiplier"]), _decimal(policy.taker_rate))
     return {
         **request,
+        **optional_fields,
         "event_id": event_id,
         "series": series_id,
         "fee_decomposition": {k: str(v) for k, v in fees.items()},
