@@ -6,9 +6,10 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from urllib.parse import parse_qs, urlparse
 
+from kalshi_predictor.crypto.doge_strikes import parse_doge_strike
 from kalshi_predictor.forecasting.crypto_v3_independent import (
     CryptoTarget,
     PriceObservation,
@@ -95,7 +96,33 @@ class SharedCryptoInputs:
         forecast_independent(rows, self.target, decision_at=cutoff)
         return tuple(rows)
 
-    def bind_market(self, market: dict) -> None:
+    def bind_market(self, market: dict, *, cutoff: datetime | None = None) -> None:
+        if self.target.symbol == "DOGE":
+            if not isinstance(cutoff, datetime):
+                raise ValueError("DOGE_EXPLICIT_INPUT_CUTOFF_REQUIRED")
+            parsed = parse_doge_strike(market, cutoff=cutoff)
+            if parsed.operator == "between":
+                raise ValueError("DOGE_RANGE_INCLUSIVITY_AND_CF_PRECISION_UNCERTIFIED")
+            doge_comparator = "ABOVE" if parsed.operator == "greater" else "BELOW"
+            strike = parsed.floor if parsed.floor is not None else parsed.cap
+            if type(self.target.threshold) not in (int, float):
+                raise ValueError("DOGE_TARGET_METADATA_MISMATCH")
+            try:
+                threshold = Decimal(str(self.target.threshold))
+            except (InvalidOperation, ValueError):
+                raise ValueError("DOGE_TARGET_METADATA_MISMATCH") from None
+            if (
+                self.target.comparator != doge_comparator
+                or self.target.observation_at != parsed.close_time
+                or self.target.lower is not None
+                or self.target.upper is not None
+                or isinstance(self.target.threshold, bool)
+                or self.target.threshold is None
+                or not threshold.is_finite()
+                or threshold != strike
+            ):
+                raise ValueError("DOGE_TARGET_METADATA_MISMATCH")
+            return
         prefix = {
             "BTC": "KXBTC",
             "ETH": "KXETH",

@@ -376,6 +376,7 @@ def run(
                         "title",
                         "subtitle",
                         "strike_type",
+                        "custom_strike",
                         "floor_strike",
                         "cap_strike",
                         "rules_primary",
@@ -386,7 +387,9 @@ def run(
                     raise ValueError("CONTRACT_METADATA_CHANGED")
                 fixed_metadata = metadata
                 if crypto_inputs is not None:
-                    crypto_inputs.bind_market(market)
+                    crypto_inputs.bind_market(
+                        market, cutoff=aware(datetime.fromisoformat(market_receipt["received_at"]))
+                    )
                 close = bound_close_time(market)
                 if target is not None and close != target:
                     raise ValueError("TARGET_METADATA_CHANGED")
