@@ -28,13 +28,14 @@ from kalshi_predictor.forecasting.crypto_v3_independent import (
     PriceObservation,
     forecast_independent,
 )
+from kalshi_predictor.ingest.public_market_discovery import event_markets
 
 
 def NOW():
     return datetime.now(UTC)
 
 
-BASE = "https://api.elections.kalshi.com/trade-api/v2"
+BASE = "https://external-api.kalshi.com/trade-api/v2"
 
 
 def main(output: Path, *, sol_history: bool = False) -> None:
@@ -167,12 +168,24 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                 )
             prices.sort(key=lambda price: price.observed_at)
             listing, book_received, book_sha = get(
-                f"{BASE}/markets?series_ticker={series}&status=open&limit=100", symbol + "-markets"
+                f"{BASE}/events?"
+                + urlencode(
+                    dict(
+                        series_ticker=series,
+                        status="open",
+                        with_nested_markets="true",
+                        limit=2,
+                        min_close_ts=int(NOW().timestamp()),
+                    )
+                ),
+                symbol + "-events",
             )
             decision = NOW()
             candidates = []
-            for market in listing.get("markets", []):
+            for market in event_markets(listing, series):
                 try:
+                    if market.get("status") not in ("active", "open") or market.get("result"):
+                        continue
                     close = datetime.fromisoformat(market["close_time"].replace("Z", "+00:00"))
                     horizon = (close - decision).total_seconds()
                     if not 0 < horizon <= min(72 * 3600, len(prices) * 60):
@@ -204,7 +217,8 @@ def main(output: Path, *, sol_history: bool = False) -> None:
                     continue
             selection = sorted(candidates, key=lambda item: (item[0], item[1]["ticker"]))[:2]
             selection_proof = {
-                "method": "FIRST_PAGE_OPEN_VALID_HORIZON_NEAREST_STRIKE_THEN_TICKER_TOP_2",
+                "method": "FIRST_TWO_OPEN_EVENTS_VALID_HORIZON_NEAREST_STRIKE_THEN_TICKER_TOP_2",
+                "catalog_partial": bool(listing.get("cursor")),
                 "ordered_tickers": [item[1]["ticker"] for item in selection],
                 "selected_as_of": decision.isoformat(),
             }
@@ -387,7 +401,7 @@ def main(output: Path, *, sol_history: bool = False) -> None:
         cohort_sha256=hashlib.sha256(encoded).hexdigest(),
         execution_enabled=False,
         paper_positions_created=0,
-        coverage="FIRST_100_OPEN_MARKETS_PER_SERIES; TOP_2_NEAR_SPOT; NOT_EXHAUSTIVE",
+        coverage="FIRST_2_OPEN_EVENTS_PER_SERIES_MAX_400_MARKETS; TOP_2_NEAR_SPOT; NOT_EXHAUSTIVE",
     )
     (output / "report.json").write_text(
         json.dumps(report, indent=2, allow_nan=False), encoding="utf-8"

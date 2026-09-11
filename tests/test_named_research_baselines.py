@@ -60,6 +60,29 @@ def arguments(*, book=False):
     return args
 
 
+def test_nested_event_original_baseline_keeps_original_hash():
+    args = arguments(book=True)
+    args["ticker"] = "KXBTC-EVENT-STRIKE"
+    rows = json.loads(args["market_original"])["markets"]
+    rows[0].update(ticker=args["ticker"], event_ticker="KXBTC-EVENT")
+    raw, digest = encoded(
+        dict(events=[dict(series_ticker="KXBTC", event_ticker="KXBTC-EVENT", markets=rows)])
+    )
+    args.update(
+        market_original=raw,
+        market_sha256=digest,
+        orderbook_url="https://external-api.kalshi.com/trade-api/v2/markets/KXBTC-EVENT-STRIKE/orderbook?depth=5",
+    )
+    result = capture_named_baselines(**args)["market_implied_v1"]
+    assert result["probability"] == 0.45
+    assert result["input_provenance"]["market_sha256"] == digest
+    altered = json.loads(raw)
+    altered["events"][0]["markets"][0]["event_ticker"] = "KXBTC-OTHER"
+    args["market_original"], args["market_sha256"] = encoded(altered)
+    with pytest.raises(ValueError, match="MARKET_EVENT_MEMBERSHIP"):
+        capture_named_baselines(**args)
+
+
 @pytest.mark.parametrize(
     "book,p,source", [(False, 0.25, "market_quote_midpoint"), (True, 0.45, "orderbook_midpoint")]
 )

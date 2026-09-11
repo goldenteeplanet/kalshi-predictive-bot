@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 from kalshi_predictor.forecasting.base import ForecastInput
 from kalshi_predictor.forecasting.market_implied import MarketImpliedForecaster
+from kalshi_predictor.ingest.public_market_discovery import event_markets
 
 BASELINE_MODULES = (
     "kalshi_predictor.crypto.named_research_baselines",
@@ -19,6 +20,7 @@ BASELINE_MODULES = (
     "kalshi_predictor.forecasting.base",
     "kalshi_predictor.kalshi.orderbook",
     "kalshi_predictor.utils.decimals",
+    "kalshi_predictor.ingest.public_market_discovery",
 )
 
 
@@ -75,6 +77,8 @@ def capture_named_baselines(
         raise ValueError("BASELINE_FUTURE_RECEIPT")
     listing = _original(market_original, market_sha256)
     markets = listing.get("markets")
+    if markets is None and "events" in listing:
+        markets = event_markets(listing, ticker.split("-", 1)[0])
     if not isinstance(markets, list):
         raise ValueError("BASELINE_ORIGINAL_MARKET_LIST_REQUIRED")
     matches = [row for row in markets if isinstance(row, dict) and row.get("ticker") == ticker]
@@ -100,7 +104,7 @@ def capture_named_baselines(
         url = urlparse(orderbook_url)
         if (
             url.scheme != "https"
-            or url.netloc != "api.elections.kalshi.com"
+            or url.netloc not in {"api.elections.kalshi.com", "external-api.kalshi.com"}
             or url.path != f"/trade-api/v2/markets/{ticker}/orderbook"
             or bool(url.fragment)
         ):
