@@ -51,6 +51,18 @@ def load_capture(root: Path) -> dict[str, bytes]:
     return files
 
 
+def evaluation_dependencies(capture_files: dict[str, bytes]) -> dict[str, bytes]:
+    """Actual executed v2 validation code, distinct from historical model code."""
+    if _json(capture_files["plan.original.json"])["schema"] != "cf-average-prospective-slot-v2":
+        return {}
+    from kalshi_predictor.forecasting import crypto_average_shadow_route as route
+
+    path = Path(route.__file__).resolve()
+    if path != Path(__file__).resolve().parents[1] / "forecasting/crypto_average_shadow_route.py":
+        raise ValueError("EVALUATION_VALIDATOR_IDENTITY")
+    return {str(path): path.read_bytes()}
+
+
 def write_evaluation(
     output: Path,
     journal: Path,
@@ -62,6 +74,7 @@ def write_evaluation(
     """Exclusive immutable publication; recording receipt follows fsynced artifacts."""
     source_path = Path(__file__)
     source_raw = source_path.read_bytes()
+    dependencies = evaluation_dependencies(capture_files)
     evaluated_at = S.now()
     result = evaluate(
         journal,
@@ -70,6 +83,8 @@ def write_evaluation(
         official=official,
         as_of=evaluated_at,
     )
+    if any(Path(path).read_bytes() != raw for path, raw in dependencies.items()):
+        raise ValueError("VALIDATOR_CHANGED_DURING_EVALUATION")
     output.mkdir(parents=False, exist_ok=False)
     artifacts = {}
 
@@ -109,9 +124,13 @@ def write_evaluation(
             save(f"official/{i}.json", raw)
             save(f"official/{i}.receipt.json", receipt_raw)
         save("evaluator.original.py", source_raw)
+        for raw in dependencies.values():
+            save("route-validator.original.py", raw)
         save("evaluation.json", S.encode(result))
         save("aggregate.json", S.encode(aggregate([result])))
-        if source_path.read_bytes() != source_raw:
+        if source_path.read_bytes() != source_raw or any(
+            Path(path).read_bytes() != raw for path, raw in dependencies.items()
+        ):
             raise ValueError("EVALUATOR_CHANGED_DURING_PUBLICATION")
         recorded = S.now()
         if recorded < evaluated_at:
@@ -187,9 +206,10 @@ def _inspect(
     pin_receipt = _json(capture_files["shadow-pins.recorded.json"])
     captured = S.at(completion["recorded_after_result"])
     target_at = S.at(plan["target_at"])
+    routed = plan["schema"] == "cf-average-prospective-slot-v2"
     if (
-        plan["schema"] != "cf-average-prospective-slot-v1"
-        or pins["schema"] != "cf-shadow-pins-v1"
+        plan["schema"] not in {"cf-average-prospective-slot-v1", "cf-average-prospective-slot-v2"}
+        or pins["schema"] != ("cf-shadow-pins-v2" if routed else "cf-shadow-pins-v1")
         or pins["event"] != plan["event_ticker"]
         or S.at(pins["target"]) != target_at
         or pin_receipt["sha256"] != S.sha(capture_files["shadow-pins.json"])
@@ -202,6 +222,20 @@ def _inspect(
         or completion["result_sha256"] != S.sha(capture_files["result.json"])
     ):
         raise ValueError("CAPTURE_CHRONOLOGY_OR_IDENTITY")
+    route_sources = {}
+    if routed:
+        if plan.get("research_route") != "crypto_v3/settlement_average":
+            raise ValueError("EXACT_RESEARCH_ROUTE_REQUIRED")
+        proof = _json(capture_files["source.originals.json"])
+        if not S.same(plan["source_sha256"], {k: v["sha256"] for k, v in proof.items()}):
+            raise ValueError("PLANNED_ROUTE_SOURCE_CLOSURE")
+        for value in proof.values():
+            S.original(value)
+        route_sources = {
+            k.removeprefix("route."): v for k, v in proof.items() if k.startswith("route.")
+        }
+    elif "research_route" in plan or any("route_sha256" in p for p in pins["decisions"]):
+        raise ValueError("LEGACY_CAPTURE_CANNOT_CLAIM_ROUTE")
     hypotheses = {h["name"]: h for h in plan["hypotheses"]}
     if len(hypotheses) != 2 or len(plan["hypotheses"]) != 2 or len(pins["decisions"]) != 4:
         raise ValueError("ALL_PREDECLARED_WINDOW_SCENARIOS_REQUIRED")
@@ -263,12 +297,40 @@ def _inspect(
                 raise ValueError("JOURNAL_IDENTITY_OR_COMPLETION")
             for source in stored["source_originals"].values():
                 S.original(source)
+            if routed and any(
+                not S.same(source, proof.get(name))
+                for name, source in stored["source_originals"].items()
+            ):
+                raise ValueError("ACTUAL_WRITER_SOURCE_NOT_PLANNED")
             target = S.target_from_request(request)
             decision_at = S.at(decision["decision_at"])
             durable = S.at(committed["original_committed_before"])
             if not decision_at <= S.at(decision["computed_at"]) <= durable <= captured:
                 raise ValueError("JOURNAL_VISIBILITY")
             target.validate(as_of=durable)
+            if routed:
+                from kalshi_predictor.forecasting.crypto_average_shadow_route import (
+                    validate_route_receipt,
+                )
+
+                route_raw = capture_files[f"route-{pin['decision_id']}.json"]
+                route_completion = capture_files[f"route_completion-{pin['decision_id']}.json"]
+                if (
+                    S.sha(route_raw) != pin["route_sha256"]
+                    or S.sha(route_completion) != pin["route_completion_sha256"]
+                ):
+                    raise ValueError("ROUTE_EXTERNAL_PIN_MISMATCH")
+                linked = validate_route_receipt(
+                    route_raw,
+                    route_completion,
+                    decision=dict(decision, journal_completion=committed),
+                    payload_sha=item[1],
+                    completion_sha=c[1],
+                    source_originals=route_sources,
+                    as_of=captured,
+                )
+                if not S.at(plan["not_before"]) <= S.at(linked["route_receipt"]["invoked_at"]):
+                    raise ValueError("ROUTE_PRECEDES_PLAN")
             semantic = target.validate(as_of=decision_at)
             if (
                 S.sha(S.encode(semantic)) != pin["rule_version"]
@@ -368,6 +430,12 @@ def _inspect(
                     completion_sha256=c[1],
                 )
             )
+            if routed:
+                rows[-1].update(
+                    research_route=plan["research_route"],
+                    route_sha256=pin["route_sha256"],
+                    route_completion_sha256=pin["route_completion_sha256"],
+                )
     return dict(
         schema="crypto-shadow-evaluation-v1"
         if official is not None

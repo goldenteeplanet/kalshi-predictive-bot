@@ -96,10 +96,14 @@ def bounds(row, event, target):
     return tuple(values)
 
 
-def source_proof():
+def source_proof(*, routed=False):
     proof = S.source_originals()
     path = Path(__file__).resolve()
     proof["capture_script"] = artifact(path.read_bytes())
+    if routed:
+        from kalshi_predictor.forecasting.crypto_average_shadow_route import route_sources
+
+        proof.update({"route." + name: value for name, value in route_sources().items()})
     return proof
 
 
@@ -117,6 +121,7 @@ def capture(
     if target.tzinfo is None or target.minute or target.second or target.microsecond:
         raise ValueError("AWARE_EXACT_FUTURE_HOUR_REQUIRED")
     plan = _json(protocol_raw)
+    routed = plan.get("schema") == "cf-average-prospective-slot-v2"
     expected = {
         "schema",
         "target_at",
@@ -150,13 +155,20 @@ def capture(
         rule_authority="DECLARED_UNCERTIFIED",
         net_costs="UNKNOWN",
     )
+    if routed:
+        expected.add("research_route")
+        fixed.update(
+            schema="cf-average-prospective-slot-v2", research_route="crypto_v3/settlement_average"
+        )
     if (
         set(plan) != expected
         or not S.same({k: plan[k] for k in fixed}, fixed)
         or S.at(plan["target_at"]) != target
         or plan["event_ticker"] != event_for(target)
         or plan["terms_sha256"] != TERMS_SHA
-        or not S.same(plan["source_sha256"], {k: v["sha256"] for k, v in source_proof().items()})
+        or not S.same(
+            plan["source_sha256"], {k: v["sha256"] for k, v in source_proof(routed=routed).items()}
+        )
     ):
         raise ValueError("EXACT_PREDECLARED_PLAN_REQUIRED")
     not_before, not_after = S.at(plan["not_before"]), S.at(plan["not_after"])
@@ -193,7 +205,7 @@ def capture(
 
     try:
         r = terms(rule_raw, rule_receipt_raw, check())
-        proof = source_proof()
+        proof = source_proof(routed=routed)
         save("plan.original.json", protocol_raw)
         save("terms.original", rule_raw)
         save("terms.receipt.json", rule_receipt_raw)
@@ -441,20 +453,48 @@ def capture(
                 dict(recorded_at=check().isoformat(), requests={k: S.sha(v) for k, v in queued})
             ),
         )
-        if source_proof() != proof or any(
+        if source_proof(routed=routed) != proof or any(
             S.sha((output / k).read_bytes()) != v for k, v in manifests.items()
         ):
             raise ValueError("FROZEN_SOURCE_OR_ORIGINAL_CHANGED")
         S.initialize_journal(output / "research.db")
-        results = []
+        results: list[dict] = []
         for filename, raw in queued:
             check()
-            result = S.append_decision(output / "research.db", raw)
+            route_pins = {}
+            if routed:
+                from kalshi_predictor.forecasting.crypto_research_router import (
+                    record_crypto_average_research,
+                )
+
+                linked = record_crypto_average_research(
+                    journal=output / "research.db", request_raw=raw
+                )
+                result = linked["decision"]
+                directory = output / "research.db.crypto-v3-route" / result["decision_id"]
+                for kind, name in (
+                    ("route", "route.json"),
+                    ("route_completion", "completion.json"),
+                ):
+                    original = (directory / name).read_bytes()
+                    returned = linked["route_receipt" if kind == "route" else "route_completion"]
+                    if original != S.encode(returned):
+                        raise ValueError("ROUTE_ORIGINAL_CHANGED_BEFORE_ARCHIVE")
+                    archived = f"{kind}-{result['decision_id']}.json"
+                    save(archived, original)
+                    route_pins[kind + "_sha256"] = manifests[archived]
+                if route_pins["route_sha256"] != linked["route_sha256"]:
+                    raise ValueError("ROUTE_RECEIPT_CHANGED")
+            else:
+                result = S.append_decision(output / "research.db", raw)
             if result["journal_completion"]["status"] != "COMPLETE_RESEARCH":
                 raise ValueError("SHADOW_COMPLETION_UNAVAILABLE")
-            results.append(dict(request=filename, decision=result))
+            item = dict(request=filename, decision=result)
+            if routed:
+                item["route_pins"] = route_pins
+            results.append(item)
         check()
-        if source_proof() != proof:
+        if source_proof(routed=routed) != proof:
             raise ValueError("SOURCE_CHANGED")
         with closing(S.connect(output / "research.db", readonly=True)) as db:
             pinned = {
@@ -480,11 +520,13 @@ def capture(
                     rule_version=d["rule_version"],
                 )
             )
+            if routed:
+                pin_rows[-1].update(item["route_pins"])
         save(
             "shadow-pins.json",
             S.encode(
                 dict(
-                    schema="cf-shadow-pins-v1",
+                    schema="cf-shadow-pins-v2" if routed else "cf-shadow-pins-v1",
                     event=event,
                     target=target.isoformat(),
                     decisions=pin_rows,

@@ -115,19 +115,50 @@ def read_route(journal: Path, decision_id: str) -> dict:
     if directory.is_symlink() or (directory / "failure.json").exists():
         raise ValueError("INCOMPLETE_ROUTE_RECEIPT")
     raw = _read(directory / "route.json")
-    receipt = _load(_read(directory / "completion.json"))
-    value = _load(raw)
     decision, payload_sha, completion_sha = _row(journal, decision_id)
+    return validate_route_receipt(
+        raw,
+        _read(directory / "completion.json"),
+        decision=decision,
+        payload_sha=payload_sha,
+        completion_sha=completion_sha,
+        source_originals=route_sources(),
+        as_of=now(),
+    )
+
+
+def validate_route_receipt(
+    raw: bytes,
+    receipt_raw: bytes,
+    *,
+    decision: dict,
+    payload_sha: str,
+    completion_sha: str,
+    source_originals: dict,
+    as_of: datetime,
+) -> dict:
+    """Pure replay against an independently anchored routing-source closure.
+
+    The live reader supplies its exact current closure; archival evaluation must
+    first verify the external capture pin and its complete predeclared source map.
+    No filesystem, model execution, source substitution or historical clock guess.
+    """
+    value, receipt = _load(raw), _load(receipt_raw)
     if (
         receipt["route_sha256"] != S.sha(raw)
         or value["schema"] != "crypto-v3-average-route-v1"
         or value["route"] != ROUTE
-        or value["decision_id"] != decision_id
+        or value["decision_id"] != decision["decision_id"]
         or value["request_sha256"] != decision["request_sha256"]
         or value["payload_sha256"] != payload_sha
         or value["completion_sha256"] != completion_sha
         or value["model"] != MODEL
         or value["model_role"] != "RESEARCH_CHALLENGER"
+        or decision["forecast"]["model"] != MODEL
+        or decision["forecast"]["model_role"] != "RESEARCH_CHALLENGER"
+        or decision["paper_eligible"] is not False
+        or decision["execution_authority"] is not False
+        or decision["journal_completion"]["decision_id"] != decision["decision_id"]
         or value["forecast_status"] != decision["journal_completion"]["status"]
         or value["execution_authority"] is not False
         or value["paper_eligible"] is not False
@@ -137,7 +168,7 @@ def read_route(journal: Path, decision_id: str) -> dict:
         <= S.at(decision["journal_completion"]["original_committed_before"])
         <= S.at(value["linked_at"])
         <= S.at(receipt["recorded_after_route"])
-        <= now()
+        <= as_of
     ):
         raise ValueError("ROUTE_RECEIPT_BINDING")
     expected_names = {"crypto_average_shadow_route", "crypto_research_router", "model_roles"}
@@ -145,10 +176,10 @@ def read_route(journal: Path, decision_id: str) -> dict:
         raise ValueError("ROUTE_SOURCE_CLOSURE")
     for artifact in value["route_source_originals"].values():
         S.original(artifact)
-    if not S.same(value["route_source_originals"], route_sources()):
-        # v1 supports only the exact current reviewed closure. Historical source
-        # migrations need a separately reviewed registry; never silently relabel.
-        raise ValueError("ROUTE_SOURCE_VERSION_NOT_CURRENT")
+    if set(source_originals) != expected_names or not S.same(
+        value["route_source_originals"], source_originals
+    ):
+        raise ValueError("ROUTE_SOURCE_CLOSURE_NOT_ANCHORED")
     return {
         "route": ROUTE,
         "route_sha256": S.sha(raw),

@@ -68,6 +68,7 @@ def collect(
     clock=S.now,
 ) -> dict:
     files = E.load_capture(capture)
+    dependencies = E.evaluation_dependencies(files)
     plan = _json(files["plan.original.json"])
     target = S.at(plan["target_at"])
     start, end = target + timedelta(minutes=5), target + timedelta(minutes=6)
@@ -89,6 +90,8 @@ def collect(
     validation = E.validate_capture(
         journal, files, completion_sha256=completion_sha256, as_of=current
     )
+    if any(Path(path).read_bytes() != raw for path, raw in dependencies.items()):
+        raise ValueError("VALIDATOR_CHANGED_DURING_PREFLIGHT")
     selected = sorted({row["ticker"] for row in validation["rows"]})
     if len(selected) != 2:
         raise ValueError("EXACT_TWO_SELECTED_CONTRACTS_REQUIRED")
@@ -98,6 +101,7 @@ def collect(
         str(Path(__file__).resolve()): Path(__file__).read_bytes(),
         str(Path(E.__file__).resolve()): Path(E.__file__).read_bytes(),
     }
+    originals.update(dependencies)
     root = Path(S.__file__).resolve().parents[1]
     for name, item in S.source_originals().items():
         originals[str(root / (name.replace(".", "/") + ".py"))] = bytes.fromhex(item["hex"])
@@ -128,6 +132,8 @@ def collect(
     )
     save("collector.original.py", Path(__file__).read_bytes())
     save("evaluator.original.py", Path(E.__file__).read_bytes())
+    for raw in dependencies.values():
+        save("route-validator.original.py", raw)
     official = {}
     states = []
     for i, ticker in enumerate(selected):
