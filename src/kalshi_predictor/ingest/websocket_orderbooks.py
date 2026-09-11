@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.locks import db_writer_monitor
 from kalshi_predictor.data.repositories import insert_market_snapshot
+from kalshi_predictor.ingest.public_book_stage import validate_public_stage
 from kalshi_predictor.kalshi.client import KalshiClient
 from kalshi_predictor.kalshi.data_environment import endpoint_environment, matched_environment
 from kalshi_predictor.kalshi.orderbook import LocalOrderbook, OrderbookSequenceGap
@@ -285,9 +286,13 @@ def drain_staged_websocket_orderbooks(
                 if payload.get("category") != "websocket_orderbook_snapshot":
                     continue
                 try:
-                    environment = matched_environment(
-                        payload["rest_base_url"], payload["websocket_url"]
-                    )
+                    if payload.get("source_kind") == "PUBLIC_REST":
+                        validate_public_stage(payload, as_of=utc_now())
+                        environment = endpoint_environment(payload["rest_base_url"])
+                    else:
+                        environment = matched_environment(
+                            payload["rest_base_url"], payload["websocket_url"]
+                        )
                     expected = endpoint_environment((settings or Settings()).kalshi_base_url)
                     if payload.get("source_environment") != environment or environment != expected:
                         raise ValueError("STAGED_MARKET_DATA_ENVIRONMENT_MISMATCH")
