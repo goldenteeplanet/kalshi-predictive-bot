@@ -125,6 +125,7 @@ def verify_complete_provenance(
             if source.get("clock_basis") in {
                 "public_rest_receipt",
                 "coinbase-btc-trade-closed-candles-v1",
+                "miami-original-replay-receipt-v1",
             }:
                 continue
             if any(
@@ -150,9 +151,26 @@ def verify_complete_provenance(
         ):
             raise ValueError("COINBASE_FEATURE_RECORD_REQUIRED")
         clocks = []
+        miami_hashes = {
+            sha for sha, value in sources.items()
+            if value.get("clock_basis") == "miami-original-replay-receipt-v1"
+        }
+        if any(sum(r.get("source_sha256") == sha for r in records) != 1 for sha in miami_hashes):
+            raise ValueError("MIAMI_FEATURE_RECORD_REQUIRED")
         for record in records:
             source = sources[record["source_sha256"]]
             observed, visible = aware(record["observed_at"]), aware(record["available_at"])
+            if source.get("clock_basis") == "miami-original-replay-receipt-v1":
+                from .miami_provenance import verify_miami_provenance_source
+
+                miami = verify_miami_provenance_source(source, decision_at=at, now=reference)
+                if (
+                    record.get("name") != "miami_prior_day_original_forecast"
+                    or record.get("value") != miami["forecast"]
+                    or observed != aware(miami["observed_at"])
+                    or visible != aware(miami["available_at"])
+                ):
+                    raise ValueError("MIAMI_FEATURE_ORIGINAL_BINDING")
             if source.get("clock_basis") == "coinbase-btc-trade-closed-candles-v1":
                 from .crypto_source import verify_coinbase_source
 

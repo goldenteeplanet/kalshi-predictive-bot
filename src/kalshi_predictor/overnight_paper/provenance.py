@@ -72,6 +72,11 @@ def validate_source_visibility(
     if not source.get("url") or not source.get("body"):
         raise ValueError("ORIGINAL_SOURCE_PAYLOAD_REQUIRED")
     basis = source.get("clock_basis", "provider")
+    if basis == "miami-original-replay-receipt-v1":
+        from .miami_provenance import verify_miami_provenance_source
+
+        verify_miami_provenance_source(source, decision_at=at, now=reference)
+        return
     if basis == "coinbase-btc-trade-closed-candles-v1":
         from .crypto_source import verify_coinbase_source
 
@@ -287,6 +292,12 @@ def verify_full_provenance(
                 raise ValueError("FUTURE_OR_INCONSISTENT_ARTIFACT_VISIBILITY:" + role)
         for source in sources:
             validate_source_visibility(source, decision_at=at, now=reference)
+            if source.get("clock_basis") == "miami-original-replay-receipt-v1":
+                from .miami_provenance import verify_miami_provenance_binding
+
+                verify_miami_provenance_binding(
+                    source, decision=decision, now=reference, forecast=forecast
+                )
             if source.get("clock_basis") == "coinbase-btc-trade-closed-candles-v1":
                 from .crypto_source import verify_coinbase_binding
 
@@ -380,7 +391,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "b03fc26ef422cdf29e845a08c9dfd4a7a1c4cd5a1a7b750ff3b04812ddd1254a"
     ),
     "kalshi_predictor.overnight_paper.provenance_gate": (
-        "cb5a7fcfb8ffe943a29415d4474bcca6e883876c2a2d0eb679790a303cdf57b5"
+        "f9c5ebbd9872d00af85c4e5c92520d6f90fb63df55e0b962d14f6a53c231edfa"
     ),
     "kalshi_predictor.overnight_paper.qualification": (
         "37067002202fa235cf45afa5b66afaa76fd855172bc7b97ec59ac83f0618661d"
