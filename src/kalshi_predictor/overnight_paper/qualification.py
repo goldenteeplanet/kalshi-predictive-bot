@@ -138,6 +138,7 @@ class GateEvidence:
         if decision_fingerprint(inputs) != self.decision_id:
             return False
         if self.gate == 4 and self.verifier == "miami-canonical-original-replay-v1":
+            from .miami_provenance import MiamiBundleGateContext, verify_miami_bundle_gate4
             from .miami_source_gate import MiamiGateContext, verify_miami_gate4
 
             at = aware(as_of) if as_of is not None else aware(inputs["decision_at"])
@@ -145,6 +146,12 @@ class GateEvidence:
                 return False
             if not aware(report["validated_at"]) <= at < aware(report["valid_until"]):
                 return False
+            if type(self.context) is MiamiBundleGateContext:
+                return verify_miami_bundle_gate4(
+                    self.context, inputs=inputs,
+                    sources=tuple((source.sha256, source.payload) for source in self.sources),
+                    now=at,
+                )
             return isinstance(self.context, MiamiGateContext) and verify_miami_gate4(
                 self.context, inputs=inputs,
                 sources=tuple((source.sha256, source.payload) for source in self.sources), now=at,

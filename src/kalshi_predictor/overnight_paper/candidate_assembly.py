@@ -13,6 +13,9 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
+
+from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.kalshi.orderbook import parse_orderbook
@@ -23,9 +26,23 @@ from kalshi_predictor.overnight_paper.boundary import (
     authorization_fingerprint,
 )
 from kalshi_predictor.overnight_paper.boundary_gate import audit_local_call_path
-from kalshi_predictor.overnight_paper.coordinator import PreparedCandidate
+from kalshi_predictor.overnight_paper.coordinator import (
+    PreparedCandidate,
+    assert_public_only_settings,
+)
 from kalshi_predictor.overnight_paper.evaluation_dataset import build_observation
 from kalshi_predictor.overnight_paper.gate_context import QualificationContext
+from kalshi_predictor.overnight_paper.miami_preparation import (
+    MiamiPreparationResult,
+    verify_miami_preparation_handoff,
+)
+from kalshi_predictor.overnight_paper.miami_provenance import (
+    BUNDLE_URL,
+    MiamiBundleGateContext,
+    miami_feature_record,
+    verify_miami_provenance_source,
+)
+from kalshi_predictor.overnight_paper.miami_source_gate import VERIFIER as MIAMI_VERIFIER
 from kalshi_predictor.overnight_paper.preparation import WeatherPreparationResult
 from kalshi_predictor.overnight_paper.provenance import Artifact, canonical_hash
 from kalshi_predictor.overnight_paper.provenance_gate import (
@@ -72,7 +89,7 @@ def _artifact(value: dict[str, Any]) -> Artifact:
 WEATHER_MODEL_ENTRYPOINT = "kalshi_predictor.forecasting.weather_v2:WeatherV2Forecaster.forecast"
 
 
-def weather_model_code_bundle(repository: Path) -> tuple[dict[str, str], bytes]:
+def _model_code_bundle(repository: Path, *, miami: bool = False) -> tuple[dict[str, str], bytes]:
     """Read the conservative whole-class closure for an explicit model freeze.
 
     The auditor supports top-level classes, not method-qualified symbols. The
@@ -83,7 +100,15 @@ def weather_model_code_bundle(repository: Path) -> tuple[dict[str, str], bytes]:
     repository = repository.resolve(strict=True)
     audit = audit_local_call_path(
         repository,
-        entrypoints=(("kalshi_predictor.forecasting.weather_v2", "WeatherV2Forecaster"),),
+        entrypoints=(
+            (
+                "kalshi_predictor.weather.miami_half_hour_forecast",
+                "forecast_miami_prior_day_grid30",
+            ),
+            ("kalshi_predictor.weather.miami_forecast", "empirical_probability"),
+        )
+        if miami
+        else (("kalshi_predictor.forecasting.weather_v2", "WeatherV2Forecaster"),),
     )
     if not audit.passed:
         raise ValueError("WEATHER_MODEL_DEPENDENCY_AUDIT_FAILED:" + repr(audit.blockers))
@@ -107,17 +132,33 @@ def weather_model_code_bundle(repository: Path) -> tuple[dict[str, str], bytes]:
         )
     bundle = _artifact(
         dict(
-            schema="weather-model-source-bundle-v1",
-            entrypoint=WEATHER_MODEL_ENTRYPOINT,
+            schema="miami-model-source-bundle-v1" if miami else "weather-model-source-bundle-v1",
+            entrypoint=MIAMI_MODEL_ENTRYPOINT if miami else WEATHER_MODEL_ENTRYPOINT,
             sources=sources,
         )
     )
     return dependencies, bundle.payload
 
 
-def _verify_model_dependencies(model: dict[str, Any], model_code: bytes, repository: Path) -> None:
-    dependencies, current_bundle = weather_model_code_bundle(repository)
-    if model.get("model_entrypoint") != WEATHER_MODEL_ENTRYPOINT:
+def weather_model_code_bundle(repository: Path) -> tuple[dict[str, str], bytes]:
+    return _model_code_bundle(repository)
+
+
+MIAMI_MODEL_ENTRYPOINT = (
+    "kalshi_predictor.weather.miami_half_hour_forecast:forecast_miami_prior_day_grid30"
+)
+
+
+def miami_model_code_bundle(repository: Path) -> tuple[dict[str, str], bytes]:
+    return _model_code_bundle(repository, miami=True)
+
+
+def _verify_model_dependencies(
+    model: dict[str, Any], model_code: bytes, repository: Path, *, miami: bool = False
+) -> None:
+    dependencies, current_bundle = _model_code_bundle(repository, miami=miami)
+    expected_entrypoint = MIAMI_MODEL_ENTRYPOINT if miami else WEATHER_MODEL_ENTRYPOINT
+    if model.get("model_entrypoint") != expected_entrypoint:
         raise ValueError("EXACT_WEATHER_MODEL_ENTRYPOINT_REQUIRED")
     if model.get("code_dependencies") != dependencies:
         raise ValueError("FROZEN_MODEL_DEPENDENCY_MISMATCH")
@@ -128,9 +169,9 @@ def _verify_model_dependencies(model: dict[str, Any], model_code: bytes, reposit
         raise ValueError("FROZEN_MODEL_ORIGINAL_CODE_BUNDLE_MISMATCH")
 
 
-def assemble_weather_candidate(
+def _assemble_candidate(
     *,
-    preparation: WeatherPreparationResult,
+    preparation: WeatherPreparationResult | MiamiPreparationResult,
     model: Artifact | None,
     model_code: bytes,
     settings: Settings,
@@ -141,6 +182,7 @@ def assemble_weather_candidate(
     now: datetime,
     include_evaluation_observation: bool = True,
     model_evaluation_head_sha256: str | None = None,
+    miami_session: Session | None = None,
 ) -> PreparedCandidate:
     """Preserve preparation identities and construct verifiable original evidence.
 
@@ -149,8 +191,13 @@ def assemble_weather_candidate(
     as a candidate attestation. Runtime/code and every gate are rechecked by the
     existing qualification implementation; failed readiness remains diagnostic.
     """
+    miami = type(preparation) is MiamiPreparationResult
+    if isinstance(preparation, MiamiPreparationResult):
+        if miami_session is None:
+            raise ValueError("MIAMI_PERSISTED_SESSION_REQUIRED")
+        verify_miami_preparation_handoff(miami_session, preparation, now=now)
     if (
-        type(preparation) is not WeatherPreparationResult
+        type(preparation) not in (WeatherPreparationResult, MiamiPreparationResult)
         or preparation.state != "COMPUTED_UNQUALIFIED"
     ):
         raise ValueError("COMPLETED_WEATHER_PREPARATION_REQUIRED")
@@ -169,6 +216,20 @@ def assemble_weather_candidate(
         )
     ):
         raise ValueError("CREDENTIAL_FREE_LOCAL_SETTINGS_REQUIRED")
+    assert_public_only_settings(settings)
+    try:
+        configured_url = urlsplit(settings.kalshi_db_url)
+    except ValueError:
+        raise ValueError("INVALID_CONFIGURED_DATABASE_URL") from None
+    if (
+        configured_url.username is not None
+        or configured_url.password is not None
+        or configured_url.query
+        or configured_url.fragment
+    ):
+        raise ValueError("CREDENTIAL_OR_QUERY_BEARING_DATABASE_URL_FORBIDDEN")
+    if miami and canonical_hash(config) != canonical_hash(preparation.records["settings"]):
+        raise ValueError("MIAMI_PREPARATION_SETTINGS_CHANGED")
     if (
         authorization.mode != ExecutionMode.LOCAL_PAPER
         or authorization.max_new_positions != 1
@@ -176,8 +237,15 @@ def assemble_weather_candidate(
         or not aware(authorization.created_at) <= aware(now) < aware(authorization.expires_at)
     ):
         raise ValueError("CURRENT_ONE_CONTRACT_AUTHORIZATION_REQUIRED")
-    paper, sizing, risk = preparation.decision, preparation.phase3m, preparation.phase3n
-    output, request = preparation.forecast_output, preparation.risk_request
+    engines = (
+        preparation.engine_outputs
+        if isinstance(preparation, MiamiPreparationResult)
+        else preparation
+    )
+    if engines is None:
+        raise ValueError("ACTUAL_PREPARATION_ENGINE_OUTPUTS_REQUIRED")
+    paper, sizing, risk = engines.decision, engines.phase3m, engines.phase3n
+    output, request = engines.forecast_output, engines.risk_request
     if paper is None or sizing is None or risk is None or output is None or request is None:
         raise ValueError("ACTUAL_PREPARATION_ENGINE_OUTPUTS_REQUIRED")
     records = preparation.records
@@ -195,7 +263,11 @@ def assemble_weather_candidate(
         or risk.decision_timestamp != at
     ):
         raise ValueError("PREPARATION_OUTPUT_IDENTITY_MISMATCH")
-    for key in ("forecast_id", "snapshot_id", "feature_id", "sizing_id", "risk_id"):
+    for key in (
+        ("forecast_id", "snapshot_id", "sizing_id", "risk_id")
+        if miami
+        else ("forecast_id", "snapshot_id", "feature_id", "sizing_id", "risk_id")
+    ):
         if type(records[key]) is not int or records[key] < 1:
             raise ValueError("PERSISTED_PREPARATION_ID_REQUIRED:" + key)
     model_row = model.decode()
@@ -204,9 +276,40 @@ def assemble_weather_candidate(
         or model_row.get("name") != paper.model_name
     ):
         raise ValueError("EXACT_FIXED_WEATHER_MODEL_REQUIRED")
-    _verify_model_dependencies(model_row, model_code, repository)
+    _verify_model_dependencies(model_row, model_code, repository, miami=miami)
     originals: dict[str, tuple[EvidenceReference, dict[str, Any]]] = {}
-    for reference in preparation.source_envelopes:
+    if isinstance(preparation, MiamiPreparationResult):
+        assert preparation.original_context is not None and preparation.orderbook is not None
+        ctx = preparation.original_context
+        assert preparation.orderbook_receipt is not None
+        metadata = zip(
+            (ctx.market, ctx.event, ctx.series, preparation.orderbook),
+            (*ctx.catalog_receipts, preparation.orderbook_receipt),
+            strict=True,
+        )
+        envelopes = []
+        for captured_original, captured_receipt in metadata:
+            envelope = _artifact(
+                dict(
+                    url=captured_original.url,
+                    received_at=captured_original.received_at.isoformat(),
+                    body=captured_original.artifact.decode(),
+                    captured_original_response_sha256=captured_original.artifact.sha256,
+                    captured_original_response_payload_hex=captured_original.artifact.payload.hex(),
+                    original_receipt_sha256=captured_receipt.sha256,
+                    original_receipt_payload_hex=captured_receipt.payload.hex(),
+                    envelope_origin="DERIVED_FROM_RETAINED_ORIGINAL_RESPONSE_AND_RECEIPT",
+                )
+            )
+            envelopes.append(
+                EvidenceReference(
+                    "miami-metadata:" + envelope.sha256, envelope.sha256, envelope.payload
+                )
+            )
+        source_envelopes = tuple(envelopes)
+    else:
+        source_envelopes = preparation.source_envelopes
+    for reference in source_envelopes:
         if not reference.valid():
             raise ValueError("ORIGINAL_PREPARATION_ENVELOPE_HASH_MISMATCH")
         row = json.loads(reference.payload)
@@ -224,9 +327,9 @@ def assemble_weather_candidate(
         raise ValueError("NO_UNAMBIGUOUS_CERTIFIED_RULE")
     policy = policies[0]
     analytical = [url for url in originals if url.endswith("/forecast/hourly")]
-    if len(analytical) != 1:
+    if not miami and len(analytical) != 1:
         raise ValueError("EXACT_ANALYTICAL_FORECAST_SOURCE_REQUIRED")
-    hourly_url = analytical[0]
+    hourly_url = BUNDLE_URL if miami else analytical[0]
     sources = []
     for url, (reference, original) in originals.items():
         row = dict(original)
@@ -249,28 +352,47 @@ def assemble_weather_candidate(
                 provider_updated_at=None,
             )
         sources.append(_artifact(row))
+    miami_verified = None
+    if isinstance(preparation, MiamiPreparationResult):
+        assert preparation.source_bundle is not None
+        miami_verified = verify_miami_provenance_source(
+            preparation.source_bundle, decision_at=at, now=now
+        )
+        sources.append(_artifact(preparation.source_bundle))
+        if model_row.get("version") != "1" or aware(model_row["frozen_at"]) > aware(
+            miami_verified["inputs"]["model_input_as_of"]
+        ):
+            raise ValueError("MIAMI_FIXED_MODEL_FREEZE_BINDING")
     source_hashes = [value.sha256 for value in sources]
     source_by_url = {value.decode()["url"]: value for value in sources}
     analytical_source = source_by_url[hourly_url]
-    feature_record = dict(
-        name="nws_hourly_input",
-        value=analytical_source.decode()["body"]["properties"]["periods"],
-        source_sha256=analytical_source.sha256,
-        observed_at=analytical_source.decode()["provider_generated_at"],
-        available_at=analytical_source.decode()["available_at"],
-    )
+    if isinstance(preparation, MiamiPreparationResult):
+        assert preparation.source_bundle is not None
+        feature_record = miami_feature_record(preparation.source_bundle, decision_at=at, now=now)
+    else:
+        feature_record = dict(
+            name="nws_hourly_input",
+            value=analytical_source.decode()["body"]["properties"]["periods"],
+            source_sha256=analytical_source.sha256,
+            observed_at=analytical_source.decode()["provider_generated_at"],
+            available_at=analytical_source.decode()["available_at"],
+        )
     features = _artifact(
         identity
         | dict(
-            id=records["feature_id"],
-            source_forecast_id=records["source_forecast_id"],
-            weather_link_id=records["weather_link_id"],
+            id=records.get("feature_id"),
+            source_forecast_id=records.get("source_forecast_id"),
+            weather_link_id=records.get("weather_link_id"),
             source_hashes=source_hashes,
-            generated_at=records["feature_generated_at"],
-            available_at=records["feature_available_at"],
+            generated_at=records["forecast_generated_at"]
+            if miami
+            else records["feature_generated_at"],
+            available_at=records["forecast_generated_at"]
+            if miami
+            else records["feature_available_at"],
             records=[feature_record],
             model_feature_json=output.feature_json,
-            computed_feature_json=records["features"],
+            computed_feature_json=feature_record["value"] if miami else records["features"],
         )
     )
     book_source = source_by_url[f"{PUBLIC_BASE}/markets/{paper.ticker}/orderbook"]
@@ -306,6 +428,7 @@ def assemble_weather_candidate(
             code_sha=code_sha,
             rule_version=policy.version,
             original_forecast_output=_json_value(asdict(output)),
+            **({"miami_input_sha256": miami_verified["input_sha256"]} if miami_verified else {}),
         )
     )
     snapshot = _artifact(
@@ -330,16 +453,23 @@ def assemble_weather_candidate(
     from kalshi_predictor.paper.fees import CONTRACT_KEY, decision_fee_quote
 
     fee_quote = decision_fee_quote(
-        paper.raw_decision_json, ticker=paper.ticker, side=paper.side,
-        quantity=paper.quantity, price=paper.limit_price,
-        simulator_floor=settings.paper_default_fee_per_contract, now=now, required=True,
+        paper.raw_decision_json,
+        ticker=paper.ticker,
+        side=paper.side,
+        quantity=paper.quantity,
+        price=paper.limit_price,
+        simulator_floor=settings.paper_default_fee_per_contract,
+        now=now,
+        required=True,
     )
     assert fee_quote is not None
-    if (fee_quote.decode()["event_id"] != identity["event_id"]
-            or fee_quote.decode()["series"] != identity["series"]
-            or records.get("fee_contract") != fee_quote.decode()
-            or Decimal(str(costs["estimated_fee"])) != fee_quote.charge
-            or request.estimated_round_trip_fees != fee_quote.charge):
+    if (
+        fee_quote.decode()["event_id"] != identity["event_id"]
+        or fee_quote.decode()["series"] != identity["series"]
+        or records.get("fee_contract") != fee_quote.decode()
+        or Decimal(str(costs["estimated_fee"])) != fee_quote.charge
+        or request.estimated_round_trip_fees != fee_quote.charge
+    ):
         raise ValueError("PREPARATION_FEE_EVIDENCE_OR_RISK_MISMATCH")
     ev = compute_net_ev(
         model_probability=paper.probability if paper.side == "BUY_YES" else 1 - paper.probability,
@@ -372,10 +502,10 @@ def assemble_weather_candidate(
         | dict(
             category=series["category"],
             model_evaluation_head_sha256=model_evaluation_head_sha256,
-            station="KNYC",
+            station=None if miami else "KNYC",
             forecast_id=paper.forecast_id,
             snapshot_id=records["snapshot_id"],
-            feature_id=records["feature_id"],
+            feature_id=records.get("feature_id"),
             sizing_id=records["sizing_id"],
             risk_id=records["risk_id"],
             position_sizing_decision_id=records["sizing_id"],
@@ -419,6 +549,19 @@ def assemble_weather_candidate(
             ),
         )
     )
+    if miami_verified is not None:
+        for key in (
+            "source_kind",
+            "historical_public_availability",
+            "miami_context_sha256",
+            "model_input_as_of",
+            "origin_at",
+            "frozen_prediction_sha256",
+        ):
+            inputs[key] = miami_verified["inputs"][key]
+        inputs["miami_input_sha256"] = miami_verified["input_sha256"]
+        if aware(inputs["observation_time"]) != aware(miami_verified["inputs"]["observation_time"]):
+            raise ValueError("MIAMI_RULE_TARGET_MISMATCH")
     inputs["feature_timestamps"] = [
         {key: value for key, value in feature_record.items() if key != "value"}
     ]
@@ -474,6 +617,16 @@ def assemble_weather_candidate(
     )
     evidence = []
     for gate in sorted(COLLECTOR_GATES):
+        verifier = MIAMI_VERIFIER if miami and gate == 4 else SEMANTIC_VERIFIERS[gate]
+        gate_references = references
+        gate_context: object = context
+        if miami and gate == 4:
+            gate_references = (
+                EvidenceReference(
+                    "miami-original-bundle", analytical_source.sha256, analytical_source.payload
+                ),
+            )
+            gate_context = MiamiBundleGateContext(analytical_source)
         report = _artifact(
             dict(
                 schema="overnight-paper-gate-v1",
@@ -481,9 +634,9 @@ def assemble_weather_candidate(
                 decision_id=decision_id,
                 ticker=paper.ticker,
                 category=series["category"],
-                verifier=SEMANTIC_VERIFIERS[gate],
+                verifier=verifier,
                 verdict="PASS",
-                sources=source_hashes,
+                sources=[r.sha256 for r in gate_references],
                 validated_at=at.isoformat(),
                 valid_until=min(
                     at + timedelta(seconds=60), aware(market["close_time"])
@@ -496,10 +649,10 @@ def assemble_weather_candidate(
                 decision_id,
                 series["category"],
                 paper.ticker,
-                SEMANTIC_VERIFIERS[gate],
+                verifier,
                 EvidenceReference("semantic-report:" + str(gate), report.sha256, report.payload),
-                sources=references,
-                context=context,
+                sources=gate_references,
+                context=gate_context,
             )
         )
     args = dict(
@@ -576,3 +729,67 @@ def assemble_weather_candidate(
         original_decision[key] = value
     linked_paper = replace(paper, raw_decision_json=original_decision)
     return PreparedCandidate(linked_paper, args, shadow, dataset)
+
+
+def assemble_weather_candidate(
+    *,
+    preparation: WeatherPreparationResult,
+    model: Artifact | None,
+    model_code: bytes,
+    settings: Settings,
+    repository: Path,
+    code_sha: str,
+    authorization: LocalPaperAuthorization,
+    rule_documents: tuple[RuleDocument, ...],
+    now: datetime,
+    include_evaluation_observation: bool = True,
+    model_evaluation_head_sha256: str | None = None,
+) -> PreparedCandidate:
+    if type(preparation) is not WeatherPreparationResult:
+        raise ValueError("COMPLETED_WEATHER_PREPARATION_REQUIRED")
+    return _assemble_candidate(
+        preparation=preparation,
+        model=model,
+        model_code=model_code,
+        settings=settings,
+        repository=repository,
+        code_sha=code_sha,
+        authorization=authorization,
+        rule_documents=rule_documents,
+        now=now,
+        include_evaluation_observation=include_evaluation_observation,
+        model_evaluation_head_sha256=model_evaluation_head_sha256,
+    )
+
+
+def assemble_miami_candidate(
+    *,
+    session: Session,
+    preparation: MiamiPreparationResult,
+    model: Artifact | None,
+    model_code: bytes,
+    settings: Settings,
+    repository: Path,
+    code_sha: str,
+    authorization: LocalPaperAuthorization,
+    rule_documents: tuple[RuleDocument, ...],
+    now: datetime,
+    include_evaluation_observation: bool = True,
+    model_evaluation_head_sha256: str | None = None,
+) -> PreparedCandidate:
+    if type(preparation) is not MiamiPreparationResult:
+        raise ValueError("COMPLETED_MIAMI_PREPARATION_REQUIRED")
+    return _assemble_candidate(
+        preparation=preparation,
+        model=model,
+        model_code=model_code,
+        settings=settings,
+        repository=repository,
+        code_sha=code_sha,
+        authorization=authorization,
+        rule_documents=rule_documents,
+        now=now,
+        include_evaluation_observation=include_evaluation_observation,
+        model_evaluation_head_sha256=model_evaluation_head_sha256,
+        miami_session=session,
+    )

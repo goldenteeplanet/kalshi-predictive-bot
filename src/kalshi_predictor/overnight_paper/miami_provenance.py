@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -12,6 +13,64 @@ from .provenance import Artifact, canonical_hash
 
 CLOCK_BASIS = "miami-original-replay-receipt-v1"
 BUNDLE_URL = "urn:kalshi-paper:miami-original-replay-v1"
+
+
+@dataclass(frozen=True)
+class MiamiBundleGateContext:
+    """Gate4 receives the same outer analytical artifact bound by gate9."""
+
+    source: Artifact
+
+
+def verify_miami_bundle_gate4(
+    context: MiamiBundleGateContext,
+    *,
+    inputs: dict,
+    sources: tuple[tuple[str, bytes], ...],
+    now: datetime,
+) -> bool:
+    if sources != ((context.source.sha256, context.source.payload),):
+        return False
+    hashes = inputs.get("source_hashes")
+    if (
+        not isinstance(hashes, list)
+        or any(type(value) is not str for value in hashes)
+        or len(set(hashes)) != len(hashes)
+        or context.source.sha256 not in hashes
+    ):
+        return False
+    source = _decode(context.source)
+    canonical_hash(source)  # Reject overflow-to-infinity even in unused parsed fields.
+    original = _context(source["body"])
+    json_originals = [
+        original.frozen_prediction,
+        original.recording_receipt,
+        original.market.artifact,
+        original.event.artifact,
+        original.series.artifact,
+        *original.catalog_receipts,
+    ]
+    for capture in original.captures:
+        json_originals.extend(
+            (
+                capture.index.artifact,
+                capture.calibrations.artifact,
+                capture.index_receipt,
+                capture.calibrations_receipt,
+            )
+        )
+    for value in json_originals:
+        canonical_hash(_decode(value))
+    # Rule PDFs and original source code are deliberately not parsed as JSON.
+    verified = verify_miami_provenance_binding(source, decision=inputs, now=now)
+    return all(
+        inputs.get(key) == verified["inputs"][key]
+        for key in (
+            "source_kind",
+            "historical_public_availability",
+            "miami_context_sha256",
+        )
+    )
 
 
 def _artifact_row(value: Artifact) -> dict[str, str]:
@@ -73,9 +132,11 @@ def _context(body: dict) -> MiamiGateContext:
         _original(body["market"]),
         _original(body["event"]),
         _original(body["series"]),
-        (_artifact(body["catalog_receipts"][0]),
-         _artifact(body["catalog_receipts"][1]),
-         _artifact(body["catalog_receipts"][2])),
+        (
+            _artifact(body["catalog_receipts"][0]),
+            _artifact(body["catalog_receipts"][1]),
+            _artifact(body["catalog_receipts"][2]),
+        ),
         tuple(_artifact(c) for c in body["rule_documents"]),
         tuple((c["path"], _artifact(c["artifact"])) for c in code),
     )
