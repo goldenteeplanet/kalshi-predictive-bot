@@ -92,6 +92,10 @@ def test_drain_retains_untrusted_original_without_inserting(tmp_path, damage):
         writer_monitor_fn=lambda: {"safe_to_start_write": True},
     )
     assert drained["snapshots_inserted"] == 0 and drained["errors"]
-    assert path.read_bytes() == original
+    assert not path.exists()
+    assert len(drained["quarantined_files"]) == 1
+    from pathlib import Path
+
+    assert Path(drained["quarantined_files"][0]).read_bytes() == original
     with factory() as session:
         assert session.scalar(select(func.count()).select_from(MarketSnapshot)) == 0

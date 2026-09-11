@@ -152,12 +152,10 @@ def validate_public_stage(payload, *, as_of):
             or receipt["url"] != BASE + "/markets/" + ticker + suffix
         ):
             raise ValueError("PUBLIC_ORIGINAL_BINDING")
-        if (
-            not requested <= received <= as_of
-            or not 0 <= (as_of - requested).total_seconds() <= 60
-            or (previous is not None and requested < previous)
-        ):
+        if not requested <= received <= as_of or (previous is not None and requested < previous):
             raise ValueError("PUBLIC_ORIGINAL_CHRONOLOGY")
+        if (as_of - requested).total_seconds() > 60:
+            raise ValueError("PUBLIC_ORIGINAL_STALE")
         previous = received
         decoded = json.loads(raw)
         if (decoded["market"] if kind == "market" else decoded) != payload[

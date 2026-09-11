@@ -87,3 +87,34 @@ def test_transport_failure_no_retry_or_stage(tmp_path):
             get=get,
         )
     assert len(calls) == 1
+
+
+def test_stale_stage_quarantined_once_with_original_bytes(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from kalshi_predictor.ingest import websocket_orderbooks
+
+    get, _ = source()
+    stage = tmp_path / "stage"
+    stage_public_books(
+        tickers=[TICKER], staging_dir=stage, evidence_dir=tmp_path / "evidence", get=get
+    )
+    original_path = next(stage.glob("*.json"))
+    original = original_path.read_bytes()
+    later = datetime.now(UTC) + timedelta(minutes=2)
+    monkeypatch.setattr(websocket_orderbooks, "utc_now", lambda: later)
+    factory = get_session_factory(init_db(f"sqlite:///{tmp_path / 'db.sqlite'}"))
+    result = drain_staged_websocket_orderbooks(
+        session_factory=factory,
+        staging_dir=stage,
+        writer_monitor_fn=lambda: {"safe_to_start_write": True},
+    )
+    assert result["snapshots_inserted"] == 0
+    assert "PUBLIC_ORIGINAL_STALE" in result["errors"][0]
+    assert Path(result["quarantined_files"][0]).read_bytes() == original
+    again = drain_staged_websocket_orderbooks(
+        session_factory=factory,
+        staging_dir=stage,
+        writer_monitor_fn=lambda: {"safe_to_start_write": True},
+    )
+    assert again["files_seen"] == 0 and again["errors"] == []

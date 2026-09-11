@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import re
 import time
@@ -9,6 +10,7 @@ from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
+from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
@@ -278,6 +280,7 @@ def drain_staged_websocket_orderbooks(
     files = sorted(staging_dir.glob("*.json")) if staging_dir.exists() else []
     inserted = 0
     committed_files: list[Path] = []
+    rejected_files: list[tuple[Path, str]] = []
     errors: list[str] = []
     with session_factory() as session:
         try:
@@ -296,8 +299,27 @@ def drain_staged_websocket_orderbooks(
                     expected = endpoint_environment((settings or Settings()).kalshi_base_url)
                     if payload.get("source_environment") != environment or environment != expected:
                         raise ValueError("STAGED_MARKET_DATA_ENVIRONMENT_MISMATCH")
-                except (KeyError, TypeError, ValueError):
-                    errors.append(f"{path.name}: UNVERIFIED_STAGED_MARKET_DATA_ENVIRONMENT")
+                except (KeyError, TypeError, ValueError) as exc:
+                    permitted = {
+                        "PUBLIC_ORIGINAL_STALE",
+                        "PUBLIC_ORIGINAL_CHRONOLOGY",
+                        "PUBLIC_ORIGINAL_BINDING",
+                        "PUBLIC_ORIGINAL_CHANGED",
+                        "PUBLIC_MARKET_NOT_ACTIVE",
+                        "PUBLIC_BOOK_SCHEMA",
+                        "PUBLIC_STAGE_CLOCK",
+                        "PUBLIC_STAGE_IDENTITY",
+                        "PUBLIC_STAGE_TICKER",
+                        "MARKET_DATA_ENVIRONMENT_MISMATCH",
+                        "STAGED_MARKET_DATA_ENVIRONMENT_MISMATCH",
+                    }
+                    reason = (
+                        str(exc)
+                        if isinstance(exc, ValueError) and str(exc) in permitted
+                        else "UNVERIFIED_STAGED_MARKET_DATA_ENVIRONMENT"
+                    )
+                    errors.append(f"{path.name}: {reason}")
+                    rejected_files.append((path, reason))
                     continue
                 market = payload.get("market")
                 orderbook = payload.get("orderbook")
@@ -317,6 +339,25 @@ def drain_staged_websocket_orderbooks(
             session.rollback()
             raise
     archive_dir = staging_dir / "drained"
+    quarantined_files: list[str] = []
+    for path, reason in rejected_files:
+        destination_dir = staging_dir / "rejected" / uuid4().hex
+        destination_dir.mkdir(parents=True, exist_ok=False)
+        raw = path.read_bytes()
+        destination = destination_dir / path.name
+        (destination_dir / "reason.json").write_text(
+            json.dumps(
+                {
+                    "reason": reason,
+                    "original_name": path.name,
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "rejected_at": utc_now().isoformat(),
+                }
+            ),
+            encoding="utf-8",
+        )
+        path.rename(destination)
+        quarantined_files.append(str(destination))
     archived_files: list[str] = []
     if committed_files:
         archive_dir.mkdir(parents=True, exist_ok=True)
@@ -330,6 +371,7 @@ def drain_staged_websocket_orderbooks(
         "snapshots_inserted": inserted,
         "files_archived": len(archived_files),
         "archived_files": archived_files,
+        "quarantined_files": quarantined_files,
         "errors": errors,
         "writer_monitor": writer,
         "single_writer_session_count": 1,
