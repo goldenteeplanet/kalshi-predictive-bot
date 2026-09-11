@@ -163,41 +163,31 @@ def forecast_independent(
             for end in range(len(prices) - 1, block - 1, -block)
         ]
 
-    def satisfies(value: float) -> bool:
+    def satisfies_exact(end: int) -> bool:
+        # Compare original decimal price ratios directly. Log roundoff can move
+        # empirical point masses across strict/inclusive contract boundaries.
+        value = Fraction(str(spot)) * Fraction(str(prices[end].price))
+        basis = Fraction(str(prices[end - block].price))
         if target.comparator in {"RANGE", "RANGE_CLOSED"}:
             assert target.lower is not None and target.upper is not None
+            lower = Fraction(str(target.lower)) * basis
+            upper = Fraction(str(target.upper)) * basis
             if target.comparator == "RANGE_CLOSED":
-                return math.log(target.lower) <= value <= math.log(target.upper)
-            return math.log(target.lower) <= value < math.log(target.upper)
+                return lower <= value <= upper
+            return lower <= value < upper
         assert target.threshold is not None
+        threshold = Fraction(str(target.threshold)) * basis
         if target.comparator == "ABOVE":
-            return value > math.log(target.threshold)
+            return value > threshold
         if target.comparator == "AT_OR_ABOVE":
-            return value >= math.log(target.threshold)
+            return value >= threshold
         if target.comparator == "BELOW":
-            return value < math.log(target.threshold)
-        return value <= math.log(target.threshold)
+            return value < threshold
+        return value <= threshold
 
-    # Closed intervals compare exact decimal representations by cross multiplication.
-    # This preserves endpoint atoms without log/subtract/add roundoff or CF rounding.
-    if target.comparator == "RANGE_CLOSED" and empirical:
-        assert target.lower is not None and target.upper is not None
-        lower, upper, current = (Fraction(str(v)) for v in (target.lower, target.upper, spot))
-        closed_hits = sum(
-            lower * Fraction(str(prices[end - block].price))
-            <= current * Fraction(str(prices[end].price))
-            <= upper * Fraction(str(prices[end - block].price))
-            for end in range(len(prices) - 1, block - 1, -block)
-        )
-    else:
-        closed_hits = None
     comparisons["empirical_matched_horizon"] = {
         "probability": (
-            (
-                closed_hits
-                if closed_hits is not None
-                else sum(satisfies(math.log(spot) + r) for r in empirical)
-            )
+            sum(satisfies_exact(end) for end in range(len(prices) - 1, block - 1, -block))
             / len(empirical)
             if len(empirical) >= 20
             else None
@@ -225,7 +215,7 @@ def forecast_independent(
     ).hexdigest()
     return {
         "model": MODEL_NAME,
-        "model_version": "2-range-closed" if target.comparator == "RANGE_CLOSED" else "1",
+        "model_version": "3-exact-empirical-boundaries",
         "probability": probability("gaussian_log_returns"),
         "generated_at": decision_at.isoformat(),
         "target": asdict(target),

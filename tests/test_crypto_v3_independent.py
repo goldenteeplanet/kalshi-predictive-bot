@@ -132,3 +132,31 @@ def test_source_asset_must_match_target():
 def test_extreme_finite_strike_has_valid_student_probability():
     result = forecast_independent(history(), replace(target(), threshold=1e308), decision_at=NOW)
     assert 0 <= result["comparisons"]["student_t_df3"]["probability"] <= 1
+
+
+@pytest.mark.parametrize(
+    "comparator,expected",
+    [("ABOVE", 0), ("AT_OR_ABOVE", 0.5), ("BELOW", 0.5), ("AT_OR_BELOW", 1),
+     ("RANGE", 0.5), ("RANGE_CLOSED", 1)],
+)
+def test_empirical_exact_strike_atoms_respect_contract_boundaries(comparator, expected):
+    # Thirty 0.01 -> 0.3 returns land exactly at 0.3 from the current 0.01.
+    # The other thirty returns land at 1/3000. Log roundoff must not move atoms.
+    rows = [
+        PriceObservation(
+            price=0.01 if i % 2 == 0 else 0.3,
+            observed_at=NOW - timedelta(minutes=60 - i),
+            received_at=NOW - timedelta(minutes=60 - i),
+            source="fixture", symbol="DOGE", source_sha256="a" * 64,
+        )
+        for i in range(61)
+    ]
+    strikes = (
+        {"lower": 0.0001, "upper": 0.3}
+        if comparator.startswith("RANGE") else {"threshold": 0.3}
+    )
+    contract = CryptoTarget("DOGE", comparator, NOW + timedelta(minutes=1), **strikes)
+    result = forecast_independent(rows, contract, decision_at=NOW)
+    empirical = result["comparisons"]["empirical_matched_horizon"]
+    assert empirical["nonoverlapping_blocks"] == 60
+    assert empirical["probability"] == expected

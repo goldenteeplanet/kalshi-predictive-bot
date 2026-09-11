@@ -174,7 +174,7 @@ def test_proof_tampering_fail_closed(change):
     "lower,upper,expected_closed,expected_legacy",
     [(1.0, 2.0, 0.5, 0), (0.5, 1.0, 0.5, 0.5), (2.01, 3.0, 0, 0), (0.1, 0.5, 0.5, 0)],
 )
-def test_empirical_exact_endpoint_atoms_preserve_legacy(
+def test_empirical_exact_endpoint_atoms_preserve_interval_semantics(
     lower, upper, expected_closed, expected_legacy
 ):
     # Alternating 1/2 prices ending at1: projected one-step atoms exactly .5 and2.
@@ -194,7 +194,7 @@ def test_empirical_exact_endpoint_atoms_preserve_legacy(
     b = forecast_independent(prices, replace(t, comparator="RANGE"), decision_at=NOW)
     assert a["comparisons"]["empirical_matched_horizon"]["probability"] == expected_closed
     assert b["comparisons"]["empirical_matched_horizon"]["probability"] == expected_legacy
-    assert a["model_version"] == "2-range-closed" and b["model_version"] == "1"
+    assert a["model_version"] == b["model_version"] == "3-exact-empirical-boundaries"
     for name in ("gaussian_log_returns", "student_t_df3", "existing_distribution_zero_drift"):
         assert a["comparisons"][name]["probability"] == b["comparisons"][name]["probability"]
 
@@ -266,7 +266,7 @@ def test_real_manifest_loader_and_capture_archive_exact_proof(harness, tmp_path)
     result = capture.run(**kwargs)
     assert result["requests"] == 6
     frozen = json.loads((kwargs["output"] / "frozen/prediction.json").read_bytes())["prediction"]
-    assert frozen["shared_crypto"]["model_version"] == "2-range-closed"
+    assert frozen["shared_crypto"]["model_version"] == "3-exact-empirical-boundaries"
     for i in range(3):
         b = json.loads((kwargs["output"] / f"sample-{i}-doge-range-binding.json").read_bytes())
         assert (
