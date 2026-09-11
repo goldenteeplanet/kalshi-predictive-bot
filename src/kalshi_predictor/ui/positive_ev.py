@@ -90,15 +90,19 @@ def render_research(report: dict[str, Any]) -> str:
         "table{border-collapse:collapse;background:white}"
         "td,th{padding:.7rem;border:1px solid #ccd5df}"
         ".table{overflow:auto}p{line-height:1.5}</style></head><body>"
-        f"<h1>Positive EV research</h1><p>{status}. As of {text(report.get('generated_at'))}.</p>"
+        "<h1>Positive EV research</h1>"
         "<p>Gross-edge counts include uncalibrated research proxies. "
         "Reported estimates require source, cost, model and risk validation. "
         "This page cannot submit orders or authorize local paper positions.</p>"
+        "<section id='research-snapshot'><h2>Earlier research report</h2>"
+        f"<p>{status}. Report timestamp: {text(report.get('generated_at'))}.</p>"
+        "<p>The counts and commentary below belong to this saved report. "
+        "They do not establish current authentication, deployed version, or cohort results.</p>"
         f"<div class='metrics'>{cards}</div>"
-        f"<p>Top opportunity: {text(report.get('top_opportunity'))}</p>"
-        f"<p>Primary blocker: {text(report.get('primary_blocker'))}</p>"
+        f"<p>Opportunity recorded in this report: {text(report.get('top_opportunity'))}</p>"
+        f"<p>Blocker recorded in this report: {text(report.get('primary_blocker'))}</p>"
         f"<div class='table'><table><thead><tr>{header}</tr></thead><tbody>{rows}</tbody></table>"
-        "</div></body></html>"
+        "</div></section></body></html>"
     )
 
 
@@ -115,8 +119,9 @@ def create_router() -> APIRouter:
             from kalshi_predictor.ui.research_journals import read_cohort, render_cohort
 
             html = html.replace(
-                "<div class='metrics'>",
-                render_cohort(read_cohort(Path(cohort), Path(control))) + "<div class='metrics'>",
+                "<section id='research-snapshot'>",
+                render_cohort(read_cohort(Path(cohort), Path(control)))
+                + "<section id='research-snapshot'>",
             )
         return HTMLResponse(html)
 
