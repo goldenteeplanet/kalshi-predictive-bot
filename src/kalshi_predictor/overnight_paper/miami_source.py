@@ -76,6 +76,7 @@ def verify_miami_source(
     model_input_as_of: datetime,
     decision_at: datetime,
     now: datetime,
+    origin_grid_minutes: int = 60,
 ) -> MiamiSourceHealth:
     """Check original capture health at explicit clocks; perform no I/O.
 
@@ -90,7 +91,9 @@ def verify_miami_source(
         _receipt(index, index_receipt, INDEX + "?last_sec=7200")
         _receipt(calibrations, calibrations_receipt, INDEX + "/calibrations")
         local = origin.astimezone(ZoneInfo("America/New_York"))
-        if local.minute or local.second or local.microsecond:
+        if type(origin_grid_minutes) is not int or origin_grid_minutes not in (30, 60):
+            raise ValueError("MIAMI_SOURCE_ORIGIN_GRID_REQUIRED")
+        if local.minute % origin_grid_minutes or local.second or local.microsecond:
             raise ValueError("MIAMI_SOURCE_EXACT_HOUR_ORIGIN")
         if target - origin not in (timedelta(minutes=30), timedelta(minutes=60)):
             raise ValueError("MIAMI_SOURCE_EXACT_HORIZON")

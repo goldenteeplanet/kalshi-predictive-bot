@@ -122,7 +122,9 @@ def candidate(context, **changes):
             "verdict": "PASS",
             "sources": [r.sha256 for r in references],
             "validated_at": inputs["decision_at"],
-            "valid_until": (fixtures.CUTOFF + timedelta(minutes=2)).isoformat(),
+            "valid_until": (
+                fixtures.datetime.fromisoformat(inputs["decision_at"]) + timedelta(minutes=2)
+            ).isoformat(),
         }
     )
     evidence = GateEvidence(
@@ -212,3 +214,184 @@ def test_refreshed_current_pair_cannot_replace_frozen_original(context):
     )
     inputs, evidence = candidate(ctx)
     assert not evidence.verified(inputs)
+
+
+@pytest.fixture
+def grid_context(context):
+    from kalshi_predictor.overnight_paper.miami_source_gate import GRID30_REPLAY_CODE_HASHES
+    from kalshi_predictor.weather.miami_half_hour_forecast import forecast_miami_prior_day_grid30
+    from kalshi_predictor.weather.miami_index import decode_miami_index
+
+    delta = timedelta(minutes=30)
+    pair = context.captures[0]
+    data = pair.index.artifact.decode()
+    # Move exact origins and current lag; retain prior-day target endpoints.
+    for point in data["timeseries"]:
+        minute = (point["t"] // 60000) % 60
+        at = fixtures.datetime.fromtimestamp(point["t"] / 1000, fixtures.UTC)
+        if at.date() == fixtures.ORIGIN.date() or (minute == 0 and at.hour == 21):
+            point["t"] += 30 * 60000
+    index = replace(pair.index, artifact=artifact(data), received_at=pair.index.received_at + delta)
+    cal = replace(pair.calibrations, received_at=pair.calibrations.received_at + delta)
+    capture = decode_miami_index(
+        index.artifact.payload,
+        cal.artifact.payload,
+        index_received_at=index.received_at,
+        calibrations_received_at=cal.received_at,
+        index_units="fahrenheit",
+    )
+    saved = context.frozen_prediction.decode()
+    for key in ("model_input_as_of", "input_received_at"):
+        saved[key] = (fixtures.datetime.fromisoformat(saved[key]) + delta).isoformat()
+    saved["prediction"]["forecasts"] = [
+        forecast_miami_prior_day_grid30(
+            [capture],
+            origin_at=fixtures.ORIGIN + delta,
+            model_input_as_of=fixtures.CUTOFF + delta,
+            horizon_minutes=30,
+        )
+    ]
+    saved["prediction"]["code_proof"]["files"] = [
+        {"path": p, "sha256": sha} for p, sha in GRID30_REPLAY_CODE_HASHES.items()
+    ]
+    prediction = artifact(saved)
+    recording = context.recording_receipt.decode()
+    recording["prediction_sha256"] = prediction.sha256
+    recording["prediction_recorded_at"] = (
+        fixtures.CUTOFF + delta + timedelta(seconds=1)
+    ).isoformat()
+    market, event, series = [
+        replace(o, received_at=o.received_at + delta)
+        for o in (context.market, context.event, context.series)
+    ]
+    repo = Path(__file__).resolve().parents[1]
+    return replace(
+        context,
+        frozen_prediction=prediction,
+        recording_receipt=artifact(recording),
+        captures=(MiamiCaptureEvidence(index, cal, receipt(index), receipt(cal)),),
+        market=market,
+        event=event,
+        series=series,
+        catalog_receipts=tuple(receipt(o) for o in (market, event, series)),
+        code_originals=tuple(
+            (p, Artifact(sha, (repo / p).read_bytes()))
+            for p, sha in GRID30_REPLAY_CODE_HASHES.items()
+        ),
+    )
+
+
+def grid_candidate(context, **changes):
+    args = dict(
+        model_name="miami_prior_day_increment_grid30_v1",
+        origin_at=(fixtures.ORIGIN + timedelta(minutes=30)).isoformat(),
+        model_input_as_of=(fixtures.CUTOFF + timedelta(minutes=30)).isoformat(),
+        decision_at=(fixtures.CUTOFF + timedelta(minutes=30, seconds=2)).isoformat(),
+    )
+    args.update(changes)
+    return candidate(context, **args)
+
+
+def test_grid30_original_replay_and_health(grid_context):
+    from kalshi_predictor.overnight_paper.miami_source_gate import verify_miami_gate4
+
+    inputs, evidence = grid_candidate(grid_context)
+    assert evidence.verified(inputs)
+    assert verify_miami_gate4(
+        grid_context,
+        inputs=inputs,
+        sources=tuple((r.sha256, r.payload) for r in evidence.sources),
+        now=fixtures.CUTOFF + timedelta(minutes=30, seconds=2),
+    )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"model_name": "miami_prior_day_increment_v1"},
+        {"model_version": "grid30-v1"},
+        {"forecast_probability": ".99"},
+        {"origin_at": fixtures.ORIGIN.isoformat()},
+        {"model_input_as_of": fixtures.CUTOFF.isoformat()},
+    ],
+)
+def test_grid30_rejects_identity_probability_and_clock_changes(grid_context, changes):
+    inputs, evidence = grid_candidate(grid_context, **changes)
+    assert not evidence.verified(inputs)
+
+
+def test_grid30_rejects_hourly_closure(grid_context, context):
+    changed = replace(grid_context, code_originals=context.code_originals)
+    inputs, evidence = grid_candidate(changed)
+    assert not evidence.verified(inputs)
+
+
+@pytest.mark.parametrize("grid", [60, True, 30.0, 15, None])
+def test_grid30_health_requires_explicit_integer_grid(grid_context, grid):
+    from kalshi_predictor.overnight_paper.miami_source import verify_miami_source
+
+    pair = grid_context.captures[0]
+    health = verify_miami_source(
+        index=pair.index,
+        calibrations=pair.calibrations,
+        index_receipt=pair.index_receipt,
+        calibrations_receipt=pair.calibrations_receipt,
+        origin_at=fixtures.ORIGIN + timedelta(minutes=30),
+        target_at=fixtures.ORIGIN + timedelta(hours=1),
+        model_input_as_of=fixtures.CUTOFF + timedelta(minutes=30),
+        decision_at=fixtures.CUTOFF + timedelta(minutes=30, seconds=2),
+        now=fixtures.CUTOFF + timedelta(minutes=30, seconds=2),
+        origin_grid_minutes=grid,
+    )
+    assert not health.source_healthy
+
+
+@pytest.mark.parametrize("mutation", ["schema", "mixed", "samples", "origin", "code"])
+def test_grid30_rehashed_prediction_tamper_rejected(grid_context, mutation):
+    saved = grid_context.frozen_prediction.decode()
+    f = saved["prediction"]["forecasts"][0]
+    if mutation == "schema":
+        f["schema"] = "miami-prior-day-prospective-v1"
+    elif mutation == "mixed":
+        other = dict(f, model="miami_prior_day_increment_v1")
+        saved["prediction"]["forecasts"].append(other)
+    elif mutation == "samples":
+        f["models"]["prior_day_increment_empirical"]["samples_f"][0] += 1
+    elif mutation == "origin":
+        f["origin_at"] = fixtures.ORIGIN.isoformat()
+    else:
+        saved["prediction"]["code_proof"]["files"][0]["sha256"] = "f" * 64
+    prediction = artifact(saved)
+    rec = grid_context.recording_receipt.decode()
+    rec["prediction_sha256"] = prediction.sha256
+    changed = replace(grid_context, frozen_prediction=prediction, recording_receipt=artifact(rec))
+    inputs, evidence = grid_candidate(changed)
+    assert not evidence.verified(inputs)
+
+
+@pytest.mark.parametrize("change", ["stale", "future", "offgrid", "date"])
+def test_grid30_health_preserves_clock_and_date_checks(grid_context, change):
+    from kalshi_predictor.overnight_paper.miami_source import verify_miami_source
+
+    pair = grid_context.captures[0]
+    kwargs = dict(
+        index=pair.index,
+        calibrations=pair.calibrations,
+        index_receipt=pair.index_receipt,
+        calibrations_receipt=pair.calibrations_receipt,
+        origin_at=fixtures.ORIGIN + timedelta(minutes=30),
+        target_at=fixtures.ORIGIN + timedelta(hours=1),
+        model_input_as_of=fixtures.CUTOFF + timedelta(minutes=30),
+        decision_at=fixtures.CUTOFF + timedelta(minutes=30, seconds=2),
+        now=fixtures.CUTOFF + timedelta(minutes=30, seconds=2),
+        origin_grid_minutes=30,
+    )
+    if change == "stale":
+        kwargs["now"] += timedelta(minutes=2)
+    elif change == "future":
+        kwargs["model_input_as_of"] -= timedelta(minutes=1)
+    elif change == "offgrid":
+        kwargs["origin_at"] += timedelta(minutes=1)
+    else:
+        kwargs["target_at"] += timedelta(days=1)
+    assert not verify_miami_source(**kwargs).source_healthy

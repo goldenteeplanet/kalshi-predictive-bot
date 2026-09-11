@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 from kalshi_predictor.overnight_paper.provenance import Artifact, canonical_hash
 from kalshi_predictor.weather.miami_forecast import empirical_probability, forecast_miami_prior_day
+from kalshi_predictor.weather.miami_half_hour_forecast import forecast_miami_prior_day_grid30
 from kalshi_predictor.weather.miami_index import decode_miami_index
 
 BASE = "https://external-api.kalshi.com/trade-api/v2"
@@ -167,6 +168,13 @@ def bind_miami_forecast_to_contract(
     forecasts = saved["prediction"]["forecasts"]
     if not isinstance(forecasts, list) or not 1 <= len(forecasts) <= 2:
         raise ValueError("MIAMI_BINDING_FORECAST_BUDGET")
+    identities = {(f.get("model"), f.get("schema")) for f in forecasts}
+    if identities == {("miami_prior_day_increment_v1", "miami-prior-day-prospective-v1")}:
+        replay_model = forecast_miami_prior_day
+    elif identities == {("miami_prior_day_increment_grid30_v1", "miami-prior-day-grid30-v1")}:
+        replay_model = forecast_miami_prior_day_grid30
+    else:
+        raise ValueError("MIAMI_BINDING_EXACT_MODEL_IDENTITY")
     earliest_target = min(_at(f["target_at"]) for f in forecasts)
     if _at(saved["target_at"]) != earliest_target or recorded >= earliest_target:
         raise ValueError("MIAMI_BINDING_EARLIEST_TARGET_FREEZE")
@@ -202,7 +210,7 @@ def bind_miami_forecast_to_contract(
         sources.extend((index, calibration))
     if max(c.available_at for c in decoded) != _at(saved["input_received_at"]):
         raise ValueError("MIAMI_BINDING_INPUT_RECEIPT_MISMATCH")
-    replay = forecast_miami_prior_day(
+    replay = replay_model(
         decoded,
         origin_at=_at(forecast["origin_at"]),
         model_input_as_of=cutoff,

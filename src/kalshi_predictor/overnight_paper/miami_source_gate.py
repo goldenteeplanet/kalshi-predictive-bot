@@ -34,6 +34,21 @@ REPLAY_CODE_HASHES = {
 }
 
 
+# Separate reviewed research closure; hourly pins above remain unchanged.
+GRID30_REPLAY_CODE_HASHES = {
+    path: sha
+    for path, sha in REPLAY_CODE_HASHES.items()
+    if path != "scripts/positive_ev_miami_research.py"
+} | {
+    "scripts/positive_ev_miami_half_hour_research.py": (
+        "4ca8e8abc4efca6891c9bf48effe31f060b90598196899b94c68e6af4b28aa6c"
+    ),
+    "src/kalshi_predictor/weather/miami_half_hour_forecast.py": (
+        "8b00b7315069ea965eacf004436a6c03f40b3ef60d14ba65cc392348902d5664"
+    ),
+}
+
+
 @dataclass(frozen=True)
 class MiamiCaptureEvidence:
     index: MiamiOriginal
@@ -105,6 +120,13 @@ def verify_miami_gate4(
     now: datetime,
 ) -> bool:
     """Recompute source truth; typed context and PASS strings alone are insufficient."""
+    model = inputs.get("model_name")
+    if model == "miami_prior_day_increment_v1":
+        code_hashes, origin_grid = REPLAY_CODE_HASHES, 60
+    elif model == "miami_prior_day_increment_grid30_v1":
+        code_hashes, origin_grid = GRID30_REPLAY_CODE_HASHES, 30
+    else:
+        return False
     if (
         type(context.current_capture) is not int
         or not 1 <= len(context.captures) <= 12
@@ -112,7 +134,6 @@ def verify_miami_gate4(
         or inputs.get("category") != "Climate and Weather"
         or inputs.get("series") != "KXTEMPMIAH"
         or inputs.get("source_kind") != SOURCE_KIND
-        or inputs.get("model_name") != "miami_prior_day_increment_v1"
         or inputs.get("model_version") != "1"
         or inputs.get("historical_public_availability") != "UNKNOWN"
         or inputs.get("miami_context_sha256") != context.fingerprint()
@@ -130,15 +151,18 @@ def verify_miami_gate4(
 
     if any(hashlib.sha256(a.payload).hexdigest() != a.sha256 for a in artifacts):
         return False
-    if dict((path, a.sha256) for path, a in context.code_originals) != REPLAY_CODE_HASHES:
+    if dict((path, a.sha256) for path, a in context.code_originals) != code_hashes:
         return False
-    if len(context.code_originals) != len(REPLAY_CODE_HASHES):
+    if len(context.code_originals) != len(code_hashes):
         return False
     saved = _decode(context.frozen_prediction)
+    forecasts = saved["prediction"]["forecasts"]
+    if not forecasts or any(f.get("model") != model for f in forecasts):
+        return False
     proof = saved["prediction"]["code_proof"]
     if (
-        {item["path"]: item["sha256"] for item in proof["files"]} != REPLAY_CODE_HASHES
-        or len(proof["files"]) != len(REPLAY_CODE_HASHES)
+        {item["path"]: item["sha256"] for item in proof["files"]} != code_hashes
+        or len(proof["files"]) != len(code_hashes)
         or _at(proof["commit_recorded_at"]) != _at(saved["model_committed_at"])
         or not _at(saved["model_committed_at"])
         <= _at(proof["code_frozen_at"])
@@ -205,5 +229,6 @@ def verify_miami_gate4(
         model_input_as_of=_at(saved["model_input_as_of"]),
         decision_at=decision,
         now=current,
+        origin_grid_minutes=origin_grid,
     )
     return health.source_healthy
