@@ -201,13 +201,21 @@ def slot_view(base: Path, control: Path, index: int, registered: dict, now: date
                         ticker=pin["ticker"],
                         hypothesis=pin["hypothesis"],
                         probability=p,
+                        payload_sha256=pin["payload_sha256"],
+                        completion_sha256=pin["completion_sha256"],
+                        rule_version=pin["rule_version"],
+                        quotes=decision.get("rows"),
                         decision_id=pin["decision_id"],
                         recorded_at=committed["original_committed_before"],
                     )
                 )
         if (capture / "failure.json").exists():
             raise ValueError("FAILED_CAPTURE")
-        result.update(status="COMPLETE_PIN_BOUND_DISPLAY", rows=rows)
+        result.update(
+            status="COMPLETE_PIN_BOUND_DISPLAY",
+            rows=rows,
+            capture_completion_sha256=external["completion_sha256"],
+        )
     except (
         OSError,
         ValueError,
@@ -235,6 +243,10 @@ def read_cohort(base: Path, control: Path, *, now: datetime | None = None) -> di
         results = [slot_view(base, control, i, slots[i], current) for i in range(5)]
     except (OSError, ValueError, TypeError, KeyError, AttributeError):
         results = [dict(slot=i, status="UNVERIFIED", rows=[]) for i in range(5)]
+    from kalshi_predictor.ui.research_outcomes import outcome_view
+
+    for slot in results:
+        slot["outcome"] = outcome_view(base, control, slot, current)
     completed = [s for s in results if s["status"] == "COMPLETE_PIN_BOUND_DISPLAY"]
     return dict(
         slots=results,
@@ -255,6 +267,19 @@ def render_cohort(report: dict) -> str:
             f"<p>{text(slot.get('event', 'Unknown'))} - target "
             f"{text(slot.get('target', 'Unknown'))}</p>"
         )
+        outcome = slot.get("outcome", {})
+        body += "<h4>Official research outcomes &mdash; no paper positions</h4>"
+        body += f"<p>{text(outcome.get('status', 'PENDING_OFFICIAL_RESEARCH'))}</p>"
+        for label in outcome.get("labels", []):
+            body += f"<p>{text(label['ticker'])}: {text(label['outcome'])}</p>"
+        for scenario in outcome.get("scenarios", []):
+            body += f"<p>{text(scenario['hypothesis'])}: two contracts, one temporal event. "
+            for model, metrics in scenario["metrics"].items():
+                body += (
+                    f"{text(model)} Brier {text(metrics['brier'])}, "
+                    f"log loss {text(metrics['log_loss'])}; "
+                )
+            body += "descriptive only; no calibration or promotion.</p>"
         for row in slot["rows"]:
             body += (
                 f"<p>{text(row['ticker'])} Â· {text(row['hypothesis'])} Â· P(YES) "

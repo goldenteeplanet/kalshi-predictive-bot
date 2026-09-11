@@ -115,7 +115,8 @@ def create_router() -> APIRouter:
             from kalshi_predictor.ui.research_journals import read_cohort, render_cohort
 
             html = html.replace(
-                "</body>", render_cohort(read_cohort(Path(cohort), Path(control))) + "</body>"
+                "<div class='metrics'>",
+                render_cohort(read_cohort(Path(cohort), Path(control))) + "<div class='metrics'>",
             )
         return HTMLResponse(html)
 
