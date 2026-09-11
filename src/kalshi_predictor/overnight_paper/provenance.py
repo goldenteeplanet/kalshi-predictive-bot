@@ -361,7 +361,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "cd39dc72aeac3bdbb7e9df05f6a244496f7384b02b5f6c1f1882872c655de989"
     ),
     "kalshi_predictor.overnight_paper.activation": (
-        "1729a0b041458ba267704cfe06c94169a98a0b27a5a9227ffb179d041d74bc2f"
+        "87d907f549ba7eba724e450febd21664c64448c2c3d97b2f522128109df4adae"
     ),
     "kalshi_predictor.overnight_paper.boundary": (
         "7e8647e9cf73874dbcc9df4c7b324b86fbaaca21a4f9981c3c71b9a85227e6e8"
@@ -370,7 +370,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "20a91e63a471ac7b9e52535391e843c7043a874fdef2fd83cf885f4e05cf33db"
     ),
     "kalshi_predictor.overnight_paper.crypto_source": (
-        "4d3b68db436435757bbcca21125f1a6e3c82df70796ff481aa4d469a0dab13d8"
+        "7590d3b5c14c354ef1e8b7ff281e189b30cad0b07ba949c1c9fd25dfb8c93a82"
     ),
     "kalshi_predictor.overnight_paper.coordinator": (
         "4cccb4c099d27605a5b3a2b9b7990b766c369daa36ea628427daa05d2cc57e88"
@@ -394,10 +394,10 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "632619cab0facc5a377fcc9bed304ccc962db91fca69048eadda6f663c0798d1"
     ),
     "kalshi_predictor.overnight_paper.qualification": (
-        "37067002202fa235cf45afa5b66afaa76fd855172bc7b97ec59ac83f0618661d"
+        "eb7e51990c44fc8d581e57bd6bc8415ee91902e8621ba20924a7f8f9277db2bb"
     ),
     "kalshi_predictor.overnight_paper.release_typing": (
-        "e0c737e8a2f3e79ab4f64f78d2b2305be7ffbc638c7433022ed2a143c6db08cb"
+        "f8468dcc1d690de74d9647e64d5a803fef8f9c74cbbbd2e377aaed2cd4d4b21d"
     ),
     "kalshi_predictor.overnight_paper.rule_verifier": (
         "66c87dcc2c014601f12d3c67e5b7b696a820e56ef6649da97873edbec69449aa"
@@ -415,7 +415,7 @@ AUDITED_BOUNDARY_SHA256: dict[str, str] = {
         "2cfcb5a66f158b35d645753748a17fb219e8aa84511fa6cb140319ad5b0872cc"
     ),
     "kalshi_predictor.overnight_paper.store": (
-        "a7f91448dec8e3d11a04410daab27d2101135ce443ee8bc3c0b38f31623423d6"
+        "a5e106e22272034a71667ea7d5891910c03cfea2928f091d2b2cf00b9f9c5cd4"
     ),
     "kalshi_predictor.overnight_paper.timing": (
         "4f08a822106e0faf6f7fd6cec05baebe56eea27a5bdbd31928269a3b261d4522"

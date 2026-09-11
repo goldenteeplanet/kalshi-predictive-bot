@@ -336,6 +336,7 @@ def _prepare_miami_candidate(
                 position_sizing_decision_id=sizing.record_id,
                 raw={
                     "guarded_fee_quote_sha256": quote.sha256,
+                    "estimated_round_trip_fees": str(request.estimated_round_trip_fees),
                     "miami_preparation": {
                         "decision": asdict(decision),
                         "risk_request": asdict(request),
@@ -545,6 +546,9 @@ def verify_miami_preparation_handoff(
         quote is None
         or canonical_hash(quote.decode()) != canonical_hash(records["fee_contract"])
         or engines.risk_request.estimated_round_trip_fees != quote.charge
+        or stored_risk["raw"].get("guarded_fee_quote_sha256") != quote.sha256
+        or stored_risk["raw"].get("estimated_round_trip_fees")
+        != str(engines.risk_request.estimated_round_trip_fees)
     ):
         raise ValueError("MIAMI_HANDOFF_FEE_CHANGED")
     market = _decode(result.original_context.market.artifact)["market"]

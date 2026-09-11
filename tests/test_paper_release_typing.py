@@ -20,25 +20,53 @@ def evidence(tmp_path, monkeypatch):
     sha = "a" * 40
     tests = ref("pytest", b"100 passed, 1 skipped")
     lint = ref("ruff", b"All checks passed!")
-    checks = ref("checks", json.dumps({"check_runs": [{
-        "name": "test", "head_sha": sha, "conclusion": "success",
-    }]}).encode())
-    typing = ref("mypy", (
-        f"Success: no issues found in {len(release_typing.TYPING_TARGETS)} source files"
-    ).encode())
+    checks = ref(
+        "checks",
+        json.dumps(
+            {
+                "check_runs": [
+                    {
+                        "name": "test",
+                        "head_sha": sha,
+                        "conclusion": "success",
+                    }
+                ]
+            }
+        ).encode(),
+    )
+    typing = ref(
+        "mypy",
+        (f"Success: no issues found in {len(release_typing.TYPING_TARGETS)} source files").encode(),
+    )
     report = {
-        "sha": sha, "pytest_command": "pytest", "lint_command": "ruff check .",
-        "required_checks": ["test"], "mypy_command": release_typing.typing_command(),
+        "sha": sha,
+        "pytest_command": "pytest",
+        "lint_command": "ruff check .",
+        "required_checks": ["test"],
+        "mypy_command": release_typing.typing_command(),
         "typing_scope": "PAPER_RELEASE_PATH_ONLY",
         "mypy_policy": release_typing.typing_manifest(tmp_path),
-        "artifacts": {"pytest": tests.sha256, "ruff": lint.sha256,
-                      "hosted_checks": checks.sha256, "mypy": typing.sha256},
+        "artifacts": {
+            "pytest": tests.sha256,
+            "ruff": lint.sha256,
+            "hosted_checks": checks.sha256,
+            "mypy": typing.sha256,
+        },
     }
     monkeypatch.setattr(activation, "_verify_import_origins", lambda repo: None)
-    monkeypatch.setattr(activation.subprocess, "check_output",
-                        lambda args, **kwargs: sha if "rev-parse" in args else "")
+    monkeypatch.setattr(
+        activation.subprocess,
+        "check_output",
+        lambda args, **kwargs: sha if "rev-parse" in args else "",
+    )
     release = activation.ExactReleaseEvidence(
-        tmp_path, sha, ref("report", json.dumps(report).encode()), tests, lint, checks, typing,
+        tmp_path,
+        sha,
+        ref("report", json.dumps(report).encode()),
+        tests,
+        lint,
+        checks,
+        typing,
     )
     return release, report
 
@@ -80,10 +108,13 @@ def test_current_source_or_checker_config_change_requires_new_evidence(evidence,
         release.verify()
 
 
-@pytest.mark.parametrize("output", [
-    b"Success: no issues found in 1 source file",
-    b"Success: no issues found in 88 source files\nx.py:1: error: broken",
-])
+@pytest.mark.parametrize(
+    "output",
+    [
+        b"Success: no issues found in 1 source file",
+        b"Success: no issues found in 88 source files\nx.py:1: error: broken",
+    ],
+)
 def test_wrong_count_or_hidden_errors_reject(evidence, output):
     release, report = evidence
     typing = ref("mypy", output)
@@ -98,3 +129,29 @@ def test_true_full_global_command_remains_supported(evidence):
     report.pop("typing_scope")
     report.pop("mypy_policy")
     changed(release, report).verify()
+
+
+def test_miami_source_change_invalidates_typing_manifest(evidence):
+    release, _ = evidence
+    required = {
+        "src/kalshi_predictor/overnight_paper/miami_driver.py",
+        "src/kalshi_predictor/overnight_paper/miami_storage.py",
+        "src/kalshi_predictor/overnight_paper/miami_preparation.py",
+        "src/kalshi_predictor/overnight_paper/miami_preparation_runner.py",
+        "src/kalshi_predictor/overnight_paper/miami_binding.py",
+        "src/kalshi_predictor/overnight_paper/miami_provenance.py",
+        "src/kalshi_predictor/overnight_paper/miami_source.py",
+        "src/kalshi_predictor/overnight_paper/miami_source_gate.py",
+        "src/kalshi_predictor/weather/miami_index.py",
+        "src/kalshi_predictor/weather/miami_forecast.py",
+        "src/kalshi_predictor/weather/miami_half_hour_forecast.py",
+        "src/kalshi_predictor/crypto/research_provenance.py",
+    }
+    assert required <= set(release_typing.TYPING_TARGETS)
+    assert len(set(release_typing.TYPING_TARGETS)) == len(release_typing.TYPING_TARGETS)
+    release.verify()
+    (release.repository / "src/kalshi_predictor/overnight_paper/miami_driver.py").write_text(
+        "# changed after typing evidence\n"
+    )
+    with pytest.raises(ValueError, match="MYPY_REVIEWED_SOURCE_SCOPE"):
+        release.verify()

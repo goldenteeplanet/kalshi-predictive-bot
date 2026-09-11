@@ -275,6 +275,31 @@ def test_handoff_rejects_mutated_assembly_records(session, prepared_inputs, chan
 def test_pending_caller_rows_cannot_be_implicitly_flushed(session, prepared_inputs):
     session.add(PaperOrder())
     result = module.prepare_miami_candidate(session, **prepared_inputs)
-    assert result.blockers == ('UNFLUSHED_CALLER_CHANGES_FORBIDDEN',)
+    assert result.blockers == ("UNFLUSHED_CALLER_CHANGES_FORBIDDEN",)
     assert result.engine_outputs is None
     assert len(session.new) == 1
+
+
+@pytest.mark.parametrize("mutation", ["missing", "changed", "boolean", "hash"])
+def test_handoff_binds_actual_persisted_risk_fee_amount(session, prepared_inputs, mutation):
+    from kalshi_predictor.data.schema import AdvancedRiskDecisionLog
+
+    result = module.prepare_miami_candidate(session, **prepared_inputs)
+    assert result.state == "COMPUTED_UNQUALIFIED", result.blockers
+    row = session.get(AdvancedRiskDecisionLog, result.records["risk_id"])
+    payload = json.loads(row.raw_json)
+    assert payload["raw"]["estimated_round_trip_fees"] == str(
+        result.engine_outputs.risk_request.estimated_round_trip_fees
+    )
+    if mutation == "missing":
+        del payload["raw"]["estimated_round_trip_fees"]
+    elif mutation == "changed":
+        payload["raw"]["estimated_round_trip_fees"] = "99"
+    elif mutation == "boolean":
+        payload["raw"]["estimated_round_trip_fees"] = False
+    else:
+        payload["raw"]["guarded_fee_quote_sha256"] = "f" * 64
+    row.raw_json = json.dumps(payload)
+    session.flush()
+    with pytest.raises(ValueError, match="MIAMI_HANDOFF_FEE_CHANGED"):
+        module.verify_miami_preparation_handoff(session, result, now=module.utc_now())

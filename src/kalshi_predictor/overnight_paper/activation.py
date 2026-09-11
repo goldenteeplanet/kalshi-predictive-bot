@@ -47,7 +47,12 @@ from kalshi_predictor.overnight_paper.qualification import (
     qualify_candidate,
 )
 from kalshi_predictor.overnight_paper.release_typing import verify_typing_evidence
-from kalshi_predictor.overnight_paper.store import aware, digest, encode
+from kalshi_predictor.overnight_paper.store import (
+    aware,
+    digest,
+    encode,
+    validate_shadow_source_clock,
+)
 from kalshi_predictor.overnight_paper.timing import verify_settlement_horizon
 from kalshi_predictor.overnight_paper.watcher import verified_settled_tickers
 from kalshi_predictor.paper.fees import CONTRACT_KEY, decision_fee_quote
@@ -219,6 +224,7 @@ def _validate_shadow_inputs(
     now: datetime,
     hard_horizon_hours: int = 72,
 ) -> None:
+    validate_shadow_source_clock(shadow)
     inputs = args["decision_inputs"]
     if any(
         _utc(args[key].decision_timestamp) != aware(shadow["decision_at"])

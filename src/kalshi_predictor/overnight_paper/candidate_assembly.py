@@ -684,7 +684,10 @@ def _assemble_candidate(
         settlement_rule_version=policy.version,
         decision_at=at.isoformat(),
         forecast_at=records["forecast_generated_at"],
-        source_updated_at=analytical_source.decode()["provider_updated_at"],
+        # Legacy shadow timestamp is interpreted by its explicit clock basis.
+        source_updated_at=analytical_source.decode()[
+            "available_at" if miami else "provider_updated_at"
+        ],
         snapshot_at=book_row["received_at"],
         close_time=market["close_time"],
         side=paper.side,
@@ -695,6 +698,13 @@ def _assemble_candidate(
         qualification_blockers=list(qualification.blockers),
         model_evaluation_required=True,
     )
+    if miami:
+        source_clock = analytical_source.decode()
+        shadow.update(
+            source_clock_basis=source_clock["clock_basis"],
+            source_available_at=source_clock["available_at"],
+            source_provider_updated_at=source_clock["provider_updated_at"],
+        )
     dataset = (
         build_observation(
             provenance_args=dict(

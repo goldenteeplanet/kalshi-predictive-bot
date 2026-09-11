@@ -98,7 +98,80 @@ def initialize_store(path: Path) -> None:
         )
 
 
+def validate_shadow_source_clock(payload: dict[str, Any]) -> None:
+    """Miami's legacy source_updated_at slot means receipt-recorded availability.
+
+    Preserve the explicitly unknown provider timestamp. This is exact shadow
+    binding, not proof of public historical availability or model qualification.
+    Other sources retain their existing provider-clock contract.
+    """
+    basis = "miami-original-replay-receipt-v1"
+    inputs = payload.get("qualification_inputs", {})
+    if not (
+        payload.get("series_ticker") == "KXTEMPMIAH"
+        or (isinstance(inputs, dict) and inputs.get("source_kind") == "miami-canonical-index-v1")
+        or payload.get("source_clock_basis") == basis
+    ):
+        return
+    if not isinstance(inputs, dict):
+        raise ValueError("SHADOW_QUALIFICATION_INPUT_TYPE")
+    required = {"source_clock_basis", "source_available_at", "source_provider_updated_at"}
+    if (
+        not required <= payload.keys()
+        or payload["source_clock_basis"] != basis
+        or payload["source_provider_updated_at"] is not None
+        or inputs.get("source_kind") != "miami-canonical-index-v1"
+        or payload.get("series_ticker") != inputs.get("series")
+        or inputs.get("series") != "KXTEMPMIAH"
+    ):
+        raise ValueError("MIAMI_SHADOW_CLOCK_BASIS_REQUIRED")
+    sources = payload.get("source_provenance")
+    if not isinstance(sources, list) or any(not isinstance(s, dict) for s in sources):
+        raise ValueError("MIAMI_SHADOW_SOURCE_ORIGINAL_REQUIRED")
+    analytical = [s for s in sources if s.get("clock_basis") == basis]
+    if len(analytical) != 1:
+        raise ValueError("MIAMI_SHADOW_SOURCE_ORIGINAL_REQUIRED")
+    source = analytical[0]
+    source_hash = digest(source)
+    hashes = inputs.get("source_hashes")
+    timestamps = inputs.get("source_timestamps")
+    if (
+        not isinstance(hashes, list)
+        or any(type(s) is not str for s in hashes)
+        or len(set(hashes)) != len(hashes)
+        or source_hash not in hashes
+        or not isinstance(timestamps, list)
+        or any(not isinstance(t, dict) for t in timestamps)
+    ):
+        raise ValueError("MIAMI_SHADOW_SOURCE_HASH_BINDING")
+    matching = [t for t in timestamps if t.get("sha256") == source_hash]
+    expected = {
+        key: source.get(key)
+        for key in (
+            "provider_updated_at",
+            "provider_generated_at",
+            "available_at",
+            "received_at",
+            "clock_basis",
+        )
+    }
+    expected["sha256"] = source_hash
+    if (
+        source.get("role") != "ANALYTICAL_SOURCE"
+        or source.get("provider_updated_at") is not None
+        or source.get("provider_generated_at") is not None
+        or matching != [expected]
+        or payload["source_available_at"] != source.get("available_at")
+        or payload.get("source_updated_at") != source.get("available_at")
+        or not aware(source["received_at"])
+        <= aware(source["available_at"])
+        <= aware(payload["decision_at"])
+    ):
+        raise ValueError("MIAMI_SHADOW_RECORDED_AVAILABILITY_BINDING")
+
+
 def record_shadow(db: sqlite3.Connection, payload: dict[str, Any]) -> str:
+    validate_shadow_source_clock(payload)
     if REQUIRED_DECISION - payload.keys():
         raise ValueError("INCOMPLETE_SHADOW_PROVENANCE")
     if any(payload[key] in (None, "", {}) for key in REQUIRED_DECISION):

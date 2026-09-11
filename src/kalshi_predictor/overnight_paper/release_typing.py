@@ -11,6 +11,18 @@ from typing import Any
 
 POLICY_VERSION = "paper-release-typing-v1"
 TYPING_TARGETS: tuple[str, ...] = (
+    "src/kalshi_predictor/crypto/research_provenance.py",
+    "src/kalshi_predictor/overnight_paper/miami_binding.py",
+    "src/kalshi_predictor/overnight_paper/miami_driver.py",
+    "src/kalshi_predictor/overnight_paper/miami_preparation.py",
+    "src/kalshi_predictor/overnight_paper/miami_preparation_runner.py",
+    "src/kalshi_predictor/overnight_paper/miami_provenance.py",
+    "src/kalshi_predictor/overnight_paper/miami_source.py",
+    "src/kalshi_predictor/overnight_paper/miami_source_gate.py",
+    "src/kalshi_predictor/overnight_paper/miami_storage.py",
+    "src/kalshi_predictor/weather/miami_forecast.py",
+    "src/kalshi_predictor/weather/miami_half_hour_forecast.py",
+    "src/kalshi_predictor/weather/miami_index.py",
     "src/kalshi_predictor/overnight_paper/crypto_source.py",
     "src/kalshi_predictor/advanced_risk/engine.py",
     "src/kalshi_predictor/advanced_risk/repository.py",
