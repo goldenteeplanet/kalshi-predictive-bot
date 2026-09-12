@@ -131,6 +131,24 @@ def test_true_full_global_command_remains_supported(evidence):
     changed(release, report).verify()
 
 
+@pytest.mark.parametrize("target", [
+    "src/kalshi_predictor/crypto/account_fee_evidence.py",
+    "src/kalshi_predictor/crypto/calibration_cost_evidence.py",
+    "src/kalshi_predictor/crypto/cost_evidence.py",
+    "src/kalshi_predictor/crypto/cost_record.py",
+    "src/kalshi_predictor/crypto/full_cost_evidence.py",
+    "src/kalshi_predictor/overnight_paper/cf_candidate_assembly.py",
+    "src/kalshi_predictor/overnight_paper/cf_source.py",
+])
+def test_cf_and_cost_source_change_invalidates_release_typing(evidence, target):
+    release, _ = evidence
+    assert target in release_typing.TYPING_TARGETS
+    release.verify()
+    (release.repository / target).write_text("# changed after typing verification\n")
+    with pytest.raises(ValueError, match="MYPY_REVIEWED_SOURCE_SCOPE"):
+        release.verify()
+
+
 @pytest.mark.parametrize("filename", ["miami_driver.py", "miami_development.py"])
 def test_miami_source_change_invalidates_typing_manifest(evidence, filename):
     release, _ = evidence
