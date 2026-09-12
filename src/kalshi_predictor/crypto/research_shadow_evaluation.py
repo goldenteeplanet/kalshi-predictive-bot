@@ -351,9 +351,15 @@ def _inspect(
             ):
                 raise ValueError("WINDOW_SCENARIO_CHANGED")
             forecast = decision["forecast"]
+            # Older frozen forecasts retain the original target shape. New SOL
+            # bindings must exactly match declared semantics; never rerun a model.
+            forecast_semantic = target.validate(
+                as_of=decision_at,
+                include_sol_rule_binding="settlement_rule_binding" in forecast["target"],
+            )
             if (
                 forecast["model"] != "crypto_settlement_average_research_v1"
-                or not S.same(forecast["target"], _json(S.encode(semantic)))
+                or not S.same(forecast["target"], _json(S.encode(forecast_semantic)))
                 or forecast["model_input_as_of"] != decision["decision_at"]
                 or forecast["source_sha256"] != request["cf"]["sha256"]
                 or forecast["volatility_sha256"] != request["cf"]["sha256"]

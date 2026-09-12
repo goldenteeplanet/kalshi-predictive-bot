@@ -10,6 +10,7 @@ from decimal import Decimal
 from urllib.parse import urlsplit
 
 from kalshi_predictor.crypto.cf_settlement_windows import CFWindow, CFWindowRules
+from kalshi_predictor.crypto.settlement_rule_version import SOLSettlementRuleVersion
 
 
 def aware(value: datetime) -> None:
@@ -64,7 +65,7 @@ class SettlementBenchmarkTarget:
     finality_deadline: datetime | None
     finality_basis: str
 
-    def validate(self, *, as_of: datetime) -> dict:
+    def validate(self, *, as_of: datetime, include_sol_rule_binding: bool = False) -> dict:
         aware(as_of)
         aware(self.rule_received_at)
         aware(self.market_received_at)
@@ -150,7 +151,7 @@ class SettlementBenchmarkTarget:
             aware(self.finality_deadline)
             if self.finality_basis != "DECLARED_UNCERTIFIED" or self.finality_deadline < close:
                 raise ValueError("INVALID_DECLARED_FINALITY")
-        return dict(
+        result = dict(
             schema="settlement-benchmark-target-v1",
             symbol=self.symbol,
             event_ticker=self.event_ticker,
@@ -171,3 +172,44 @@ class SettlementBenchmarkTarget:
             settlement_aligned_forecast=False,
             paper_eligible=False,
         )
+        if self.symbol == "SOL" or r.market_ticker.startswith("KXSOLE-"):
+            if (
+                self.symbol != "SOL"
+                or not r.market_ticker.startswith("KXSOLE-")
+                or not self.event_ticker.startswith("KXSOLE-")
+            ):
+                raise ValueError("SOL_EVENT_TARGET_IDENTITY_REQUIRED")
+            # These are declared computational assumptions, not interpreted legal
+            # evidence. Preserve unknown semantics and attach no field certification.
+            rule = SOLSettlementRuleVersion(
+                family="KXSOLE",
+                benchmark_id=r.index_id,
+                sample_frequency_ms=r.closing.cadence_ms,
+                sample_count=r.closing.expected_ticks,
+                start_offset_ms=r.closing.start_ms - r.closing.end_ms,
+                end_offset_ms=0,
+                include_start=r.closing.include_start,
+                include_end=r.closing.include_end,
+                sample_precision=None,
+                sample_rounding=None,
+                average_precision=None,
+                final_precision=format(Decimal((0, (1,), -r.decimal_places)), "f"),
+                final_rounding=r.rounding,
+                tie_breaking=None,
+                missing_sample_behavior=None,
+                amendment_handling=r.amendments,
+                finality=None,
+                effective_from=None,
+                effective_until=None,
+                authority_version=None,
+                field_evidence=(),
+            )
+            if include_sol_rule_binding:
+                result["settlement_rule_binding"] = {
+                    "version_id": rule.bind(family="KXSOLE", benchmark_id="SOLUSD_RTI"),
+                    "rule": asdict(rule),
+                    "status": rule.status,
+                    "unresolved_fields": list(rule.unresolved_fields),
+                    "evidence_role": "DECLARED_ASSUMPTIONS_NOT_AUTHORITY",
+                }
+        return result

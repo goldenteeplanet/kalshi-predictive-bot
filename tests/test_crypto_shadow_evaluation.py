@@ -313,9 +313,21 @@ def test_publication_failure_cannot_present_complete_receipt(tmp_path, monkeypat
     assert not (output / "recording_receipt.json").exists()
 
 
-def test_actual_capture_harness_original_schema_end_to_end(tmp_path, monkeypatch):
+@pytest.mark.parametrize("legacy_target_shape", [False, True])
+def test_actual_capture_harness_original_schema_end_to_end(
+    tmp_path, monkeypatch, legacy_target_shape
+):
     from test_cf_average_shadow_capture import harness
 
+    if legacy_target_shape:
+        original_model = S.forecast_benchmark_average
+
+        def legacy_model(*args, **kwargs):
+            result = original_model(*args, **kwargs)
+            result["target"].pop("settlement_rule_binding", None)
+            return result
+
+        monkeypatch.setattr(S, "forecast_benchmark_average", legacy_model)
     capture, out, calls, catalog, _, _, plan = harness(tmp_path, monkeypatch)
     capture()
     completion = (out / "completion.json").read_bytes()

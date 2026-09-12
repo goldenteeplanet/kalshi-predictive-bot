@@ -147,7 +147,7 @@ def forecast_benchmark_average(
     """Forecast the rounded arithmetic average; target/basis evidence remains uncertified."""
     if type(target) is not SettlementBenchmarkTarget or type(process) is not BenchmarkProcessInputs:
         raise ValueError("EXACT_TARGET_AND_PROCESS_TYPES_REQUIRED")
-    target_record = target.validate(as_of=as_of)
+    target_record = target.validate(as_of=as_of, include_sol_rule_binding=True)
     process.validate(target, as_of)
     times = tuple(
         (datetime.fromtimestamp(t / 1000, UTC) - process.level_observed_at).total_seconds() / 60

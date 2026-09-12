@@ -176,6 +176,7 @@ def source_originals() -> dict:
         "crypto.cf_settlement_windows",
         "crypto.settlement_average_model",
         "crypto.settlement_target",
+        "crypto.settlement_rule_version",
         "paper.fees",
         "kalshi.protocol_math",
         "utils.decimals",
@@ -203,7 +204,7 @@ def build_decision(request_raw: bytes, *, as_of: datetime) -> dict:
     if request.get("schema") != "crypto-average-shadow-request-v1":
         raise ValueError("REQUEST_SCHEMA_REQUIRED")
     target = target_from_request(request)
-    target.validate(as_of=as_of)
+    target_record = target.validate(as_of=as_of)
     market_raw = original(request["market"])
     ticker = target.rules.market_ticker
     market_receipt = receipt(
@@ -315,7 +316,9 @@ def build_decision(request_raw: bytes, *, as_of: datetime) -> dict:
         ticker=ticker,
         benchmark=target.rules.index_id,
         decision_at=as_of.isoformat(),
-        rule_version=sha(encode(target.validate(as_of=as_of))),
+        # Preserve the existing target fingerprint for frozen-outcome replay.
+        # New SOL forecasts additionally carry their typed semantic rule binding.
+        rule_version=sha(encode(target_record)),
         rule_version_authority="DECLARED_SEMANTICS_UNCERTIFIED",
         settlement_eta=market["close_time"],
         forecast=forecast,
