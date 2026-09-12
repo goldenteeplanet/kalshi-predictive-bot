@@ -125,8 +125,10 @@ def pin_capture(control: Path, slot: int, plan: dict, item: dict):
     provisional_receipt = encode({"pin_sha256": digest(pin), "at": current.isoformat()})
     verify_capture(root, pin, provisional_receipt, item["plan_sha256"])
     persist(control / f"slot-{slot}.pin.json", pin)
+    os.chmod(control / f"slot-{slot}.pin.json", 0o644)
     receipt = encode({"pin_sha256": digest(pin), "at": datetime.now(UTC).isoformat()})
     persist(control / f"slot-{slot}.pin-receipt.json", receipt)
+    os.chmod(control / f"slot-{slot}.pin-receipt.json", 0o644)
     verify_capture(root, pin, receipt, item["plan_sha256"])
     if datetime.now(UTC) >= at(plan["target_at"]):
         raise ValueError("POST_FSYNC_PIN_DEADLINE")
