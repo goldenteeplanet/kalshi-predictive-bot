@@ -159,7 +159,8 @@ class FREDResearchClient:
         return self.__remaining
 
     def _get(
-        self, path: str, params: dict[str, str | int], *, initial_claims: bool = False
+        self, path: str, params: dict[str, str | int], *, initial_claims: bool = False,
+        cpi_vintage: bool = False,
     ) -> FREDResponse:
         allowed = {"series_id", "file_type", "realtime_start", "realtime_end"}
         if path == "/fred/series/observations":
@@ -176,6 +177,17 @@ class FREDResearchClient:
                 or params.get("sort_order") != "asc"
             ):
                 raise FREDError("FRED_CLAIMS_QUERY_INVALID")
+        if cpi_vintage:
+            allowed |= {"output_type", "units", "offset"}
+            if (
+                initial_claims or path != "/fred/series/observations"
+                or params.keys() != allowed or params.get("series_id") != "CPIAUCSL"
+                or type(params.get("output_type")) is not int
+                or params["output_type"] not in {1, 4}
+                or params.get("units") != "lin" or params.get("offset") != 0
+                or params.get("sort_order") != "asc"
+            ):
+                raise FREDError("FRED_CPI_VINTAGE_QUERY_INVALID")
         if path not in _PATHS or not params.keys() <= allowed:
             raise FREDError("FRED_ENDPOINT_NOT_ALLOWED")
         series_allowed = params.get("series_id") in _SERIES
@@ -250,6 +262,32 @@ class FREDResearchClient:
             except httpx.HTTPError:
                 pass
             raise FREDError("FRED_TRANSPORT_FAILED")
+
+    def cpi_vintage(
+        self, *, observation_start: str, observation_end: str, as_of: str,
+        output_type: int,
+    ) -> FREDResponse:
+        """At most 24 monthly CPI levels; original first, normalization separately."""
+        _window(observation_start, observation_end)
+        _window(observation_end, as_of)
+        start, end = date.fromisoformat(observation_start), date.fromisoformat(observation_end)
+        months = (end.year - start.year) * 12 + end.month - start.month + 1
+        if start.day != 1 or end.day != 1 or not 1 <= months <= 24:
+            raise FREDError("FRED_CPI_MONTH_WINDOW_INVALID")
+        if as_of > datetime.now(UTC).date().isoformat():
+            raise FREDError("FRED_FUTURE_VINTAGE_INVALID")
+        if type(output_type) is not int or output_type not in {1, 4}:
+            raise FREDError("FRED_CPI_OUTPUT_TYPE_INVALID")
+        return self._get(
+            "/fred/series/observations",
+            {"series_id": "CPIAUCSL", "file_type": "json", "units": "lin",
+             "output_type": output_type, "offset": 0, "sort_order": "asc",
+             "limit": months, "observation_start": observation_start,
+             "observation_end": observation_end,
+             "realtime_start": "1776-07-04" if output_type == 4 else as_of,
+             "realtime_end": as_of},
+            cpi_vintage=True,
+        )
 
     def initial_claims_releases(
         self,

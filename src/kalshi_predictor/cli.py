@@ -1172,6 +1172,32 @@ def ev_funnel_command(source: Path, expected_sha256: str, output: Path) -> None:
     typer.echo(json.dumps(audit_file(source, expected_sha256, output), default=str, indent=2))
 
 
+@app.command("capture-cpi-vintages")
+def capture_cpi_vintages_command(
+    output: Path, observation_start: str, observation_end: str, as_of: str,
+) -> None:
+    """Archive initial/as-of FRED CPI separately; key comes from FRED_API_KEY."""
+    from kalshi_predictor.economic.cpi_vintages import capture_cpi_vintage_pair
+    from kalshi_predictor.research.fred import FREDError, FREDResearchClient
+
+    key = os.environ.get("FRED_API_KEY", "")
+    if not key:
+        typer.echo("FRED_API_KEY_NOT_CONFIGURED")
+        raise typer.Exit(1)
+    try:
+        with FREDResearchClient(key, request_budget=2) as client:
+            report = capture_cpi_vintage_pair(
+                client, output, observation_start=observation_start,
+                observation_end=observation_end, as_of=as_of,
+            )
+    except FREDError:
+        typer.echo("FRED_CLIENT_CONFIGURATION_FAILED")
+        raise typer.Exit(1) from None
+    typer.echo(json.dumps(report, indent=2))
+    if report["status"] == "INCOMPLETE":
+        raise typer.Exit(1)
+
+
 @app.command("init-db")
 def init_db_command() -> None:
     init_db()
