@@ -203,23 +203,28 @@ def coverage_receipt(body, receipt):
 
 
 @pytest.mark.parametrize(
-    "symbol,index",
+    "symbol,index,series",
     [
-        ("BTC", "BRTI"),
-        ("ETH", "ETHUSD_RTI"),
-        ("SOL", "SOLUSD_RTI"),
-        ("XRP", "XRPUSD_RTI"),
-        ("DOGE", "DOGEUSD_RTI"),
+        ("BTC", "BRTI", "KXBTC"),
+        ("ETH", "ETHUSD_RTI", "KXETH"),
+        ("SOL", "SOLUSD_RTI", "KXSOLE"),
+        ("XRP", "XRPUSD_RTI", "KXXRP"),
+        ("DOGE", "DOGEUSD_RTI", "KXDOGE"),
     ],
 )
-def test_original_coverage_receipt_and_explicit_index_map(symbol, index):
+def test_original_coverage_receipt_and_explicit_index_map(symbol, index, series):
     from dataclasses import replace
 
     body, receipt = fixture()
     receipt.update(index_id=index, url=receipt["url"].replace("BRTI", index))
     raw, rr = encode(body), encode(coverage_receipt(body, receipt))
     t = target()
-    t = replace(t, symbol=symbol, rules=replace(t.rules, index_id=index))
+    market = json.loads(t.market_original)
+    market["market"].update(ticker=series + "-E-T100", event_ticker=series + "-E")
+    t = replace(
+        t, symbol=symbol, event_ticker=series + "-E", market_original=encode(market),
+        rules=replace(t.rules, index_id=index, market_ticker=series + "-E-T100"),
+    )
     result = estimate_cf_process(
         raw, rr, source_sha256=digest(raw), receipt_sha256=digest(rr), target=t, as_of=NOW
     )
@@ -227,6 +232,23 @@ def test_original_coverage_receipt_and_explicit_index_map(symbol, index):
     assert result.process.index_id == index
     assert result.evidence["recorded_at"] is None
     assert result.evidence["received_at"] == NOW.isoformat()
+
+
+def test_sol_process_cannot_relabel_a_btc_contract():
+    from dataclasses import replace
+
+    body, receipt = fixture()
+    receipt.update(index_id="SOLUSD_RTI", url=receipt["url"].replace("BRTI", "SOLUSD_RTI"))
+    raw, rr = encode(body), encode(coverage_receipt(body, receipt))
+    original = target()
+    mismatched = replace(
+        original, symbol="SOL", rules=replace(original.rules, index_id="SOLUSD_RTI")
+    )
+    with pytest.raises(ValueError, match="SOL_EVENT_TARGET_IDENTITY_REQUIRED"):
+        estimate_cf_process(
+            raw, rr, source_sha256=digest(raw), receipt_sha256=digest(rr),
+            target=mismatched, as_of=NOW,
+        )
 
 
 @pytest.mark.parametrize(
