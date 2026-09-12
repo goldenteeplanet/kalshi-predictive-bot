@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.data.repositories import decode_json
@@ -45,6 +45,15 @@ def signal_marketplace(session: Session) -> dict[str, Any]:
             "signals": len(cards),
             "active_forecasts": sum(card["forecast_count"] for card in cards),
             "active_trades": sum(card["trade_count"] for card in cards),
+            "unique_historical_orders": int(
+                session.scalar(
+                    select(func.count(func.distinct(PaperOrder.id))).join(
+                        SignalTrade, SignalTrade.paper_order_id == PaperOrder.id
+                    )
+                )
+                or 0
+            ),
+            "mission_trades": None,
         },
     }
 
@@ -172,16 +181,13 @@ def _signal_card(
             signal.status,
         )
     )
-    status = (
-        readiness.get("status_label", performance_status)
-        if readiness and readiness.get("readiness_status") != "ACTIVE"
-        else performance_status
-    )
+    status = (readiness or {}).get("status_label", "Readiness unknown")
     return {
         "signal_name": signal.signal_name,
         "category": signal.category,
         "description": signal.description,
         "status": status,
+        "historical_performance_label": performance_status,
         "roi": performance.roi if performance else None,
         "win_rate": performance.win_rate if performance else None,
         "trade_count": performance.trade_count if performance else 0,
@@ -194,9 +200,15 @@ def _signal_card(
         "avg_opportunity_score": performance.avg_opportunity_score if performance else None,
         "readiness_status": (readiness or {}).get("readiness_status", "UNKNOWN"),
         "status_label": (readiness or {}).get("status_label", status),
-        "missing_data": (readiness or {}).get("missing_data", "none"),
-        "next_action": (readiness or {}).get("next_action", "No action needed."),
+        "missing_data": (readiness or {}).get("missing_data", "readiness evidence"),
+        "next_action": (readiness or {}).get(
+            "next_action", "Review signal data and model readiness."
+        ),
         "latest_signal": (readiness or {}).get("latest_signal", "none"),
+        "freshness_checked_at": (readiness or {}).get("freshness_checked_at"),
+        "model_readiness": "UNVERIFIED",
+        "evidence_type": "Historical attribution; heuristic score is not calibrated probability",
+        "performance_generated_at": performance.generated_at.isoformat() if performance else None,
         "skip_count": (readiness or {}).get("skip_count", 0),
         "skip_reason": (readiness or {}).get("skip_reason", "No skip logged yet."),
     }
@@ -208,11 +220,7 @@ def _leaderboard_row(
     readiness: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     performance_status = decode_json(row.raw_json).get("status", "Insufficient Data")
-    status = (
-        readiness.get("status_label", performance_status)
-        if readiness and readiness.get("readiness_status") != "ACTIVE"
-        else performance_status
-    )
+    status = (readiness or {}).get("status_label", "Readiness unknown")
     return {
         "rank": rank,
         "signal_name": row.signal_name,
@@ -224,10 +232,13 @@ def _leaderboard_row(
         "confidence_score": row.confidence_score,
         "brier_score": row.brier_score,
         "status": status,
+        "historical_performance_label": performance_status,
         "readiness_status": (readiness or {}).get("readiness_status", "UNKNOWN"),
         "status_label": (readiness or {}).get("status_label", status),
-        "missing_data": (readiness or {}).get("missing_data", "none"),
-        "next_action": (readiness or {}).get("next_action", "No action needed."),
+        "missing_data": (readiness or {}).get("missing_data", "readiness evidence"),
+        "next_action": (readiness or {}).get(
+            "next_action", "Review signal data and model readiness."
+        ),
         "latest_signal": (readiness or {}).get("latest_signal", "none"),
         "skip_count": (readiness or {}).get("skip_count", 0),
         "skip_reason": (readiness or {}).get("skip_reason", "No skip logged yet."),

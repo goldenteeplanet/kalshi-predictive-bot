@@ -5,7 +5,6 @@ from pathlib import Path
 
 from kalshi_predictor.benchmarking.export_custody import write_export_custody_preview
 
-
 parser = argparse.ArgumentParser(description="Run local PMB-34D export custody certification")
 parser.add_argument(
     "--custody", type=Path,

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
 from alembic import context
+from sqlalchemy import Connection, engine_from_config, pool
+
 from kalshi_predictor.config import get_settings
 from kalshi_predictor.data.backend import database_url_from_settings
 from kalshi_predictor.data.schema import Base
@@ -19,7 +19,10 @@ target_metadata = Base.metadata
 
 def _database_url() -> str:
     settings_url = database_url_from_settings(get_settings())
-    return settings_url or config.get_main_option("sqlalchemy.url")
+    url = settings_url or config.get_main_option("sqlalchemy.url")
+    if not url:
+        raise ValueError("MIGRATION_DATABASE_URL_REQUIRED")
+    return url
 
 
 def run_migrations_offline() -> None:
@@ -36,6 +39,19 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    if "connection" in config.attributes:
+        connection = config.attributes["connection"]
+        if not isinstance(connection, Connection) or connection.closed:
+            raise ValueError("EXPLICIT_OPEN_SQLALCHEMY_CONNECTION_REQUIRED")
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            render_as_batch=connection.dialect.name == "sqlite",
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+        return
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = _database_url()
     connectable = engine_from_config(

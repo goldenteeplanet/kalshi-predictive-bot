@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,12 @@ from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings, get_settings
 from kalshi_predictor.data.repositories import decode_json
-from kalshi_predictor.data.schema import MarketSnapshot, WeatherFeature, WeatherMarketLink
+from kalshi_predictor.data.schema import (
+    MarketSnapshot,
+    WeatherFeature,
+    WeatherForecast,
+    WeatherMarketLink,
+)
 from kalshi_predictor.forecasting.base import ForecastOutput
 from kalshi_predictor.forecasting.skip_log import log_forecast_skip
 from kalshi_predictor.utils.decimals import midpoint, to_decimal
@@ -23,6 +29,7 @@ from kalshi_predictor.weather.observation_shadow import evaluate_knyc_observatio
 from kalshi_predictor.weather.repository import (
     get_latest_weather_features,
     get_latest_weather_link_for_ticker,
+    weather_forecast_clock_consistent,
 )
 from kalshi_predictor.weather.temperature_contracts import (
     parse_point_temperature_ticker,
@@ -43,7 +50,11 @@ class WeatherV2Forecaster:
         self.settings = settings or get_settings()
 
     def forecast(self, session: Session, snapshot: MarketSnapshot) -> ForecastOutput | None:
-        link = get_latest_weather_link_for_ticker(session, snapshot.ticker)
+        input_cutoff = utc_now()
+        if _utc(snapshot.captured_at) > input_cutoff:
+            _skip(session, snapshot, "future market snapshot", available={"snapshot": True})
+            return None
+        link = get_latest_weather_link_for_ticker(session, snapshot.ticker, as_of=input_cutoff)
         if link is None:
             _skip(session, snapshot, "no weather market link", available={"snapshot": True})
             return None
@@ -64,7 +75,9 @@ class WeatherV2Forecaster:
             link.location_key,
             self.settings.weather_v2_default_location_key,
         )
-        features, feature_alignment = _features_for_link(session, location_key, link)
+        features, feature_alignment = _features_for_link(
+            session, location_key, link, as_of=input_cutoff
+        )
         if features is None:
             _skip(
                 session,
@@ -73,7 +86,26 @@ class WeatherV2Forecaster:
                 available={"link": True, "location_key": location_key},
             )
             return None
-        if _forecast_age_hours(features) > self.settings.weather_v2_max_forecast_age_hours:
+        reference = _feature_source_reference(features)
+        if reference and reference.get("table") == "weather_forecasts":
+            original = session.get(WeatherForecast, reference.get("id"))
+            if (
+                original is None
+                or not weather_forecast_clock_consistent(original)
+                or _utc(features.target_time) != _utc(original.forecast_time)
+            ):
+                _skip(
+                    session,
+                    snapshot,
+                    "weather source target timestamp mismatch",
+                    available={"feature_id": features.id, "source_reference": reference},
+                )
+                return None
+        source_age = _forecast_age_hours(features, as_of=input_cutoff)
+        if source_age < 0:
+            _skip(session, snapshot, "future weather source", available={"feature_id": features.id})
+            return None
+        if source_age > self.settings.weather_v2_max_forecast_age_hours:
             _skip(
                 session,
                 snapshot,
@@ -111,6 +143,13 @@ class WeatherV2Forecaster:
             return None
         final_probability = _clamp_probability(market_mid + adjustment)
         feature_json = {
+            "input_cutoff": input_cutoff.isoformat(),
+            "snapshot_id": snapshot.id,
+            "snapshot_captured_at": _utc(snapshot.captured_at).isoformat(),
+            "feature_generated_at": _utc(features.generated_at).isoformat(),
+            "feature_created_at": _utc(features.created_at).isoformat(),
+            "link_detected_at": _utc(link.detected_at).isoformat(),
+            "source_age_hours_at_cutoff": str(source_age),
             "location_key": location_key,
             "linked_location_key": link.location_key,
             "weather_metric": link.weather_metric,
@@ -129,7 +168,7 @@ class WeatherV2Forecaster:
         }
         notes = "weather_v2 midpoint plus bounded weather adjustment."
         if link.weather_metric == "RAIN":
-            calibrated_rain = _calibrated_monthly_rain_probability(link)
+            calibrated_rain = _calibrated_monthly_rain_probability(link, as_of=input_cutoff)
             if calibrated_rain is not None:
                 final_probability, rain_evidence = calibrated_rain
                 feature_json["monthly_rain_calibration"] = rain_evidence
@@ -145,6 +184,7 @@ class WeatherV2Forecaster:
                 market_mid=market_mid,
                 baseline_probability=final_probability,
                 max_adjustment=self.settings.weather_v2_max_adjustment,
+                as_of=input_cutoff,
             )
             if guarded_result is not None:
                 final_probability, evidence = guarded_result
@@ -157,9 +197,13 @@ class WeatherV2Forecaster:
                         "non-settlement observation evidence."
                     )
 
+        generated_at = utc_now()
+        if generated_at < input_cutoff:
+            _skip(session, snapshot, "forecast clock moved backward", available={"snapshot": True})
+            return None
         return ForecastOutput(
             ticker=snapshot.ticker,
-            forecasted_at=snapshot.captured_at,
+            forecasted_at=generated_at,
             model_name=self.model_name,
             yes_probability=final_probability,
             market_mid_probability=market_mid,
@@ -178,6 +222,7 @@ def _guarded_knyc_temperature_probability(
     market_mid: Decimal,
     baseline_probability: Decimal,
     max_adjustment: Decimal,
+    as_of: datetime | None = None,
 ) -> tuple[Decimal, dict[str, Any]] | None:
     contract = parse_point_temperature_ticker(snapshot.ticker)
     if contract is None:
@@ -242,6 +287,16 @@ def _guarded_knyc_temperature_probability(
     evidence["observation_provenance"] = guard.provenance
     if not guard.passed:
         return blocked(guard.blocker or "KNYC_OBSERVATION_NOT_VERIFIED")
+    if not isinstance(observation_evidence, dict):
+        return blocked("KNYC_EVIDENCE_MISSING")
+    cutoff = as_of if as_of is not None else utc_now()
+    offset = to_decimal(observation_evidence.get("offset_seconds"))
+    assert offset is not None  # Validated by evaluate_knyc_observation above.
+    observed_at = contract.target_utc_time + timedelta(seconds=float(offset))
+    evidence["input_cutoff"] = cutoff.isoformat()
+    evidence["observation_time"] = observed_at.isoformat()
+    if observed_at > cutoff:
+        return blocked("OBSERVATION_AFTER_INPUT_CUTOFF")
 
     observation_temperature = to_decimal(observation_evidence.get("observation_temperature_f"))
     if observation_temperature is None:
@@ -315,6 +370,8 @@ def _features_for_link(
     session: Session,
     location_key: str,
     link: WeatherMarketLink,
+    *,
+    as_of: datetime | None = None,
 ) -> tuple[WeatherFeature | None, str]:
     """Use exact terminal features, with a disclosed bounded-horizon rain fallback.
 
@@ -327,12 +384,15 @@ def _features_for_link(
         session,
         location_key,
         target_time=link.target_time,
+        **({"as_of": as_of} if as_of is not None else {}),
     )
     if features is not None:
         return features, "EXACT_TARGET_TIME"
     if link.weather_metric == "RAIN":
         return (
-            get_latest_weather_features(session, location_key),
+            get_latest_weather_features(
+                session, location_key, **({"as_of": as_of} if as_of is not None else {})
+            ),
             "LATEST_RAIN_RISK_WITHIN_NOAA_HORIZON",
         )
     return None, "NO_COMPATIBLE_FEATURE"
@@ -340,6 +400,8 @@ def _features_for_link(
 
 def _calibrated_monthly_rain_probability(
     link: WeatherMarketLink,
+    *,
+    as_of: datetime | None = None,
 ) -> tuple[Decimal, dict[str, Any]] | None:
     path = Path("reports/phase_gh2/cliaus_monthly_rain_prepare.json")
     if link.location_key != "austin" or not path.exists():
@@ -347,6 +409,12 @@ def _calibrated_monthly_rain_probability(
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    cutoff = as_of if as_of is not None else utc_now()
+    artifact_generated_at = parse_datetime(payload.get("generated_at"))
+    if artifact_generated_at is None or artifact_generated_at > cutoff:
         return None
     if payload.get("activation_permitted") is not True:
         return None
@@ -392,7 +460,8 @@ def _calibrated_monthly_rain_probability(
         "monotonic_probability": str(probability),
         "monotonic_blocks": blocks,
         "generated_at": payload.get("generated_at"),
-        "no_leakage": True,
+        "input_cutoff": cutoff.isoformat(),
+        "local_generation_clock_checked": True,
     }
 
 
@@ -430,15 +499,29 @@ def _operator_direction(operator: str) -> Decimal | None:
     return None
 
 
-def _forecast_age_hours(features: WeatherFeature) -> Decimal:
+def _forecast_age_hours(
+    features: WeatherFeature, *, as_of: datetime | None = None
+) -> Decimal:
     raw = decode_json(features.raw_json)
+    cutoff = as_of if as_of is not None else utc_now()
+    reference = raw.get("source_observation_ref")
+    if isinstance(reference, dict):
+        for field in ("forecast_generated_at", "created_at", "available_at"):
+            timestamp = parse_datetime(reference.get(field))
+            if timestamp is not None and timestamp > cutoff:
+                return Decimal("-1")
+    forecast_generated_at = parse_datetime(raw.get("forecast_generated_at"))
+    if forecast_generated_at is not None:
+        return Decimal(str((cutoff - forecast_generated_at).total_seconds() / 3600))
     explicit_age = to_decimal(raw.get("forecast_age_hours"))
     if explicit_age is not None:
-        return explicit_age
-    forecast_generated_at = parse_datetime(raw.get("forecast_generated_at"))
-    if forecast_generated_at is None:
-        return Decimal("999")
-    return Decimal(str((utc_now() - forecast_generated_at).total_seconds() / 3600))
+        elapsed = Decimal(str((cutoff - _utc(features.generated_at)).total_seconds() / 3600))
+        return explicit_age + elapsed
+    return Decimal("999")
+
+
+def _utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 def _feature_values(features: WeatherFeature) -> dict[str, Any]:

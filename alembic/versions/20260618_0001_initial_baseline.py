@@ -8,6 +8,7 @@ Create Date: 2026-06-18
 from __future__ import annotations
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260618_0001"

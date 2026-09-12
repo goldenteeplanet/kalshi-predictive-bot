@@ -6,7 +6,6 @@ from pathlib import Path
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.phase_prov14 import write_prov14_certification_report
 
-
 parser = argparse.ArgumentParser(description="Read-only PROV-14 future attribution certification")
 parser.add_argument("--after-event-id", type=int, required=True)
 parser.add_argument("--limit", type=int, default=200)

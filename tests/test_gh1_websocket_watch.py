@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from kalshi_predictor.config import Settings
@@ -55,6 +56,42 @@ def test_discovery_keeps_bounded_quoted_books_per_series() -> None:
         "KXTEMPNYCH-EMPTY",
         "KXTEMPNYCH-QUOTED",
     ]
+
+
+def test_expired_preferred_and_fallback_books_do_not_take_current_slots(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "kalshi_predictor.ingest.websocket_watch.utc_now",
+        lambda: datetime(2026, 9, 10, 17, 5, tzinfo=UTC),
+    )
+
+    class RolloverClient(_FakeClient):
+        def get_market(self, ticker):
+            return {"ticker": ticker, "status": "open", "close_time": "2026-09-10T17:00:00Z"}
+
+        def get_markets(self, **kwargs):
+            return {
+                "markets": [
+                    self.get_market("KXTEMPMIAH-EXPIRED"),
+                    {"ticker": "KXTEMPMIAH-CLOSED", "status": "closed"},
+                    {
+                        "ticker": "KXTEMPMIAH-CURRENT",
+                        "status": "open",
+                        "close_time": "2026-09-10T18:00:00Z",
+                    },
+                ]
+            }
+
+    client = RolloverClient()
+    rows = discover_quoted_market_tickers(
+        client=client,
+        series=["KXTEMPMIAH"],
+        max_markets_per_series=3,
+        max_quoted_per_series=1,
+        preferred_tickers=["KXTEMPMIAH-OLD-RANKING"],
+    )
+    assert [row["ticker"] for row in rows] == ["KXTEMPMIAH-CURRENT"]
+    assert "KXTEMPMIAH-EXPIRED" not in client.orderbook_calls
+    assert "KXTEMPMIAH-CLOSED" not in client.orderbook_calls
 
 
 def test_discovery_prioritizes_ranked_manifest_books(tmp_path: Path) -> None:
@@ -168,8 +205,8 @@ class _FakeClient:
     def get_markets(self, *, series_ticker: str, **_: object) -> dict[str, object]:
         return {
             "markets": [
-                {"ticker": f"{series_ticker}-EMPTY"},
-                {"ticker": f"{series_ticker}-QUOTED"},
+                self.get_market(f"{series_ticker}-EMPTY"),
+                self.get_market(f"{series_ticker}-QUOTED"),
             ]
         }
 
@@ -185,6 +222,7 @@ class _FakeClient:
             "series_ticker": ticker.split("-", 1)[0],
             "status": "open",
             "source": "fake",
+            "close_time": "2099-01-01T00:00:00Z",
         }
 
 
@@ -215,3 +253,187 @@ class _AdapterFactory:
         self.calls += 1
         self.ticker_sets.append(tuple(tickers))
         return _FakeAdapter(fail=self.calls == 1)
+
+
+def _run_rollover(tmp_path, discoveries, *, cycles=3, adapter_seconds=60, fail_first=False):
+    from datetime import timedelta
+
+    clock = [datetime(2026, 9, 10, 23, tzinfo=UTC)]
+    monotonic = [0.0]
+    calls = []
+    streams = []
+    sleeps = []
+
+    def discovery(**kwargs):
+        calls.append(clock[0])
+        item = discoveries[min(len(calls) - 1, len(discoveries) - 1)]
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        clock[0] += timedelta(seconds=seconds)
+        monotonic[0] += seconds
+
+    class Adapter:
+        def __init__(self, tickers):
+            self.tickers = tuple(tickers)
+
+        async def run(self, *, max_seconds, **kwargs):
+            streams.append((self.tickers, max_seconds, clock[0]))
+            if fail_first and len(streams) == 1:
+                raise ConnectionError("disconnect")
+            clock[0] += timedelta(seconds=max_seconds)
+            monotonic[0] += max_seconds
+            return StreamSummary(
+                messages_seen=1,
+                snapshots_seen=1,
+                deltas_applied=0,
+                sequence_recoveries=0,
+                staged_files=(),
+                errors=(),
+                timed_out=True,
+            )
+
+    result = run_reconnecting_websocket_watch(
+        settings=Settings(kalshi_websocket_enabled=True),
+        series=["KXBTC"],
+        stream_max_seconds=adapter_seconds,
+        discovery_refresh_seconds=900,
+        healthy_cycle_delay_seconds=2,
+        reconnect_initial_seconds=5,
+        reconnect_max_seconds=20,
+        max_cycles=cycles,
+        status_path=tmp_path / "status.json",
+        client_factory=_FakeClient,
+        discovery_fn=discovery,
+        adapter_factory=lambda tickers, **kwargs: Adapter(tickers),
+        sleep_fn=sleep,
+        monotonic_fn=lambda: monotonic[0],
+        clock_fn=lambda: clock[0],
+    )
+    return result, calls, streams, sleeps
+
+
+def _market_row(ticker, close):
+    return {"ticker": ticker, "market": {"ticker": ticker, "status": "open", "close_time": close}}
+
+
+def test_full_rollover_forces_discovery_and_caps_stream(tmp_path):
+    old = _market_row("OLD", "2026-09-10T23:00:10Z")
+    new = _market_row("NEW", "2026-09-11T00:00:00Z")
+    result, calls, streams, _ = _run_rollover(tmp_path, [[old], [new]], cycles=2)
+    assert len(calls) == 2
+    assert streams[0][0] == ("OLD",) and streams[0][1] == 10
+    assert streams[1][0] == ("NEW",)
+    assert result["expired_tickers_pruned"] == 1
+
+
+def test_partial_expiry_discovery_failure_keeps_only_future(tmp_path):
+    old = _market_row("OLD", "2026-09-10T23:00:10Z")
+    future = _market_row("FUTURE", "2026-09-11T00:00:00Z")
+    result, calls, streams, _ = _run_rollover(
+        tmp_path, [[old, future], RuntimeError("offline")], cycles=2
+    )
+    assert len(calls) == 2
+    assert streams[1][0] == ("FUTURE",)
+    assert result["selected_tickers"] == ["FUTURE"]
+    assert json.loads((tmp_path / "active_market_catalog.json").read_text())["market_count"] == 1
+
+
+def test_failed_rollover_never_reuses_expired_cache_or_hot_retries(tmp_path):
+    old = _market_row("OLD", "2026-09-10T23:00:01Z")
+    result, calls, streams, sleeps = _run_rollover(
+        tmp_path, [[old], RuntimeError("offline")], cycles=4
+    )
+    assert len(streams) == 1
+    assert len(calls) == 2
+    assert result["selected_tickers"] == []
+    assert sleeps == [2, 5, 10]
+
+
+def test_empty_rollover_never_reuses_expired_cache(tmp_path):
+    old = _market_row("OLD", "2026-09-10T23:00:01Z")
+    result, calls, streams, sleeps = _run_rollover(tmp_path, [[old], []], cycles=4)
+    assert len(calls) == 2 and len(streams) == 1
+    assert result["selected_tickers"] == [] and sleeps == [2, 5, 10]
+
+
+def test_unknown_naive_invalid_or_mismatched_close_never_streams(tmp_path):
+    invalid = [
+        _market_row("MISSING", None),
+        _market_row("NAIVE", "2026-09-11T00:00:00"),
+        _market_row("INVALID", "bad"),
+    ]
+    mismatch = _market_row("A", "2026-09-11T00:00:00Z")
+    mismatch["market"]["ticker"] = "B"
+    result, calls, streams, sleeps = _run_rollover(tmp_path, [invalid + [mismatch]], cycles=3)
+    assert streams == [] and len(calls) == 1 and sleeps == [5, 10]
+    assert result["selected_tickers"] == []
+
+
+def test_reconnect_before_expiry_retains_cache_then_rolls(tmp_path):
+    old = _market_row("OLD", "2026-09-10T23:00:10Z")
+    new = _market_row("NEW", "2026-09-11T00:00:00Z")
+    result, calls, streams, _ = _run_rollover(tmp_path, [[old], [new]], cycles=3, fail_first=True)
+    assert len(calls) == 2
+    assert [x[0] for x in streams] == [("OLD",), ("OLD",), ("NEW",)]
+    assert streams[1][1] == 5
+
+
+def test_preferred_without_close_or_failed_metadata_is_not_trusted():
+    class Missing(_FakeClient):
+        def get_market(self, ticker):
+            raise RuntimeError("metadata unavailable")
+
+        def get_markets(self, **kwargs):
+            return {"markets": []}
+
+    assert (
+        discover_quoted_market_tickers(
+            client=Missing(),
+            series=["KXBTC"],
+            max_markets_per_series=2,
+            max_quoted_per_series=1,
+            preferred_tickers=["KXBTC-PREFERRED"],
+        )
+        == []
+    )
+
+
+def test_inactive_or_unknown_status_never_streams(tmp_path):
+    rows = []
+    for status in ("expired", "inactive", "resolved", "", None, "unknown"):
+        row = _market_row(str(status), "2026-09-11T00:00:00Z")
+        row["market"]["status"] = status
+        rows.append(row)
+    result, calls, streams, _ = _run_rollover(tmp_path, [rows], cycles=1)
+    assert not streams and not result["selected_tickers"]
+
+
+def test_adapter_setup_expiry_prevents_run(tmp_path):
+    from datetime import timedelta
+
+    clock = [datetime(2026, 9, 10, 23, tzinfo=UTC)]
+
+    class ExpiringAdapter:
+        async def run(self, **kwargs):
+            raise AssertionError("Expired adapter must never run")
+
+    def factory(**kwargs):
+        clock[0] += timedelta(seconds=11)
+        return ExpiringAdapter()
+
+    result = run_reconnecting_websocket_watch(
+        settings=Settings(kalshi_websocket_enabled=True),
+        series=["KXBTC"],
+        max_cycles=1,
+        status_path=tmp_path / "status.json",
+        client_factory=_FakeClient,
+        discovery_fn=lambda **kwargs: [_market_row("OLD", "2026-09-10T23:00:10Z")],
+        adapter_factory=factory,
+        clock_fn=lambda: clock[0],
+    )
+    assert result["stream_cycles_completed"] == 0 and result["selected_tickers"] == []
+    assert any("expired during adapter setup" in item for item in result["recent_errors"])

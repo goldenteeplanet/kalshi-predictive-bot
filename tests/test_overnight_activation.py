@@ -1,0 +1,729 @@
+"""Synthetic fixtures only. No external market or runtime database is modified."""
+
+import hashlib
+import json
+import shutil
+from dataclasses import asdict, replace
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from pathlib import Path
+from unittest.mock import Mock
+
+import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from test_phase_3n_advanced_risk import _config, _request
+
+from kalshi_predictor.advanced_risk.engine import AdvancedRiskEngine
+from kalshi_predictor.advanced_risk.repository import insert_advanced_risk_decision
+from kalshi_predictor.config import Settings
+from kalshi_predictor.data.schema import Base, Forecast, Market, MarketSnapshot
+from kalshi_predictor.overnight_paper import activation, rule_verifier
+from kalshi_predictor.overnight_paper.boundary import (
+    ExecutionMode,
+    LocalPaperAuthorization,
+    authorization_fingerprint,
+)
+from kalshi_predictor.overnight_paper.gate_context import QualificationContext
+from kalshi_predictor.overnight_paper.qualification import (
+    COLLECTOR_GATES,
+    EvidenceReference,
+    GateEvidence,
+    compute_net_ev,
+    decision_fingerprint,
+)
+from kalshi_predictor.overnight_paper.rule_verifier import CertifiedRulePolicy, RuleDocument
+from kalshi_predictor.overnight_paper.store import initialize_store, record_shadow
+from kalshi_predictor.paper.models import BUY_YES, PaperDecision
+from kalshi_predictor.position_sizing.repository import insert_position_sizing_decision
+from kalshi_predictor.position_sizing.sizer import (
+    DynamicPositionSizer,
+    PositionSizingConfig,
+    PositionSizingInput,
+)
+
+
+def ref(name, payload):
+    return EvidenceReference(name, hashlib.sha256(payload).hexdigest(), payload)
+
+
+@pytest.fixture(scope="module")
+def baseline_template(tmp_path_factory):
+    path = tmp_path_factory.mktemp("activation-template") / "baseline.db"
+    engine = create_engine(f"sqlite:///{path}")
+    Base.metadata.create_all(engine)
+    engine.dispose()
+    return path
+
+
+@pytest.fixture
+def prepared(tmp_path, baseline_template, monkeypatch):
+    path = tmp_path / "paper.db"
+    shutil.copyfile(baseline_template, path)
+    engine = create_engine(f"sqlite:///{path}")
+    initialize_store(path)
+    factory = sessionmaker(engine)
+    now = datetime.now(UTC)
+    settings = Settings(
+        _env_file=None,
+        kalshi_api_key_id=None,
+        kalshi_private_key_path=None,
+        postgres_password="",
+        execution_confirmation_token="",
+        execution_enabled=False,
+        execution_dry_run=True,
+        execution_kill_switch=True,
+        execution_gateway_mode="disabled",
+        autopilot_enabled=False,
+        autopilot_dry_run=True,
+        paper_order_creation_enabled=True,
+        paper_order_kill_switch=False,
+        learning_mode=False,
+    )
+    objective = b"synthetic local-paper authorization"
+    authorization = LocalPaperAuthorization(
+        now,
+        now + timedelta(days=1),
+        hashlib.sha256(objective).hexdigest(),
+        isolated_database_path=str(path.resolve()),
+        database_id="fixture-database-identity-0001",
+    )
+    authorization_sha = authorization_fingerprint(authorization)
+    marker = dict(
+        kind="LOCAL_PAPER_AUTHORIZATION_BASELINE_V1",
+        database_id=authorization.database_id,
+        database_path=str(path.resolve()),
+        objective_sha256=authorization.objective_sha256,
+        authorization_sha256=authorization_sha,
+        baseline_paper_orders=0,
+        baseline_paper_fills=0,
+    )
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO overnight_sprint_cycles VALUES(:id,:at,:payload)"),
+            {
+                "id": "authorization-baseline:" + authorization.database_id,
+                "at": now.isoformat(),
+                "payload": json.dumps(marker),
+            },
+        )
+    size = DynamicPositionSizer(PositionSizingConfig()).decide(
+        PositionSizingInput(
+            confidence_score=0.55,
+            opportunity_score=0.55,
+            liquidity_score=0.8,
+            current_drawdown_fraction=0.0,
+            max_drawdown_fraction=0.2,
+            historical_accuracy=0.55,
+            historical_sample_size=30,
+            decision_timestamp=now,
+        )
+    )
+    request = _request(phase_3m_contracts=1)
+    request = replace(
+        request,
+        decision_timestamp=now,
+        instrument_id="BTC-TEST",
+        portfolio_snapshot=replace(request.portfolio_snapshot, captured_at=now),
+        market_snapshot=replace(request.market_snapshot, captured_at=now),
+    )
+    risk = AdvancedRiskEngine(_config()).decide(request)
+    from test_guarded_fee_contract import synthetic_evidence
+
+    from kalshi_predictor.paper.fees import CONTRACT_KEY, build_fee_quote
+
+    fee_quote = build_fee_quote(
+        evidence=synthetic_evidence(monkeypatch, now, "BTC-TEST"),
+        ticker="BTC-TEST",
+        side=BUY_YES,
+        price=Decimal("0.21"),
+        simulator_floor=settings.paper_default_fee_per_contract,
+        now=now,
+    )
+    book = {"yes": [[20, 100]], "no": [[79, 100]]}
+    with factory() as session:
+        session.add(
+            Market(
+                ticker="BTC-TEST",
+                event_ticker="E",
+                series_ticker="S",
+                status="active",
+                close_time=now + timedelta(hours=1),
+                expiration_time=now + timedelta(hours=2),
+                first_seen_at=now,
+                last_seen_at=now,
+                raw_json="{}",
+            )
+        )
+        forecast = Forecast(
+            ticker="BTC-TEST",
+            forecasted_at=now,
+            model_name="ensemble_v2",
+            yes_probability="0.7",
+            feature_json="{}",
+        )
+        snapshot = MarketSnapshot(
+            ticker="BTC-TEST",
+            captured_at=now,
+            status="active",
+            raw_market_json="{}",
+            raw_orderbook_json=json.dumps(book),
+        )
+        session.add_all([forecast, snapshot])
+        session.flush()
+        size_row = insert_position_sizing_decision(
+            session,
+            size,
+            ticker="BTC-TEST",
+            model_name="ensemble_v2",
+            strategy_id="s",
+            instrument="BTC-TEST",
+            trade_intent_id="i",
+            order_correlation_id=None,
+        )
+        risk_row = insert_advanced_risk_decision(
+            session,
+            risk,
+            request,
+            ticker="BTC-TEST",
+            position_sizing_decision_id=size_row.id,
+            raw={
+                "guarded_fee_quote_sha256": fee_quote.sha256,
+                "estimated_round_trip_fees": str(fee_quote.charge),
+            },
+        )
+        decision = PaperDecision(
+            "BTC-TEST",
+            forecast.id,
+            "ensemble_v2",
+            BUY_YES,
+            Decimal("0.7"),
+            Decimal("0.21"),
+            Decimal("0.21"),
+            Decimal("0.49"),
+            1,
+            "synthetic fixture",
+            {
+                "position_sizing_decision_id": size_row.id,
+                "advanced_risk_decision_id": risk_row.id,
+                CONTRACT_KEY: fee_quote.decode(),
+            },
+        )
+        inputs = dict(
+            guarded_fee_contract=fee_quote.decode(),
+            ticker="BTC-TEST",
+            category="crypto",
+            code_sha="a" * 40,
+            authorization_sha256=authorization_sha,
+            side=BUY_YES,
+            executable_price="0.21",
+            latest_settlement_at=(now + timedelta(hours=2)).isoformat(),
+            event_id="E",
+            series="S",
+            forecast_id=forecast.id,
+            snapshot_id=snapshot.id,
+            rule_version="fixture-v1",
+            source_hashes=["fixture"],
+            model_version="fixture-model",
+            config_hash=decision_fingerprint(settings.model_dump(mode="json")),
+            phase3m_hash=decision_fingerprint(size.as_dict()),
+            phase3n_hash=decision_fingerprint(risk.as_dict()),
+        )
+        session.commit()
+    rule_document = RuleDocument("https://assets.kalshi.com/synthetic-rule", b"test-only rule")
+    policy = CertifiedRulePolicy(
+        ticker="BTC-TEST",
+        event_id="E",
+        series="S",
+        provider="synthetic",
+        source_identity="synthetic-index",
+        observation_time=(now + timedelta(hours=1)).isoformat(),
+        selection="exact timestamp",
+        conversion="identity",
+        precision="original decimal",
+        rounding="none",
+        finality="explicit bounded finality",
+        effective_from=(now - timedelta(days=1)).isoformat(),
+        effective_to=(now + timedelta(days=1)).isoformat(),
+        documents=((rule_document.url, rule_document.sha256),),
+        amendments=(),
+        methodology="exact-timestamp-decimal-v1",
+        expected_settlement_seconds=3600,
+        final_settlement_seconds=3600,
+        review_extension_seconds=0,
+    )
+    inputs.update(
+        rule_version=policy.version,
+        settlement_rule={**asdict(policy), "amendments": []},
+        decision_at=now.isoformat(),
+        observation_time=policy.observation_time,
+        market_open_time=(now - timedelta(days=1)).isoformat(),
+        market_close_time=(now + timedelta(hours=1)).isoformat(),
+        expected_settlement_time=(now + timedelta(hours=2)).isoformat(),
+        settlement_deadline=(now + timedelta(hours=2)).isoformat(),
+        final_settlement_time=None,
+    )
+    monkeypatch.setattr(rule_verifier, "CERTIFIED_RULE_POLICIES", (policy,))
+    rule_context = QualificationContext(
+        repository=Path(__file__).resolve().parents[1], rule_documents=(rule_document,)
+    )
+    key = decision_fingerprint(inputs)
+    source = ref(
+        "synthetic-fixture",
+        json.dumps(
+            {
+                "url": "https://external-api.kalshi.com/trade-api/v2/markets/BTC-TEST/orderbook",
+                "received_at": now.isoformat(),
+                "body": book,
+                "synthetic_fixture": True,
+            }
+        ).encode(),
+    )
+    evidence = []
+    for gate in COLLECTOR_GATES:
+        report = dict(
+            schema="overnight-paper-gate-v1",
+            gate=gate,
+            decision_id=key,
+            ticker="BTC-TEST",
+            category="crypto",
+            verifier="test-fixture-v1",
+            verdict="PASS",
+            validated_at=now.isoformat(),
+            valid_until=(now + timedelta(seconds=60)).isoformat(),
+            sources=[source.sha256],
+        )
+        evidence.append(
+            GateEvidence(
+                gate,
+                key,
+                "crypto",
+                "BTC-TEST",
+                "test-fixture-v1",
+                ref(f"gate-{gate}", json.dumps(report).encode()),
+                sources=(source,),
+                context=rule_context if gate == 3 else None,
+            )
+        )
+    ev = compute_net_ev(
+        model_probability=Decimal("0.7"),
+        executable_price=Decimal("0.21"),
+        estimated_fee=max(settings.paper_default_fee_per_contract, Decimal("0.02")),
+        slippage_allowance=Decimal("0.01"),
+        uncertainty_buffer=Decimal("0.03"),
+    )
+    args = dict(
+        ticker="BTC-TEST",
+        category="crypto",
+        decision_inputs=inputs,
+        decision_id=key,
+        evidence=tuple(evidence),
+        ev=ev,
+        minimum_net_ev=settings.paper_min_edge,
+        phase3m=size,
+        phase3n=risk,
+        mode=ExecutionMode.LOCAL_PAPER,
+    )
+    payload = dict(
+        ticker="BTC-TEST",
+        event_ticker="E",
+        series_ticker="S",
+        model="ensemble_v2",
+        model_version="fixture-model",
+        forecast="0.7",
+        snapshot=book,
+        price="0.21",
+        net_ev=str(ev.net_ev),
+        sizing=size.as_dict(),
+        risk=risk.as_dict(),
+        source_provenance={"fixture": source.sha256},
+        settlement_rule_version=policy.version,
+        decision_at=now.isoformat(),
+        forecast_at=now.isoformat(),
+        source_updated_at=now.isoformat(),
+        snapshot_at=now.isoformat(),
+        close_time=(now + timedelta(hours=1)).isoformat(),
+        side=BUY_YES,
+        expected_settlement_at=(now + timedelta(hours=2)).isoformat(),
+        latest_settlement_at=(now + timedelta(hours=2)).isoformat(),
+        qualification_inputs=inputs,
+    )
+    import sqlite3
+
+    with sqlite3.connect(path) as db:
+        shadow_id = record_shadow(db, payload)
+    objective = b"synthetic local-paper authorization"
+    result = dict(
+        session_factory=factory,
+        database_path=path,
+        authorization=authorization,
+        objective_bytes=objective,
+        release=Mock(spec=activation.ExactReleaseEvidence),
+        qualification_args=args,
+        shadow_payload=payload,
+        shadow_id=shadow_id,
+        decision=decision,
+        settings=settings,
+        now=now,
+    )
+    result["release"].sha = "a" * 40
+    monkeypatch.setattr(GateEvidence, "verified", lambda *args, **kwargs: True)
+    # Isolate transaction mechanics from the separately tested source/model engines.
+    # Passing fixtures are synthetic and never release/activation evidence.
+    monkeypatch.setattr(activation, "_revalidate_engines", lambda *args: None)
+    # Mechanics-only fixture; real same-ledger evaluation has separate tests.
+    monkeypatch.setattr(
+        activation,
+        "verify_model_release",
+        lambda *args: Mock(passed=True, model_calibration_verified=True),
+    )
+    # This fixture isolates ledger mechanics, not operational monitoring evidence.
+    monkeypatch.setattr(activation, "verify_monitoring", lambda *a, **kw: Mock(passed=True))
+    # Transaction fixture does not certify source/model gates. Semantic validators
+    # are independently tested and intentionally block unsupported runtime evidence.
+    monkeypatch.setattr(
+        activation,
+        "qualify_candidate",
+        lambda **kwargs: Mock(
+            status=("PAPER_ELIGIBLE" if kwargs.get("evidence") else "PAPER_NOT_READY")
+        ),
+    )
+    yield result
+    engine.dispose()
+
+
+def count(prepared):
+    with prepared["session_factory"]() as session:
+        return session.execute(text("SELECT count(*) FROM paper_orders")).scalar_one()
+
+
+def test_real_local_simulator_and_shadow_link(prepared):
+    result = activation.activate_local_paper(**prepared)
+    assert result.fill_created
+    assert result.actual_simulated_fee == Decimal("0.02")
+    assert count(prepared) == 1
+    with pytest.raises(ValueError, match="SHADOW_ALREADY_ACTIVATED"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 1
+
+
+def test_ledger_quantity_deviation_rolls_back_everything(prepared, monkeypatch):
+    original = activation.create_paper_order
+
+    def altered(*args, **kwargs):
+        order = original(*args, **kwargs)
+        order.quantity = 3
+        return order
+
+    monkeypatch.setattr(activation, "create_paper_order", altered)
+    with pytest.raises(ValueError, match="CHANGED_QUANTITY"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+    with prepared["session_factory"]() as session:
+        assert session.execute(text("SELECT count(*) FROM paper_fills")).scalar_one() == 0
+        assert (
+            session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
+            is None
+        )
+
+
+def test_shadow_and_engine_changes_block_before_order(prepared):
+    prepared["decision"] = replace(prepared["decision"], probability=Decimal("0.9"))
+    with pytest.raises(ValueError, match="FORECAST_MISMATCH"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+def test_missing_readiness_and_exchange_flags_block(prepared):
+    prepared["qualification_args"]["evidence"] = ()
+    with pytest.raises(ValueError, match="TWELVE_GATES"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+def test_release_failure_precedes_every_database_write(prepared):
+    prepared["release"].verify.side_effect = ValueError("EXACT_SHA_CLEAN_RELEASE_REQUIRED")
+    with pytest.raises(ValueError, match="EXACT_SHA"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+def test_changed_engine_on_atomic_revalidation_rolls_back(prepared, monkeypatch):
+    def changed(*args):
+        raise ValueError("ENGINE_REVALIDATION_REQUIRES_NEW_SHADOW")
+
+    monkeypatch.setattr(activation, "_revalidate_engines", changed)
+    with pytest.raises(ValueError, match="ENGINE_REVALIDATION"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+def test_release_artifacts_require_success_at_exact_sha(tmp_path, monkeypatch):
+    monkeypatch.setattr(activation, "_verify_import_origins", lambda repository: None)
+    sha = "a" * 40
+    tests = ref("pytest.log", b"7000 passed, 1 skipped in 500.0s")
+    lint = ref("ruff.log", b"All checks passed!")
+    checks = ref(
+        "ci.json",
+        json.dumps(
+            {"check_runs": [{"name": "test", "head_sha": sha, "conclusion": "success"}]}
+        ).encode(),
+    )
+    payload = dict(
+        sha=sha,
+        artifacts={"pytest": tests.sha256, "ruff": lint.sha256, "hosted_checks": checks.sha256},
+        pytest_command="pytest",
+        lint_command="ruff check .",
+        required_checks=["test"],
+    )
+    release = activation.ExactReleaseEvidence(
+        tmp_path, sha, ref("release.json", json.dumps(payload).encode()), tests, lint, checks
+    )
+    monkeypatch.setattr(
+        activation.subprocess,
+        "check_output",
+        lambda args, **kwargs: sha if "rev-parse" in args else "",
+    )
+    release.verify()
+    with pytest.raises(ValueError, match="EXACT_SHA"):
+        replace(release, sha="b" * 40).verify()
+    (tmp_path / "pyproject.toml").write_text("[tool.mypy]\ncheck_untyped_defs=true\n")
+    with pytest.raises(ValueError, match="MYPY_EVIDENCE"):
+        release.verify()
+
+
+@pytest.mark.parametrize("expiration_hours", [None, 73])
+def test_expiration_does_not_substitute_for_rule_settlement_deadline(prepared, expiration_hours):
+    with prepared["session_factory"]() as session:
+        market = session.get(Market, "BTC-TEST")
+        market.expiration_time = (
+            None
+            if expiration_hours is None
+            else prepared["now"] + timedelta(hours=expiration_hours)
+        )
+        session.commit()
+    assert activation.activate_local_paper(**prepared).fill_created
+    assert count(prepared) == 1
+
+
+def validate_shadow_timing(prepared):
+    with prepared["session_factory"]() as session:
+        activation._validate_shadow_inputs(
+            session,
+            prepared["decision"],
+            prepared["shadow_payload"],
+            prepared["qualification_args"],
+            prepared["now"],
+        )
+
+
+def test_missing_verified_deadline_blocks_even_with_short_expiration(prepared):
+    prepared["qualification_args"]["decision_inputs"].pop("settlement_deadline")
+    with pytest.raises(ValueError, match="EXPLICIT_RULE_SUPPORTED_SETTLEMENT_TIMES_REQUIRED"):
+        validate_shadow_timing(prepared)
+    assert count(prepared) == 0
+
+
+def test_rule_deadline_beyond_72_hours_blocks_short_expiration(prepared, monkeypatch):
+    policy = replace(rule_verifier.CERTIFIED_RULE_POLICIES[0], final_settlement_seconds=72 * 3600)
+    monkeypatch.setattr(rule_verifier, "CERTIFIED_RULE_POLICIES", (policy,))
+    inputs = prepared["qualification_args"]["decision_inputs"]
+    inputs["rule_version"] = policy.version
+    inputs["settlement_deadline"] = (prepared["now"] + timedelta(hours=73)).isoformat()
+    prepared["shadow_payload"]["settlement_rule_version"] = policy.version
+    with pytest.raises(ValueError, match="SETTLEMENT_HORIZON_EXCEEDS_72H"):
+        validate_shadow_timing(prepared)
+    assert count(prepared) == 0
+
+
+def test_caller_supplied_historical_cache_cannot_bless_engine_revalidation(prepared):
+    prepared["decision"] = replace(
+        prepared["decision"],
+        raw_decision_json={
+            **prepared["decision"].raw_decision_json,
+            "position_sizing_historical_evidence_cache": {
+                "accuracy": 1.0,
+                "sample_count": 99999,
+            },
+        },
+    )
+    with pytest.raises(ValueError, match="UNVERIFIED_HISTORY_CACHE"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+def test_release_rejects_artifacts_for_another_checkout(tmp_path):
+    with pytest.raises(ValueError, match="NOT_RUNNING_CHECKOUT"):
+        activation._verify_import_origins(tmp_path)
+
+
+def test_authorization_cannot_be_reused_against_another_database(prepared, tmp_path):
+    other = tmp_path / "another-paper.db"
+    shutil.copyfile(prepared["database_path"], other)
+    prepared["database_path"] = other
+    with pytest.raises(ValueError, match="AUTHORIZATION_DATABASE_PATH_MISMATCH"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+def test_missing_authorization_marker_never_recreated_by_activation(prepared):
+    with prepared["session_factory"]() as session:
+        session.execute(
+            text("DELETE FROM overnight_sprint_cycles WHERE id LIKE 'authorization-baseline:%'")
+        )
+        session.commit()
+    with pytest.raises(ValueError, match="IMMUTABLE_AUTHORIZATION_BASELINE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    with prepared["session_factory"]() as session:
+        assert (
+            session.execute(
+                text(
+                    "SELECT count(*) FROM overnight_sprint_cycles "
+                    "WHERE id LIKE 'authorization-baseline:%'"
+                )
+            ).scalar_one()
+            == 0
+        )
+    assert count(prepared) == 0
+
+
+def test_marker_database_id_change_invalidates_authorization(prepared):
+    with prepared["session_factory"]() as session:
+        raw = session.execute(
+            text(
+                "SELECT payload FROM overnight_sprint_cycles "
+                "WHERE id LIKE 'authorization-baseline:%'"
+            )
+        ).scalar_one()
+        marker = json.loads(raw)
+        marker["database_id"] = "other-database-identity"
+        session.execute(
+            text(
+                "UPDATE overnight_sprint_cycles SET payload=:raw "
+                "WHERE id LIKE 'authorization-baseline:%'"
+            ),
+            {"raw": json.dumps(marker)},
+        )
+        session.commit()
+    with pytest.raises(ValueError, match="IMMUTABLE_AUTHORIZATION_BASELINE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+@pytest.mark.parametrize(
+    "field,value,blocker",
+    [
+        ("final_settlement_time", "2026-09-08T01:00:00Z", "ACTUAL_SETTLEMENT_TIME_PRESENT"),
+        ("market_close_time", "2026-09-08T01:00:00Z", "APPLICATION_CLOCK_MISMATCH"),
+    ],
+)
+def test_activation_rejects_ambiguous_canonical_times(prepared, field, value, blocker):
+    prepared["qualification_args"]["decision_inputs"][field] = value
+    with pytest.raises(ValueError, match=blocker):
+        validate_shadow_timing(prepared)
+    assert count(prepared) == 0
+
+
+def test_activation_requires_pinned_rule_even_when_other_gates_mocked(prepared, monkeypatch):
+    monkeypatch.setattr(rule_verifier, "CERTIFIED_RULE_POLICIES", ())
+    with pytest.raises(ValueError, match="CERTIFIED_TIMING_RULE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+def test_real_model_release_guard_blocks_entry_without_evaluation(prepared, monkeypatch):
+    from kalshi_predictor.overnight_paper.model_release import verify_model_release
+
+    calls = []
+
+    def actual_guard(session, inputs, now):
+        assert session.in_transaction()
+        assert session.connection().connection.driver_connection.in_transaction
+        result = verify_model_release(session, inputs, now)
+        calls.append(result)
+        return result
+
+    monkeypatch.setattr(activation, "verify_model_release", actual_guard)
+    with pytest.raises(ValueError, match="MODEL_RELEASE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert len(calls) == 1
+    assert not calls[0].passed
+    assert count(prepared) == 0
+    with prepared["session_factory"]() as session:
+        assert session.execute(text("SELECT count(*) FROM paper_fills")).scalar_one() == 0
+        assert session.execute(text("SELECT count(*) FROM paper_positions")).scalar_one() == 0
+        assert (
+            session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
+            is None
+        )
+
+
+def test_actual_monitor_guard_rejects_absent_permit_before_order(prepared, monkeypatch):
+    from kalshi_predictor.overnight_paper.monitoring import verify_monitoring
+
+    monkeypatch.setattr(activation, "verify_monitoring", verify_monitoring)
+    with pytest.raises(ValueError, match="OPERATIONAL_MONITOR_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+    with prepared["session_factory"]() as session:
+        assert session.execute(text("SELECT count(*) FROM paper_fills")).scalar_one() == 0
+        assert (
+            session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
+            is None
+        )
+
+
+def test_charged_fee_mismatch_rolls_back_everything(prepared, monkeypatch):
+    original = activation.simulate_immediate_fill
+
+    def wrong_fee(*args, **kwargs):
+        fill = original(*args, **kwargs)
+        fill.fee = "0"
+        return fill
+
+    monkeypatch.setattr(activation, "simulate_immediate_fill", wrong_fee)
+    with pytest.raises(ValueError, match="CHANGED_FILL"):
+        activation.activate_local_paper(**prepared)
+    with prepared["session_factory"]() as session:
+        for table in ("paper_orders", "paper_fills", "paper_positions"):
+            assert session.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0
+        assert (
+            session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
+            is None
+        )
+
+
+def test_stripped_contract_cannot_use_legacy_default(prepared):
+    raw = dict(prepared["decision"].raw_decision_json)
+    raw.pop("guarded_fee_contract")
+    prepared["decision"] = replace(prepared["decision"], raw_decision_json=raw)
+    with pytest.raises(ValueError, match="EVIDENCE_REQUIRED"):
+        activation.activate_local_paper(**prepared)
+    assert count(prepared) == 0
+
+
+@pytest.mark.parametrize(
+    "field,value", [("fee_contract", {}), ("fee_provenance", "LEGACY_CONFIGURED_NONCERTIFIED")]
+)
+def test_fill_lineage_substitution_rolls_back_even_with_correct_fee_and_hash(
+    prepared, monkeypatch, field, value
+):
+    original = activation.simulate_immediate_fill
+
+    def changed_lineage(*args, **kwargs):
+        fill = original(*args, **kwargs)
+        raw = json.loads(fill.raw_fill_json)
+        raw[field] = value
+        fill.raw_fill_json = json.dumps(raw)
+        return fill
+
+    monkeypatch.setattr(activation, "simulate_immediate_fill", changed_lineage)
+    with pytest.raises(ValueError, match="LOCAL_SIMULATOR_CHANGED_FILL"):
+        activation.activate_local_paper(**prepared)
+    with prepared["session_factory"]() as session:
+        for table in ("paper_orders", "paper_fills", "paper_positions"):
+            assert session.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0
+        assert (
+            session.execute(text("SELECT paper_order_id FROM overnight_shadow")).scalar_one()
+            is None
+        )

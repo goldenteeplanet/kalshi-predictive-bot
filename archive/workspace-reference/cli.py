@@ -440,7 +440,7 @@ from kalshi_predictor.phase3aj import write_phase3aj_report
 from kalshi_predictor.phase3aj_gap_closure import (
     write_composite_settlement_resolve_report,
     write_gap_closure_doctor_report,
-    write_market_data_refresh_status,
+    write_market_data_refresh_status as write_market_data_refresh_status,
     write_paper_trade_funnel_report,
     write_phase_3aj_report,
     write_source_readiness_report,
@@ -482,7 +482,7 @@ from kalshi_predictor.phase3an import (
     write_phase3an_preflight_report,
     write_phase3an_report,
     write_phase3an_settlement_health_confirm_report,
-    write_phase3an_sports_blocker_report,
+    write_phase3an_sports_blocker_report as _legacy_write_phase3an_sports_blocker_report,
     write_phase3an_usda_date_mismatch_report,
 )
 from kalshi_predictor.phase3ao import (
@@ -524,12 +524,12 @@ from kalshi_predictor.phase3at import (
 from kalshi_predictor.phase3au import load_latest_long_job_status, write_phase3au_report
 from kalshi_predictor.phase3aw import (
     build_phase3aw_recovery_status,
-    write_phase3aw_dashboard_truth_report,
+    write_phase3aw_dashboard_truth_report as _legacy_write_phase3aw_dashboard_truth_report,
     write_phase3aw_recovery_report,
 )
 from kalshi_predictor.phase3ax import (
     run_resumable_sports_derivation,
-    write_phase3ax_gap_analysis_report,
+    write_phase3ax_gap_analysis_report as _legacy_write_phase3ax_gap_analysis_report,
 )
 from kalshi_predictor.phase3ay import (
     run_phase3ay_health_refresh_loop,
@@ -802,6 +802,11 @@ from kalshi_predictor.phase3bc_r16 import (
 )
 from kalshi_predictor.phase3bc_r17 import (
     write_phase3bc_r17_crypto_liquidity_actionability_report,
+)
+del (
+    _legacy_write_phase3an_sports_blocker_report,
+    _legacy_write_phase3aw_dashboard_truth_report,
+    _legacy_write_phase3ax_gap_analysis_report,
 )
 from kalshi_predictor.phase3ax_r6 import (
     write_phase3an_sports_blocker_report,
@@ -1233,7 +1238,10 @@ def _print_db_writer_monitor(payload: dict[str, object]) -> None:
     console.print(f"Elapsed time: {payload.get('current_writer_elapsed') or 'n/a'}")
     console.print(
         "Heartbeat status: "
-        f"{payload.get('long_job_heartbeat_display_status') or payload.get('long_job_heartbeat_status') or 'unknown'}"
+        f"""{
+            payload.get('long_job_heartbeat_display_status')
+            or payload.get('long_job_heartbeat_status') or 'unknown'
+        }"""
     )
     console.print(f"Heartbeat stage: {payload.get('long_job_stage') or 'none'}")
     console.print(f"Heartbeat age: {payload.get('long_job_heartbeat_age') or 'n/a'}")
@@ -2398,7 +2406,7 @@ def phase3aw_crash_report_command(
 
 
 @app.command("phase3aw-dashboard-truth", help="Write the Phase 3AW dashboard truth report.")
-def phase3aw_dashboard_truth_command(
+def _legacy_phase3aw_dashboard_truth_command(
     output_dir: Annotated[
         Path,
         typer.Option(help="Output directory for Phase 3AW dashboard truth artifacts."),
@@ -2438,7 +2446,7 @@ def phase3aw_dashboard_truth_command(
 
 
 @app.command("phase3ax-gap-analysis", help="Write the Phase 3AX full app gap analysis report.")
-def phase3ax_gap_analysis_command(
+def _legacy_phase3ax_gap_analysis_command(
     output_dir: Annotated[
         Path,
         typer.Option(help="Output directory for Phase 3AX app gap analysis artifacts."),
@@ -4376,7 +4384,7 @@ def phase3an_general_sources_status_command(
 
 
 @app.command("phase3an-sports-blocker-report")
-def phase3an_sports_blocker_report_command(
+def _legacy_phase3an_sports_blocker_report_command(
     output_dir: Annotated[
         Path,
         typer.Option(help="Directory for Phase 3AN sports blocker artifact."),
@@ -9481,7 +9489,8 @@ def phase3bb_r26_cloud_ui_access_control_gate_command(
     auth_mode: Annotated[
         str,
         typer.Option(
-            help="Auth mode to evaluate: none, basic_auth, oauth_proxy, cloudflare_access, tailscale_funnel_auth."
+            help=("Auth mode to evaluate: none, basic_auth, oauth_proxy, "
+                  "cloudflare_access, tailscale_funnel_auth.")
         ),
     ] = "none",
     max_public_route_seconds: Annotated[
@@ -9543,7 +9552,8 @@ def phase3bb_r27_cloud_ui_private_access_auth_draft_command(
     preferred_access: Annotated[
         str,
         typer.Option(
-            help="Preferred private access mode: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."
+            help=("Preferred private access mode: ssh_tunnel, private_vpn, "
+                  "or cloudflare_access_tunnel.")
         ),
     ] = "private_vpn",
     operator_email: Annotated[
@@ -9608,7 +9618,8 @@ def phase3bb_r28_cloud_ui_private_access_operator_review_command(
     selected_access: Annotated[
         str | None,
         typer.Option(
-            help="Optional selected access override: ssh_tunnel, private_vpn, or cloudflare_access_tunnel."
+            help=("Optional selected access override: ssh_tunnel, private_vpn, "
+                  "or cloudflare_access_tunnel.")
         ),
     ] = None,
 ) -> None:
@@ -10848,7 +10859,8 @@ def phase3bb_r46_cloud_scheduler_weather_writer_gate_repair_command(
     reset_failed: Annotated[
         bool,
         typer.Option(
-            help="Clear the failed systemd service marker after installing; does not start the service."
+            help=("Clear the failed systemd service marker after installing; "
+                  "does not start the service.")
         ),
     ] = False,
     per_probe_timeout_seconds: Annotated[
@@ -11946,7 +11958,8 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
     min_minutes_before_target: Annotated[
         int,
         typer.Option(
-            help="Minimum lead time before weather target expiry before running the selected-window pipeline."
+            help=("Minimum lead time before weather target expiry before running "
+                  "the selected-window pipeline.")
         ),
     ] = 10,
     fresh_window_hours: Annotated[
@@ -11962,7 +11975,8 @@ def phase3bb_r57_weather_selected_window_pipeline_command(
     max_records: Annotated[
         int,
         typer.Option(
-            help="Maximum R12 missing-link rows to apply if the current-window gate says it is safe."
+            help=("Maximum R12 missing-link rows to apply "
+                  "if the current-window gate says it is safe.")
         ),
     ] = 25,
     limit: Annotated[
@@ -12242,7 +12256,8 @@ def phase3bb_r59_weather_catalog_refresh_r57_retry_command(
         typer.Option(help="Timeout for each bounded remote probe."),
     ] = 60,
 ) -> None:
-    """Wait for writer clear, refresh KXTEMPNYCH catalog, then rerun patched R57 if a future window exists."""
+    ("Wait for writer clear, refresh KXTEMPNYCH catalog, "
+     "then rerun patched R57 if a future window exists.")
     settings = get_settings()
     engine = make_engine(database_url_from_settings(settings))
     session_factory = get_session_factory(engine)
@@ -12370,7 +12385,8 @@ def phase3bb_r60_weather_next_window_lead_time_scheduler_repair_command(
     max_minutes_before_target: Annotated[
         int,
         typer.Option(
-            help="Maximum lead time before weather target expiry before waiting for a later scheduler tick."
+            help=("Maximum lead time before weather target expiry before waiting "
+                  "for a later scheduler tick.")
         ),
     ] = 90,
     fresh_window_hours: Annotated[
@@ -19501,7 +19517,8 @@ def link_crypto_markets_command(
     stop_after_minutes: Annotated[
         int,
         typer.Option(
-            help="Stop cleanly after N minutes and keep committed checkpoint batches. Use 0 for no limit."
+            help=("Stop cleanly after N minutes and keep committed checkpoint batches. "
+                  "Use 0 for no limit.")
         ),
     ] = 0,
     heartbeat_dir: Annotated[

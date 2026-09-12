@@ -1,6 +1,7 @@
 """Phase 3O market memory tables."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260618_0002"

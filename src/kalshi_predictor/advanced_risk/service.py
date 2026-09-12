@@ -161,6 +161,17 @@ def advanced_risk_request_for_paper_decision(
     decision_timestamp: datetime,
 ) -> AdvancedRiskRequest:
     timestamp = _ensure_utc(decision_timestamp)
+    from kalshi_predictor.paper.fees import decision_fee_quote
+
+    fee_quote = decision_fee_quote(
+        decision.raw_decision_json,
+        ticker=decision.ticker,
+        side=decision.side,
+        quantity=decision.quantity,
+        price=decision.limit_price,
+        simulator_floor=settings.paper_default_fee_per_contract,
+        now=timestamp,
+    )
     forecast = session.get(Forecast, decision.forecast_id) if decision.forecast_id else None
     market = session.get(Market, decision.ticker)
     market_snapshot = _latest_snapshot_for_ticker(session, decision.ticker)
@@ -205,7 +216,9 @@ def advanced_risk_request_for_paper_decision(
         stop_price=Decimal("0"),
         point_value=Decimal("1"),
         tick_size=Decimal("0.01"),
-        estimated_round_trip_fees=settings.paper_default_fee_per_contract,
+        estimated_round_trip_fees=(
+            settings.paper_default_fee_per_contract if fee_quote is None else fee_quote.charge
+        ),
         estimated_slippage_per_contract=settings.advanced_risk_estimated_slippage_per_contract,
         gap_or_tail_buffer_per_contract=settings.advanced_risk_gap_tail_buffer_per_contract,
         portfolio_snapshot=portfolio,

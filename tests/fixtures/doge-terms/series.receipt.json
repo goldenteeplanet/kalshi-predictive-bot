@@ -1,0 +1,14 @@
+{
+  "url": "https://external-api.kalshi.com/trade-api/v2/series/KXDOGE",
+  "requested_at": "2026-09-11T06:28:16.068782+00:00",
+  "received_at": "2026-09-11T06:28:16.260681+00:00",
+  "status": 200,
+  "sha256": "493d6716921550544bb625f460dde2cea245bae69054e6f3a93885ba118644b9",
+  "bytes": 747,
+  "headers": {
+    "Content-Type": "application/json",
+    "Date": "Fri, 11 Sep 2026 06:28:16 GMT",
+    "Last-Modified": null,
+    "ETag": null
+  }
+}

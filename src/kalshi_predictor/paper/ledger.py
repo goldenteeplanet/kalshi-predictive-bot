@@ -23,6 +23,7 @@ from kalshi_predictor.data.schema import (
     PaperPosition,
     Settlement,
 )
+from kalshi_predictor.paper.fees import FeeQuote, verify_fee_quote
 from kalshi_predictor.paper.models import (
     BUY_NO,
     BUY_YES,
@@ -180,8 +181,22 @@ def insert_paper_fill(
     quantity: int,
     fee: Decimal,
     filled_at: datetime | None = None,
+    fee_quote: FeeQuote | None = None,
 ) -> PaperFill:
     resolved_filled_at = filled_at or utc_now()
+    if fee_quote is not None:
+        payload = fee_quote.decode()
+        checked = verify_fee_quote(
+            payload,
+            ticker=order.ticker,
+            side=order.side,
+            quantity=quantity,
+            price=price,
+            simulator_floor=Decimal(payload["simulator_floor"]),
+            now=resolved_filled_at,
+        )
+        if checked != fee_quote or fee != checked.charge:
+            raise ValueError("FILL_FEE_QUOTE_MISMATCH")
     fill = PaperFill(
         paper_order_id=order.id,
         ticker=order.ticker,
@@ -200,6 +215,11 @@ def insert_paper_fill(
                 "fee": decimal_to_str(fee),
                 "filled_at": resolved_filled_at.isoformat(),
                 "simulation": "immediate_fill_v1",
+                "fee_provenance": "LEGACY_CONFIGURED_NONCERTIFIED"
+                if fee_quote is None
+                else "GUARDED_FEE_EVIDENCE_V1",
+                "fee_quote_sha256": None if fee_quote is None else fee_quote.sha256,
+                "fee_contract": None if fee_quote is None else fee_quote.decode(),
             }
         ),
     )

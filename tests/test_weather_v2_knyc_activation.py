@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import httpx
+import pytest
 from sqlalchemy import func, select
 
 from kalshi_predictor.config import Settings
@@ -25,7 +26,16 @@ TICKER = "KXTEMPNYCH-26JUL1523-T80.99"
 TARGET = datetime(2026, 7, 16, 3, tzinfo=UTC)
 
 
-def test_flag_off_preserves_baseline_weather_v2_behavior(tmp_path) -> None:
+@pytest.fixture
+def historical_runtime(monkeypatch):
+    # These activation cases describe an observation four minutes after TARGET.
+    now = TARGET + timedelta(minutes=5)
+    monkeypatch.setattr(__name__ + ".utc_now", lambda: now)
+    monkeypatch.setattr("kalshi_predictor.weather.repository.utc_now", lambda: now)
+    monkeypatch.setattr("kalshi_predictor.forecasting.weather_v2.utc_now", lambda: now)
+
+
+def test_flag_off_preserves_baseline_weather_v2_behavior(tmp_path, historical_runtime) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
         snapshot = _seed_exact_runtime_rows(session)
@@ -39,7 +49,7 @@ def test_flag_off_preserves_baseline_weather_v2_behavior(tmp_path) -> None:
     assert forecast.notes == "weather_v2 midpoint plus bounded weather adjustment."
 
 
-def test_flag_on_applies_exact_bounded_probability_helpers(tmp_path) -> None:
+def test_flag_on_applies_exact_bounded_probability_helpers(tmp_path, historical_runtime) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
         snapshot = _seed_exact_runtime_rows(session)
@@ -59,7 +69,9 @@ def test_flag_on_applies_exact_bounded_probability_helpers(tmp_path) -> None:
     ]
 
 
-def test_flag_on_keeps_baseline_when_exact_evidence_is_invalid(tmp_path) -> None:
+def test_flag_on_keeps_baseline_when_exact_evidence_is_invalid(
+    tmp_path, historical_runtime
+) -> None:
     session_factory = _session_factory(tmp_path)
     with session_factory() as session:
         snapshot = _seed_exact_runtime_rows(session, station_id="KLGA")
@@ -71,6 +83,22 @@ def test_flag_on_keeps_baseline_when_exact_evidence_is_invalid(tmp_path) -> None
     assert evidence["status"] == "BLOCKED"
     assert evidence["applied"] is False
     assert evidence["blocker"] == "STATION_NOT_KNYC"
+
+
+def test_future_observation_does_not_change_probability(tmp_path, historical_runtime, monkeypatch):
+    now = TARGET + timedelta(minutes=3)
+    monkeypatch.setattr(__name__ + ".utc_now", lambda: now)
+    monkeypatch.setattr("kalshi_predictor.weather.repository.utc_now", lambda: now)
+    monkeypatch.setattr("kalshi_predictor.forecasting.weather_v2.utc_now", lambda: now)
+    with _session_factory(tmp_path)() as session:
+        snapshot = _seed_exact_runtime_rows(session)
+        forecast = WeatherV2Forecaster(settings=_settings(enabled=True)).forecast(session, snapshot)
+
+    assert forecast is not None
+    assert forecast.yes_probability == Decimal("0.44005")
+    evidence = forecast.feature_json["knyc_temperature_probability"]
+    assert evidence["applied"] is False
+    assert evidence["blocker"] == "OBSERVATION_AFTER_INPUT_CUTOFF"
 
 
 def test_feature_builder_attaches_only_exact_knyc_observation(tmp_path) -> None:

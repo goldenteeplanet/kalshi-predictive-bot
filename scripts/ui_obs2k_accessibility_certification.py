@@ -6,7 +6,6 @@ from pathlib import Path
 
 from kalshi_predictor.ui.accessibility_certification import write_accessibility_certification
 
-
 parser = argparse.ArgumentParser(description="Run local UI-OBS-2K accessibility certification")
 parser.add_argument("--project-root", type=Path, default=Path("."))
 parser.add_argument("--output-dir", type=Path, default=Path("reports/ui_obs2k"))

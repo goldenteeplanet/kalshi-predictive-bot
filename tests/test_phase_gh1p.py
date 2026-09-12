@@ -25,7 +25,7 @@ def test_gh1p_eligibility_filter_keeps_only_exact_model_candidates(monkeypatch) 
         pass
 
     monkeypatch.setattr(phase, "get_latest_crypto_link_for_ticker", lambda *_args: None)
-    monkeypatch.setattr(phase, "get_latest_weather_link_for_ticker", lambda *_args: None)
+    monkeypatch.setattr(phase, "get_latest_weather_link_for_ticker", lambda *_args, **_kwargs: None)
     assert phase._candidate_eligibility(Session(), "crypto_v2", {"ticker": "UNLINKED"}) == (
         False,
         "NO_EXACT_CRYPTO_LINK",

@@ -66,10 +66,28 @@ def build_source_reconnect_health(
     decision = gh2_payload.get("decision_refresh") or {}
     weather_features = list(decision.get("weather_features") or [])
     weather_forecasts = decision.get("weather_forecasts") or {}
+    inserted_features = sum(int(row.get("features_inserted") or 0) for row in weather_features)
+    fresh_reused_features = 0
+    for row in weather_features:
+        locations = int(row.get("location_count") or 0)
+        oldest_at = _datetime(row.get("oldest_latest_feature_at"))
+        oldest_age = _age_minutes(row.get("oldest_latest_feature_at"), resolved_now)
+        freshness = min(int(row.get("freshness_minutes") or 0), decision_stale_minutes)
+        if (
+            row.get("mode") == "DEDICATED_RUNTIME_OWNER_REUSE"
+            and locations > 0
+            and int(row.get("fresh_location_count") or 0) == locations
+            and int(row.get("features_reused") or 0) >= locations
+            and oldest_at is not None
+            and oldest_at <= resolved_now
+            and oldest_age is not None
+            and 0 <= oldest_age <= freshness
+        ):
+            fresh_reused_features += locations
     weather_healthy = (
         decision_age is not None
         and decision_age <= decision_stale_minutes
-        and sum(int(row.get("features_inserted") or 0) for row in weather_features) > 0
+        and inserted_features + fresh_reused_features > 0
         and int(weather_forecasts.get("forecasts_inserted") or 0) > 0
     )
 
@@ -110,8 +128,8 @@ def build_source_reconnect_health(
             "status_kind": "healthy" if weather_healthy else "blocked",
             "age_minutes": decision_age,
             "detail": (
-                f"{sum(int(row.get('features_inserted') or 0) for row in weather_features)} "
-                f"features; {int(weather_forecasts.get('forecasts_inserted') or 0)} forecasts"
+                f"{inserted_features} new features; {fresh_reused_features} fresh reused features; "
+                f"{int(weather_forecasts.get('forecasts_inserted') or 0)} forecasts"
             ),
             "recovery": (
                 "Bounded weather refresh is producing current decisions."

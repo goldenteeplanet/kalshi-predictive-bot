@@ -5,7 +5,6 @@ from pathlib import Path
 
 from kalshi_predictor.ui.dashboard_deployment_preview import certify_dashboard_deployment_preview
 
-
 report = certify_dashboard_deployment_preview(
     Path.cwd(), Path("deploy/systemd/kalshi-ui.service.ui-obs5ia.preview"),
     Path("reports/phase_ui_obs5i/deploy_ui_obs5i.sh"),

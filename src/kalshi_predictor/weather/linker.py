@@ -3,6 +3,7 @@ import re
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import or_, select
@@ -75,7 +76,7 @@ class WeatherLinkDetection:
     weather_metric: str
     target_operator: str
     target_value: Decimal | None
-    target_time: object | None
+    target_time: datetime | None
     confidence: Decimal
     reason: str
     station_id: str | None = None
@@ -122,7 +123,7 @@ def link_weather_markets(
         if limit is not None:
             statement = statement.limit(limit)
         markets = list(session.scalars(statement))
-    existing_links: dict[str, WeatherMarketLink] = {}
+    existing_links: dict[str, WeatherMarketLink | None] = {}
     if markets:
         existing_links = {
             link.ticker: link

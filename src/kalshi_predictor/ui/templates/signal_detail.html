@@ -16,14 +16,18 @@
   <div><span>ROI</span><strong>{{ card.roi or 'n/a' }}</strong></div>
   <div><span>Win Rate</span><strong>{{ card.win_rate or 'n/a' }}</strong></div>
   <div><span>Forecasts</span><strong>{{ card.forecast_count }}</strong></div>
-  <div><span>Trades</span><strong>{{ card.trade_count }}</strong></div>
-  <div><span>Confidence</span><strong>{{ card.confidence_score or 'n/a' }}</strong></div>
+  <div><span>Historical trade attributions</span><strong>{{ card.trade_count }}</strong></div>
+  <div><span>Heuristic score (not probability)</span><strong>{{ card.confidence_score or 'n/a' }}</strong></div>
+  <div><span>Model readiness</span><strong>{{ card.model_readiness or 'UNVERIFIED' }}</strong></div>
+  <div><span>Freshness checked</span><strong>{{ card.freshness_checked_at or 'Unknown' }}</strong></div>
+  <div><span>Evidence type</span><strong>{{ card.evidence_type or 'Unknown' }}</strong></div>
 </section>
 
 <section class="section-band">
   <div class="section-head">
     <div>
-      <h2>Performance</h2>
+      <h2>Historical performance</h2>
+      <p class="muted">Attributions may overlap across signals and do not establish current mission trades or model readiness.</p>
       <p class="muted">{{ research_summary }}</p>
     </div>
   </div>

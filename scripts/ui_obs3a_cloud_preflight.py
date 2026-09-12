@@ -8,7 +8,9 @@ from kalshi_predictor.ui.cloud_deployment_preflight import write_preflight_repor
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Certify a captured UI-OBS-3A read-only cloud preflight.")
+    parser = argparse.ArgumentParser(
+        description="Certify a captured UI-OBS-3A read-only cloud preflight."
+    )
     parser.add_argument("--capture", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()

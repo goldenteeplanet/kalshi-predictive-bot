@@ -9,7 +9,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import Table, create_engine, inspect
 
 from kalshi_predictor.data.schema import RuntimeProvenanceEvent
 from kalshi_predictor.provenance.dual_write import MODEL_VERSIONS
@@ -33,19 +33,24 @@ def write_prov5_certification(
     legacy_before = _legacy_digest(clone_path)
 
     engine = create_engine(f"sqlite:///{clone_path}")
-    started = perf_counter()
-    RuntimeProvenanceEvent.__table__.create(engine, checkfirst=True)
-    migration_seconds = perf_counter() - started
-    first = _backfill(clone_path)
-    first_count = _event_count(clone_path)
-    second = _backfill(clone_path)
-    second_count = _event_count(clone_path)
-    chain_valid = _verify_events(clone_path)
+    try:
+        provenance_table = RuntimeProvenanceEvent.__table__
+        assert isinstance(provenance_table, Table)
+        started = perf_counter()
+        provenance_table.create(engine, checkfirst=True)
+        migration_seconds = perf_counter() - started
+        first = _backfill(clone_path)
+        first_count = _event_count(clone_path)
+        second = _backfill(clone_path)
+        second_count = _event_count(clone_path)
+        chain_valid = _verify_events(clone_path)
 
-    RuntimeProvenanceEvent.__table__.drop(engine, checkfirst=True)
-    rollback_table_absent = "runtime_provenance_events" not in inspect(engine).get_table_names()
-    legacy_after = _legacy_digest(clone_path)
-    clone_bytes = clone_path.stat().st_size
+        provenance_table.drop(engine, checkfirst=True)
+        rollback_table_absent = "runtime_provenance_events" not in inspect(engine).get_table_names()
+        legacy_after = _legacy_digest(clone_path)
+        clone_bytes = clone_path.stat().st_size
+    finally:
+        engine.dispose()
     clone_path.unlink()
 
     report = {
@@ -137,7 +142,7 @@ def _seed_volume(path: Path, samples: list[dict[str, Any]], count: int) -> None:
             "crypto_features": "crypto_feature_id",
             "weather_features": "weather_feature_id",
             "sports_features": "sports_feature_id",
-        }.get(mapping.get("source_table"))
+        }.get(mapping.get("source_table") or "")
         feature = {feature_key: mapping.get("source_id")} if feature_key else {}
         forecasts.append(
             (

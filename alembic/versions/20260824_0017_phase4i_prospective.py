@@ -1,6 +1,7 @@
 """Phase 4I strict-causality prospective paired research lane."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260824_0017"

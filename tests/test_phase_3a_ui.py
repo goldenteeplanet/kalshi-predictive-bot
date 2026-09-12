@@ -48,7 +48,9 @@ def test_fixed_routes_are_registered_before_parameterized_routes(tmp_path) -> No
     assert route_paths.index("/opportunities/best-payouts") < route_paths.index(
         "/opportunities/{ticker}"
     )
-    assert route_paths.index("/reports/best-payouts") < route_paths.index("/reports/{report_name}")
+    assert route_paths.index("/reports/best-payouts") < route_paths.index(
+        "/reports/{report_name:path}"
+    )
     assert route_paths.index("/research") < route_paths.index("/research/opportunity/{ticker}")
     assert route_paths.index("/signals") < route_paths.index("/signals/{signal_name}")
 

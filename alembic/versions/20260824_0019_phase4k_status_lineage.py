@@ -1,6 +1,7 @@
 """Phase 4K immutable status-lineage evidence."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260824_0019"
