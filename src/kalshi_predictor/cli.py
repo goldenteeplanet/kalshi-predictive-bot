@@ -1164,6 +1164,14 @@ def main() -> None:
     configure_logging(get_settings().log_level)
 
 
+@app.command("ev-funnel")
+def ev_funnel_command(source: Path, expected_sha256: str, output: Path) -> None:
+    """Audit frozen economics without changing forecasts or authorizing paper orders."""
+    from kalshi_predictor.crypto.ev_funnel import audit_file
+
+    typer.echo(json.dumps(audit_file(source, expected_sha256, output), default=str, indent=2))
+
+
 @app.command("init-db")
 def init_db_command() -> None:
     init_db()

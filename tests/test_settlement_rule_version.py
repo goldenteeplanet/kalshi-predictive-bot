@@ -1,8 +1,22 @@
-from dataclasses import replace
+from dataclasses import asdict, replace
 
 import pytest
 
-from kalshi_predictor.crypto.settlement_rule_version import CryptoSettlementRuleVersion
+from kalshi_predictor.crypto.settlement_rule_version import (
+    CryptoSettlementRuleVersion,
+    SOLSettlementRuleVersion,
+)
+
+
+def test_sol_identity_preserves_frozen_hash_and_rejects_wrong_contract():
+    generic = rule()
+    sol = SOLSettlementRuleVersion(**asdict(generic))
+    assert sol.version_id == generic.version_id
+    assert sol.status == "UNCERTIFIED"
+    with pytest.raises(ValueError, match="SOL_EVENT"):
+        replace(sol, family="SOLPERP")
+    with pytest.raises(ValueError, match="SOL_EVENT"):
+        replace(sol, benchmark_id="BRTI")
 
 
 def rule():

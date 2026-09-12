@@ -107,3 +107,13 @@ class CryptoSettlementRuleVersion:
         if family != self.family or benchmark_id != self.benchmark_id:
             raise ValueError("FORECAST_RULE_IDENTITY_MISMATCH")
         return self.version_id
+
+
+@dataclass(frozen=True)
+class SOLSettlementRuleVersion(CryptoSettlementRuleVersion):
+    """SOL event-contract identity; scalar agreement alone grants no authority."""
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.family != "KXSOLE" or self.benchmark_id != "SOLUSD_RTI":
+            raise ValueError("SOL_EVENT_RULE_IDENTITY_REQUIRED")

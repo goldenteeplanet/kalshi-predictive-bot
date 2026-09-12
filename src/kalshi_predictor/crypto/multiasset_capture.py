@@ -18,7 +18,10 @@ from kalshi_predictor.crypto.cf_process_inputs import INDEX, decode_cf_original
 from kalshi_predictor.crypto.doge_strikes import parse_doge_strike
 from kalshi_predictor.crypto.multiasset_challengers import forecast_challengers
 from kalshi_predictor.crypto.research_costs import full_costs, unknown
-from kalshi_predictor.crypto.settlement_rule_version import CryptoSettlementRuleVersion
+from kalshi_predictor.crypto.settlement_rule_version import (
+    CryptoSettlementRuleVersion,
+    SOLSettlementRuleVersion,
+)
 from kalshi_predictor.kalshi.orderbook import usable_bid_ask_book
 
 BASE = "https://external-api.kalshi.com/trade-api/v2"
@@ -211,7 +214,10 @@ def capture(output: Path, plan: dict, transport, *, clock=lambda: datetime.now(U
             ):
                 baseline = float((yes.bid_price + yes.ask_price) / 2)
             for hypothesis in plan["rule_hypotheses"]:
-                rule = CryptoSettlementRuleVersion(
+                rule_type = (
+                    SOLSettlementRuleVersion if symbol == "SOL" else CryptoSettlementRuleVersion
+                )
+                rule = rule_type(
                     **{
                         **hypothesis,
                         "field_evidence": tuple(tuple(x) for x in hypothesis["field_evidence"]),
