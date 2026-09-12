@@ -52,7 +52,7 @@ def test_unknown_does_not_become_zero_and_gate_is_strict():
     args = dict(
         probability=D(".6"),
         executable_price=D(".5"),
-        fee=component(".02"),
+        fee=CostComponent(D(".02"), EvidenceStatus.CERTIFIED, "fee-test", HASH, "fixture"),
         slippage=component(".01"),
     )
     assert (
@@ -62,6 +62,33 @@ def test_unknown_does_not_become_zero_and_gate_is_strict():
     assert result.full_net_ev == D(".05")
     assert not result.clears_ev_gate
     assert not result.execution_authority
+
+
+@pytest.mark.parametrize("fee_status", [EvidenceStatus.ESTIMATED, EvidenceStatus.UNKNOWN])
+def test_uncertified_fee_cannot_produce_known_positive_full_net_ev(fee_status):
+    fee = CostComponent(
+        None if fee_status == EvidenceStatus.UNKNOWN else D(".01"),
+        fee_status, "conditional-fee", HASH, "account applicability unresolved",
+    )
+    result = full_costs(
+        probability=D(".9"), executable_price=D(".1"), fee=fee,
+        slippage=component(".01"), uncertainty=component(".01"),
+    )
+    assert result.gross_edge == D(".8")
+    assert result.fee is fee
+    assert result.full_net_ev is None and result.shortfall_to_five_cents is None
+    assert not result.clears_ev_gate and not result.execution_authority
+
+
+def test_certified_applicable_fee_preserves_strict_gate_and_estimated_allowances():
+    result = full_costs(
+        probability=D(".9"), executable_price=D(".1"),
+        fee=CostComponent(D(".01"), EvidenceStatus.CERTIFIED, "fee-test", HASH, "fixture"),
+        slippage=component(".01"), uncertainty=component(".01"),
+    )
+    assert result.full_net_ev == D(".77") and result.clears_ev_gate
+    assert not result.execution_authority
+    assert result.engine_version == "ONE_CONTRACT_FULL_COST_V2_CERTIFIED_FEE"
 
 
 def test_depth_and_quote_history_cannot_be_omitted():

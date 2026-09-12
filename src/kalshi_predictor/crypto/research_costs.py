@@ -145,7 +145,7 @@ class FullCostResult:
     full_net_ev: Decimal | None
     shortfall_to_five_cents: Decimal | None
     clears_ev_gate: bool
-    engine_version: str = "ONE_CONTRACT_FULL_COST_V1"
+    engine_version: str = "ONE_CONTRACT_FULL_COST_V2_CERTIFIED_FEE"
     execution_authority: bool = False
 
 
@@ -157,13 +157,19 @@ def full_costs(
     slippage: CostComponent,
     uncertainty: CostComponent,
 ) -> FullCostResult:
+    """Only applicable certified fees support full-net arithmetic.
+
+    Estimated fee scenarios remain in the component provenance but cannot turn
+    an unresolved account/series fee into known full net EV. Slippage and
+    uncertainty may be explicit evidenced estimates; this grants no admission.
+    """
     if not 0 <= number(probability) <= 1 or not 0 < number(executable_price) < 1:
         raise ValueError("VALID_PROBABILITY_AND_PRICE_REQUIRED")
     gross = probability - executable_price
     values = [component.value for component in (fee, slippage, uncertainty)]
     net = (
         None
-        if any(v is None for v in values)
+        if fee.status != EvidenceStatus.CERTIFIED or any(v is None for v in values)
         else gross - sum((v for v in values if v is not None), Decimal(0))
     )
     return FullCostResult(
