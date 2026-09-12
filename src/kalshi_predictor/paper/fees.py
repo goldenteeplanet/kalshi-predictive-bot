@@ -506,6 +506,8 @@ def verify_fee_quote(
         "quoted_at",
         "evidence",
     )
+    if any(key not in payload for key in keys):
+        raise ValueError("COMPLETE_FEE_CONTRACT_REQUIRED")
     request = {key: payload[key] for key in keys}
     if (
         payload["ticker"] != ticker

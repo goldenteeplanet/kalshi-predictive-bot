@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, time, timedelta
@@ -159,21 +160,54 @@ def advanced_risk_request_for_paper_decision(
     settings: Settings,
     phase_3m_decision: PositionSizingDecision | None,
     decision_timestamp: datetime,
+    cf_cost_record: dict[str, Any] | None = None,
+    cf_account_identity_sha256: str | None = None,
 ) -> AdvancedRiskRequest:
     timestamp = _ensure_utc(decision_timestamp)
+    from kalshi_predictor.overnight_paper.cf_source import CLOCK_BASIS as CF_CLOCK_BASIS
     from kalshi_predictor.paper.fees import decision_fee_quote
 
-    fee_quote = decision_fee_quote(
-        decision.raw_decision_json,
-        ticker=decision.ticker,
-        side=decision.side,
-        quantity=decision.quantity,
-        price=decision.limit_price,
-        simulator_floor=settings.paper_default_fee_per_contract,
-        now=timestamp,
-    )
     forecast = session.get(Forecast, decision.forecast_id) if decision.forecast_id else None
+    features = json.loads(forecast.feature_json) if forecast is not None else {}
+    cf_source = (
+        decision.raw_decision_json.get("source_kind") == CF_CLOCK_BASIS
+        or (isinstance(features, dict) and features.get("source_kind") == CF_CLOCK_BASIS)
+    )
     market = session.get(Market, decision.ticker)
+    if cf_source or cf_cost_record is not None:
+        from kalshi_predictor.advanced_risk.cf_costs import replay_cf_risk_costs
+
+        if cf_cost_record is None:
+            raise ValueError("CF_RISK_ORIGINAL_COST_RECORD_REQUIRED")
+        if cf_account_identity_sha256 is None:
+            raise ValueError("CF_RISK_ACCOUNT_IDENTITY_REQUIRED")
+        if forecast is None or market is None:
+            raise ValueError("CF_RISK_PERSISTED_FORECAST_BINDING_REQUIRED")
+        if not 0 <= (timestamp - _ensure_utc(forecast.forecasted_at)).total_seconds() <= 60:
+            raise ValueError("CF_RISK_CURRENT_FORECAST_REQUIRED")
+        fee_cost, slippage_cost, uncertainty_cost = replay_cf_risk_costs(
+            record=cf_cost_record, forecast=forecast, market=market,
+            decision=decision, at=timestamp,
+            account_identity_sha256=cf_account_identity_sha256,
+        )
+        # Keep existing conservative risk-policy floors after evidence replay.
+        # These maxima are risk controls, never certification of unknown costs.
+        fee_cost = max(fee_cost, settings.paper_default_fee_per_contract)
+        slippage_cost = max(slippage_cost, settings.advanced_risk_estimated_slippage_per_contract)
+        uncertainty_cost = max(
+            uncertainty_cost, settings.advanced_risk_gap_tail_buffer_per_contract,
+        )
+    else:
+        fee_quote = decision_fee_quote(
+            decision.raw_decision_json, ticker=decision.ticker, side=decision.side,
+            quantity=decision.quantity, price=decision.limit_price,
+            simulator_floor=settings.paper_default_fee_per_contract, now=timestamp,
+        )
+        fee_cost = (
+            settings.paper_default_fee_per_contract if fee_quote is None else fee_quote.charge
+        )
+        slippage_cost = settings.advanced_risk_estimated_slippage_per_contract
+        uncertainty_cost = settings.advanced_risk_gap_tail_buffer_per_contract
     market_snapshot = _latest_snapshot_for_ticker(session, decision.ticker)
     category = _category_for_decision(session, forecast=forecast, market=market, decision=decision)
     model_id = str(decision.model_name or (forecast.model_name if forecast else "") or UNKNOWN)
@@ -216,11 +250,9 @@ def advanced_risk_request_for_paper_decision(
         stop_price=Decimal("0"),
         point_value=Decimal("1"),
         tick_size=Decimal("0.01"),
-        estimated_round_trip_fees=(
-            settings.paper_default_fee_per_contract if fee_quote is None else fee_quote.charge
-        ),
-        estimated_slippage_per_contract=settings.advanced_risk_estimated_slippage_per_contract,
-        gap_or_tail_buffer_per_contract=settings.advanced_risk_gap_tail_buffer_per_contract,
+        estimated_round_trip_fees=fee_cost,
+        estimated_slippage_per_contract=slippage_cost,
+        gap_or_tail_buffer_per_contract=uncertainty_cost,
         portfolio_snapshot=portfolio,
         market_snapshot=market_risk,
         edge_statistics=edge_stats,

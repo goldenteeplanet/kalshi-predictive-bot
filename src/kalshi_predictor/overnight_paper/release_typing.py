@@ -11,6 +11,7 @@ from typing import Any
 
 POLICY_VERSION = "paper-release-typing-v1"
 TYPING_TARGETS: tuple[str, ...] = (
+    "src/kalshi_predictor/advanced_risk/cf_costs.py",
     "src/kalshi_predictor/crypto/account_fee_evidence.py",
     "src/kalshi_predictor/crypto/calibration_cost_evidence.py",
     "src/kalshi_predictor/crypto/cost_evidence.py",
