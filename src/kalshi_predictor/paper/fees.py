@@ -10,9 +10,11 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from decimal import ROUND_CEILING, Decimal
+from decimal import Decimal
 from typing import Any
 from urllib.parse import urlsplit
+
+from kalshi_predictor.utils.single_fill_fees import single_buy_fill
 
 CONTRACT_KEY = "guarded_fee_contract"
 CONTRACT_KIND = "guarded-single-buy-fee-v1"
@@ -288,10 +290,10 @@ def single_buy_fees(price: Decimal, multiplier: Decimal, rate: Decimal) -> dict[
     price, multiplier, rate = map(_decimal, (price, multiplier, rate))
     if price > 1:
         raise ValueError("FEE_PRICE_OUT_OF_RANGE")
-    trade = (rate * multiplier * price * (1 - price)).quantize(
-        Decimal("0.000001"), rounding=ROUND_CEILING
+    result = single_buy_fill(
+        price=price, multiplier=multiplier, rate=rate, balance_precision=Decimal("0.01")
     )
-    debit = (price + trade).quantize(Decimal("0.01"), rounding=ROUND_CEILING)
+    trade, debit = result["trade_fee"], result["total_debit"]
     return dict(
         trade_fee=trade,
         rounding_allowance=debit - price - trade,

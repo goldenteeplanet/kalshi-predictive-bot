@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
+from decimal import Decimal
 from enum import StrEnum
+
+from kalshi_predictor.utils.single_fill_fees import single_buy_fill
 
 
 class EvidenceStatus(StrEnum):
@@ -60,17 +62,10 @@ def single_buy_fee(
         raise ValueError("NONNEGATIVE_RATE_REQUIRED")
     if balance_precision not in (Decimal("0.01"), Decimal("0.0001")):
         raise ValueError("DOCUMENTED_ACCOUNT_PRECISION_REQUIRED")
-    model = rate * multiplier * price * (1 - price)
-    trade = model.quantize(Decimal("0.000001"), rounding=ROUND_CEILING)
-    change = (-price - trade).quantize(balance_precision, rounding=ROUND_FLOOR)
-    rounding = -price - trade - change
-    return {
-        "model_fee": model,
-        "trade_fee": trade,
-        "rounding_fee": rounding,
-        "rebate": Decimal(0),
-        "fee_cost": trade + rounding,
-    }
+    result = single_buy_fill(
+        price=price, multiplier=multiplier, rate=rate, balance_precision=balance_precision
+    )
+    return {key: value for key, value in result.items() if key != "total_debit"}
 
 
 def book_slippage(
