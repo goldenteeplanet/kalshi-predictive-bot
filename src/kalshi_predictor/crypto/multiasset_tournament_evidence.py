@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
 from kalshi_predictor.crypto.multiasset_capture import at, digest, encode
 from kalshi_predictor.crypto.multiasset_outcomes import verify_capture
+from kalshi_predictor.crypto.registered_outcome_window import outcome_window
 from kalshi_predictor.crypto.research_shadow_evaluation import _official, scores
 from kalshi_predictor.kalshi.orderbook import usable_bid_ask_book
 
@@ -32,6 +33,7 @@ def verify_outcomes(capture_root, outcome_root, pin_raw, receipt_raw, plan_sha, 
         raise ValueError("AWARE_AUDIT_CLOCK_REQUIRED")
     plan, decisions, capture_sha = verify_capture(capture_root, pin_raw, receipt_raw, plan_sha)
     target = at(plan["target_at"])
+    outcome_start, outcome_end = outcome_window(plan)
     if (outcome_root / "failure.json").exists():
         raise ValueError("TERMINAL_OUTCOME_FAILURE")
     completion_raw = _read(outcome_root, "completion.json")
@@ -40,9 +42,7 @@ def verify_outcomes(capture_root, outcome_root, pin_raw, receipt_raw, plan_sha, 
         completion["status"] != "OFFICIAL_RESEARCH_EVALUATED"
         or completion["requests"] != 2
         or at(completion["at"]) > as_of
-        or not target + timedelta(minutes=10)
-        <= at(completion["at"])
-        < target + timedelta(minutes=11)
+        or not outcome_start <= at(completion["at"]) < outcome_end
         or not 1 <= len(completion["files"]) <= 30
     ):
         raise ValueError("EXACT_COMPLETED_OUTCOME_REQUIRED")
@@ -60,7 +60,7 @@ def verify_outcomes(capture_root, outcome_root, pin_raw, receipt_raw, plan_sha, 
     evaluation = json.loads(originals["evaluation.json"])
     if (
         evaluation["capture_completion_sha256"] != capture_sha
-        or not target + timedelta(minutes=10) <= at(evaluation["at"]) <= at(completion["at"])
+        or not outcome_start <= at(evaluation["at"]) <= at(completion["at"])
         or evaluation["execution_authority"] is not False
         or evaluation["paper_pnl"] is not None
     ):
@@ -69,6 +69,14 @@ def verify_outcomes(capture_root, outcome_root, pin_raw, receipt_raw, plan_sha, 
     markets = {m["ticker"]: m for m in catalog["markets"]}
     outcomes = {}
     for index, ticker in enumerate(sorted({d["ticker"] for d in decisions})):
+        http_receipt = json.loads(originals[f"{index}.receipt.json"])
+        if not (
+            outcome_start
+            <= at(http_receipt["requested_at"])
+            <= at(http_receipt["received_at"])
+            <= at(evaluation["at"])
+        ):
+            raise ValueError("REGISTERED_OUTCOME_RECEIPT_CLOCKS")
         outcomes[ticker] = _official(
             (originals[f"{index}.original.json"], originals[f"{index}.receipt.json"]),
             ticker,

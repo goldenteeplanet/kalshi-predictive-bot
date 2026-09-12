@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import closing
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -17,6 +17,7 @@ from kalshi_predictor.crypto.multiasset_capture import (
     persist,
     source_manifest,
 )
+from kalshi_predictor.crypto.registered_outcome_window import outcome_window
 from kalshi_predictor.crypto.research_shadow_evaluation import _official, scores
 
 
@@ -95,7 +96,8 @@ def collect(
             capture_root, pin_raw, pin_receipt_raw, expected_plan_sha
         )
         target = at(plan["target_at"])
-        if not target + timedelta(minutes=10) <= clock() < target + timedelta(minutes=11):
+        outcome_start, outcome_end = outcome_window(plan)
+        if not outcome_start <= clock() < outcome_end:
             raise ValueError("EXACT_OUTCOME_WINDOW_REQUIRED")
         save("capture-pin.json", pin_raw)
         save("capture-pin-receipt.json", pin_receipt_raw)
@@ -104,13 +106,13 @@ def collect(
         official = {}
         for index, ticker in enumerate(sorted({d["ticker"] for d in decisions})):
             requested = clock()
-            if requested >= target + timedelta(minutes=11) or requests >= 2:
+            if not outcome_start <= requested < outcome_end or requests >= 2:
                 raise ValueError("OUTCOME_DEADLINE_OR_BUDGET")
             url = BASE + "/markets/" + ticker
             save(f"{index}.reservation.json", encode({"url": url, "at": requested.isoformat()}))
             requests += 1
             status, raw = transport(
-                url, min(12, (target + timedelta(minutes=11) - requested).total_seconds())
+                url, min(12, (outcome_end - requested).total_seconds())
             )
             received = clock()
             if type(raw) is not bytes or not 0 < len(raw) <= 3000000:
@@ -161,7 +163,7 @@ def collect(
                     }
                 )
         _, _, after_sha = verify_capture(capture_root, pin_raw, pin_receipt_raw, expected_plan_sha)
-        if after_sha != completion_sha or clock() >= target + timedelta(minutes=11):
+        if after_sha != completion_sha or not outcome_start <= clock() < outcome_end:
             raise ValueError("CAPTURE_CHANGED_OR_EVALUATION_DEADLINE")
         save(
             "evaluation.json",
@@ -186,7 +188,7 @@ def collect(
                 }
             ),
         )
-        if clock() >= target + timedelta(minutes=11):
+        if not outcome_start <= clock() < outcome_end:
             raise ValueError("POST_PUBLICATION_DEADLINE")
         return {"rows": len(results), "requests": requests}
     except Exception as exc:
