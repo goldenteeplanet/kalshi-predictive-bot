@@ -31,7 +31,7 @@ def matched_comparisons(rows, baselines, *, subset="all_named"):
         brier = row["scores"]["brier"]
         if (
             isinstance(brier, bool)
-            or not isinstance(brier, (float, int))
+            or not isinstance(brier, float | int)
             or not isfinite(brier)
             or not 0 <= brier <= 1
         ):
@@ -39,7 +39,7 @@ def matched_comparisons(rows, baselines, *, subset="all_named"):
         scored[key] = row
     field = fields[subset]
     eligible = set()
-    excluded = Counter()
+    excluded: Counter[str] = Counter()
     for ticker, baseline in baselines.items():
         quality = baseline.get("quote_quality", {})
         if field is None or quality.get(field) is True:
