@@ -57,6 +57,11 @@ from kalshi_predictor.microstructure.repository import insert_microstructure_fea
 BASE = "https://api.elections.kalshi.com/trade-api/v2/markets/"
 MAX_BYTES = 1_000_000
 MAX_SECONDS = 90.0
+# Full repository collection loads 937 source files / 13.28 MB (September 2026).
+# Preserve the entire loaded closure, including modules imported by other routes.
+# These are bounded archival resource limits, not model or trading qualification.
+MAX_SOURCE_FILES = 2048
+MAX_SOURCE_BYTES = 32_000_000
 SOURCE_PATHS = tuple(
     "src/kalshi_predictor/" + name
     for name in (
@@ -173,7 +178,10 @@ def runtime_sources(repo: Path) -> tuple[str, ...]:
         if path not in {expected.with_suffix(".py"), expected / "__init__.py"}:
             raise ValueError("IMPORTED_MODULE_IDENTITY_MISMATCH")
         paths.add(path.relative_to(repo.resolve()).as_posix())
-    if len(paths) > 256 or sum((repo / name).stat().st_size for name in paths) > 8_000_000:
+    if (
+        len(paths) > MAX_SOURCE_FILES
+        or sum((repo / name).stat().st_size for name in paths) > MAX_SOURCE_BYTES
+    ):
         raise ValueError("SOURCE_CLOSURE_SIZE_CAP")
     return tuple(sorted(paths))
 
