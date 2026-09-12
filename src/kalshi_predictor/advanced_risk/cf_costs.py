@@ -11,6 +11,7 @@ from kalshi_predictor.crypto.cost_record import (
     cost_decision_from_qualification,
     replay_cost_record,
 )
+from kalshi_predictor.crypto.public_paper_costs import replayed_fee_supports_paper
 from kalshi_predictor.data.schema import Forecast, Market
 from kalshi_predictor.overnight_paper.cf_source import CLOCK_BASIS
 from kalshi_predictor.paper.models import PaperDecision
@@ -78,12 +79,14 @@ def replay_cf_risk_costs(
         raise ValueError("CF_RISK_ACCOUNT_IDENTITY_MISMATCH")
     assessed = replay_cost_record(record, expected_decision=scope)
     values = []
-    for name in ("exchange_fee", "observed_book_stress", "uncertainty"):
+    execution_component = ('execution_price_impact' if 'execution_price_impact' in assessed
+                           else 'observed_book_stress')
+    for name in ("exchange_fee", execution_component, "uncertainty"):
         component = assessed[name]
         if (
             component["value"] is None or component["paper_support"] is not True
             or component["status"] not in ("CERTIFIED", "ESTIMATED_WITH_SUPPORT")
-            or (name == "exchange_fee" and component["status"] != "CERTIFIED")
+            or (name == "exchange_fee" and not replayed_fee_supports_paper(component))
         ):
             raise ValueError("CF_RISK_SUPPORTED_COST_REQUIRED:" + name)
         value = Decimal(component["value"])

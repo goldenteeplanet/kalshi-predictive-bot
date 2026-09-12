@@ -61,7 +61,9 @@ def _unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def _levels(original: OriginalBook, ticker: str) -> dict[str, list[tuple[Decimal, Decimal]]]:
+def _levels(
+    original: OriginalBook, ticker: str, *, require_two_sided: bool = True,
+) -> dict[str, list[tuple[Decimal, Decimal]]]:
     _aware(original.received_at)
     url = urlsplit(original.url)
     query = parse_qs(url.query, keep_blank_values=True)
@@ -89,7 +91,7 @@ def _levels(original: OriginalBook, ticker: str) -> dict[str, list[tuple[Decimal
     result = {}
     for side in ("yes", "no"):
         rows = book.get(side + "_dollars" if dollars else side)
-        if not isinstance(rows, list) or not rows:
+        if not isinstance(rows, list) or (require_two_sided and not rows):
             raise ValueError("COST_TWO_SIDED_BOOK_REQUIRED")
         levels: list[tuple[Decimal, Decimal]] = []
         seen = set()
@@ -110,7 +112,7 @@ def _levels(original: OriginalBook, ticker: str) -> dict[str, list[tuple[Decimal
             seen.add(price)
             levels.append((price, quantity))
         result[side] = sorted(levels, reverse=True)
-    if result["yes"][0][0] + result["no"][0][0] > 1:
+    if result["yes"] and result["no"] and result["yes"][0][0] + result["no"][0][0] > 1:
         raise ValueError("COST_CROSSED_BOOK")
     return result
 

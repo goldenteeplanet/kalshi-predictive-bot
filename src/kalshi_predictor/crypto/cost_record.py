@@ -11,10 +11,14 @@ from typing import Any
 
 from kalshi_predictor.crypto.account_fee_evidence import FeeAuthorityOriginal
 from kalshi_predictor.crypto.cost_evidence import OriginalBook
-from kalshi_predictor.crypto.full_cost_evidence import assess_full_cost_evidence
+from kalshi_predictor.crypto.full_cost_evidence import (
+    assess_full_cost_evidence,
+    assess_public_paper_cost_evidence,
+)
 from kalshi_predictor.overnight_paper.rule_verifier import RuleDocument
 
 KIND = "ORIGINAL_FULL_COST_ASSESSMENT_V1"
+PUBLIC_PAPER_KIND = "DOCUMENTED_PUBLIC_PAPER_COST_ASSESSMENT_V2"
 
 
 def cost_decision_from_qualification(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -61,7 +65,9 @@ def _restore(original: dict[str, Any]) -> bytes:
 
 def build_cost_record(**request: Any) -> dict[str, Any]:
     """Store originals alongside a recomputed diagnostic, using only JSON types."""
-    result = assess_full_cost_evidence(**request)
+    public = 'public_paper_fee_originals' in request
+    assessment = (assess_public_paper_cost_evidence(**request) if public
+                  else asdict(assess_full_cost_evidence(**request)))
     payload = {
         "decision": request["decision"], "side": request["side"],
         "selected_probability": str(request["selected_probability"]),
@@ -79,7 +85,14 @@ def build_cost_record(**request: Any) -> dict[str, Any]:
         "rule_documents": [dict(url=d.url, **_original(d.payload))
                            for d in request.get("rule_documents", ())],
     }
-    return json.loads(_json({"kind": KIND, "request": payload, "assessment": asdict(result)}))
+    if public:
+        payload['public_paper_fee_originals'] = [
+            dict(url=o.url, received_at=o.received_at.isoformat(), **_original(o.payload))
+            for o in request['public_paper_fee_originals']
+        ]
+        payload['public_paper_assessed_at'] = request['public_paper_assessed_at'].isoformat()
+    return json.loads(_json({"kind": PUBLIC_PAPER_KIND if public else KIND,
+                             "request": payload, "assessment": assessment}))
 
 
 def replay_cost_record(
@@ -90,13 +103,23 @@ def replay_cost_record(
     Caller must supply the independently bound decision. Registry changes may
     invalidate historical replay; they must not silently rewrite old records.
     """
-    if len(_json(record)) > 80_000_000 or record.get("kind") != KIND:
+    if len(_json(record)) > 80_000_000 or record.get("kind") not in (KIND, PUBLIC_PAPER_KIND):
         raise ValueError("COST_RECORD_SCHEMA_OR_SIZE_INVALID")
     request = record["request"]
     if _json(request["decision"]) != _json(expected_decision):
         raise ValueError("COST_RECORD_DECISION_MISMATCH")
     if len(request["books"]) > 100 or len(request["fee_originals"]) > 12:
         raise ValueError("COST_RECORD_ORIGINAL_COUNT_LIMIT")
+    extra: dict[str, Any] = {}
+    if record['kind'] == PUBLIC_PAPER_KIND:
+        if len(request['public_paper_fee_originals']) != 3:
+            raise ValueError('PUBLIC_PAPER_THREE_FEE_ORIGINALS_REQUIRED')
+        extra = dict(
+            public_paper_assessed_at=datetime.fromisoformat(request['public_paper_assessed_at']),
+            public_paper_fee_originals=tuple(FeeAuthorityOriginal(
+                o['url'], _restore(o), datetime.fromisoformat(o['received_at']),
+            ) for o in request['public_paper_fee_originals']),
+        )
     rebuilt = build_cost_record(
         decision=request["decision"], side=request["side"],
         selected_probability=Decimal(request["selected_probability"]),
@@ -115,6 +138,7 @@ def replay_cost_record(
         rule_documents=tuple(
             RuleDocument(o["url"], _restore(o)) for o in request["rule_documents"]
         ),
+        **extra,
     )
     if _json(rebuilt) != _json(record):
         raise ValueError("COST_RECORD_RECOMPUTATION_MISMATCH")

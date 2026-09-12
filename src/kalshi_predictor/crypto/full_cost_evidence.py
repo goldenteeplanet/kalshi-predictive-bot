@@ -123,3 +123,78 @@ def assess_full_cost_evidence(
         None if net is None else max(Decimal(0), Decimal(".05") - net),
         net is not None and net > Decimal(".05"),
     )
+
+
+def assess_public_paper_cost_evidence(
+    *, public_paper_fee_originals: tuple[FeeAuthorityOriginal, ...],
+    public_paper_assessed_at: datetime, **request: Any,
+) -> dict[str, Any]:
+    """Explicit public-fee/snapshot paper model using the canonical validators.
+
+    Reuses actual rule and calibration verification. Whole-cent fee modeling
+    does not attest an account class. Quote-range stress is diagnostic, not an
+    additional deduction from a price that already uses the executable ask.
+    """
+    from dataclasses import asdict
+
+    from kalshi_predictor.crypto.public_paper_costs import (
+        public_paper_fee,
+        snapshot_one_contract_impact,
+    )
+
+    if request.get('fee_policy_version') is not None or request.get('fee_originals'):
+        raise ValueError('PUBLIC_MODEL_CANNOT_OVERRIDE_ACCOUNT_EVIDENCE')
+    prior = assess_full_cost_evidence(**request)
+    result = asdict(prior)
+    decision = request['decision']
+    fee = public_paper_fee(
+        series=decision['series'], price=request['executable_price'],
+        originals=public_paper_fee_originals, assessed_at=public_paper_assessed_at,
+    )
+    books = request.get('books', ())
+    impact = snapshot_one_contract_impact(
+        ticker=decision['ticker'], side=request['side'], price=request['executable_price'],
+        originals=books, decision_at=datetime.fromisoformat(decision['decision_at']),
+    ) if books else {
+        'component': 'execution_price_impact', 'value': None, 'status': 'UNKNOWN',
+        'paper_support': False, 'fill_status': 'BOOK_FILL_PRICE_UNKNOWN',
+        'blockers': ['BOOK_FILL_PRICE_UNKNOWN'], 'evidence_sources': [],
+        'timestamp': decision['decision_at'], 'method': 'ONE_CONTRACT_SNAPSHOT_VWAP',
+        'version': 'SNAPSHOT_FILL_V1', 'unit': 'USD_PER_ONE_DOLLAR_PAYOUT',
+    }
+    uncertainty = prior.uncertainty
+    values = (fee['value'], impact['value'], uncertainty.value)
+    supported = fee['paper_support'] and impact['paper_support'] and uncertainty.paper_support
+    net = None
+    if supported and all(value is not None for value in values):
+        net = prior.gross_edge - sum((Decimal(str(v)) for v in values), Decimal(0))
+    rule = verify_settlement_rule(decision=decision, documents=request.get('rule_documents', ()))
+    blockers = [] if rule.passed else ['RULE_UNCERTIFIED', *rule.blockers]
+    blockers.extend(fee['blockers'])
+    blockers.extend(impact['blockers'])
+    if not uncertainty.paper_support:
+        blockers.extend(('CALIBRATION_BLOCKED', *uncertainty.blockers))
+    if net is None:
+        blockers.append('FULL_NET_EV_UNKNOWN')
+    elif net <= Decimal('.05'):
+        blockers.append('NET_EV_NOT_STRICTLY_ABOVE_FIVE_CENTS')
+    result.update(
+        exchange_fee=fee, execution_price_impact=impact,
+        additional_execution_slippage={
+            'value': '0' if impact['paper_support'] else None,
+            'status': 'CERTIFIED' if impact['paper_support'] else 'UNKNOWN',
+            'method': 'IMMEDIATE_SNAPSHOT_FILL_NO_SECOND_SPREAD_OR_MOVEMENT_CHARGE',
+            'evidence_sources': impact['evidence_sources'], 'timestamp': impact['timestamp'],
+            'unit': 'USD_PER_ONE_DOLLAR_PAYOUT', 'version': 'SNAPSHOT_FILL_V1',
+            'scope': 'SIMULATION_AT_SNAPSHOT_NOT_REAL_EXCHANGE_LATENCY',
+        },
+        full_net_ev=net, full_net_ev_status='FULL_NET_EV_UNKNOWN' if net is None
+        else 'FULL_NET_EV_KNOWN', blockers=tuple(dict.fromkeys(blockers)),
+        qualification_status='RULE_BLOCKED' if 'RULE_UNCERTIFIED' in blockers
+        else 'COST_BLOCKED' if net is None else 'FULL_NET_EV_KNOWN',
+        shortfall_to_five_cents=None if net is None else max(Decimal(0), Decimal('.05')-net),
+        clears_net_gate=net is not None and net > Decimal('.05'),
+        fee_model_scope='LOCAL_PAPER_MODEL_NOT_ACCOUNT_INVOICE',
+        stress_deducted=False, execution_authority=False,
+    )
+    return result

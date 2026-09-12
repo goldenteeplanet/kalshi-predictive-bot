@@ -17,6 +17,7 @@ from kalshi_predictor.crypto.cost_record import (
     cost_decision_from_qualification,
     replay_cost_record,
 )
+from kalshi_predictor.crypto.public_paper_costs import replayed_fee_supports_paper
 from kalshi_predictor.overnight_paper.boundary import ExecutionMode
 from kalshi_predictor.overnight_paper.cf_source import VERIFIER, CFSourceContext
 from kalshi_predictor.overnight_paper.coordinator import PreparedCandidate
@@ -47,12 +48,14 @@ def _qualification_ev_from_replayed_costs(
     """
     if assessment["full_net_ev"] is None:
         return None
+    execution_component = ('execution_price_impact' if 'execution_price_impact' in assessment
+                           else 'observed_book_stress')
     components = [assessment[name] for name in (
-        "exchange_fee", "observed_book_stress", "uncertainty",
+        "exchange_fee", execution_component, "uncertainty",
     )]
     if (
         assessment["full_net_ev_status"] != "FULL_NET_EV_KNOWN"
-        or components[0]["status"] != "CERTIFIED"
+        or not replayed_fee_supports_paper(components[0])
         or any(c["value"] is None or c["paper_support"] is not True
                or c["status"] not in ("CERTIFIED", "ESTIMATED_WITH_SUPPORT")
                for c in components)
