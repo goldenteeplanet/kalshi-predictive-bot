@@ -1,3 +1,4 @@
+from copy import deepcopy
 from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
@@ -6,7 +7,10 @@ import pytest
 from test_cf_feature_provenance import complete_cf_inputs
 from test_overnight_provenance import artifact
 
-from kalshi_predictor.overnight_paper.cf_candidate_assembly import assemble_cf_research_candidate
+from kalshi_predictor.overnight_paper.cf_candidate_assembly import (
+    _qualification_ev_from_replayed_costs,
+    assemble_cf_research_candidate,
+)
 from kalshi_predictor.overnight_paper.provenance import canonical_hash
 from kalshi_predictor.overnight_paper.qualification import Readiness, qualify_candidate
 from kalshi_predictor.paper.models import PaperDecision
@@ -38,6 +42,55 @@ def test_original_bound_cf_candidate_uses_existing_qualification_without_cost_in
     assert candidate.decision is paper
     assert candidate.shadow_payload["full_net_ev"] is None
     assert candidate.shadow_payload["cf_context"]["target"]["symbol"] == "SOL"
+
+
+def test_assembler_rejects_invented_numeric_cost_verdict_before_qualification():
+    paper, args = preparation()
+    original = assemble_cf_research_candidate(paper_decision=paper, provenance_args=args)
+    forged = deepcopy(original.shadow_payload["cost_record"])
+    forged["assessment"]["full_net_ev"] = "0.2"
+    forged["assessment"]["full_net_ev_status"] = "FULL_NET_EV_KNOWN"
+    with pytest.raises(ValueError, match="COST_RECORD_RECOMPUTATION_MISMATCH"):
+        assemble_cf_research_candidate(
+            paper_decision=paper, provenance_args=args, cost_record=forged,
+        )
+
+
+def arithmetic_fixture():
+    # Internal adapter unit inputs only: these are not reviewed cost evidence,
+    # cannot pass replay_cost_record, and never establish paper eligibility.
+    component = dict(value="0.01", status="CERTIFIED", paper_support=True)
+    return dict(
+        exchange_fee=component.copy(), observed_book_stress=component.copy(),
+        uncertainty=component.copy(), gross_edge="0.1", full_net_ev="0.07",
+        full_net_ev_status="FULL_NET_EV_KNOWN",
+    ), dict(selected_probability="0.6", executable_price="0.5")
+
+
+def test_internal_ev_adapter_preserves_selected_side_and_each_cost():
+    assessment, inputs = arithmetic_fixture()
+    ev = _qualification_ev_from_replayed_costs(assessment, inputs)
+    assert ev is not None
+    assert ev.model_probability == Decimal("0.6")
+    assert ev.net_ev == Decimal("0.07")
+    assert ev.estimated_fee == ev.slippage_allowance == ev.uncertainty_buffer == Decimal("0.01")
+
+
+@pytest.mark.parametrize("component", ["exchange_fee", "observed_book_stress", "uncertainty"])
+@pytest.mark.parametrize(
+    "change", [dict(paper_support=False), dict(value=None), dict(status="UNKNOWN")],
+)
+def test_internal_ev_adapter_refuses_any_unsupported_component(component, change):
+    assessment, inputs = arithmetic_fixture()
+    assessment[component].update(change)
+    assert _qualification_ev_from_replayed_costs(assessment, inputs) is None
+
+
+def test_internal_ev_adapter_rejects_inconsistent_arithmetic():
+    assessment, inputs = arithmetic_fixture()
+    assessment["full_net_ev"] = "0.2"
+    with pytest.raises(ValueError, match="ARITHMETIC_MISMATCH"):
+        _qualification_ev_from_replayed_costs(assessment, inputs)
 
 
 @pytest.mark.parametrize("changes", [

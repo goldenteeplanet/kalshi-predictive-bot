@@ -1,7 +1,7 @@
 """Assemble original-bound CF research into the coordinator's qualification path.
 
-No calibrated cost validator is available yet: EV remains absent, not zero.
-This assembler cannot produce paper eligibility or write a ledger itself.
+Replayed supported costs feed the existing qualification arithmetic. Missing
+costs remain absent, not zero. This assembler never writes a ledger itself.
 """
 
 from __future__ import annotations
@@ -20,13 +20,16 @@ from kalshi_predictor.crypto.cost_record import (
 from kalshi_predictor.overnight_paper.boundary import ExecutionMode
 from kalshi_predictor.overnight_paper.cf_source import VERIFIER, CFSourceContext
 from kalshi_predictor.overnight_paper.coordinator import PreparedCandidate
+from kalshi_predictor.overnight_paper.evaluation_dataset import _validate_stored_observation
 from kalshi_predictor.overnight_paper.gate_context import QualificationContext
-from kalshi_predictor.overnight_paper.provenance import canonical_hash
+from kalshi_predictor.overnight_paper.provenance import Artifact, canonical_hash
 from kalshi_predictor.overnight_paper.provenance_gate import verify_complete_provenance
 from kalshi_predictor.overnight_paper.qualification import (
     SEMANTIC_VERIFIERS,
     EvidenceReference,
     GateEvidence,
+    NetEV,
+    compute_net_ev,
     qualify_candidate,
 )
 from kalshi_predictor.overnight_paper.rule_verifier import RuleDocument
@@ -34,10 +37,45 @@ from kalshi_predictor.overnight_paper.source_health import aware
 from kalshi_predictor.paper.models import PaperDecision
 
 
+def _qualification_ev_from_replayed_costs(
+    assessment: dict[str, Any], inputs: dict[str, Any],
+) -> NetEV | None:
+    """Internal arithmetic adapter; caller must first replay original evidence.
+
+    This helper is not a verifier or a public evidence intake. The assembler
+    obtains assessment only from replay_cost_record, never from stored labels.
+    """
+    if assessment["full_net_ev"] is None:
+        return None
+    components = [assessment[name] for name in (
+        "exchange_fee", "observed_book_stress", "uncertainty",
+    )]
+    if (
+        assessment["full_net_ev_status"] != "FULL_NET_EV_KNOWN"
+        or components[0]["status"] != "CERTIFIED"
+        or any(c["value"] is None or c["paper_support"] is not True
+               or c["status"] not in ("CERTIFIED", "ESTIMATED_WITH_SUPPORT")
+               for c in components)
+    ):
+        return None
+    ev = compute_net_ev(
+        model_probability=Decimal(inputs["selected_probability"]),
+        executable_price=Decimal(str(inputs["executable_price"])),
+        estimated_fee=Decimal(components[0]["value"]),
+        slippage_allowance=Decimal(components[1]["value"]),
+        uncertainty_buffer=Decimal(components[2]["value"]),
+    )
+    if (ev.net_ev != Decimal(assessment["full_net_ev"])
+            or ev.gross_edge != Decimal(assessment["gross_edge"])):
+        raise ValueError("CF_ASSEMBLY_REPLAYED_COST_ARITHMETIC_MISMATCH")
+    return ev
+
+
 def assemble_cf_research_candidate(
     *, paper_decision: PaperDecision, provenance_args: dict[str, Any],
     rule_documents: tuple[RuleDocument, ...] = (), repository: Path | None = None,
     cost_record: dict[str, Any] | None = None,
+    evaluation_observation: Artifact | None = None,
 ) -> PreparedCandidate:
     """Consume existing engine/original records; never invent a new forecast.
 
@@ -111,13 +149,6 @@ def assemble_cf_research_candidate(
             sources=public_sources,
             context=gate_context if gate in (3, 9, 12) else None,
         ))
-    args = dict(
-        ticker=inputs["ticker"], category="Crypto", decision_inputs=inputs,
-        decision_id=identity, evidence=tuple(evidence_items), ev=None,
-        minimum_net_ev=Decimal("0.05"), phase3m=provenance_args["phase3m"],
-        phase3n=provenance_args["phase3n"], mode=ExecutionMode.OBSERVATION_ONLY,
-    )
-    qualified = qualify_candidate(**args)
     cost_inputs = cost_decision_from_qualification(inputs)
     if cost_record is None:
         cost_record = build_cost_record(
@@ -127,6 +158,24 @@ def assemble_cf_research_candidate(
             side=inputs["side"].removeprefix("BUY_"), rule_documents=rule_documents,
         )
     cost_assessment = replay_cost_record(cost_record, expected_decision=cost_inputs)
+    if evaluation_observation is not None:
+        row = evaluation_observation.decode()
+        if (
+            row.get("kind") != "observation-v1"
+            or row.get("decision_id") != identity or row.get("decision") != inputs
+            or row.get("cost_record") != cost_record
+        ):
+            raise ValueError("CF_ASSEMBLY_EVALUATION_BINDING_MISMATCH")
+        _validate_stored_observation(row)
+    ev = _qualification_ev_from_replayed_costs(cost_assessment, cost_inputs)
+    args = dict(
+        ticker=inputs["ticker"], category="Crypto", decision_inputs=inputs,
+        decision_id=identity, evidence=tuple(evidence_items), ev=ev,
+        minimum_net_ev=Decimal("0.05"), phase3m=provenance_args["phase3m"],
+        phase3n=provenance_args["phase3n"],
+        mode=ExecutionMode.OBSERVATION_ONLY if ev is None else ExecutionMode.LOCAL_PAPER,
+    )
+    qualified = qualify_candidate(**args)
     payload = dict(
         qualification_inputs=inputs, qualification_status=qualified.status.value,
         qualification_blockers=list(qualified.blockers),
@@ -135,4 +184,4 @@ def assemble_cf_research_candidate(
         cost_evidence_status="ORIGINAL_EVIDENCE_REPLAYED",
         evidence_role="CF_RESEARCH_NOT_CURRENT_PAPER_ELIGIBILITY",
     )
-    return PreparedCandidate(paper_decision, args, payload, None)
+    return PreparedCandidate(paper_decision, args, payload, evaluation_observation)

@@ -39,6 +39,35 @@ def _number(value: Any, *, low: float = 0, high: float = 1) -> float:
     return result
 
 
+def _replayed_observation_costs(
+    decision: dict[str, Any], cost_record: dict[str, Any],
+) -> dict[str, float | None]:
+    """Unsupported descriptive estimates are not execution costs."""
+    from kalshi_predictor.crypto.cost_record import (
+        cost_decision_from_qualification,
+        replay_cost_record,
+    )
+
+    assessed = replay_cost_record(
+        cost_record, expected_decision=cost_decision_from_qualification(decision),
+    )
+    result: dict[str, float | None] = {}
+    for field, component in (
+        ("estimated_fee", "exchange_fee"), ("slippage", "observed_book_stress"),
+        ("uncertainty", "uncertainty"),
+    ):
+        item = assessed[component]
+        supported = (
+            item["paper_support"] is True
+            and item["status"] in ("CERTIFIED", "ESTIMATED_WITH_SUPPORT")
+            and (field != "estimated_fee" or item["status"] == "CERTIFIED")
+        )
+        result[field] = (
+            _number(item["value"]) if supported and item["value"] is not None else None
+        )
+    return result
+
+
 def build_observation(
     *,
     provenance_args: dict[str, Any],
@@ -48,15 +77,18 @@ def build_observation(
     rule_artifact: Artifact,
     market_probability: float,
     executable_price: float,
-    estimated_fee: float,
-    slippage: float,
-    uncertainty: float,
+    estimated_fee: float | None,
+    slippage: float | None,
+    uncertainty: float | None,
+    cost_record: dict[str, Any] | None = None,
 ) -> Artifact:
     """Freeze verified decision-time originals, including the market baseline.
 
     Market probability must equal the independently captured snapshot field and
-    all cost fields must equal the frozen decision. Book executability and the
-    baseline's quote methodology remain the pricing adapter's responsibility.
+    legacy cost fields must equal the frozen decision. When original CF cost
+    evidence is supplied, costs must instead match its independent replay;
+    unsupported costs stay null without changing the original decision fields.
+    Book executability and baseline methodology remain the pricing adapter's responsibility.
     No outcome can be supplied while constructing this observation.
     """
     verified = verify_complete_provenance(**provenance_args)
@@ -77,15 +109,25 @@ def build_observation(
     baseline = _number(market_probability)
     if baseline != _number(snapshot["market_implied_probability"]):
         raise ValueError("BASELINE_SNAPSHOT_MISMATCH")
-    prices = {
-        "executable_price": _number(executable_price),
-        "estimated_fee": _number(estimated_fee),
-        "slippage": _number(slippage),
-        "uncertainty": _number(uncertainty),
-    }
-    for key, value in prices.items():
-        if value != _number(decision[key]):
-            raise ValueError("DATASET_COST_BINDING_MISMATCH:" + key)
+    supplied_costs = dict(estimated_fee=estimated_fee, slippage=slippage, uncertainty=uncertainty)
+    prices: dict[str, float | None] = {"executable_price": _number(executable_price)}
+    if prices["executable_price"] != _number(decision["executable_price"]):
+        raise ValueError("DATASET_COST_BINDING_MISMATCH:executable_price")
+    if cost_record is not None:
+        if context.cf_context is None:
+            raise ValueError("CF_COST_OBSERVATION_CONTEXT_REQUIRED")
+        costs = _replayed_observation_costs(decision, cost_record)
+        if any(
+            (None if value is None else _number(value)) != costs[key]
+            for key, value in supplied_costs.items()
+        ):
+            raise ValueError("DATASET_REPLAYED_COST_BINDING_MISMATCH")
+        prices.update(costs)
+    else:
+        for key, value in supplied_costs.items():
+            prices[key] = _number(value)
+            if prices[key] != _number(decision[key]):
+                raise ValueError("DATASET_COST_BINDING_MISMATCH:" + key)
     if decision.get("side") not in {"BUY_YES", "BUY_NO"}:
         raise ValueError("DATASET_SIDE_REQUIRED")
     cf_record = {}
@@ -125,6 +167,7 @@ def build_observation(
             "rule": {"sha256": rule_artifact.sha256, "payload": rule},
             "model_code_hex": context.model_code.hex(),
             **cf_record,
+            **({"cost_record": cost_record} if cost_record is not None else {}),
         }
     )
 
@@ -429,6 +472,8 @@ def evaluate_dataset(
             ) / len(selected)
             evs, pnls = [], []
             for (row, _), actual, prob in zip(selected, y, probability, strict=True):
+                if any(row[key] is None for key in ("estimated_fee", "slippage", "uncertainty")):
+                    continue
                 yes = row["decision"]["side"] == "BUY_YES"
                 costs = row["executable_price"] + row["estimated_fee"] + row["slippage"]
                 evs.append((prob if yes else 1 - prob) - costs - row["uncertainty"])
@@ -440,11 +485,18 @@ def evaluate_dataset(
                     "ece": ece,
                     "baseline_brier": brier_score(y, baseline),
                     "baseline_log_loss": log_loss(y, baseline),
-                    "mean_after_cost_predicted_ev": sum(evs) / len(evs),
-                    "mean_hypothetical_one_contract_pnl": sum(pnls) / len(pnls),
-                    "hypothetical_one_contract_pnl_sum": sum(pnls),
                 }
             )
+            costs_complete = len(evs) == len(selected)
+            if costs_complete:
+                metrics.update(
+                    mean_after_cost_predicted_ev=sum(evs) / len(evs),
+                    mean_hypothetical_one_contract_pnl=sum(pnls) / len(pnls),
+                    hypothetical_one_contract_pnl_sum=sum(pnls),
+                )
+            else:
+                metrics["unknown_cost_holdout_observations"] = len(selected) - len(evs)
+                blockers.append("FULL_COST_EVIDENCE_INCOMPLETE")
             comparisons = (
                 (
                     metrics["baseline_brier"] - metrics["brier"]
@@ -458,11 +510,12 @@ def evaluate_dataset(
                 ),
                 (ece <= policy["maximum_ece"], "CALIBRATION_ACCEPTANCE_FAILED"),
                 (
-                    metrics["mean_after_cost_predicted_ev"] > policy["minimum_mean_net_ev"],
+                    costs_complete and metrics["mean_after_cost_predicted_ev"]
+                    > policy["minimum_mean_net_ev"],
                     "AFTER_COST_EV_ACCEPTANCE_FAILED",
                 ),
                 (
-                    metrics["mean_hypothetical_one_contract_pnl"]
+                    costs_complete and metrics["mean_hypothetical_one_contract_pnl"]
                     > policy["minimum_mean_simulated_pnl"],
                     "SIMULATED_PNL_ACCEPTANCE_FAILED",
                 ),
@@ -606,6 +659,17 @@ def _validate_stored_observation(row: dict[str, Any]) -> None:
         snapshot["market_implied_probability"]
     ) or _number(decision["forecast_probability"]) != _number(forecast["probability"]):
         raise ValueError("STORED_PROBABILITY_BINDING_MISMATCH")
-    for key in ("executable_price", "estimated_fee", "slippage", "uncertainty"):
+    cost_keys: tuple[str, ...] = ("executable_price", "estimated_fee", "slippage", "uncertainty")
+    if "cost_record" in row:
+        if cf_context is None:
+            raise ValueError("CF_COST_OBSERVATION_CONTEXT_REQUIRED")
+        costs = _replayed_observation_costs(decision, row["cost_record"])
+        if any(
+            (None if row[key] is None else _number(row[key])) != value
+            for key, value in costs.items()
+        ):
+            raise ValueError("STORED_REPLAYED_COST_BINDING_MISMATCH")
+        cost_keys = ("executable_price",)
+    for key in cost_keys:
         if _number(row[key]) != _number(decision[key]):
             raise ValueError("STORED_COST_BINDING_MISMATCH")
