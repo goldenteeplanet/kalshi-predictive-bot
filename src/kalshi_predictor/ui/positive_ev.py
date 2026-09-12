@@ -113,6 +113,15 @@ def create_router() -> APIRouter:
     def positive_ev() -> HTMLResponse:
         path = Path(os.environ.get("POSITIVE_EV_REPORT_PATH", "reports/positive_ev/current.json"))
         html = render_research(read_research(path))
+        progress_root = os.environ.get("POSITIVE_EV_MULTI_ASSET_PROGRESS_ROOT")
+        if progress_root:
+            from kalshi_predictor.ui.multiasset_progress_view import read_progress, render_progress
+
+            html = html.replace(
+                "<section id='research-snapshot'>",
+                render_progress(read_progress(Path(progress_root)))
+                + "<section id='research-snapshot'>",
+            )
         cohort = os.environ.get("POSITIVE_EV_COHORT_ROOT")
         control = os.environ.get("POSITIVE_EV_CONTROL_ROOT")
         if cohort and control:
