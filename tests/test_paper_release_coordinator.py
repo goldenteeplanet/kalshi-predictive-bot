@@ -90,6 +90,12 @@ def test_shadow_only_decimal_checkpoint_and_duplicate_replay(admission):
     assert dashboard["qualification_current"] is False
     assert dashboard["paper_mode"] == "NOT_ACTIVE"
     assert "RECORDED_QUALIFICATION_REQUIRES_REVALIDATION" in dashboard["blockers"]
+    assert dashboard["research_assessment_count"] == 1
+    research = dashboard["latest_research_assessment"]
+    assert research["status"] == "COST_UNKNOWN"
+    assert research["full_net_ev"] is None
+    assert research["execution_authority"] is False
+    assert research["provisional_qualification_net_ev"] == payload["qualification"]["net_ev"]
 
 
 def test_entry_restart_and_settlement_exactly_once(admission, prepared):  # noqa: F811
@@ -143,6 +149,9 @@ def test_crash_before_shadow_commit_rolls_back_then_retries(admission, monkeypat
         coordinator.admit_prepared_candidate(**admission)
     with admission["session_factory"]() as session:
         assert session.execute(text("SELECT count(*) FROM overnight_shadow")).scalar_one() == 0
+        assert session.execute(text(
+            "SELECT count(*) FROM overnight_sprint_cycles WHERE id LIKE 'release-research-v1:%'"
+        )).scalar_one() == 0
     monkeypatch.setattr(coordinator, "_checkpoint", original)
     assert coordinator.admit_prepared_candidate(**admission).state == "SHADOW_ONLY"
 
@@ -178,6 +187,57 @@ def test_missing_evidence_is_durable_rejection(admission):
     dashboard = snapshot(admission["database_path"])
     assert dashboard["first_blocker"] == result.blockers[0]
     assert dashboard["last_qualification_status"] == "PAPER_NOT_READY"
+    assert dashboard["research_assessment_count"] == 1
+    assert dashboard["research_status_counts"] == {"RULE_UNCERTIFIED": 1}
+    assert dashboard["latest_research_assessment"]["research_blockers"] == [
+        "RULE_UNCERTIFIED", "BOOK_INVALID", "COST_UNKNOWN",
+    ]
+    assert dashboard["shadow_candidates"] == 0
+
+
+def test_invalid_book_record_is_durable_and_idempotent(admission):
+    args = admission["candidate"].qualification_args
+    args["evidence"] = tuple(e for e in args["evidence"] if e.gate != 5)
+    first = coordinator.admit_prepared_candidate(**admission)
+    assert first.state == "BLOCKED"
+    assert coordinator.admit_prepared_candidate(**admission) == first
+    dashboard = snapshot(admission["database_path"])
+    assert dashboard["research_assessment_count"] == 1
+    assert dashboard["research_status_counts"] == {"BOOK_INVALID": 1}
+    assert dashboard["shadow_candidates"] == 0
+    assert dashboard["open_positions"] == 0
+
+
+@pytest.mark.parametrize("tamper", ["positive", "missing_qualification", "changed_qualification"])
+def test_research_reader_refuses_forged_positive_or_broken_lineage(admission, tamper):
+    coordinator.admit_prepared_candidate(**admission)
+    with admission["session_factory"]() as session:
+        if tamper == "positive":
+            query = ("SELECT id,payload FROM overnight_sprint_cycles "
+                     "WHERE id LIKE 'release-research-v1:%'")
+            key, raw = session.execute(text(query)).one()
+            payload = json.loads(raw)
+            payload.update(status="POSITIVE_NET_EV", full_net_ev="0.50")
+            session.execute(text("UPDATE overnight_sprint_cycles SET payload=:p WHERE id=:id"),
+                            {"p": json.dumps(payload), "id": key})
+        elif tamper == "missing_qualification":
+            session.execute(text(
+                "DELETE FROM overnight_sprint_cycles WHERE id LIKE 'release-qualification:%'"
+            ))
+        else:
+            query = ("SELECT id,payload FROM overnight_sprint_cycles "
+                     "WHERE id LIKE 'release-qualification:%'")
+            key, raw = session.execute(text(query)).one()
+            payload = json.loads(raw)
+            payload["qualification"]["net_ev"] = "0.99"
+            session.execute(text("UPDATE overnight_sprint_cycles SET payload=:p WHERE id=:id"),
+                            {"p": json.dumps(payload), "id": key})
+        session.commit()
+    dashboard = snapshot(admission["database_path"])
+    assert dashboard["paper_mode"] == "UNVERIFIED"
+    assert dashboard["research_assessment_count"] is None
+    assert dashboard["latest_research_assessment"] is None
+    assert dashboard["research_status_counts"] is None
 
 
 def test_different_candidate_cannot_use_second_slot(admission):

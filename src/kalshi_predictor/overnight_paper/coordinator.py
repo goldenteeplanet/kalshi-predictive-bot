@@ -32,6 +32,7 @@ from kalshi_predictor.overnight_paper.dataset_store import persist_dataset_recor
 from kalshi_predictor.overnight_paper.monitoring import MonitoringPermit
 from kalshi_predictor.overnight_paper.provenance import Artifact
 from kalshi_predictor.overnight_paper.qualification import Readiness, qualify_candidate
+from kalshi_predictor.overnight_paper.research_record import PREFIX, research_record
 from kalshi_predictor.overnight_paper.store import digest, encode, record_shadow
 from kalshi_predictor.paper.models import PaperDecision
 
@@ -280,16 +281,23 @@ def admit_prepared_candidate(
         qualification_payload["net_ev"] = (
             None if qualification.net_ev is None else str(qualification.net_ev)
         )
+        qualification_checkpoint = {
+            "kind": "PAPER_RELEASE_QUALIFICATION",
+            "decision_inputs": inputs,
+            "qualification": qualification_payload,
+            "shadow_payload": candidate.shadow_payload,
+        }
         _checkpoint(
             session,
             "release-qualification:" + args["decision_id"],
             now,
-            {
-                "kind": "PAPER_RELEASE_QUALIFICATION",
-                "decision_inputs": inputs,
-                "qualification": qualification_payload,
-                "shadow_payload": candidate.shadow_payload,
-            },
+            qualification_checkpoint,
+        )
+        _checkpoint(
+            session,
+            PREFIX + args["decision_id"],
+            now,
+            research_record(qualification_checkpoint),
         )
         if qualification.status != Readiness.PAPER_ELIGIBLE:
             session.commit()

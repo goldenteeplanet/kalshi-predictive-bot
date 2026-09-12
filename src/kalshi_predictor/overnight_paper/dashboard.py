@@ -17,6 +17,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from kalshi_predictor.overnight_paper.qualification import GATE_NAMES, decision_fingerprint
+from kalshi_predictor.overnight_paper.research_record import KIND, PREFIX, research_record
 from kalshi_predictor.overnight_paper.runtime_liveness import inspect_process
 from kalshi_predictor.overnight_paper.source_health import MAX_FORECAST_AGE_SECONDS, aware
 from kalshi_predictor.overnight_paper.watcher import verified_paper_marker
@@ -328,6 +329,9 @@ def snapshot(path: Path | None) -> dict:
         "next_expected_settlement": None,
         "positions": [],
         "shadow_candidates": 0,
+        "research_assessment_count": 0,
+        "research_status_counts": {},
+        "latest_research_assessment": None,
         "last_decision_at": None,
         "last_qualification_status": None,
         "last_qualification_recorded_at": None,
@@ -446,10 +450,29 @@ def snapshot(path: Path | None) -> dict:
                 result["paper_mode"] = "POSITIONS_PRESENT_WATCHER_UNVERIFIED"
             result["blockers"] = ["NO_ACTIVATION_CERTIFICATE_OR_CURRENT_WATCHER_EVIDENCE"]
             for record in db.execute(
-                "SELECT captured_at,payload FROM overnight_sprint_cycles ORDER BY captured_at DESC"
+                "SELECT id,captured_at,payload FROM overnight_sprint_cycles "
+                "ORDER BY captured_at DESC,id DESC"
             ):
                 evidence = json.loads(record["payload"])
-                if evidence.get("kind") == "PAPER_RELEASE_QUALIFICATION":
+                if evidence.get("kind") == KIND or record["id"].startswith(PREFIX):
+                    linked = db.execute(
+                        "SELECT payload FROM overnight_sprint_cycles WHERE id=?",
+                        (evidence["qualification_checkpoint_id"],),
+                    ).fetchone()
+                    if (
+                        linked is None
+                        or record["id"] != PREFIX + evidence["decision_id"]
+                        or evidence != research_record(json.loads(linked[0]))
+                    ):
+                        raise ValueError("RESEARCH_ASSESSMENT_LINEAGE_INVALID")
+                    result["research_assessment_count"] += 1
+                    counts = result["research_status_counts"]
+                    counts[evidence["status"]] = counts.get(evidence["status"], 0) + 1
+                    if result["latest_research_assessment"] is None:
+                        result["latest_research_assessment"] = {
+                            **evidence, "recorded_at": record["captured_at"],
+                        }
+                elif evidence.get("kind") == "PAPER_RELEASE_QUALIFICATION":
                     if result["last_qualification_status"] is None:
                         inputs = evidence["decision_inputs"]
                         qualification = evidence["qualification"]
@@ -533,6 +556,8 @@ def snapshot(path: Path | None) -> dict:
             "reported_final_examples",
             "independent_final_reproductions",
             "shadow_candidates",
+            "research_assessment_count",
+            "research_status_counts",
         ):
             result[key] = None
         result["blockers"] = ["PAPER_DASHBOARD_EVIDENCE_INVALID"]
@@ -629,6 +654,12 @@ def render(payload: dict) -> str:
         "<h2>Historical diagnostics</h2><p>These archived records do not establish current "
         "source freshness or the presence or absence of externally archived evidence.</p>"
         f"<pre>{escape(json.dumps(payload['historical_diagnostics'], indent=2))}</pre>"
+        "<h2>Historical research assessments</h2>"
+        "<p>These records preserve qualification blockers. Provisional calculations have "
+        "unverified full-cost applicability and do not establish positive full net EV.</p>"
+        f"<p>Records: {escape(payload['research_assessment_count'])}; "
+        f"statuses: {escape(payload['research_status_counts'])}</p>"
+        f"<pre>{escape(json.dumps(payload['latest_research_assessment'], indent=2))}</pre>"
         f"<h2>Paper positions</h2>{cards or '<p>' + empty + '</p>'}"
         "</main></html>"
     )
