@@ -14,6 +14,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from kalshi_predictor.crypto.cf_process_inputs import INDEX, decode_cf_original
+from kalshi_predictor.crypto.doge_strikes import parse_doge_strike
 from kalshi_predictor.crypto.multiasset_challengers import forecast_challengers
 from kalshi_predictor.crypto.research_costs import full_costs, unknown
 from kalshi_predictor.crypto.settlement_rule_version import CryptoSettlementRuleVersion
@@ -131,9 +132,10 @@ def capture(output: Path, plan: dict, transport, *, clock=lambda: datetime.now(U
         ):
             raise ValueError("COMPLETE_CATALOG_REQUIRED")
         markets = catalog["markets"]
+        plain_markets = json.loads(catalog_raw)["markets"]
         ranges = []
         tickers = set()
-        for row in markets:
+        for market_index, row in enumerate(markets):
             ticker = row["ticker"]
             if (
                 not re.fullmatch(r"[A-Z0-9.-]{1,128}", ticker)
@@ -146,7 +148,12 @@ def capture(output: Path, plan: dict, transport, *, clock=lambda: datetime.now(U
             ):
                 raise ValueError("EXACT_ACTIVE_EVENT_REQUIRED")
             tickers.add(ticker)
-            if row.get("strike_type") == "between" and row.get("custom_strike") in (None, {}):
+            if symbol == "DOGE" and row.get("strike_type") == "custom":
+                strike = parse_doge_strike(plain_markets[market_index], cutoff=check())
+                if strike.operator == "between":
+                    assert strike.floor is not None and strike.cap is not None
+                    ranges.append((row, strike.floor, strike.cap))
+            elif row.get("strike_type") == "between" and row.get("custom_strike") in (None, {}):
                 lo, hi = Decimal(str(row["floor_strike"])), Decimal(str(row["cap_strike"]))
                 if not lo.is_finite() or not hi.is_finite() or not 0 < lo < hi:
                     raise ValueError("FINITE_ORDERED_RANGE_REQUIRED")
