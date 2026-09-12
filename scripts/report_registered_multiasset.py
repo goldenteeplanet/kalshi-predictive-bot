@@ -11,8 +11,8 @@ from pathlib import Path
 FROZEN = Path("/opt/kalshi-multiasset-frozen-20260912")
 CONTROL = Path("/mnt/kalshi-backup-02/multiasset-control-20260912")
 ANALYSIS = Path("/mnt/kalshi-backup-02/multiasset-analysis-protocol-20260912")
-TOOLS = Path('/mnt/kalshi-backup-02/multiasset-report-tools-20260912')
-EVIDENCE = TOOLS / 'multiasset_tournament_evidence.py'
+TOOLS = Path("/mnt/kalshi-backup-02/multiasset-report-tools-20260912")
+EVIDENCE = TOOLS / "multiasset_tournament_evidence.py"
 
 
 def module(name, path):
@@ -40,19 +40,20 @@ def main():
     args = parser.parse_args()
     if (
         any(p.is_symlink() for p in (args.output, *args.output.parents))
-        or args.output.parent != Path('/mnt/kalshi-backup-02/multiasset-tournament-reports-20260912')
+        or args.output.parent
+        != Path("/mnt/kalshi-backup-02/multiasset-tournament-reports-20260912")
         or not args.output.name.startswith("multiasset-tournament-report-")
     ):
         raise ValueError("DEDICATED_UNLINKED_REPORT_OUTPUT_REQUIRED")
     args.output.mkdir(exist_ok=False)
     now = datetime.now(UTC)
     runner = module("registered_capture_reader", FROZEN / "scripts/multiasset_cohort_runner.py")
-    tools_manifest = json.loads(runner.trusted(TOOLS / 'manifest.json'))
-    for name, expected in tools_manifest['files'].items():
-        if Path(name).name != name or digest(runner.trusted(TOOLS/name)) != expected:
-            raise ValueError('REGISTERED_REPORT_TOOLS_CHANGED')
-    if Path(__file__).resolve() != (TOOLS/'report_registered_multiasset.py').resolve():
-        raise ValueError('FROZEN_REPORT_WRITER_REQUIRED')
+    tools_manifest = json.loads(runner.trusted(TOOLS / "manifest.json"))
+    for name, expected in tools_manifest["files"].items():
+        if Path(name).name != name or digest(runner.trusted(TOOLS / name)) != expected:
+            raise ValueError("REGISTERED_REPORT_TOOLS_CHANGED")
+    if Path(__file__).resolve() != (TOOLS / "report_registered_multiasset.py").resolve():
+        raise ValueError("FROZEN_REPORT_WRITER_REQUIRED")
     registration_raw = runner.trusted(CONTROL / "registration.json")
     if (
         digest(registration_raw)
