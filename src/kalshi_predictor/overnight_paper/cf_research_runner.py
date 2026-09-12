@@ -42,6 +42,8 @@ def run_cf_research_cycle(
     cost_record: dict[str, Any] | None = None,
     evaluation_observation: Artifact | None = None,
     runtime_owner: RuntimeOwner,
+    preparation_cost_record: dict[str, Any] | None = None,
+    preparation_account_identity_sha256: str | None = None,
 ) -> CoordinatorResult:
     """Persist one current qualification/research attempt with entries disabled.
 
@@ -73,6 +75,30 @@ def run_cf_research_cycle(
         or not aware(authorization.created_at) <= now < aware(authorization.expires_at)
     ):
         raise ValueError("CF_RESEARCH_CURRENT_OBJECTIVE_AND_DATABASE_REQUIRED")
+    if preparation_cost_record is not None:
+        # This is an incomplete preparation outcome, never qualification intake.
+        # The writer replays costs against actual persisted forecast/market rows.
+        from kalshi_predictor.overnight_paper.cf_preparation_block import persist_cf_cost_block
+
+        if (
+            provenance_args.get("phase3n", "MISSING") is not None
+            or preparation_account_identity_sha256 is None
+            or cost_record is not None or evaluation_observation is not None
+        ):
+            raise ValueError("CF_RESEARCH_DISTINCT_INCOMPLETE_PREPARATION_REQUIRED")
+        identity = persist_cf_cost_block(
+            session_factory=session_factory, database_path=database_path,
+            decision=paper_decision, decision_at=aware(provenance_args["decision"]["decision_at"]),
+            cost_record=preparation_cost_record,
+            account_identity_sha256=preparation_account_identity_sha256,
+            runtime_owner=runtime_owner, authorization=authorization,
+            objective_bytes=objective_bytes, settings=settings,
+        )
+        return CoordinatorResult(
+            "PREPARATION_BLOCKED", identity,
+            blockers=("FULL_NET_EV_UNKNOWN", "FULL_PROVENANCE_NOT_VERIFIED",
+                      "RISK_PREPARATION_INCOMPLETE"),
+        )
     context = provenance_args.get("context")
     if type(context) is not ProvenanceContext:
         raise ValueError("CF_RESEARCH_CONCRETE_PROVENANCE_REQUIRED")

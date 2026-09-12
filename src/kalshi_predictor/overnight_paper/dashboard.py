@@ -16,6 +16,13 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from kalshi_predictor.overnight_paper.cf_preparation_record import (
+    KIND as CF_PREPARATION_KIND,
+)
+from kalshi_predictor.overnight_paper.cf_preparation_record import (
+    PREFIX as CF_PREPARATION_PREFIX,
+)
+from kalshi_predictor.overnight_paper.cf_preparation_record import preparation_cost_block_record
 from kalshi_predictor.overnight_paper.qualification import GATE_NAMES, decision_fingerprint
 from kalshi_predictor.overnight_paper.research_record import KIND, PREFIX, research_record
 from kalshi_predictor.overnight_paper.runtime_liveness import inspect_process
@@ -332,6 +339,8 @@ def snapshot(path: Path | None) -> dict:
         "research_assessment_count": 0,
         "research_status_counts": {},
         "latest_research_assessment": None,
+        "cf_preparation_block_count": None,
+        "latest_cf_preparation_block": None,
         "last_decision_at": None,
         "last_qualification_status": None,
         "last_qualification_recorded_at": None,
@@ -362,6 +371,7 @@ def snapshot(path: Path | None) -> dict:
             tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not {"overnight_shadow", "overnight_history", "paper_orders"}.issubset(tables):
                 raise ValueError("SPRINT_SCHEMA_MISSING")
+            result["cf_preparation_block_count"] = 0
             result.update(_runtime_snapshot(db, path))
             result["historical_evaluated_events"] = db.execute(
                 "SELECT count(DISTINCT event_ticker) FROM overnight_history"
@@ -454,7 +464,32 @@ def snapshot(path: Path | None) -> dict:
                 "ORDER BY captured_at DESC,id DESC"
             ):
                 evidence = json.loads(record["payload"])
-                if evidence.get("kind") == KIND or record["id"].startswith(PREFIX):
+                if (
+                    evidence.get("kind") == CF_PREPARATION_KIND
+                    or record["id"].startswith(CF_PREPARATION_PREFIX)
+                ):
+                    scope = evidence["decision_inputs"]
+                    rebuilt = preparation_cost_block_record(scope, evidence["cost_record"])
+                    if (
+                        evidence != rebuilt
+                        or record["id"] != CF_PREPARATION_PREFIX + rebuilt["preparation_id"]
+                        or aware(record["captured_at"]) != aware(scope["decision_at"])
+                        or aware(record["captured_at"]) > datetime.now(UTC)
+                    ):
+                        raise ValueError("CF_PREPARATION_RECORD_INVALID")
+                    result["cf_preparation_block_count"] += 1
+                    if result["latest_cf_preparation_block"] is None:
+                        result["latest_cf_preparation_block"] = {
+                            "preparation_id": rebuilt["preparation_id"],
+                            "ticker": scope["ticker"], "event_id": scope["event_id"],
+                            "recorded_at": record["captured_at"], "status": rebuilt["status"],
+                            "blockers": rebuilt["blockers"],
+                            "source_binding_status": rebuilt["source_binding_status"],
+                            "phase3m_status": rebuilt["phase3m_status"],
+                            "phase3n_status": rebuilt["phase3n_status"],
+                            "full_net_ev": None, "execution_authority": False,
+                        }
+                elif evidence.get("kind") == KIND or record["id"].startswith(PREFIX):
                     linked = db.execute(
                         "SELECT payload FROM overnight_sprint_cycles WHERE id=?",
                         (evidence["qualification_checkpoint_id"],),
@@ -558,6 +593,7 @@ def snapshot(path: Path | None) -> dict:
             "shadow_candidates",
             "research_assessment_count",
             "research_status_counts",
+            "cf_preparation_block_count",
         ):
             result[key] = None
         result["blockers"] = ["PAPER_DASHBOARD_EVIDENCE_INVALID"]
@@ -569,6 +605,7 @@ def render(payload: dict) -> str:
     def escape(value) -> str:
         return html.escape(str(value))
 
+    preparation_count = payload.get("cf_preparation_block_count")
     metrics = "".join(
         f"<article><h2>{escape(key.replace('_', ' ').title())}</h2>"
         f"<p>{escape(payload[key])}</p></article>"
@@ -660,6 +697,12 @@ def render(payload: dict) -> str:
         f"<p>Records: {escape(payload['research_assessment_count'])}; "
         f"statuses: {escape(payload['research_status_counts'])}</p>"
         f"<pre>{escape(json.dumps(payload['latest_research_assessment'], indent=2))}</pre>"
+        "<h2>Recorded incomplete CF preparation</h2>"
+        "<p>These attempts stopped with unknown costs. They do not establish current source "
+        "freshness, completed risk approval, a qualified candidate, or a paper trade.</p>"
+        "<p>Recorded attempts: "
+        f"{escape('unavailable' if preparation_count is None else preparation_count)}</p>"
+        f"<pre>{escape(json.dumps(payload.get('latest_cf_preparation_block'), indent=2))}</pre>"
         f"<h2>Paper positions</h2>{cards or '<p>' + empty + '</p>'}"
         "</main></html>"
     )
