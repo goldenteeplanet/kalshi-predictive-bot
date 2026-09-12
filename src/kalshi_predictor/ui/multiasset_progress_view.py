@@ -92,7 +92,12 @@ def read_progress(directory: Path, *, now: datetime | None = None) -> dict[str, 
             by_asset[asset]["captured"] += 1
             decisions += event["decisions"]
             if event.get("outcome") == "VERIFIED_OFFICIAL_EVALUATION":
-                if type(event.get("score_rows")) is not int or event["score_rows"] != 20:
+                # Missing model probabilities are not scored by the verified collector.
+                # Four decisions have at most five model scores each, not always twenty.
+                if (
+                    type(event.get("score_rows")) is not int
+                    or not 0 <= event["score_rows"] <= event["decisions"] * 5
+                ):
                     return unavailable
                 evaluated += 1
                 by_asset[asset]["evaluated"] += 1

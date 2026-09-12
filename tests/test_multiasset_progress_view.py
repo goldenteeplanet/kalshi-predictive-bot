@@ -74,6 +74,25 @@ def test_duplicate_events_cannot_inflate_progress(snapshot):
     assert not V.read_progress(directory, now=NOW)["available"]
 
 
+@pytest.mark.parametrize("score_rows", [0, 16, 18, 20])
+def test_verified_evaluation_accepts_available_model_score_count(snapshot, score_rows):
+    directory, path, payload = snapshot
+    payload["selected_events"][0]["score_rows"] = score_rows
+    path.write_text(json.dumps(payload))
+    result = V.read_progress(directory, now=NOW)
+    assert result["available"]
+    assert result["selected_evaluated_events"] == 1
+    assert result["selected_research_decisions"] == 4
+
+
+@pytest.mark.parametrize("score_rows", [-1, 21, True, "18", None, 18.0])
+def test_invalid_model_score_count_remains_unavailable(snapshot, score_rows):
+    directory, path, payload = snapshot
+    payload["selected_events"][0]["score_rows"] = score_rows
+    path.write_text(json.dumps(payload))
+    assert V.read_progress(directory, now=NOW) == {"available": False}
+
+
 def test_stale_source_retains_counts_with_explicit_age(snapshot):
     directory, _, _ = snapshot
     report = V.read_progress(directory, now=NOW + timedelta(hours=2))
