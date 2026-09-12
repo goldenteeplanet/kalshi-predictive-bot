@@ -12,6 +12,7 @@ from alembic.operations import Operations
 from kalshi_predictor.data.migration_compat import (
     LANE_CHECK_NAME,
     LANE_CHECK_SQL,
+    _sqlite_original_checks,
     ensure_canonical_lane_check,
     ensure_compatible_column,
 )
@@ -216,12 +217,47 @@ def test_lane_check_preserves_unnamed_check_unique_index_and_rows(expression):
         assert ensure_canonical_lane_check(op)["action"] == "ADDED_CHECK"
         assert ensure_canonical_lane_check(op)["action"] == "VERIFIED_EXISTING_CHECK"
         inspector = sa.inspect(connection)
-        assert len(inspector.get_check_constraints("canonical_evaluations")) == 2
+        # Recent SQLite reflection reports CHECK text inside literals/comments as
+        # phantom constraints. Verify the actual DDL and enforcement instead.
+        ddl = connection.execute(sa.text(
+            "SELECT sql FROM sqlite_master WHERE name='canonical_evaluations'"
+        )).scalar_one()
+        assert expression in ddl and LANE_CHECK_NAME in ddl
         assert len(inspector.get_unique_constraints("canonical_evaluations")) == 1
         assert inspector.get_indexes("canonical_evaluations")[0]["name"] == "ix_lane_payload"
         assert connection.execute(sa.text("SELECT * FROM canonical_evaluations")).all() == [
             (1, "SHADOW", "original")
         ]
+        for lane, payload in [("SHADOW", ""), ("OTHER", "new"), ("SHADOW", "original")]:
+            with pytest.raises(sa.exc.IntegrityError):
+                connection.execute(sa.text(
+                    "INSERT INTO canonical_evaluations VALUES (2,:lane,:payload)"
+                ), {"lane": lane, "payload": payload})
+    engine.dispose()
+
+
+@pytest.mark.parametrize("extra", [
+    {"sqltext": "not_in_original", "name": None},
+    {"sqltext": "fake", "name": "invented_name"},
+])
+def test_unproven_reflection_is_not_discarded(extra):
+    engine = sa.create_engine("sqlite://")
+    expression = "payload != 'CHECK(fake)'"
+    with engine.begin() as connection:
+        connection.execute(sa.text(
+            "CREATE TABLE canonical_evaluations (payload TEXT, "
+            f"CHECK({expression}))"
+        ))
+        before = connection.execute(sa.text(
+            "SELECT sql FROM sqlite_master WHERE name='canonical_evaluations'"
+        )).scalar_one()
+        with pytest.raises(ValueError, match="UNVERIFIED_CHECK_REFLECTION"):
+            _sqlite_original_checks(connection, "canonical_evaluations", [
+                {"sqltext": expression, "name": None}, extra,
+            ])
+        assert connection.execute(sa.text(
+            "SELECT sql FROM sqlite_master WHERE name='canonical_evaluations'"
+        )).scalar_one() == before
     engine.dispose()
 
 

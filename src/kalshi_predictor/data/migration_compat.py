@@ -145,7 +145,28 @@ def _sqlite_check_expressions(ddl: str) -> list[str]:
     return expressions
 
 
-def _sqlite_original_checks(bind: Any, table: str, checks: list) -> dict[str, str]:
+def _sqlite_quoted_check_artifacts(ddl: str) -> list[str]:
+    """Prove phantom reflection bodies occur wholly within a quote or comment."""
+    tokens = re.finditer(
+        r"--[^\n]*|/\*[\s\S]*?\*/|'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|"
+        r"`(?:``|[^`])*`|\[[^\]]*\]",
+        ddl,
+    )
+    bodies = []
+    for token in tokens:
+        value = token.group()
+        content = value[2:-2] if value.startswith("/*") else (
+            value[2:] if value.startswith("--") else value[1:-1]
+        )
+        try:
+            bodies.extend(_sqlite_check_expressions(content))
+        except ValueError:
+            # Unparseable quoted text is not permission to discard a constraint.
+            continue
+    return bodies
+
+
+def _sqlite_original_checks(bind: Any, table: str, checks: list) -> dict[str, str | None]:
     # SQLAlchemy 2.0.0's SQLite reflection can include the table's closing ')'
     # in a CHECK body. Only repair that exact discrepancy against original DDL.
     ddl = bind.execute(
@@ -153,7 +174,9 @@ def _sqlite_original_checks(bind: Any, table: str, checks: list) -> dict[str, st
         {"name": table},
     ).scalar_one()
     remaining = _sqlite_check_expressions(ddl)
-    replacements = {}
+    artifacts = _sqlite_quoted_check_artifacts(ddl)
+    replacements: dict[str, str | None] = {}
+    verified = []
     for check in checks:
         reflected = check.get("sqltext") or ""
         normalized = _check_expression(reflected)
@@ -165,14 +188,24 @@ def _sqlite_original_checks(bind: Any, table: str, checks: list) -> dict[str, st
                 and set(normalized[len(_check_expression(expression)):]) == {")"}
             )
         ]
+        if not matches and check.get("name") is None and reflected in artifacts:
+            if reflected in replacements:
+                raise ValueError("MIGRATION_AMBIGUOUS_CHECK_REFLECTION")
+            artifacts.remove(reflected)
+            replacements[reflected] = None
+            continue
         if len(set(matches)) != 1:
             raise ValueError("MIGRATION_UNVERIFIED_CHECK_REFLECTION")
         original = matches[0]
+        if reflected in replacements and replacements[reflected] is None:
+            raise ValueError("MIGRATION_AMBIGUOUS_CHECK_REFLECTION")
         remaining.remove(original)
         replacements[reflected] = original
         check["sqltext"] = original
+        verified.append(check)
     if remaining:
         raise ValueError("MIGRATION_UNREFLECTED_TABLE_CHECK")
+    checks[:] = verified
     return replacements
 
 
@@ -210,11 +243,17 @@ def ensure_canonical_lane_check(operations: Any) -> dict[str, Any]:
     # default reflected-batch path deliberately drops. Refuse unreflected objects.
     reflected = sa.Table(table, sa.MetaData(), autoload_with=bind)
     if bind.dialect.name == "sqlite":
-        for constraint in reflected.constraints:
+        for constraint in list(reflected.constraints):
             if isinstance(constraint, sa.CheckConstraint):
-                original = replacements.get(str(constraint.sqltext))
-                if original is None:
+                expression = str(constraint.sqltext)
+                if expression not in replacements:
                     raise ValueError("MIGRATION_UNVERIFIED_CHECK_REFLECTION")
+                original = replacements[expression]
+                if original is None:
+                    if constraint.name is not None:
+                        raise ValueError("MIGRATION_UNVERIFIED_CHECK_REFLECTION")
+                    reflected.constraints.remove(constraint)
+                    continue
                 constraint.sqltext = sa.text(original)
         triggers = bind.execute(
             sa.text("SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name=:table"),
