@@ -7,7 +7,6 @@ historical engine objects or trusts a caller's clock to make them current.
 from __future__ import annotations
 
 import hashlib
-from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -27,7 +26,6 @@ from kalshi_predictor.overnight_paper.provenance_gate import ProvenanceContext
 from kalshi_predictor.overnight_paper.rule_verifier import RuleDocument
 from kalshi_predictor.overnight_paper.runtime_owner import (
     RuntimeOwner,
-    acquire_runtime_owner,
     validate_runtime_owner,
 )
 from kalshi_predictor.overnight_paper.source_health import aware
@@ -43,11 +41,12 @@ def run_cf_research_cycle(
     rule_documents: tuple[RuleDocument, ...] = (),
     cost_record: dict[str, Any] | None = None,
     evaluation_observation: Artifact | None = None,
-    runtime_owner: RuntimeOwner | None = None,
+    runtime_owner: RuntimeOwner,
 ) -> CoordinatorResult:
     """Persist one current qualification/research attempt with entries disabled.
 
-    Source/provenance/cost checks run inside the same-process ownership interval.
+    The outer orchestrator acquires ownership before this guarded entry point.
+    Source/provenance/cost checks require that same-process lock to remain active.
     Repeated identical attempts reuse coordinator checkpoints. Stale attempts
     cannot be made current by a historical ``provenance_args['now']`` value.
     A fully qualifying result may produce a shadow, never an order from here.
@@ -86,41 +85,37 @@ def run_cf_research_cycle(
         raise ValueError("CF_RESEARCH_BOUNDED_ORIGINALS_REQUIRED")
     if evaluation_observation is not None and len(evaluation_observation.payload) > 80_000_000:
         raise ValueError("CF_RESEARCH_BOUNDED_OBSERVATION_REQUIRED")
-    ownership = (
-        acquire_runtime_owner(database_path)
-        if runtime_owner is None else nullcontext(runtime_owner)
+    owner = runtime_owner
+    validate_runtime_owner(owner, database_path)
+    current = utc_now()
+    if not 0 <= (
+        current - aware(provenance_args["decision"]["decision_at"])
+    ).total_seconds() <= 60:
+        raise ValueError("CF_RESEARCH_CURRENT_DECISION_REQUIRED")
+    candidate = assemble_cf_research_candidate(
+        paper_decision=paper_decision, provenance_args=provenance_args | {"now": current},
+        rule_documents=rule_documents, cost_record=cost_record,
+        evaluation_observation=evaluation_observation,
     )
-    with ownership as owner:
-        validate_runtime_owner(owner, database_path)
-        current = utc_now()
-        if not 0 <= (
-            current - aware(provenance_args["decision"]["decision_at"])
-        ).total_seconds() <= 60:
-            raise ValueError("CF_RESEARCH_CURRENT_DECISION_REQUIRED")
-        candidate = assemble_cf_research_candidate(
-            paper_decision=paper_decision, provenance_args=provenance_args | {"now": current},
-            rule_documents=rule_documents, cost_record=cost_record,
-            evaluation_observation=evaluation_observation,
-        )
-        validate_runtime_owner(owner, database_path)
-        # Recheck visibility immediately before entering the writer; assembly
-        # does not freeze a previously passing freshness check for later use.
-        current = utc_now()
-        candidate = assemble_cf_research_candidate(
-            paper_decision=paper_decision, provenance_args=provenance_args | {"now": current},
-            rule_documents=rule_documents, cost_record=candidate.shadow_payload["cost_record"],
-            evaluation_observation=evaluation_observation,
-        )
-        validate_runtime_owner(owner, database_path)
-        current = utc_now()
-        if not 0 <= (
-            current - aware(provenance_args["decision"]["decision_at"])
-        ).total_seconds() <= 60:
-            raise ValueError("CF_RESEARCH_CURRENT_DECISION_REQUIRED")
-        if not aware(authorization.created_at) <= current < aware(authorization.expires_at):
-            raise ValueError("CF_RESEARCH_AUTHORIZATION_EXPIRED")
-        return admit_prepared_candidate(
-            session_factory=session_factory, database_path=database_path, candidate=candidate,
-            authorization=authorization, objective_bytes=objective_bytes, release=release,
-            settings=settings, now=current, entries_enabled=False,
-        )
+    validate_runtime_owner(owner, database_path)
+    # Recheck visibility immediately before entering the writer; assembly
+    # does not freeze a previously passing freshness check for later use.
+    current = utc_now()
+    candidate = assemble_cf_research_candidate(
+        paper_decision=paper_decision, provenance_args=provenance_args | {"now": current},
+        rule_documents=rule_documents, cost_record=candidate.shadow_payload["cost_record"],
+        evaluation_observation=evaluation_observation,
+    )
+    validate_runtime_owner(owner, database_path)
+    current = utc_now()
+    if not 0 <= (
+        current - aware(provenance_args["decision"]["decision_at"])
+    ).total_seconds() <= 60:
+        raise ValueError("CF_RESEARCH_CURRENT_DECISION_REQUIRED")
+    if not aware(authorization.created_at) <= current < aware(authorization.expires_at):
+        raise ValueError("CF_RESEARCH_AUTHORIZATION_EXPIRED")
+    return admit_prepared_candidate(
+        session_factory=session_factory, database_path=database_path, candidate=candidate,
+        authorization=authorization, objective_bytes=objective_bytes, release=release,
+        settings=settings, now=current, entries_enabled=False,
+    )

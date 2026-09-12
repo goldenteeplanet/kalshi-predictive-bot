@@ -45,11 +45,17 @@ def inputs(session_factory, monkeypatch):
     )
 
 
+def run_cf(args):
+    # Real outer orchestration owns the lock; the guarded entry verifies it.
+    with acquire_runtime_owner(args["database_path"]) as owner:
+        return runner.run_cf_research_cycle(**args, runtime_owner=owner)
+
+
 def test_current_cf_runner_persists_rejection_idempotently_without_orders(factory, monkeypatch):  # noqa: F811
     args = inputs(factory, monkeypatch)
-    first = runner.run_cf_research_cycle(**args)
+    first = run_cf(args)
     assert first.state == "BLOCKED"
-    assert runner.run_cf_research_cycle(**args) == first
+    assert run_cf(args) == first
     with factory() as session:
         for table in ("paper_orders", "paper_fills", "overnight_shadow"):
             assert session.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() == 0
@@ -69,7 +75,7 @@ def test_historical_caller_clock_cannot_make_stale_candidate_current(factory, mo
     actual = args["provenance_args"]["now"] + timedelta(seconds=61)
     monkeypatch.setattr(runner, "utc_now", lambda: actual)
     with pytest.raises(ValueError, match="CURRENT_DECISION_REQUIRED"):
-        runner.run_cf_research_cycle(**args)
+        run_cf(args)
     with factory() as session:
         assert session.execute(text(
             "SELECT count(*) FROM overnight_sprint_cycles"
@@ -80,14 +86,14 @@ def test_cf_research_runner_refuses_enabled_paper_orders(factory, monkeypatch): 
     args = inputs(factory, monkeypatch)
     args["settings"].paper_order_creation_enabled = True
     with pytest.raises(ValueError, match="ORDERS_DISABLED_REQUIRED"):
-        runner.run_cf_research_cycle(**args)
+        run_cf(args)
 
 
 def test_cf_research_runner_binds_operator_objective(factory, monkeypatch):  # noqa: F811
     args = inputs(factory, monkeypatch)
     args["objective_bytes"] = b"different objective"
     with pytest.raises(ValueError, match="CURRENT_OBJECTIVE_AND_DATABASE_REQUIRED"):
-        runner.run_cf_research_cycle(**args)
+        run_cf(args)
 
 
 def test_cf_research_runner_uses_borrowed_owner_without_reacquiring(factory, monkeypatch):  # noqa: F811
@@ -111,7 +117,7 @@ def test_clock_advance_during_assembly_cannot_write_stale_attempt(factory, monke
     monkeypatch.setattr(runner, "utc_now", lambda: next(clock))
     expected = "AUTHORIZATION_EXPIRED" if expiry else "CURRENT_DECISION_REQUIRED"
     with pytest.raises(ValueError, match=expected):
-        runner.run_cf_research_cycle(**args)
+        run_cf(args)
     with factory() as session:
         assert session.execute(text(
             "SELECT count(*) FROM overnight_sprint_cycles"
@@ -131,9 +137,9 @@ def test_current_unknown_cost_observation_commits_and_replays_after_restart(fact
         provenance_args=provenance, evaluation_observation=item,
         cost_record=item.decode()["cost_record"],
     )
-    first = runner.run_cf_research_cycle(**args)
+    first = run_cf(args)
     assert first.state == "BLOCKED"
-    assert runner.run_cf_research_cycle(**args) == first
+    assert run_cf(args) == first
     del item, args
     with factory() as session:
         records = load_dataset(session, dataset="paper-release")
@@ -161,8 +167,29 @@ def test_candidate_observation_must_share_exact_cost_record(factory, monkeypatch
         ),
     )
     with pytest.raises(ValueError, match="CF_ASSEMBLY_EVALUATION_BINDING_MISMATCH"):
-        runner.run_cf_research_cycle(**args)
+        run_cf(args)
     with factory() as session:
         assert session.execute(text(
             "SELECT count(*) FROM overnight_sprint_cycles"
         )).scalar_one() == 0
+
+
+def test_cf_runner_cannot_enter_without_concrete_active_owner(factory, monkeypatch):  # noqa: F811
+    args = inputs(factory, monkeypatch)
+    with pytest.raises(ValueError, match="CONCRETE_RUNTIME_OWNER_REQUIRED"):
+        runner.run_cf_research_cycle(**args, runtime_owner=None)
+    with factory() as session:
+        assert session.execute(text(
+            "SELECT count(*) FROM overnight_sprint_cycles"
+        )).scalar_one() == 0
+
+
+def test_actual_cf_guarded_entry_has_no_dynamic_execution_capability():
+    from kalshi_predictor.overnight_paper.boundary_gate import audit_local_call_path
+
+    checked = audit_local_call_path(
+        Path(__file__).resolve().parents[1],
+        entrypoints=(("kalshi_predictor.overnight_paper.cf_research_runner",
+                      "run_cf_research_cycle"),),
+    )
+    assert checked.passed, checked.blockers
