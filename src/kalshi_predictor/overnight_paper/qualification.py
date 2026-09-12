@@ -126,6 +126,11 @@ class GateEvidence:
             from .crypto_source import VERIFIER as CRYPTO_VERIFIER
 
             expected_verifier = CRYPTO_VERIFIER
+            from .cf_source import CLOCK_BASIS as CF_CLOCK_BASIS
+            from .cf_source import VERIFIER as CF_VERIFIER
+
+            if inputs.get("source_kind") == CF_CLOCK_BASIS:
+                expected_verifier = CF_VERIFIER
         if (
             self.gate == 4 and self.category == "Climate and Weather"
             and inputs.get("series") == "KXTEMPMIAH"
@@ -137,6 +142,23 @@ class GateEvidence:
             return False
         if decision_fingerprint(inputs) != self.decision_id:
             return False
+        if self.gate == 4 and self.verifier == "cf-sol-original-analytical-v1":
+            from .cf_source import CFSourceContext, verify_cf_binding
+
+            at = aware(as_of) if as_of is not None else aware(inputs["decision_at"])
+            if (
+                type(self.context) is not CFSourceContext
+                or len(self.sources) != 1
+                or inputs.get("ticker") != self.ticker
+                or inputs.get("category") != self.category
+                or not aware(report["validated_at"]) <= at < aware(report["valid_until"])
+            ):
+                return False
+            verify_cf_binding(
+                json.loads(self.sources[0].payload), context=self.context,
+                decision=inputs, now=at,
+            )
+            return True
         if self.gate == 4 and self.verifier == "miami-canonical-original-replay-v1":
             from .miami_provenance import MiamiBundleGateContext, verify_miami_bundle_gate4
             from .miami_source_gate import MiamiGateContext, verify_miami_gate4

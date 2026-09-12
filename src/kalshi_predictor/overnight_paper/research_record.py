@@ -1,15 +1,20 @@
 """Conservative research view of coordinator qualification checkpoints.
 
-This adapter has no full-cost applicability validator. Numeric qualification
-arithmetic and original-artifact lineage cannot certify fees or uncertainty.
-Keep that limitation explicit until a reviewed cost adapter is integrated.
+New cost records replay original evidence through the shared assessment.
+Legacy records retain their explicit missing-validator status. Numeric
+qualification arithmetic alone cannot certify fees or uncertainty.
 These records never enter overnight_shadow or grant activation authority.
 """
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
+from kalshi_predictor.crypto.cost_record import (
+    cost_decision_from_qualification,
+    replay_cost_record,
+)
 from kalshi_predictor.overnight_paper.qualification import GATE_NAMES, decision_fingerprint
 from kalshi_predictor.overnight_paper.store import digest
 
@@ -41,7 +46,7 @@ def research_record(qualification_checkpoint: dict[str, Any]) -> dict[str, Any]:
     if not passed["VALID_EXECUTABLE_BOOK"]:
         blockers.append("BOOK_INVALID")
     blockers.append("COST_UNKNOWN")
-    return {
+    record: dict[str, Any] = {
         "kind": KIND,
         "decision_id": qualification["decision_id"],
         "qualification_checkpoint_id": "release-qualification:" + qualification["decision_id"],
@@ -59,3 +64,23 @@ def research_record(qualification_checkpoint: dict[str, Any]) -> dict[str, Any]:
         "evidence_role": "HISTORICAL_RESEARCH_NOT_CURRENT_ELIGIBILITY",
         "execution_authority": False,
     }
+    cost_record = qualification_checkpoint.get("shadow_payload", {}).get("cost_record")
+    if cost_record is not None:
+        costs = replay_cost_record(
+            cost_record, expected_decision=cost_decision_from_qualification(inputs),
+        )
+        record.update(
+            cost_evidence_status="ORIGINAL_EVIDENCE_REPLAYED",
+            cost_assessment=costs, cost_record_sha256=digest(cost_record),
+            full_net_ev=costs["full_net_ev"], full_net_ev_status=costs["full_net_ev_status"],
+        )
+        # Rule/book precedence is retained. Missing costs remain explicit even
+        # though the generic unintegrated-adapter message is no longer accurate.
+        if costs["full_net_ev"] is not None:
+            blockers.remove("COST_UNKNOWN")
+            record["status"] = blockers[0] if blockers else (
+                "POSITIVE_NET_EV_RESEARCH" if Decimal(costs["full_net_ev"]) > 0
+                else "NEGATIVE_NET_EV_RESEARCH"
+            )
+        record["research_blockers"] = list(dict.fromkeys(blockers + costs["blockers"]))
+    return record

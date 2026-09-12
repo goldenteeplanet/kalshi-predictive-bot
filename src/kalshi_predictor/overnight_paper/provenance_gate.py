@@ -34,6 +34,7 @@ class ProvenanceContext:
     features_artifact: Artifact
     expected_code_sha: str
     expected_rule_version: str
+    cf_context: object | None = None
 
 
 def verify_complete_provenance(
@@ -63,6 +64,7 @@ def verify_complete_provenance(
         now=now,
         phase3m=phase3m,
         phase3n=phase3n,
+        cf_context=context.cf_context,
     )
     if not base.passed:
         return base
@@ -122,11 +124,14 @@ def verify_complete_provenance(
         if decision.get("source_timestamps") != manifest:
             raise ValueError("SOURCE_TIMESTAMP_BINDING_MISMATCH")
         for source in sources.values():
-            validate_source_visibility(source, decision_at=at, now=reference)
+            validate_source_visibility(
+                source, decision_at=at, now=reference, cf_context=context.cf_context,
+            )
             if source.get("clock_basis") in {
                 "public_rest_receipt",
                 "coinbase-btc-trade-closed-candles-v1",
                 "miami-original-replay-receipt-v1",
+                "cf-sol-original-observation-receipt-v1",
             }:
                 continue
             if any(
@@ -152,6 +157,12 @@ def verify_complete_provenance(
         ):
             raise ValueError("COINBASE_FEATURE_RECORD_REQUIRED")
         clocks = []
+        cf_hashes = {
+            sha for sha, value in sources.items()
+            if value.get("clock_basis") == "cf-sol-original-observation-receipt-v1"
+        }
+        if any(sum(r.get("source_sha256") == sha for r in records) != 1 for sha in cf_hashes):
+            raise ValueError("CF_FEATURE_RECORD_REQUIRED")
         miami_hashes = {
             sha for sha, value in sources.items()
             if value.get("clock_basis") == "miami-original-replay-receipt-v1"
@@ -161,6 +172,16 @@ def verify_complete_provenance(
         for record in records:
             source = sources[record["source_sha256"]]
             observed, visible = aware(record["observed_at"]), aware(record["available_at"])
+            if source.get("clock_basis") == "cf-sol-original-observation-receipt-v1":
+                from .cf_source import CFSourceContext, cf_feature_record
+
+                if type(context.cf_context) is not CFSourceContext:
+                    raise ValueError("CF_BRIDGE_CONTEXT_REQUIRED")
+                expected_cf_feature = cf_feature_record(
+                    source, context=context.cf_context, decision_at=at, now=reference,
+                )
+                if canonical_hash(record) != canonical_hash(expected_cf_feature):
+                    raise ValueError("CF_FEATURE_ORIGINAL_BINDING")
             if source.get("clock_basis") == "miami-original-replay-receipt-v1":
                 from .miami_provenance import verify_miami_provenance_source
 

@@ -88,6 +88,13 @@ def build_observation(
             raise ValueError("DATASET_COST_BINDING_MISMATCH:" + key)
     if decision.get("side") not in {"BUY_YES", "BUY_NO"}:
         raise ValueError("DATASET_SIDE_REQUIRED")
+    cf_record = {}
+    if context.cf_context is not None:
+        from .cf_source import CFSourceContext
+
+        if type(context.cf_context) is not CFSourceContext:
+            raise ValueError("CF_BRIDGE_CONTEXT_REQUIRED")
+        cf_record = {"cf_context": context.cf_context.to_record(decision_at=at)}
     return _artifact(
         {
             "kind": "observation-v1",
@@ -117,6 +124,7 @@ def build_observation(
             ],
             "rule": {"sha256": rule_artifact.sha256, "payload": rule},
             "model_code_hex": context.model_code.hex(),
+            **cf_record,
         }
     )
 
@@ -524,10 +532,35 @@ def _validate_stored_observation(row: dict[str, Any]) -> None:
         or hashlib.sha256(bytes.fromhex(row["model_code_hex"])).hexdigest() != model["code_sha256"]
     ):
         raise ValueError("STORED_MODEL_LINEAGE_INVALID")
+    cf_sources = [
+        item["payload"] for item in row["sources"]
+        if item["payload"].get("clock_basis") == "cf-sol-original-observation-receipt-v1"
+    ]
+    cf_context = None
+    if cf_sources:
+        from .cf_source import CFSourceContext, cf_feature_record, verify_cf_binding
+
+        if len(cf_sources) != 1 or "cf_context" not in row:
+            raise ValueError("STORED_CF_CONTEXT_REQUIRED")
+        cf_context = CFSourceContext.from_record(row["cf_context"], decision_at=at)
+        source = cf_sources[0]
+        verify_cf_binding(
+            source, context=cf_context, decision=decision, now=at,
+            forecast=row["originals"]["forecast"]["payload"],
+        )
+        expected_cf = cf_feature_record(source, context=cf_context, decision_at=at, now=at)
+        matches = [
+            feature for feature in row["features"]["payload"]["records"]
+            if feature.get("source_sha256") == canonical_hash(source)
+        ]
+        if len(matches) != 1 or canonical_hash(matches[0]) != canonical_hash(expected_cf):
+            raise ValueError("STORED_CF_FEATURE_ORIGINAL_BINDING")
+    elif "cf_context" in row:
+        raise ValueError("STORED_CF_SOURCE_REQUIRED")
     for item in row["sources"]:
         source = item["payload"]
         try:
-            validate_source_visibility(source, decision_at=at, now=at)
+            validate_source_visibility(source, decision_at=at, now=at, cf_context=cf_context)
         except ValueError:
             raise ValueError("STORED_FUTURE_SOURCE") from None
     for item in row["training"]:

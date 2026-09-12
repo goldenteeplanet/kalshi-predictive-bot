@@ -61,6 +61,7 @@ def validate_source_visibility(
     *,
     decision_at: datetime,
     now: datetime,
+    cf_context: object | None = None,
 ) -> None:
     """Verify original clocks without inventing provider clocks for REST metadata.
 
@@ -72,6 +73,13 @@ def validate_source_visibility(
     if not source.get("url") or not source.get("body"):
         raise ValueError("ORIGINAL_SOURCE_PAYLOAD_REQUIRED")
     basis = source.get("clock_basis", "provider")
+    if basis == "cf-sol-original-observation-receipt-v1":
+        from .cf_source import CFSourceContext, verify_cf_source
+
+        if type(cf_context) is not CFSourceContext:
+            raise ValueError("CF_BRIDGE_CONTEXT_REQUIRED")
+        verify_cf_source(source, target=cf_context.target, decision_at=at, now=reference)
+        return
     if basis == "miami-original-replay-receipt-v1":
         from .miami_provenance import verify_miami_provenance_source
 
@@ -182,6 +190,7 @@ def verify_full_provenance(
     model_code: bytes = b"",
     phase3m: PositionSizingDecision | None = None,
     phase3n: AdvancedRiskDecision | None = None,
+    cf_context: object | None = None,
 ) -> Verification:
     """Verify every bound original record and original decision-time visibility.
 
@@ -291,7 +300,15 @@ def verify_full_provenance(
             if any(value > at for value in times) or times != sorted(times):
                 raise ValueError("FUTURE_OR_INCONSISTENT_ARTIFACT_VISIBILITY:" + role)
         for source in sources:
-            validate_source_visibility(source, decision_at=at, now=reference)
+            validate_source_visibility(source, decision_at=at, now=reference, cf_context=cf_context)
+            if source.get("clock_basis") == "cf-sol-original-observation-receipt-v1":
+                from .cf_source import CFSourceContext, verify_cf_binding
+
+                if type(cf_context) is not CFSourceContext:
+                    raise ValueError("CF_BRIDGE_CONTEXT_REQUIRED")
+                verify_cf_binding(
+                    source, context=cf_context, decision=decision, now=reference, forecast=forecast,
+                )
             if source.get("clock_basis") == "miami-original-replay-receipt-v1":
                 from .miami_provenance import verify_miami_provenance_binding
 
