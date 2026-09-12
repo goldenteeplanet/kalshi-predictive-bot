@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
+from kalshi_predictor.crypto.catalog_liquidity import catalog_liquidity
 from kalshi_predictor.crypto.cf_process_inputs import INDEX, decode_cf_original
 from kalshi_predictor.crypto.doge_strikes import parse_doge_strike
 from kalshi_predictor.crypto.multiasset_challengers import forecast_challengers
@@ -123,7 +124,9 @@ def capture(output: Path, plan: dict, transport, *, clock=lambda: datetime.now(U
 
     try:
         save("protocol.json", encode(plan))
-        catalog_raw, _ = get("catalog", BASE + "/markets?event_ticker=" + event + "&limit=1000")
+        catalog_raw, catalog_receipt = get(
+            "catalog", BASE + "/markets?event_ticker=" + event + "&limit=1000"
+        )
         catalog = json.loads(catalog_raw, parse_float=Decimal)
         if (
             catalog.get("cursor") != ""
@@ -234,6 +237,12 @@ def capture(output: Path, plan: dict, transport, *, clock=lambda: datetime.now(U
                     raise ValueError("DECIMAL_POWER_RULE_PRECISION_REQUIRED")
                 places = -exponent
                 decision_time = check()
+                liquidity = catalog_liquidity(
+                    market,
+                    catalog_sha256=digest(catalog_raw),
+                    received_at=at(catalog_receipt["received_at"]),
+                    decision_at=decision_time,
+                )
                 if (
                     not timedelta(0)
                     <= decision_time - at(receipt["received_at"])
@@ -259,7 +268,9 @@ def capture(output: Path, plan: dict, transport, *, clock=lambda: datetime.now(U
                 for name, forecast in models["models"].items():
                     p = forecast["probability"]
                     for side in ("YES", "NO"):
-                        quote = usable_bid_ask_book(book, side=side)
+                        quote = usable_bid_ask_book(
+                            book, side=side, liquidity_score=liquidity["score"]
+                        )
                         costs = None
                         if (
                             p is not None
@@ -302,6 +313,7 @@ def capture(output: Path, plan: dict, transport, *, clock=lambda: datetime.now(U
                     "rule": asdict(rule),
                     "rule_status": rule.status,
                     "models": models,
+                    "catalog_liquidity": liquidity,
                     "rows": rows,
                     "input_manifest": dict(manifest),
                     "protocol_sha256": digest(encode(plan)),
