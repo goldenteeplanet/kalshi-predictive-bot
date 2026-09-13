@@ -79,7 +79,8 @@ def test_real_snapshot_routes_do_not_mutate(tmp_path, monkeypatch):
                               payload=alpha_row('.994', '.99'), recorded_at=NOW)
     before = path.read_bytes()
     monkeypatch.setenv('OVERNIGHT_PAPER_DB', str(path))
-    app = FastAPI(); app.include_router(create_router())
+    app = FastAPI()
+    app.include_router(create_router())
     with TestClient(app) as client:
         response = client.get('/api/alpha-lab')
         assert response.status_code == 200

@@ -74,7 +74,8 @@ def lab_snapshot(current: dict[str, Any]) -> dict[str, Any]:
 
 def render_tournament(report: dict[str, Any]) -> str:
     if report.get('status') != 'RETAINED_ARITHMETIC_CHECKED':
-        return '<section><h2>Retained tournament</h2><p>Pinned tournament evidence unavailable.</p></section>'
+        return ('<section><h2>Retained tournament</h2>'
+                '<p>Pinned tournament evidence unavailable.</p></section>')
     rows = []
     with localcontext(Context(prec=28, rounding=ROUND_HALF_EVEN)):
         for row in report['leaderboard']:
@@ -152,7 +153,8 @@ def render_lab(current: dict[str, Any], tournament: dict[str, Any] | None = None
     body = ''.join('<tr>' + ''.join(f'<td>{cell(row, key)}</td>' for key, _ in fields)
                    + '</tr>' for row in report['leaderboard'])
     if not body:
-        body = f'<tr><td colspan="{len(fields)}">No checked forecast assessments available.</td></tr>'
+        body = (f'<tr><td colspan="{len(fields)}">'
+                'No checked forecast assessments available.</td></tr>')
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
@@ -166,8 +168,10 @@ def render_lab(current: dict[str, Any], tournament: dict[str, Any] | None = None
         '<a href="/api/alpha-lab">Research JSON</a></nav>'
         '<p>Captured research economics. After-fee edge excludes execution impact and '
         'calibrated uncertainty. This page cannot authorize or submit a trade.</p>'
-        f'<p>Capture: {text(report["assessed_at"])}. Freshness: {text(report["freshness"])}.</p>'
-        '<h2>Predictive quality</h2><p>Official outcomes are not joined to the latest assessments below. '
+        f'<p>Capture: {text(report["assessed_at"])}. '
+        f'Freshness: {text(report["freshness"])}.</p>'
+        '<h2>Predictive quality</h2><p>Official outcomes are not joined '
+        'to the latest assessments below. '
         'Brier, log loss, ECE, accuracy and hypothetical returns remain Unknown. '
         'No segment is holdout validated.</p><h2>Trading value</h2>'
         '<p>Gross percentages use executable sides; after-fee percentages use fee-known '
@@ -175,7 +179,8 @@ def render_lab(current: dict[str, Any], tournament: dict[str, Any] | None = None
         'distinct contracts per model within each segment; the same forecast can appear '
         'in multiple side-price bands. Counts do not measure independent observations. '
         'Observation lead is not the market settlement interval.</p>'
-        f'<div class="table"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
+        f'<div class="table"><table><thead><tr>{head}</tr></thead>'
+        f'<tbody>{body}</tbody></table></div>'
         + render_tournament(tournament or {})
         + render_alpha_analysis(current) + '</body></html>'
     )

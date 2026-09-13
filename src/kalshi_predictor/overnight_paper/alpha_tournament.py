@@ -84,7 +84,8 @@ def score_tournament(analysis: dict[str, Any], evaluation: dict[str, Any]) -> di
                 raise ValueError('TOURNAMENT_SCORE_IDENTITY_MISMATCH')
             band = 'UNKNOWN'
             value = dict(score=score_record, side=row['side'], after=None,
-                         gross=_decimal(row['gross'], '-1', '1') if row.get('gross') is not None else None,
+                         gross=(_decimal(row['gross'], '-1', '1')
+                                if row.get('gross') is not None else None),
                          hypothetical_result=None, hypothetical_return=None)
             if edge is not None:
                 price = _decimal(row['fee']['price'], '0', '1')
@@ -112,7 +113,8 @@ def score_tournament(analysis: dict[str, Any], evaluation: dict[str, Any]) -> di
             events = {v['event'] for v in unique.values()}
             gross_values = [v['gross'] for v in items if v['gross'] is not None]
             after_values = [v['after'] for v in items if v['after'] is not None]
-            returns = [v['hypothetical_return'] for v in items if v['hypothetical_return'] is not None]
+            returns = [v['hypothetical_return'] for v in items
+                       if v['hypothetical_return'] is not None]
             leaderboard.append(dict(
                 model=model, asset=asset, endpoint_hypothesis=endpoint, price_band=band,
                 forecast_n=len(unique), event_n=len(events), dependency_group_n=None,
@@ -121,12 +123,14 @@ def score_tournament(analysis: dict[str, Any], evaluation: dict[str, Any]) -> di
                 log_loss=sum(v['score']['log_loss'] for v in unique.values()) / len(unique),
                 accuracy=sum((Decimal(v['score']['probability']) >= Decimal('.5'))
                              == bool(v['score']['outcome']) for v in unique.values()) / len(unique),
-                ece=None, executable_side_n=len(gross_values), fee_supported_side_n=len(after_values),
+                ece=None, executable_side_n=len(gross_values),
+                fee_supported_side_n=len(after_values),
                 gross_thresholds_cents={str(c): sum(v > Decimal(c)/100 for v in gross_values)
                                         for c in (0, 1, 3, 5, 7, 10)},
                 after_fee_thresholds_cents={str(c): sum(v > Decimal(c)/100 for v in after_values)
                                             for c in (0, 2, 5, 7, 10)},
-                mean_after_fee_edge=str(sum(after_values)/len(after_values)) if after_values else None,
+                mean_after_fee_edge=(str(sum(after_values)/len(after_values))
+                                     if after_values else None),
                 best_after_fee_edge=str(max(after_values)) if after_values else None,
                 mean_hypothetical_return=str(sum(returns)/len(returns)) if returns else None,
                 paper_eligible=False, full_net_ev=None,

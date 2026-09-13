@@ -38,7 +38,7 @@ def test_join_price_segments_and_count_forecasts_once():
     assert result['model_forecasts'] == 2 and result['event_n'] == 1
     assert result['scored_side_rows'] == 4
     assert len(result['leaderboard']) == 2
-    yes, = [r for r in result['leaderboard'] if r['price_band'] == '10-25c']
+    yes, = (r for r in result['leaderboard'] if r['price_band'] == '10-25c')
     assert yes['forecast_n'] == 2 and yes['event_n'] == 1
     assert yes['brier'] == '0.09' and yes['accuracy'] == 1
     assert yes['after_fee_thresholds_cents']['5'] == 2
@@ -52,18 +52,30 @@ def test_join_price_segments_and_count_forecasts_once():
                                     'wrong_edge','wrong_fee','paper','clipped'])
 def test_contradictory_evidence_refuses(mutation):
     a, e = inputs()
-    if mutation == 'duplicate_score': e['rows'].append(copy.deepcopy(e['rows'][0]))
-    if mutation == 'duplicate_side': a['rows'].append(copy.deepcopy(a['rows'][0]))
-    if mutation == 'wrong_model': a['rows'][0]['model'] = 'other'
-    if mutation == 'wrong_ticker': a['rows'][0]['ticker'] = 'other'
-    if mutation == 'wrong_endpoint': a['rows'][0]['rule_version'] = 'other'
-    if mutation == 'wrong_brier': e['rows'][0]['score']['brier'] = '.08'
-    if mutation == 'wrong_loss': e['rows'][0]['score']['log_loss'] = .1
-    if mutation == 'wrong_edge': a['rows'][0]['gross'] = '.11'
-    if mutation == 'wrong_fee': a['rows'][0]['fee']['value'] = '.01'
-    if mutation == 'paper': a['rows'][0]['paper_eligible'] = True
-    if mutation == 'clipped': e['rows'][0]['score']['probability_clipped'] = True
-    with pytest.raises(ValueError): score_tournament(a, e)
+    if mutation == 'duplicate_score':
+        e['rows'].append(copy.deepcopy(e['rows'][0]))
+    if mutation == 'duplicate_side':
+        a['rows'].append(copy.deepcopy(a['rows'][0]))
+    if mutation == 'wrong_model':
+        a['rows'][0]['model'] = 'other'
+    if mutation == 'wrong_ticker':
+        a['rows'][0]['ticker'] = 'other'
+    if mutation == 'wrong_endpoint':
+        a['rows'][0]['rule_version'] = 'other'
+    if mutation == 'wrong_brier':
+        e['rows'][0]['score']['brier'] = '.08'
+    if mutation == 'wrong_loss':
+        e['rows'][0]['score']['log_loss'] = .1
+    if mutation == 'wrong_edge':
+        a['rows'][0]['gross'] = '.11'
+    if mutation == 'wrong_fee':
+        a['rows'][0]['fee']['value'] = '.01'
+    if mutation == 'paper':
+        a['rows'][0]['paper_eligible'] = True
+    if mutation == 'clipped':
+        e['rows'][0]['score']['probability_clipped'] = True
+    with pytest.raises(ValueError):
+        score_tournament(a, e)
 
 
 def test_no_fee_does_not_turn_missing_economics_into_zero():
@@ -83,9 +95,11 @@ def test_reader_requires_exact_pins_and_escapes_rendered_metadata(tmp_path):
     manifest = dict(schema='ALPHA_TOURNAMENT_INPUTS_V1', files={},
                     horizon='5-minute lead', cohort='<script>unsafe</script>')
     for name, data in [('analysis.json', a), ('evaluation.json', e)]:
-        raw = json.dumps(data).encode(); (tmp_path/name).write_bytes(raw)
+        raw = json.dumps(data).encode()
+        (tmp_path/name).write_bytes(raw)
         manifest['files'][name] = hashlib.sha256(raw).hexdigest()
-    raw = json.dumps(manifest).encode();(tmp_path/'manifest.json').write_bytes(raw)
+    raw = json.dumps(manifest).encode()
+    (tmp_path/'manifest.json').write_bytes(raw)
     pin = hashlib.sha256(raw).hexdigest()
     report = read_tournament(tmp_path, pin)
     assert report['status'] == 'RETAINED_ARITHMETIC_CHECKED'

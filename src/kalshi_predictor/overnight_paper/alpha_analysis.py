@@ -101,7 +101,8 @@ def captured_alpha_analysis(records: list[dict[str, Any]], *, now: datetime) -> 
         model_vs_market_performance=None, effective_independent_n=None,
         horizon_semantics='REMAINING_TIME_TO_OBSERVATION_NOT_MARKET_FAMILY',
         probability_band_semantics='LOWER_INCLUSIVE_UPPER_EXCLUSIVE_LAST_INCLUDES_ONE',
-        price_band_semantics='EXECUTABLE_SIDE_ASK_LOWER_INCLUSIVE_UPPER_EXCLUSIVE_LAST_INCLUDES_99C',
+        price_band_semantics=('EXECUTABLE_SIDE_ASK_LOWER_INCLUSIVE_UPPER_EXCLUSIVE_'
+                             'LAST_INCLUDES_99C'),
         rows=[], by_asset={}, by_horizon={}, by_probability={}, by_price={}, funnel=None,
         best_captured_after_fee=None, best_captured_divergence=None,
         current_best_after_fee=None, current_best_divergence=None,
@@ -120,7 +121,8 @@ def captured_alpha_analysis(records: list[dict[str, Any]], *, now: datetime) -> 
             forecast = record.get('forecast')
             model = forecast.get('model') if isinstance(forecast, dict) else None
             row.update(asset=record.get('asset') if record.get('asset') in ASSETS else 'UNKNOWN',
-                       model=model if isinstance(model, str) and 0 < len(model) <= 200 else 'UNKNOWN',
+                       model=(model if isinstance(model, str) and 0 < len(model) <= 200
+                              else 'UNKNOWN'),
                        horizon=_horizon(record.get('observation_close_hours')),
                        probability_band=_probability_band(row['probability']),
                        price_band=_price_band(row['executable_price']),
