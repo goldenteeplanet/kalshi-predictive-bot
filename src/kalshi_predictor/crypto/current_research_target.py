@@ -27,6 +27,18 @@ TERMS_URLS = {
 }
 
 
+# Current KXBTC series advertises BTC.pdf. Retain the prior generic document
+# only for original-bound historical research compatibility; neither grants
+# paper authority. Future controllers must also bind the fresh series URL.
+RESEARCH_TERMS_URLS = {asset: frozenset({url}) for asset, url in TERMS_URLS.items()}
+RESEARCH_TERMS_URLS["BTC"] = frozenset(
+    {
+        TERMS_URLS["BTC"],
+        "https://assets.kalshi.com/contract_terms/BTC.pdf",
+    }
+)
+
+
 def target_from_discovery(
     market: dict | bytes,
     asset: str,
@@ -46,7 +58,7 @@ def target_from_discovery(
     aware(rule_received_at)
     if asset not in FAMILIES:
         raise ValueError("SUPPORTED_RESEARCH_ASSET_REQUIRED")
-    if rule_url != TERMS_URLS[asset]:
+    if rule_url not in RESEARCH_TERMS_URLS[asset]:
         raise ValueError("FAMILY_TERMS_URL_MISMATCH")
     if not 0 <= (as_of - market_received_at).total_seconds() <= 300:
         raise ValueError("FRESH_DISCOVERY_REQUIRED")

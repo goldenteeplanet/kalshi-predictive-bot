@@ -144,3 +144,53 @@ def test_doge_rejects_generic_crypto_terms_attachment():
 def test_non_doge_rejects_doge_terms_attachment():
     with pytest.raises(ValueError, match="FAMILY_TERMS_URL_MISMATCH"):
         build(market(), rule_url="https://assets.kalshi.com/contract_terms/DOGE.pdf")
+
+
+def test_preserved_current_btc_series_terms_bind_without_promoting_paper():
+    import hashlib
+
+    raw = (Path(__file__).parent / "fixtures/current_btc_series_terms_20260913.json").read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == (
+        "14724d5d6f0edc99f26176cd2deddbdc77873f29b4cbfb1dd88cc5e41e10f968"
+    )
+    series = json.loads(raw)["series"]
+    assert series["ticker"] == "KXBTC"
+    url = series["contract_terms_url"]
+    assert url == "https://assets.kalshi.com/contract_terms/BTC.pdf"
+    target = build(market(), rule_url=url)
+    assert target.rules.rule_source == url
+    assert target.finality_deadline is None
+    assert target_assumptions(target)["rule_certified"] is False
+    assert target_assumptions(target)["paper_eligible"] is False
+    assert target.validate(as_of=NOW)["settlement_aligned_forecast"] is False
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com/contract_terms/BTC.pdf",
+        "https://assets.kalshi.com/contract_terms/BTC.pdf?override=1",
+        "https://assets.kalshi.com/contract_terms/BTC.pdf/extra",
+    ],
+)
+def test_current_btc_terms_allowlist_is_exact(url):
+    with pytest.raises(ValueError, match="FAMILY_TERMS_URL_MISMATCH"):
+        build(market(), rule_url=url)
+
+
+def test_current_btc_document_cannot_bind_ethereum():
+    row = market(
+        ticker="KXETH-E-B100",
+        event_ticker="KXETH-E",
+        rules_primary="CF Ethereum Real-Time Index (ETHUSD_RTI)",
+    )
+    with pytest.raises(ValueError, match="FAMILY_TERMS_URL_MISMATCH"):
+        build(row, "ETH", rule_url="https://assets.kalshi.com/contract_terms/BTC.pdf")
+
+
+def test_historical_generic_btc_research_document_remains_original_bound():
+    target = build(market(), rule_url=RULE_URL)
+    assert target.rules.rule_source == RULE_URL
+    assert target.rule_original == b"test-rule-original"
+    assert target.finality_deadline is None
+    assert target_assumptions(target)["paper_eligible"] is False
