@@ -20,6 +20,10 @@ from kalshi_predictor.crypto.current_calibration_evidence import (
     CurrentCalibrationOriginals,
     assess_current_conditional_calibration,
 )
+from kalshi_predictor.crypto.current_event_selection import (
+    CurrentEventSelectionInputs,
+    selected_event_rows,
+)
 from kalshi_predictor.crypto.current_research_intake import prepare_current_research_forecast
 from kalshi_predictor.crypto.public_paper_costs import (
     SERIES_HASHES,
@@ -276,6 +280,7 @@ def evaluate_paginated_current_research(
     research_inputs: dict[str, CurrentResearchInputs] | None = None,
     acquisition_errors: dict[str, str] | None = None, limit: int = PAGE_LIMIT,
     calibration_originals: dict[str, CurrentCalibrationOriginals] | None = None,
+    event_selections: dict[str, CurrentEventSelectionInputs] | None = None,
 ) -> dict[str, Any]:
     """Current research diagnostics with original-recomputed forecasts and support bounds.
 
@@ -286,16 +291,18 @@ def evaluate_paginated_current_research(
     """
     inputs = research_inputs or {}
     calibration = calibration_originals or {}
+    selections = event_selections or {}
     if (len(calibration) > MAX_SCAN_BOOKS
             or any(type(value) is not CurrentCalibrationOriginals for value in calibration.values())
             or sum(value.byte_count() for value in calibration.values()) > 24_000_000):
         raise ValueError('SCAN_CALIBRATION_ORIGINAL_BOUND_INVALID')
     if (assessed_at.utcoffset() is None or len(books) > MAX_SCAN_BOOKS
             or len(inputs) > MAX_SCAN_BOOKS
-            or set(discovery_pages)-set(FAMILIES.values())):
+            or set(discovery_pages)-set(FAMILIES.values())
+            or set(selections)-set(FAMILIES.values()) or set(selections) & set(discovery_pages)):
         raise ValueError('SCAN_RESEARCH_COUNT_OR_SCOPE_INVALID')
     families = []
-    rows = []
+    rows: list[dict[str, Any]] = []
     stages: dict[str, set[str]] = {name: set() for name in (
         'markets_scanned', 'observation_horizon_eligible', 'forecastable',
         'book_valid_independent_of_forecast', 'book_valid',
@@ -314,11 +321,13 @@ def evaluate_paginated_current_research(
             'error': (acquisition_errors or {}).get(series),
         }
         families.append(family)
-        if not originals:
+        if not originals and series not in selections:
             continue
         try:
-            discovery = paginated_discovery_rows(
-                originals, series=series, assessed_at=assessed_at, limit=limit)
+            discovery = (
+                selected_event_rows(selections[series], asset=asset, assessed_at=assessed_at)
+                if series in selections else paginated_discovery_rows(
+                    originals, series=series, assessed_at=assessed_at, limit=limit))
         except (ValueError, KeyError, TypeError) as exc:
             family.update(status='INVALID_DISCOVERY', error=str(exc))
             continue
@@ -327,6 +336,8 @@ def evaluate_paginated_current_research(
         if not discovery['rows'] and discovery['pagination_incomplete']:
             family['status'] = 'EMPTY_PARTIAL_PAGE'
         for sighting in discovery['rows']:
+            if len(rows) >= 600:
+                raise ValueError('SCAN_TOTAL_ASSESSMENT_ROW_BOUND')
             market = sighting['market']
             ticker = market['ticker']
             recognized.add(ticker)
@@ -347,6 +358,15 @@ def evaluate_paginated_current_research(
                 try:
                     if type(intake) is not CurrentResearchInputs:
                         raise ValueError('SCAN_EXACT_ORIGINAL_INTAKE_REQUIRED')
+                    if series in selections:
+                        selected_at = selections[series].selected_at
+                        protocol = json.loads(intake.protocol_original)
+                        receipt = json.loads(intake.cf_receipt)
+                        declared = datetime.fromisoformat(protocol['declared_at'])
+                        requested = datetime.fromisoformat(receipt['requested_at'])
+                        if (declared.utcoffset() is None or requested.utcoffset() is None
+                                or not selected_at <= declared <= requested):
+                            raise ValueError('SCAN_FORECAST_MUST_FOLLOW_FROZEN_SELECTION')
                     target_market = json.loads(intake.target.market_original)['market']
                     if target_market != market or intake.target.symbol != asset:
                         raise ValueError('SCAN_INTAKE_DISCOVERY_MARKET_MISMATCH')
@@ -366,6 +386,8 @@ def evaluate_paginated_current_research(
                 common.append('BOOK_NOT_ACQUIRED')
             else:
                 try:
+                    if series in selections and book.received_at < selections[series].selected_at:
+                        raise ValueError('SCAN_BOOK_MUST_FOLLOW_FROZEN_SELECTION')
                     depth = _levels(book, ticker, require_two_sided=False)
                 except (ValueError, KeyError, TypeError) as exc:
                     common.append('BOOK_INVALID:'+str(exc))
@@ -470,7 +492,8 @@ def evaluate_paginated_current_research(
     if set(books)-recognized or set(inputs)-recognized or set(calibration)-recognized:
         raise ValueError('SCAN_BOOK_OR_INTAKE_OUTSIDE_VERIFIED_DISCOVERY')
     return {
-        'version': 'PAGINATED_CURRENT_RESEARCH_V2', 'assessed_at': assessed_at.isoformat(),
+        'version': ('EVENT_SELECTED_CURRENT_RESEARCH_V1' if selections
+                    else 'PAGINATED_CURRENT_RESEARCH_V2'), 'assessed_at': assessed_at.isoformat(),
         'scope': 'BOUNDED_DISCOVERY_CURRENT_RESEARCH_NOT_PAPER_ADMISSION',
         'families': families, 'rows': rows,
         'funnel_count_unit': 'UNIQUE_MARKETS_WITH_AT_LEAST_ONE_PASSING_SIDE',
