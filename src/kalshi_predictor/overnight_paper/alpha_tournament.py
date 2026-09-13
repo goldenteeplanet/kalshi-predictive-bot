@@ -51,14 +51,19 @@ def score_tournament(analysis: dict[str, Any], evaluation: dict[str, Any]) -> di
             if abs(brier - (p-y)**2) > Decimal('1e-24'):
                 raise ValueError('TOURNAMENT_BRIER_MISMATCH')
             loss = score['log_loss']
-            if type(loss) not in (float, int) or not math.isfinite(loss) or loss < 0:
-                raise ValueError('TOURNAMENT_LOGLOSS_REQUIRED')
             # Unknown clipping rules cannot be silently substituted.
-            if score.get('probability_clipped') is not False or not 0 < p < 1:
+            if score.get('probability_clipped') is not False:
                 raise ValueError('TOURNAMENT_UNSUPPORTED_CLIPPED_SCORE')
-            expected = -math.log(float(p if y else 1-p))
-            if not math.isclose(loss, expected, rel_tol=1e-12, abs_tol=1e-12):
-                raise ValueError('TOURNAMENT_LOGLOSS_MISMATCH')
+            assigned = p if y else 1-p
+            if assigned == 0:
+                if loss != 'POSITIVE_INFINITY':
+                    raise ValueError('TOURNAMENT_EXACT_INFINITE_LOGLOSS_REQUIRED')
+            else:
+                if type(loss) not in (float, int) or not math.isfinite(loss) or loss < 0:
+                    raise ValueError('TOURNAMENT_LOGLOSS_REQUIRED')
+                expected = -float(assigned.ln())
+                if not math.isclose(loss, expected, rel_tol=1e-12, abs_tol=1e-12):
+                    raise ValueError('TOURNAMENT_LOGLOSS_MISMATCH')
             if not isinstance(record.get('event'), str) or not record['event']:
                 raise ValueError('TOURNAMENT_EVENT_REQUIRED')
             by_key[key] = record
@@ -115,12 +120,16 @@ def score_tournament(analysis: dict[str, Any], evaluation: dict[str, Any]) -> di
             after_values = [v['after'] for v in items if v['after'] is not None]
             returns = [v['hypothetical_return'] for v in items
                        if v['hypothetical_return'] is not None]
+            infinite_losses = sum(v['score']['log_loss'] == 'POSITIVE_INFINITY'
+                                  for v in unique.values())
             leaderboard.append(dict(
                 model=model, asset=asset, endpoint_hypothesis=endpoint, price_band=band,
                 forecast_n=len(unique), event_n=len(events), dependency_group_n=None,
                 effective_independent_n=None, status='INSUFFICIENT_DATA',
                 brier=str(sum(Decimal(v['score']['brier']) for v in unique.values()) / len(unique)),
-                log_loss=sum(v['score']['log_loss'] for v in unique.values()) / len(unique),
+                log_loss=('POSITIVE_INFINITY' if infinite_losses else
+                          sum(v['score']['log_loss'] for v in unique.values()) / len(unique)),
+                infinite_log_loss_n=infinite_losses,
                 accuracy=sum((Decimal(v['score']['probability']) >= Decimal('.5'))
                              == bool(v['score']['outcome']) for v in unique.values()) / len(unique),
                 ece=None, executable_side_n=len(gross_values),

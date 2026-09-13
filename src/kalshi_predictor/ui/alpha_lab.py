@@ -88,7 +88,8 @@ def render_tournament(report: dict[str, Any]) -> str:
             values = [row['model'], row['asset'], report['horizon'],
                       row['endpoint_hypothesis'], row['price_band'], row['forecast_n'],
                       row['event_n'], 'Unknown', f'{Decimal(row["brier"]):.6f}',
-                      f'{row["log_loss"]:.6f}', f'{row["accuracy"]*100:.2f}%',
+                      ('Infinity' if row['log_loss'] == 'POSITIVE_INFINITY' else
+                       f'{row["log_loss"]:.6f}'), f'{row["accuracy"]*100:.2f}%',
                       'Unknown', gross_n, count,
                       pct(row['gross_thresholds_cents']['0'], gross_n),
                       pct(row['after_fee_thresholds_cents']['0'], count),
@@ -113,6 +114,8 @@ def render_tournament(report: dict[str, Any]) -> str:
         'Endpoints, models and opposite sides share evidence. Forecasts may appear in '
         'multiple price bands; counts are not additive or independent sample sizes. '
         'No holdout validation or paper eligibility.</p>'
+        '<p>Exact 0% and 100% forecasts are retained. Assigning zero probability '
+        'to the observed outcome produces infinite log loss; scores are not clipped.</p>'
         '<p>Hypothetical return assumes one contract at the captured ask plus modeled fee '
         'for each displayed side. It is a descriptive scenario, not a portfolio, an '
         'executed fill, or paper P&amp;L. Selection, slippage, latency and calibrated '
