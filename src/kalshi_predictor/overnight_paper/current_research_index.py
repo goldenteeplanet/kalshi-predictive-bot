@@ -112,6 +112,39 @@ class ResearchValidationSession:
             self._close()
             raise
 
+    def latest_assessment_ids(self) -> tuple[str, ...]:
+        """Compact latest physical-clock selection; never load historical payloads.
+
+        Return original journal order for deterministic legacy tie handling;
+        the deployed aware() helper normalizes offsets to UTC. A malformed clock
+        anywhere takes precedence,
+        as in the legacy projection's complete candidate comprehension.
+        """
+        self._check()
+        invalid = self._index.execute(
+            'SELECT id FROM assessments WHERE invalid_clock=1 ORDER BY ordinal LIMIT 1'
+        ).fetchone()
+        if invalid is not None:
+            self._check()
+            return (invalid[0],)
+        latest = self._index.execute('SELECT max(assessed_utc) FROM assessments').fetchone()[0]
+        if latest is None:
+            self._check()
+            return ()
+        count, hashes = self._index.execute(
+            'SELECT count(*),count(DISTINCT scan_sha) FROM assessments WHERE assessed_utc=?',
+            (latest,),
+        ).fetchone()
+        self._check()
+        if count > 600 or hashes != 1:
+            raise ValueError('AMBIGUOUS_OR_OVERSIZED_LATEST_ASSESSMENT_BATCH')
+        rows = self._index.execute(
+            'SELECT id FROM assessments WHERE assessed_utc=? ORDER BY ordinal LIMIT 600',
+            (latest,),
+        ).fetchall()
+        self._check()
+        return tuple(row[0] for row in rows)
+
     def _read(self, key: str, *, linked: bool) -> tuple[str, dict[str, Any]]:
         self._check()
         expected = self._index.execute(
@@ -137,6 +170,18 @@ class ResearchValidationSession:
         envelope = _read_envelope(key, observed[0], raw)
         if envelope['record_kind'] != kind or envelope['payload_sha256'] != payload_sha:
             raise ValueError("INDEX_ORIGINAL_IDENTITY_MISMATCH")
+        if kind == 'ASSESSMENT':
+            batch_clock: str | None
+            try:
+                batch_clock = aware(envelope['record']['assessed_at']).astimezone(UTC).isoformat()
+                invalid_clock = 0
+            except (ValueError, TypeError, KeyError):
+                batch_clock, invalid_clock = None, 1
+            metadata = self._index.execute(
+                'SELECT assessed_utc,scan_sha,invalid_clock FROM assessments WHERE id=?', (key,),
+            ).fetchone()
+            if metadata != (batch_clock, envelope['record']['scan_sha256'], invalid_clock):
+                raise ValueError('INDEX_ASSESSMENT_METADATA_MISMATCH')
         if linked and (kind != 'PROSPECTIVE_SHADOW' or parent is not None):
             raise ValueError("INDEX_PARENT_KIND_MISMATCH")
         if parent is not None:
@@ -211,6 +256,11 @@ def research_validation_session(
             "bytes INTEGER NOT NULL, semantic_id TEXT, state TEXT, parent TEXT)"
         )
         index.execute("CREATE UNIQUE INDEX semantic ON records(kind,semantic_id,state)")
+        index.execute(
+            'CREATE TABLE assessments (id TEXT PRIMARY KEY, assessed_utc TEXT, '
+            'scan_sha TEXT NOT NULL, ordinal INTEGER NOT NULL, invalid_clock INTEGER NOT NULL)'
+        )
+        index.execute('CREATE INDEX assessment_clock ON assessments(assessed_utc,ordinal)')
         source = sqlite3.connect(mission_path.as_uri() + "?mode=ro", uri=True, timeout=1)
         source.execute("PRAGMA query_only=ON")
         source.execute("PRAGMA cache_size=-2048")
@@ -244,6 +294,17 @@ def research_validation_session(
             ).fetchone()[0]
             envelope = _read_envelope(key, at, raw)
             record, kind = envelope["record"], envelope["record_kind"]
+            if kind == 'ASSESSMENT':
+                assessed_utc: str | None
+                try:
+                    assessed_utc = aware(record['assessed_at']).astimezone(UTC).isoformat()
+                    invalid_clock = 0
+                except (ValueError, TypeError, KeyError):
+                    assessed_utc, invalid_clock = None, 1
+                index.execute(
+                    'INSERT INTO assessments VALUES(?,?,?,?,?)',
+                    (key, assessed_utc, record['scan_sha256'], observed_count, invalid_clock),
+                )
             if kind in ("SHADOW_OBSERVATION", "EVALUATION"):
                 identity = (
                     record["decision_id"]
