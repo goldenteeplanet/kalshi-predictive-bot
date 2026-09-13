@@ -15,6 +15,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from kalshi_predictor.crypto.account_fee_evidence import FeeAuthorityOriginal
+from kalshi_predictor.crypto.candidate_uncertainty import verify_candidate_uncertainty
 from kalshi_predictor.crypto.cost_evidence import OriginalBook, _levels, _unique
 from kalshi_predictor.crypto.current_calibration_evidence import (
     CurrentCalibrationOriginals,
@@ -413,6 +414,7 @@ def evaluate_paginated_current_research(
                     'gross_edge': None, 'after_fee': None, 'after_execution': None,
                     'uncertainty': None, 'full_net_ev': None, 'conservative_bound': None,
                     'conditional_calibration': None,
+                    'candidate_uncertainty_applicability': None,
                     'net_lower_bound': None, 'net_upper_bound': None,
                     'book_source': ({'url': book.url, 'sha256': book.sha256,
                                      'received_at': book.received_at.isoformat()}
@@ -447,6 +449,21 @@ def evaluate_paginated_current_research(
                                 decision_at=assessed_at, book=book,
                                 fee_originals=fee_originals.get(series, ()))
                             row['conditional_calibration'] = evidence
+                            cal_originals = calibration[ticker]
+                            applicability = verify_candidate_uncertainty(
+                                decision=dict(ticker=ticker,
+                                    event_id=market.get('event_ticker', ''), series=series,
+                                    side='BUY_'+side, selected_probability=str(probability),
+                                    model_version=prepared['model'], segment=cal_originals.segment,
+                                    decision_at=assessed_at.isoformat(),
+                                    market=market, forecast=prepared,
+                                    discovery_sources=sighting['sources'],
+                                    book_sha256=book.sha256),
+                                policy_version=cal_originals.policy_version,
+                                dataset=cal_originals.dataset, protocol=cal_originals.protocol,
+                                independence_review=cal_originals.independence_review)
+                            row['candidate_uncertainty_applicability'] = applicability
+                            blockers.extend(applicability['blockers'])
                             blockers.extend(evidence['blockers'])
                             if evidence['conditional_uncertainty_value'] is not None:
                                 stages['conditional_uncertainty_supported'].add(ticker)

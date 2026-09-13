@@ -10,6 +10,7 @@ from decimal import Decimal
 from typing import Any
 
 from kalshi_predictor.crypto.account_fee_evidence import FeeAuthorityOriginal
+from kalshi_predictor.crypto.candidate_uncertainty import verify_candidate_uncertainty
 from kalshi_predictor.crypto.cost_evidence import OriginalBook
 from kalshi_predictor.crypto.full_cost_evidence import (
     assess_full_cost_evidence,
@@ -143,3 +144,34 @@ def replay_cost_record(
     if _json(rebuilt) != _json(record):
         raise ValueError("COST_RECORD_RECOMPUTATION_MISMATCH")
     return rebuilt["assessment"]
+
+
+def replay_candidate_cost_record(
+    record: dict[str, Any], *, expected_decision: dict[str, Any],
+) -> dict[str, Any]:
+    """Admission-facing replay separates conditional costs from candidate support.
+
+    Keep historical cost record bytes and their diagnostic replay unchanged.
+    Guarded assembly must use this boundary, not conditional paper_support flags.
+    """
+    assessment = replay_cost_record(record, expected_decision=expected_decision)
+    request = record["request"]
+    applicability = verify_candidate_uncertainty(
+        decision=expected_decision, policy_version=request["calibration_policy_version"],
+        dataset=_restore(request["calibration_dataset"]),
+        protocol=_restore(request["calibration_protocol"]),
+        independence_review=_restore(request["independence_review"]),
+    )
+    # No current reviewed method establishes candidate probability-error scope.
+    # Do not reinterpret conditional diagnostic numbers as canonical full-net EV.
+    return assessment | {
+        "conditional_assessment": assessment,
+        "candidate_applicability": applicability,
+        "uncertainty": assessment["uncertainty"] | {
+            "value": None, "status": "UNKNOWN", "paper_support": False,
+            "blockers": applicability["blockers"],
+        },
+        "full_net_ev": None, "full_net_ev_status": "FULL_NET_EV_UNKNOWN",
+        "clears_net_gate": False,
+        "blockers": list(dict.fromkeys(assessment["blockers"] + applicability["blockers"])),
+    }

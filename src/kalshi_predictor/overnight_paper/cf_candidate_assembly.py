@@ -15,7 +15,7 @@ from typing import Any
 from kalshi_predictor.crypto.cost_record import (
     build_cost_record,
     cost_decision_from_qualification,
-    replay_cost_record,
+    replay_candidate_cost_record,
 )
 from kalshi_predictor.crypto.public_paper_costs import replayed_fee_supports_paper
 from kalshi_predictor.overnight_paper.boundary import ExecutionMode
@@ -160,7 +160,7 @@ def assemble_cf_research_candidate(
             executable_price=Decimal(str(inputs["executable_price"])),
             side=inputs["side"].removeprefix("BUY_"), rule_documents=rule_documents,
         )
-    cost_assessment = replay_cost_record(cost_record, expected_decision=cost_inputs)
+    cost_assessment = replay_candidate_cost_record(cost_record, expected_decision=cost_inputs)
     if evaluation_observation is not None:
         row = evaluation_observation.decode()
         if (
@@ -184,6 +184,8 @@ def assemble_cf_research_candidate(
         qualification_blockers=list(qualified.blockers),
         cf_context=context.cf_context.to_record(decision_at=at),
         full_net_ev=cost_assessment["full_net_ev"], cost_record=cost_record,
+        candidate_uncertainty_applicability=cost_assessment["candidate_applicability"],
+        conditional_cost_diagnostic=cost_assessment["conditional_assessment"],
         cost_evidence_status="ORIGINAL_EVIDENCE_REPLAYED",
         evidence_role="CF_RESEARCH_NOT_CURRENT_PAPER_ELIGIBILITY",
     )
