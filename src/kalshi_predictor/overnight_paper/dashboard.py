@@ -400,7 +400,7 @@ def snapshot(path: Path | None) -> dict:
                 cleanup_index=True,
             ) as session:
                 result["current_research"] = indexed_current_research_snapshot(
-                    session, now=captured_now,
+                    session, now=captured_now, include_alpha=True,
                 )
             result.update(_runtime_snapshot(db, path, captured_now))
             result["historical_evaluated_events"] = db.execute(

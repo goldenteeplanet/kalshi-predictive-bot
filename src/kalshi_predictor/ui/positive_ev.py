@@ -12,6 +12,8 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from kalshi_predictor.overnight_paper.alpha_analysis import render_alpha_analysis
+
 MAX_BYTES = 2 * 1024 * 1024
 
 
@@ -41,7 +43,7 @@ def read_research(path: Path, *, now: datetime | None = None) -> dict[str, Any]:
         return {"fresh": False, "rows": [], "primary_blocker": "Research report unavailable"}
 
 
-def render_research(report: dict[str, Any]) -> str:
+def render_research(report: dict[str, Any], current: dict[str, Any] | None = None) -> str:
     def text(value: Any) -> str:
         return escape("Unknown" if value is None else str(value))
 
@@ -95,6 +97,8 @@ def render_research(report: dict[str, Any]) -> str:
         "<p>Gross-edge counts include uncalibrated research proxies. "
         "Reported estimates require source, cost, model and risk validation. "
         "This page cannot submit orders or authorize local paper positions.</p>"
+        + render_alpha_analysis(current or {})
+        +
         "<section id='research-snapshot'><h2>Earlier research report</h2>"
         f"<p>{status}. Report timestamp: {text(report.get('generated_at'))}.</p>"
         "<p>The counts and commentary below belong to this saved report. "
@@ -112,8 +116,12 @@ def create_router() -> APIRouter:
 
     @router.get("/positive-ev", response_class=HTMLResponse)
     def positive_ev() -> HTMLResponse:
+        from kalshi_predictor.overnight_paper.dashboard import snapshot
+
         path = Path(os.environ.get("POSITIVE_EV_REPORT_PATH", "reports/positive_ev/current.json"))
-        html = render_research(read_research(path))
+        db_path = os.environ.get('OVERNIGHT_PAPER_DB')
+        current = snapshot(Path(db_path) if db_path else None)
+        html = render_research(read_research(path), current.get('current_research', {}))
         progress_root = os.environ.get("POSITIVE_EV_MULTI_ASSET_PROGRESS_ROOT")
         if progress_root:
             from kalshi_predictor.ui.multiasset_progress_view import read_progress, render_progress
