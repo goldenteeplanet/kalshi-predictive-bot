@@ -91,6 +91,7 @@ def render_research(report: dict[str, Any]) -> str:
         "td,th{padding:.7rem;border:1px solid #ccd5df}"
         ".table{overflow:auto}p{line-height:1.5}</style></head><body>"
         "<h1>Positive EV research</h1>"
+        "<p><a href='/paper-live'>Current assessments and shadow lifecycle</a></p>"
         "<p>Gross-edge counts include uncalibrated research proxies. "
         "Reported estimates require source, cost, model and risk validation. "
         "This page cannot submit orders or authorize local paper positions.</p>"

@@ -23,6 +23,7 @@ from kalshi_predictor.overnight_paper.cf_preparation_record import (
     PREFIX as CF_PREPARATION_PREFIX,
 )
 from kalshi_predictor.overnight_paper.cf_preparation_record import preparation_cost_block_record
+from kalshi_predictor.overnight_paper.current_assessment_view import render_assessment_batch
 from kalshi_predictor.overnight_paper.current_research_dashboard import (
     current_research_snapshot,
     empty_current_research,
@@ -685,6 +686,7 @@ def render(payload: dict) -> str:
             ("latest_scan_at", "Latest saved scan"), ("latest_scan_freshness", "Scan freshness"),
         )
     )
+    assessment_html = render_assessment_batch(current_research.get("latest_assessment_batch") or {})
     return (
         "<!doctype html><html lang='en'><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
@@ -710,6 +712,7 @@ def render(payload: dict) -> str:
         "is missing. Research shadows are observations for evaluation, "
         "not admitted paper trades.</p>"
         f"<section>{research_metrics}</section>"
+        f"{assessment_html}"
         "<h3>Latest scan funnel and blockers</h3>"
         f"<pre>{escape(json.dumps(current_research.get('latest_scan_funnel'), indent=2))}</pre>"
         "<pre>"

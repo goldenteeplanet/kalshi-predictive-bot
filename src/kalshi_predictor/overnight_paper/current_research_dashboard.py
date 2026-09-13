@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
+from .current_assessment_view import empty_assessment_batch, latest_assessment_batch
 from .current_research_store import read_current_records
 from .store import aware
 
@@ -21,6 +22,7 @@ def empty_current_research() -> dict[str, Any]:
         "funnel_scope": "LATEST_SCAN_ONLY_NOT_LIFETIME_TOTAL",
         "runtime_verified": False, "paper_eligible": False,
         "full_net_point_estimate_status": "UNKNOWN",
+        "latest_assessment_batch": empty_assessment_batch(),
     }
 
 
@@ -87,6 +89,7 @@ def current_research_snapshot(db: sqlite3.Connection, *, now: datetime) -> dict[
     result.update(
         evidence_status="VERIFIED_JOURNAL_NOT_RUNTIME_CERTIFICATION",
         journal_records=len(records), scan_count=len(scans), assessment_count=assessed,
+        latest_assessment_batch=latest_assessment_batch(records, now=at),
         prospective_shadow_count=len(shadows), evaluated_shadow_count=len(evaluated),
         shadow_state_counts={
             state: sum(value == state for value in states.values())
