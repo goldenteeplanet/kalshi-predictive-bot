@@ -512,7 +512,18 @@ def snapshot(path: Path | None) -> dict:
                     counts[evidence["status"]] = counts.get(evidence["status"], 0) + 1
                     if result["latest_research_assessment"] is None:
                         result["latest_research_assessment"] = {
-                            **evidence, "recorded_at": record["captured_at"],
+                            **{k: v for k, v in evidence.items() if k != "cost_assessment"},
+                            "recorded_at": record["captured_at"],
+                            "historical_conditional_diagnostic": evidence,
+                            "projection_scope": "HISTORICAL_REPLAY_NOT_CANDIDATE_CERTIFICATION",
+                            "full_net_ev": None,
+                            "full_net_ev_status": "FULL_NET_EV_UNKNOWN",
+                            "candidate_applicability": False,
+                            "paper_eligible": False,
+                            "execution_authority": False,
+                            "status": ("CANDIDATE_APPLICABILITY_UNKNOWN"
+                                       if evidence.get("full_net_ev") is not None
+                                       else evidence["status"]),
                         }
                 elif evidence.get("kind") == "PAPER_RELEASE_QUALIFICATION":
                     if result["last_qualification_status"] is None:
@@ -727,10 +738,11 @@ def render(payload: dict) -> str:
         "source freshness or the presence or absence of externally archived evidence.</p>"
         f"<pre>{escape(json.dumps(payload['historical_diagnostics'], indent=2))}</pre>"
         "<h2>Historical research assessments</h2>"
-        "<p>These records preserve qualification blockers. Provisional calculations have "
-        "unverified full-cost applicability and do not establish positive full net EV.</p>"
+        "<p>Canonical candidate full net EV remains unknown. The nested historical "
+        "conditional diagnostic preserves the original record, including any conditional "
+        "cost calculations; it does not certify candidate uncertainty or paper eligibility.</p>"
         f"<p>Records: {escape(payload['research_assessment_count'])}; "
-        f"statuses: {escape(payload['research_status_counts'])}</p>"
+        f"historical statuses: {escape(payload['research_status_counts'])}</p>"
         f"<pre>{escape(json.dumps(payload['latest_research_assessment'], indent=2))}</pre>"
         "<h2>Recorded incomplete CF preparation</h2>"
         "<p>These attempts stopped with unknown costs. They do not establish current source "
