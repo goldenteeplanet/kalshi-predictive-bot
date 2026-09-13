@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
 from kalshi_predictor.overnight_paper.alpha_analysis import render_alpha_analysis
+from kalshi_predictor.overnight_paper.alpha_tournament import read_tournament
 
 
 def leaderboard(alpha: dict[str, Any]) -> list[dict[str, Any]]:
@@ -71,7 +72,56 @@ def lab_snapshot(current: dict[str, Any]) -> dict[str, Any]:
                 trading_value='CAPTURED_AFTER_RECORDED_FEE_BEFORE_IMPACT_AND_UNCERTAINTY')
 
 
-def render_lab(current: dict[str, Any]) -> str:
+def render_tournament(report: dict[str, Any]) -> str:
+    if report.get('status') != 'RETAINED_ARITHMETIC_CHECKED':
+        return '<section><h2>Retained tournament</h2><p>Pinned tournament evidence unavailable.</p></section>'
+    rows = []
+    with localcontext(Context(prec=28, rounding=ROUND_HALF_EVEN)):
+        for row in report['leaderboard']:
+            count = row['fee_supported_side_n']
+            gross_n = row['executable_side_n']
+            def pct(n: int, total: int) -> str:
+                return f'{Decimal(n)*100/total:.2f}%' if total else 'Unknown'
+            def cents(value: str | None) -> str:
+                return f'{Decimal(value)*100:+.4f}c' if value is not None else 'Unknown'
+            values = [row['model'], row['asset'], report['horizon'],
+                      row['endpoint_hypothesis'], row['price_band'], row['forecast_n'],
+                      row['event_n'], 'Unknown', f'{Decimal(row["brier"]):.6f}',
+                      f'{row["log_loss"]:.6f}', f'{row["accuracy"]*100:.2f}%',
+                      'Unknown', gross_n, count,
+                      pct(row['gross_thresholds_cents']['0'], gross_n),
+                      pct(row['after_fee_thresholds_cents']['0'], count),
+                      pct(row['after_fee_thresholds_cents']['5'], count),
+                      cents(row['mean_after_fee_edge']), cents(row['best_after_fee_edge']),
+                      'Unknown' if row['mean_hypothetical_return'] is None else
+                      f'{Decimal(row["mean_hypothetical_return"])*100:+.2f}%', row['status']]
+            rows.append('<tr>' + ''.join(f'<td>{escape(str(v))}</td>' for v in values) + '</tr>')
+    headings = ('Model', 'Asset', 'Horizon', 'Endpoint hypothesis', 'Executable price band',
+                'Forecast N', 'Event N', 'Dependency group N', 'Brier', 'Log loss', 'Accuracy',
+                'ECE', 'Executable sides', 'Fee-known sides', 'Gross positive %',
+                'After-fee positive %', 'After-fee >5c %', 'Mean after-fee edge',
+                'Best after-fee edge', 'Mean hypothetical return', 'Status')
+    head = ''.join(f'<th>{escape(v)}</th>' for v in headings)
+    return (
+        '<section id="retained-tournament"><h2>Retained prospective tournament</h2>'
+        f'<p>{escape(str(report["cohort"]))}. Model forecasts: {report["model_forecasts"]}; '
+        f'events: {report["event_n"]}; unavailable model/side rows: '
+        f'{report["unavailable_model_side_rows"]}.</p>'
+        '<p>Historical captured books and supported fee estimates. These scores join '
+        'pinned retained outcome reports; this page does not replay provider originals. '
+        'Endpoints, models and opposite sides share evidence. Forecasts may appear in '
+        'multiple price bands; counts are not additive or independent sample sizes. '
+        'No holdout validation or paper eligibility.</p>'
+        '<p>Hypothetical return assumes one contract at the captured ask plus modeled fee '
+        'for each displayed side. It is a descriptive scenario, not a portfolio, an '
+        'executed fill, or paper P&amp;L. Selection, slippage, latency and calibrated '
+        'uncertainty are not included. Predictive accuracy alone does not establish alpha.</p>'
+        f'<div class="table"><table><thead><tr>{head}</tr></thead>'
+        f'<tbody>{"".join(rows)}</tbody></table></div></section>'
+    )
+
+
+def render_lab(current: dict[str, Any], tournament: dict[str, Any] | None = None) -> str:
     report = lab_snapshot(current)
 
     def text(value: Any) -> str:
@@ -117,7 +167,7 @@ def render_lab(current: dict[str, Any]) -> str:
         '<p>Captured research economics. After-fee edge excludes execution impact and '
         'calibrated uncertainty. This page cannot authorize or submit a trade.</p>'
         f'<p>Capture: {text(report["assessed_at"])}. Freshness: {text(report["freshness"])}.</p>'
-        '<h2>Predictive quality</h2><p>Official outcomes are not joined in this view. '
+        '<h2>Predictive quality</h2><p>Official outcomes are not joined to the latest assessments below. '
         'Brier, log loss, ECE, accuracy and hypothetical returns remain Unknown. '
         'No segment is holdout validated.</p><h2>Trading value</h2>'
         '<p>Gross percentages use executable sides; after-fee percentages use fee-known '
@@ -126,6 +176,7 @@ def render_lab(current: dict[str, Any]) -> str:
         'in multiple side-price bands. Counts do not measure independent observations. '
         'Observation lead is not the market settlement interval.</p>'
         f'<div class="table"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
+        + render_tournament(tournament or {})
         + render_alpha_analysis(current) + '</body></html>'
     )
 
@@ -139,12 +190,21 @@ def create_router() -> APIRouter:
         path = os.environ.get('OVERNIGHT_PAPER_DB')
         return dict(snapshot(Path(path) if path else None).get('current_research', {}))
 
+    def tournament() -> dict[str, Any]:
+        path = os.environ.get('ALPHA_TOURNAMENT_ROOT')
+        pin = os.environ.get('ALPHA_TOURNAMENT_MANIFEST_SHA256')
+        if not path or not pin:
+            return dict(status='UNCONFIGURED', leaderboard=[], paper_eligible=False)
+        return read_tournament(Path(path), pin)
+
     @router.get('/alpha-lab', response_class=HTMLResponse)
     def alpha_lab() -> HTMLResponse:
-        return HTMLResponse(render_lab(current()))
+        return HTMLResponse(render_lab(current(), tournament()))
 
     @router.get('/api/alpha-lab')
     def alpha_lab_api() -> dict[str, Any]:
-        return lab_snapshot(current())
+        result = lab_snapshot(current())
+        result['retained_tournament'] = tournament()
+        return result
 
     return router
