@@ -25,8 +25,18 @@ from kalshi_predictor.overnight_paper.cf_preparation_record import (
 from kalshi_predictor.overnight_paper.cf_preparation_record import preparation_cost_block_record
 from kalshi_predictor.overnight_paper.current_assessment_view import render_assessment_batch
 from kalshi_predictor.overnight_paper.current_research_dashboard import (
-    current_research_snapshot,
     empty_current_research,
+)
+from kalshi_predictor.overnight_paper.current_research_index import (
+    borrowed_research_validation_session,
+)
+from kalshi_predictor.overnight_paper.dashboard_scratch import (
+    ResearchScratchUnavailable,
+    ResearchViewBusy,
+    research_request_scratch,
+)
+from kalshi_predictor.overnight_paper.indexed_research_dashboard import (
+    indexed_current_research_snapshot,
 )
 from kalshi_predictor.overnight_paper.qualification import GATE_NAMES, decision_fingerprint
 from kalshi_predictor.overnight_paper.research_record import KIND, PREFIX, research_record
@@ -35,7 +45,9 @@ from kalshi_predictor.overnight_paper.source_health import MAX_FORECAST_AGE_SECO
 from kalshi_predictor.overnight_paper.watcher import verified_paper_marker
 
 
-def _runtime_snapshot(db: sqlite3.Connection, path: Path) -> dict[str, Any]:
+def _runtime_snapshot(
+    db: sqlite3.Connection, path: Path, now: datetime | None = None,
+) -> dict[str, Any]:
     latest = db.execute(
         "SELECT id,payload FROM overnight_sprint_cycles "
         "WHERE id LIKE 'runtime-health:%' ORDER BY captured_at DESC,id DESC LIMIT 1"
@@ -102,7 +114,7 @@ def _runtime_snapshot(db: sqlite3.Connection, path: Path) -> dict[str, Any]:
     if type(event["pid"]) is not int or type(event["entries_enabled"]) is not bool:
         raise ValueError("RUNTIME_HEALTH_FIELDS_INVALID")
     process = inspect_process(event["pid"], event.get("process_start_identity"))
-    age = (datetime.now(UTC) - aware(event["captured_at"])).total_seconds()
+    age = ((now or datetime.now(UTC)) - aware(event["captured_at"])).total_seconds()
     # Process presence and recent records do not prove the supervisor still holds
     # its owner lock or is progressing. Keep those observations separate.
     state = "UNVERIFIED"
@@ -371,15 +383,26 @@ def snapshot(path: Path | None) -> dict:
         result["blockers"] = ["ISOLATED_PAPER_DATABASE_NOT_CONFIGURED"]
         return result
     try:
-        with closing(sqlite3.connect(path.absolute().as_uri() + "?mode=ro", uri=True)) as db:
+        with research_request_scratch() as scratch, closing(
+            sqlite3.connect(path.absolute().as_uri() + "?mode=ro", uri=True, timeout=1)
+        ) as db:
             db.row_factory = sqlite3.Row
             db.execute("PRAGMA query_only=ON")
+            db.set_progress_handler(lambda: int(scratch.expired()), 1000)
+            db.execute('BEGIN')
             tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            captured_now = datetime.now(UTC)
             if not {"overnight_shadow", "overnight_history", "paper_orders"}.issubset(tables):
                 raise ValueError("SPRINT_SCHEMA_MISSING")
             result["cf_preparation_block_count"] = 0
-            result["current_research"] = current_research_snapshot(db, now=datetime.now(UTC))
-            result.update(_runtime_snapshot(db, path))
+            with borrowed_research_validation_session(
+                db, scratch.index_path, caller_deadline=scratch.deadline,
+                cleanup_index=True,
+            ) as session:
+                result["current_research"] = indexed_current_research_snapshot(
+                    session, now=captured_now,
+                )
+            result.update(_runtime_snapshot(db, path, captured_now))
             result["historical_evaluated_events"] = db.execute(
                 "SELECT count(DISTINCT event_ticker) FROM overnight_history"
             ).fetchone()[0]
@@ -426,7 +449,7 @@ def snapshot(path: Path | None) -> dict:
                         shadow_payload=payload,
                         shadow_order_id=item["order_id"],
                         shadow_evaluation=json.loads(item["evaluation_json"]),
-                        now=datetime.now(UTC),
+                        now=captured_now,
                     )
                     state = "PAPER_EVALUATED"
                     result["settled"] += 1
@@ -481,7 +504,7 @@ def snapshot(path: Path | None) -> dict:
                         evidence != rebuilt
                         or record["id"] != CF_PREPARATION_PREFIX + rebuilt["preparation_id"]
                         or aware(record["captured_at"]) != aware(scope["decision_at"])
-                        or aware(record["captured_at"]) > datetime.now(UTC)
+                        or aware(record["captured_at"]) > captured_now
                     ):
                         raise ValueError("CF_PREPARATION_RECORD_INVALID")
                     result["cf_preparation_block_count"] += 1
@@ -565,7 +588,7 @@ def snapshot(path: Path | None) -> dict:
                     if result["last_capture_at"] is None:
                         result["last_capture_at"] = record["captured_at"]
                         result["capture_state"] = "HISTORICAL_DIAGNOSTIC"
-            weather = _weather_snapshot(db, path, datetime.now(UTC))
+            weather = _weather_snapshot(db, path, captured_now)
             if weather:
                 result.update(weather)
                 qualified_at = result["last_qualification_recorded_at"]
@@ -587,6 +610,7 @@ def snapshot(path: Path | None) -> dict:
                 if all(t is None or aware(runtime_blocker["at"]) >= aware(t) for t in other_times):
                     result["first_blocker"] = next(iter(runtime_blocker["blockers"]), None)
                 result["blockers"].extend(runtime_blocker["blockers"])
+            scratch.deadline()
     except (
         sqlite3.DatabaseError,
         ValueError,
@@ -595,7 +619,7 @@ def snapshot(path: Path | None) -> dict:
         OSError,
         AttributeError,
         ArithmeticError,
-    ):
+    ) as exc:
         result = snapshot(None)
         result["paper_mode"] = "UNVERIFIED"
         for key in (
@@ -614,8 +638,12 @@ def snapshot(path: Path | None) -> dict:
             "cf_preparation_block_count",
         ):
             result[key] = None
-        result["blockers"] = ["PAPER_DASHBOARD_EVIDENCE_INVALID"]
-        result["first_blocker"] = "PAPER_DASHBOARD_EVIDENCE_INVALID"
+        blocker = 'RESEARCH_VIEW_BUSY' if isinstance(exc, ResearchViewBusy) else (
+            'RESEARCH_VIEW_SCRATCH_UNAVAILABLE' if isinstance(exc, ResearchScratchUnavailable)
+            else 'PAPER_DASHBOARD_EVIDENCE_INVALID'
+        )
+        result["blockers"] = [blocker]
+        result["first_blocker"] = blocker
     return result
 
 

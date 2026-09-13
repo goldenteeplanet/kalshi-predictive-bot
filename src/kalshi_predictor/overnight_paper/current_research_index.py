@@ -1,7 +1,7 @@
 """Complete-only disk indexed validation; existing aggregate limits still apply.
 
-This new API has no callers in production. It writes only an exclusively created
-scratch index, never the mission. The index contains references, not originals.
+It writes only an exclusively created scratch index, never the mission. The
+index contains references, not originals; aggregate admission bounds are unchanged.
 """
 
 from __future__ import annotations
@@ -99,6 +99,7 @@ class ResearchValidationSession:
         self, owner: object, source: sqlite3.Connection, index: sqlite3.Connection,
         manifest: ValidatedResearchIndex, deadline: Callable[[], None],
         file_identity: tuple[int, int],
+        owns_source: bool = True,
     ) -> None:
         if owner is not _SESSION_OWNER:
             raise ValueError("INDEX_OWNED_CONTEXT_REQUIRED")
@@ -108,6 +109,7 @@ class ResearchValidationSession:
         self._deadline = deadline
         self._file_identity = file_identity
         self._closed = False
+        self._owns_source = owns_source
 
     def _check(self) -> None:
         if self._closed:
@@ -127,7 +129,8 @@ class ResearchValidationSession:
         if not self._closed:
             self._closed = True
             try:
-                self._source.close()
+                if self._owns_source:
+                    self._source.close()
             finally:
                 self._index.close()
 
@@ -283,13 +286,16 @@ class ResearchValidationSession:
 
 
 @contextmanager
-def research_validation_session(
-    mission_path: Path,
+def _research_validation_session(
+    mission_path: Path | None,
     index_path: Path,
     *,
     max_records: int = 10000,
     max_bytes: int = MAX_READ_BYTES,
     timeout_seconds: int = 30,
+    borrowed_source: sqlite3.Connection | None = None,
+    caller_deadline: Callable[[], None] | None = None,
+    cleanup_index: bool = False,
 ) -> Iterator[ResearchValidationSession]:
     """Replay one payload at a time in one read transaction, then publish index.
 
@@ -307,7 +313,17 @@ def research_validation_session(
         or not 1 <= timeout_seconds <= 60
     ):
         raise ValueError("INDEX_BOUNDS_INVALID")
-    mission_path = mission_path.resolve(strict=True)
+    owns_source = borrowed_source is None
+    if owns_source:
+        if mission_path is None:
+            raise ValueError('INDEX_SOURCE_PATH_REQUIRED')
+        mission_path = mission_path.resolve(strict=True)
+    else:
+        assert borrowed_source is not None
+        if not borrowed_source.in_transaction or borrowed_source.execute(
+            'PRAGMA query_only'
+        ).fetchone()[0] != 1:
+            raise ValueError('INDEX_BORROWED_READ_TRANSACTION_REQUIRED')
     index_path = index_path.absolute()
     if index_path.exists() or index_path.is_symlink() or not index_path.parent.is_dir():
         raise ValueError("INDEX_EXCLUSIVE_DESTINATION_REQUIRED")
@@ -316,6 +332,8 @@ def research_validation_session(
     started = time.monotonic()
 
     def deadline() -> None:
+        if caller_deadline is not None:
+            caller_deadline()
         if time.monotonic() - started >= timeout_seconds:
             raise ValueError("INDEX_TIME_BOUND")
 
@@ -324,8 +342,21 @@ def research_validation_session(
         pass
     stat = index_path.lstat()
     file_identity = (stat.st_dev, stat.st_ino)
+    ancestor_identities = tuple(
+        (path, path.stat().st_dev, path.stat().st_ino) for path in index_path.parents
+    )
+
+    def remove_owned_index() -> None:
+        for path, device, inode in ancestor_identities:
+            info = path.lstat()
+            if path.is_symlink() or (info.st_dev, info.st_ino) != (device, inode):
+                raise ValueError('INDEX_ANCESTOR_OWNERSHIP_CHANGED')
+        info = index_path.lstat()
+        if index_path.is_symlink() or (info.st_dev, info.st_ino) != file_identity:
+            raise ValueError('INDEX_OWNERSHIP_CHANGED')
+        index_path.unlink()
     index: sqlite3.Connection | None = None
-    source: sqlite3.Connection | None = None
+    source: sqlite3.Connection | None = borrowed_source
     session: ResearchValidationSession | None = None
     complete = False
     try:
@@ -354,13 +385,16 @@ def research_validation_session(
         )
         index.execute('CREATE INDEX dashboard_order ON dashboard_metadata(ordinal)')
         index.execute('CREATE INDEX dashboard_scan ON dashboard_metadata(scan_clock,id)')
-        source = sqlite3.connect(mission_path.as_uri() + "?mode=ro", uri=True, timeout=1)
-        source.execute("PRAGMA query_only=ON")
-        source.execute("PRAGMA cache_size=-2048")
-        source.set_progress_handler(
-            lambda: int(time.monotonic() - started >= timeout_seconds), 1000
-        )
-        source.execute("BEGIN")
+        if owns_source:
+            assert mission_path is not None
+            source = sqlite3.connect(mission_path.as_uri() + "?mode=ro", uri=True, timeout=1)
+            source.execute("PRAGMA query_only=ON")
+            source.execute("PRAGMA cache_size=-2048")
+            source.set_progress_handler(
+                lambda: int(time.monotonic() - started >= timeout_seconds), 1000
+            )
+            source.execute("BEGIN")
+        assert source is not None
         count, total = source.execute(
             "SELECT count(*),coalesce(sum(length(CAST(payload AS BLOB))),0) "
             "FROM overnight_sprint_cycles WHERE id LIKE ?",
@@ -486,7 +520,7 @@ def research_validation_session(
             total,
         )
         session = ResearchValidationSession(
-            _SESSION_OWNER, source, index, manifest_result, deadline, file_identity,
+            _SESSION_OWNER, source, index, manifest_result, deadline, file_identity, owns_source,
         )
         session._check()
         complete = True
@@ -494,23 +528,58 @@ def research_validation_session(
         if not session._closed:
             session._check()
     except BaseException:
-        if source is not None:
+        if source is not None and owns_source:
             source.close()
         if index is not None:
             index.close()
         if not complete:
-            stat = index_path.lstat()
-            if index_path.is_symlink() or (stat.st_dev, stat.st_ino) != file_identity:
-                raise ValueError('INDEX_OWNERSHIP_CHANGED') from None
-            index_path.unlink()
+            remove_owned_index()
         raise
     finally:
         if session is not None:
             session._close()
-        elif source is not None:
+        elif source is not None and owns_source:
             source.close()
         if index is not None:
             index.close()
+
+        if complete and cleanup_index:
+            remove_owned_index()
+
+
+@contextmanager
+def research_validation_session(
+    mission_path: Path, index_path: Path, *, max_records: int = 10000,
+    max_bytes: int = MAX_READ_BYTES, timeout_seconds: int = 30,
+) -> Iterator[ResearchValidationSession]:
+    """Own the source connection; preserve the original path-based API."""
+    with _research_validation_session(
+        mission_path, index_path, max_records=max_records, max_bytes=max_bytes,
+        timeout_seconds=timeout_seconds,
+    ) as session:
+        yield session
+
+
+@contextmanager
+def borrowed_research_validation_session(
+    source: sqlite3.Connection, index_path: Path, *, caller_deadline: Callable[[], None],
+    max_records: int = 10000, max_bytes: int = MAX_READ_BYTES, timeout_seconds: int = 30,
+    cleanup_index: bool = False,
+) -> Iterator[ResearchValidationSession]:
+    """Borrow an existing query-only transaction without modifying its ownership.
+
+    Caller must install and own a SQL progress deadline before lending its fresh
+    connection. Python cannot introspect that callback; this API does not claim
+    to verify it, replace it, or change row factory, authorizer or transaction.
+    Optional cleanup removes only the index with its creation identity and
+    unchanged ancestors after closing it; foreign replacements are preserved.
+    """
+    with _research_validation_session(
+        None, index_path, max_records=max_records, max_bytes=max_bytes,
+        timeout_seconds=timeout_seconds, borrowed_source=source, caller_deadline=caller_deadline,
+        cleanup_index=cleanup_index,
+    ) as session:
+        yield session
 
 
 def validate_research_index(
