@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +49,43 @@ class ValidatedResearchIndex:
 
 
 _SESSION_OWNER = object()
+
+
+def _dashboard_scan_clock(record: dict[str, Any], recorded: str) -> str:
+    clock = aware(record['assessed_at'])
+    if clock > aware(recorded):
+        raise ValueError('CURRENT_RESEARCH_SCAN_CLOCK_INVALID')
+    for field in ('funnel', 'first_blocker_counts'):
+        counts = record[field]
+        if not isinstance(counts, dict) or any(
+            not isinstance(k, str) or type(v) is not int or v < 0
+            for k, v in counts.items()
+        ):
+            raise ValueError('CURRENT_RESEARCH_SCAN_COUNTS_INVALID')
+    return clock.isoformat()
+
+
+def _dashboard_scan_metadata(
+    record: dict[str, Any], recorded: str,
+) -> tuple[str | None, str | None, str | None]:
+    try:
+        return _dashboard_scan_clock(record, recorded), None, None
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
+        # Do not store potentially huge parser exception text; replay the first
+        # offending original only when dashboard projection requests this error.
+        return None, type(exc).__name__, None
+
+
+@dataclass(frozen=True)
+class ResearchDashboardSummary:
+    journal_records: int
+    scan_count: int
+    assessment_count: int
+    prospective_shadow_count: int
+    evaluated_shadow_count: int
+    shadow_state_counts: tuple[tuple[str, int], ...]
+    latest_scan_id: str | None
+    latest_scan_at: str | None
 
 
 class ResearchValidationSession:
@@ -145,6 +182,48 @@ class ResearchValidationSession:
         self._check()
         return tuple(row[0] for row in rows)
 
+    def dashboard_summary(self, *, now: datetime) -> ResearchDashboardSummary:
+        """Complete compact projection; dashboard errors stay outside foundation validation."""
+        self._check()
+        if now.utcoffset() is None:
+            raise ValueError('CURRENT_RESEARCH_DASHBOARD_AWARE_CLOCK_REQUIRED')
+        at = aware(now.isoformat()).isoformat()
+        first_error = self._index.execute(
+            'SELECT r.id,r.at FROM records r '
+            'JOIN dashboard_metadata m ON m.id=r.id '
+            'WHERE r.at>? OR m.error_type IS NOT NULL ORDER BY m.ordinal LIMIT 1', (at,),
+        ).fetchone()
+        self._check()
+        if first_error is not None:
+            key, recorded = first_error
+            if recorded > at:
+                raise ValueError('CURRENT_RESEARCH_DASHBOARD_FUTURE_CLOCK')
+            raw, envelope = self._read(key, linked=False)
+            del raw
+            _dashboard_scan_clock(envelope['record'], envelope['recorded_at'])
+            raise ValueError('INDEX_DASHBOARD_ERROR_METADATA_MISMATCH')
+        counts = dict(self._index.execute('SELECT kind,count(*) FROM records GROUP BY kind'))
+        states = dict(self._index.execute(
+            "SELECT CASE WHEN EXISTS(SELECT 1 FROM records e WHERE e.kind='EVALUATION' "
+            'AND e.parent=s.semantic_id) THEN \'EVALUATED\' ELSE COALESCE('
+            "(SELECT o.state FROM records o JOIN dashboard_metadata m ON m.id=o.id "
+            "WHERE o.kind='SHADOW_OBSERVATION' AND o.parent=s.semantic_id "
+            "ORDER BY m.ordinal DESC LIMIT 1),'OPEN') END AS final_state,count(*) "
+            "FROM records s WHERE s.kind='PROSPECTIVE_SHADOW' GROUP BY final_state"
+        ))
+        latest = self._index.execute(
+            'SELECT id,scan_clock FROM dashboard_metadata WHERE scan_clock IS NOT NULL '
+            'ORDER BY scan_clock DESC,id DESC LIMIT 1'
+        ).fetchone()
+        self._check()
+        return ResearchDashboardSummary(
+            sum(counts.values()), counts.get('SCAN', 0), counts.get('ASSESSMENT', 0),
+            counts.get('PROSPECTIVE_SHADOW', 0), counts.get('EVALUATION', 0),
+            tuple((state, states.get(state, 0)) for state in (
+                'OPEN', 'CLOSED', 'AWAITING_FINAL', 'FINAL', 'EVALUATED')),
+            None if latest is None else latest[0], None if latest is None else latest[1],
+        )
+
     def _read(self, key: str, *, linked: bool) -> tuple[str, dict[str, Any]]:
         self._check()
         expected = self._index.execute(
@@ -170,6 +249,13 @@ class ResearchValidationSession:
         envelope = _read_envelope(key, observed[0], raw)
         if envelope['record_kind'] != kind or envelope['payload_sha256'] != payload_sha:
             raise ValueError("INDEX_ORIGINAL_IDENTITY_MISMATCH")
+        if kind == 'SCAN':
+            metadata = self._index.execute(
+                'SELECT scan_clock,error_type,error_message FROM dashboard_metadata WHERE id=?',
+                (key,),
+            ).fetchone()
+            if metadata != _dashboard_scan_metadata(envelope['record'], observed[0]):
+                raise ValueError('INDEX_SCAN_METADATA_MISMATCH')
         if kind == 'ASSESSMENT':
             batch_clock: str | None
             try:
@@ -256,11 +342,18 @@ def research_validation_session(
             "bytes INTEGER NOT NULL, semantic_id TEXT, state TEXT, parent TEXT)"
         )
         index.execute("CREATE UNIQUE INDEX semantic ON records(kind,semantic_id,state)")
+        index.execute('CREATE INDEX lifecycle_parent ON records(kind,parent)')
         index.execute(
             'CREATE TABLE assessments (id TEXT PRIMARY KEY, assessed_utc TEXT, '
             'scan_sha TEXT NOT NULL, ordinal INTEGER NOT NULL, invalid_clock INTEGER NOT NULL)'
         )
         index.execute('CREATE INDEX assessment_clock ON assessments(assessed_utc,ordinal)')
+        index.execute(
+            'CREATE TABLE dashboard_metadata (id TEXT PRIMARY KEY,ordinal INTEGER NOT NULL, '
+            'scan_clock TEXT,error_type TEXT,error_message TEXT)'
+        )
+        index.execute('CREATE INDEX dashboard_order ON dashboard_metadata(ordinal)')
+        index.execute('CREATE INDEX dashboard_scan ON dashboard_metadata(scan_clock,id)')
         source = sqlite3.connect(mission_path.as_uri() + "?mode=ro", uri=True, timeout=1)
         source.execute("PRAGMA query_only=ON")
         source.execute("PRAGMA cache_size=-2048")
@@ -294,6 +387,11 @@ def research_validation_session(
             ).fetchone()[0]
             envelope = _read_envelope(key, at, raw)
             record, kind = envelope["record"], envelope["record_kind"]
+            dashboard_metadata = (
+                _dashboard_scan_metadata(record, at) if kind == 'SCAN' else (None, None, None)
+            )
+            index.execute('INSERT INTO dashboard_metadata VALUES(?,?,?,?,?)',
+                          (key, observed_count, *dashboard_metadata))
             if kind == 'ASSESSMENT':
                 assessed_utc: str | None
                 try:
