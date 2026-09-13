@@ -2,9 +2,11 @@ import copy
 import hashlib
 import json
 import math
+from decimal import Decimal
 
 import pytest
 
+from kalshi_predictor.crypto.research_shadow_evaluation import scores
 from kalshi_predictor.overnight_paper.alpha_tournament import read_tournament, score_tournament
 from kalshi_predictor.ui.alpha_lab import render_tournament
 
@@ -18,7 +20,6 @@ def inputs():
                            event='event', rule_version='endpoint', score=dict(
                            probability=probability, outcome=outcome, brier='.09',
                            log_loss=-math.log(p if outcome else 1-p), probability_clipped=False)))
-        from decimal import Decimal
         for side in ('YES', 'NO'):
             side_p = Decimal(probability) if side == 'YES' else Decimal(str(1-p))
             price = Decimal('.2') if side == 'YES' else Decimal('.8')
@@ -109,3 +110,56 @@ def test_reader_requires_exact_pins_and_escapes_rendered_metadata(tmp_path):
     assert read_tournament(tmp_path, '0'*64)['status'] == 'UNAVAILABLE_OR_INVALID'
     (tmp_path/'evaluation.json').write_text('{}')
     assert read_tournament(tmp_path, pin)['status'] == 'UNAVAILABLE_OR_INVALID'
+
+
+def endpoint_inputs(probability, outcome):
+    analysis, evaluation = inputs()
+    p = Decimal(probability)
+    evaluation['rows'][0]['score'] = scores(p, outcome)
+    for row in analysis['rows']:
+        if row['decision_id'] == 'a':
+            side_p = p if row['side'] == 'YES' else Decimal(str(1-float(p)))
+            gross = side_p-Decimal(row['fee']['price'])
+            row['gross'] = str(gross)
+            row['gross_minus_supported_fee'] = str(gross-Decimal(row['fee']['value']))
+    return analysis, evaluation
+
+
+@pytest.mark.parametrize('probability,outcome', [('0', 0), ('0', 1), ('1', 0), ('1', 1)])
+def test_exact_endpoint_forecasts_keep_scores_denominators_and_infinite_penalty(
+    probability, outcome,
+):
+    analysis, evaluation = endpoint_inputs(probability, outcome)
+    before = copy.deepcopy((analysis, evaluation))
+    result = score_tournament(analysis, evaluation)
+    assert result['model_forecasts'] == 2 and result['scored_side_rows'] == 4
+    wrong = int(probability) != outcome
+    for row in result['leaderboard']:
+        assert row['forecast_n'] == 2 and row['fee_supported_side_n'] == 2
+        assert row['infinite_log_loss_n'] == int(wrong)
+        assert Decimal(row['brier']) == (Decimal(int(wrong))+Decimal('.09'))/2
+        if wrong:
+            assert row['log_loss'] == 'POSITIVE_INFINITY'
+        else:
+            assert row['log_loss'] == evaluation['rows'][1]['score']['log_loss']/2
+    result.update(cohort='Endpoint fixture', horizon='5-minute lead')
+    html = render_tournament(result)
+    assert ('Infinity' in html) == wrong
+    assert 'scores are not clipped' in html
+    assert (analysis, evaluation) == before
+    json.dumps(result, allow_nan=False)
+
+
+@pytest.mark.parametrize('bad_loss', [0, 27.631, None, float('inf'), 'Infinity'])
+def test_wrong_certain_prediction_cannot_be_replaced_with_clipped_or_missing_loss(bad_loss):
+    analysis, evaluation = endpoint_inputs('0', 1)
+    evaluation['rows'][0]['score']['log_loss'] = bad_loss
+    with pytest.raises(ValueError, match='EXACT_INFINITE_LOGLOSS'):
+        score_tournament(analysis, evaluation)
+
+
+def test_finite_probability_cannot_claim_infinite_loss():
+    analysis, evaluation = inputs()
+    evaluation['rows'][0]['score']['log_loss'] = 'POSITIVE_INFINITY'
+    with pytest.raises(ValueError, match='LOGLOSS_REQUIRED'):
+        score_tournament(analysis, evaluation)
