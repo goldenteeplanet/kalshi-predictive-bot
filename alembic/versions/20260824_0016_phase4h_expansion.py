@@ -1,6 +1,7 @@
 """Phase 4H checkpointed expansion and executable edge attribution."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260824_0016"

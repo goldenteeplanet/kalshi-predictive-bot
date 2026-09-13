@@ -7,7 +7,6 @@ from kalshi_predictor.benchmarking.offline_export_join import (
     write_offline_exact_export_join_preview,
 )
 
-
 parser = argparse.ArgumentParser(description="Run local PMB-34B exact export join preview")
 parser.add_argument(
     "--fixtures", type=Path,

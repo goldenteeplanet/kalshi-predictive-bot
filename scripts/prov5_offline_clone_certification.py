@@ -5,7 +5,6 @@ from pathlib import Path
 
 from kalshi_predictor.phase_prov5 import write_prov5_certification
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--prov3-report", type=Path,
                     default=Path("reports/phase_prov3/prov3_exact_attribution_schema_repair_preview.json"))

@@ -7,7 +7,6 @@ from pathlib import Path
 
 from kalshi_predictor.runtime_provenance import write_runtime_provenance_audit
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--database", type=Path, default=Path("data/kalshi_phase1.db"))
 parser.add_argument("--output-dir", type=Path, default=Path("reports/phase_prov2"))

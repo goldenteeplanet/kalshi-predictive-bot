@@ -18,6 +18,8 @@ def test_long_job_monitor_reports_phase3ay_progress_and_finish_hook(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _seed_phase3ay_files(tmp_path, hook_pid=os.getpid())
+    # The finish-hook probe is independent of the mocked refresh runtime.
+    monkeypatch.setattr(long_jobs, "_pid_running", lambda pid: pid == os.getpid())
     monkeypatch.setattr(phase3ay, "_phase3ay_running_pids", lambda: [os.getpid()])
     monkeypatch.setattr(
         long_jobs,
@@ -69,6 +71,7 @@ def test_long_job_monitor_distinguishes_budget_used_from_completion(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _seed_phase3ay_files(tmp_path, hook_pid=os.getpid())
+    monkeypatch.setattr(long_jobs, "_pid_running", lambda pid: pid == os.getpid())
     monkeypatch.setattr(phase3ay, "_phase3ay_running_pids", lambda: [os.getpid()])
     monkeypatch.setattr(
         long_jobs,
@@ -95,6 +98,7 @@ def test_long_job_monitor_distinguishes_budget_used_from_completion(
 def test_long_job_monitor_page_and_api_render(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _seed_phase3ay_files(tmp_path, hook_pid=os.getpid())
+    monkeypatch.setattr(long_jobs, "_pid_running", lambda pid: pid == os.getpid())
     monkeypatch.setattr(phase3ay, "_phase3ay_running_pids", lambda: [os.getpid()])
     monkeypatch.setattr(
         long_jobs,

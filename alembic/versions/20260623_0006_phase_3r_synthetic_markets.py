@@ -1,6 +1,7 @@
 """Phase 3R synthetic markets research tables."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260623_0006"

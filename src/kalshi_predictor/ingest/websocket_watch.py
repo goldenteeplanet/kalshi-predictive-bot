@@ -4,9 +4,11 @@ import asyncio
 import json
 import time
 from collections.abc import Callable, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from kalshi_predictor.active_universe import is_active_market_status
 from kalshi_predictor.config import Settings
 from kalshi_predictor.ingest.websocket_orderbooks import (
     StreamSummary,
@@ -59,6 +61,8 @@ def discover_quoted_market_tickers(
             market = client.get_market(ticker)
         except Exception:
             market = None
+        if _market_closed(market):
+            continue
         yes_levels, no_levels = _book_levels(orderbook)
         rows.append(
             {
@@ -87,8 +91,12 @@ def discover_quoted_market_tickers(
         )
         selected = already_selected
         for market in list(payload.get("markets") or [])[:max_markets_per_series]:
+            if not isinstance(market, dict):
+                continue
             ticker = str(market.get("ticker") or "").strip()
             if not ticker or ticker in selected_tickers:
+                continue
+            if _market_closed(market):
                 continue
             orderbook = client.get_orderbook(ticker)
             yes_levels, no_levels = _book_levels(orderbook)
@@ -109,6 +117,28 @@ def discover_quoted_market_tickers(
             if selected >= max_quoted_per_series:
                 break
     return rows
+
+
+def _market_close(market: dict[str, Any] | None) -> datetime | None:
+    if not isinstance(market, dict):
+        return None
+    if not is_active_market_status(market.get("status")):
+        return None
+    value = market.get("close_time")
+    if not isinstance(value, str):
+        return None
+    try:
+        close = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if close.tzinfo is None or close.utcoffset() is None:
+        return None
+    return close.astimezone(UTC)
+
+
+def _market_closed(market: dict[str, Any] | None) -> bool:
+    close = _market_close(market)
+    return close is None or close <= utc_now()
 
 
 def load_actionable_tickers(path: Path, *, limit: int = 40) -> list[str]:
@@ -151,6 +181,7 @@ def run_reconnecting_websocket_watch(
     async_runner: Callable[[Any], StreamSummary] = asyncio.run,
     sleep_fn: Callable[[float], None] = time.sleep,
     monotonic_fn: Callable[[], float] = time.monotonic,
+    clock_fn: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
     """Run a reconnecting, filesystem-stage-only orderbook producer."""
 
@@ -174,8 +205,19 @@ def run_reconnecting_websocket_watch(
     ):
         raise ValueError("GH-1 watch bounds and reconnect intervals are invalid.")
 
-    started_at = utc_now()
+    clock = clock_fn or utc_now
+
+    def now_utc() -> datetime:
+        value = clock()
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Watch clock must be timezone aware.")
+        return value.astimezone(UTC)
+
+    started_at = now_utc()
     cached_tickers: list[str] = []
+    cached_rows: dict[str, dict[str, Any]] = {}
+    close_times: dict[str, datetime] = {}
+    expired_tickers_pruned = 0
     next_discovery_at = 0.0
     backoff_seconds = reconnect_initial_seconds
     cycles_started = 0
@@ -207,11 +249,13 @@ def run_reconnecting_websocket_watch(
     def status_payload() -> dict[str, Any]:
         return {
             "phase": "GH-1-WATCH",
-            "generated_at": utc_now().isoformat(),
+            "generated_at": now_utc().isoformat(),
             "started_at": started_at.isoformat(),
             "state": state,
             "series": list(series),
             "selected_tickers": list(cached_tickers),
+            "selected_ticker_close_times": {t: close_times[t].isoformat() for t in cached_tickers},
+            "expired_tickers_pruned": expired_tickers_pruned,
             "preferred_tickers_path": (
                 str(preferred_tickers_path) if preferred_tickers_path else None
             ),
@@ -250,6 +294,24 @@ def run_reconnecting_websocket_watch(
     def write_status() -> None:
         _atomic_write_json(status_path, status_payload())
 
+    def prune_expired() -> bool:
+        nonlocal cached_tickers, expired_tickers_pruned, catalog_rows_staged
+        nonlocal catalog_generated_at
+        now = now_utc()
+        expired = [ticker for ticker in cached_tickers if close_times[ticker] <= now]
+        if not expired:
+            return False
+        for ticker in expired:
+            close_times.pop(ticker)
+            cached_rows.pop(ticker)
+        cached_tickers = [ticker for ticker in cached_tickers if ticker not in expired]
+        expired_tickers_pruned += len(expired)
+        payload = _active_market_catalog_payload(list(cached_rows.values()))
+        _atomic_write_json(resolved_catalog_path, payload)
+        catalog_rows_staged = int(payload["market_count"])
+        catalog_generated_at = str(payload["generated_at"])
+        return True
+
     write_status()
     try:
         while max_cycles is None or cycles_started < max_cycles:
@@ -261,7 +323,8 @@ def run_reconnecting_websocket_watch(
             try:
                 with client_factory(settings=settings) as client:
                     now_monotonic = monotonic_fn()
-                    if not cached_tickers or now_monotonic >= next_discovery_at:
+                    expired = prune_expired()
+                    if expired or now_monotonic >= next_discovery_at:
                         state = "DISCOVERING_QUOTED_BOOKS"
                         write_status()
                         try:
@@ -287,22 +350,39 @@ def run_reconnecting_websocket_watch(
                             if not cached_tickers:
                                 raise
                         else:
-                            discovered = list(
-                                dict.fromkeys(
-                                    str(row.get("ticker") or "").strip()
-                                    for row in rows
-                                    if row.get("ticker")
-                                )
-                            )
+                            discovered_rows: dict[str, dict[str, Any]] = {}
+                            discovered_closes: dict[str, datetime] = {}
+                            discovered_at = now_utc()
+                            row_limit = max_preferred_tickers + len(series) * max_quoted_per_series
+                            for row in rows[:row_limit]:
+                                ticker = str(row.get("ticker") or "").strip()
+                                market = row.get("market")
+                                close = _market_close(market)
+                                if (
+                                    not ticker
+                                    or not isinstance(market, dict)
+                                    or market.get("ticker") != ticker
+                                    or close is None
+                                    or close <= discovered_at
+                                ):
+                                    continue
+                                discovered_rows.setdefault(ticker, row)
+                                discovered_closes.setdefault(ticker, close)
+                            discovered = list(discovered_rows)
+                            next_discovery_at = now_monotonic + min(60.0, discovery_refresh_seconds)
                             if discovered:
                                 cached_tickers = discovered
-                                catalog_payload = _active_market_catalog_payload(rows)
+                                cached_rows = discovered_rows
+                                close_times = discovered_closes
+                                catalog_payload = _active_market_catalog_payload(
+                                    list(cached_rows.values())
+                                )
                                 _atomic_write_json(resolved_catalog_path, catalog_payload)
                                 catalog_rows_staged = int(catalog_payload["market_count"])
                                 catalog_generated_at = str(catalog_payload["generated_at"])
                                 preferred_selected = sum(
                                     1
-                                    for row in rows
+                                    for row in cached_rows.values()
                                     if row.get("selection_source")
                                     in {
                                         "ACTIONABLE_RANKING",
@@ -310,13 +390,25 @@ def run_reconnecting_websocket_watch(
                                     }
                                 )
                                 discovery_refreshes += 1
-                                last_discovery_success_at = utc_now().isoformat()
+                                last_discovery_success_at = now_utc().isoformat()
                                 next_discovery_at = now_monotonic + discovery_refresh_seconds
                             elif not cached_tickers:
                                 raise RuntimeError(
                                     "No visibly quoted books were discovered for the "
                                     "configured series."
                                 )
+                    if prune_expired():
+                        next_discovery_at = 0.0
+                    if not cached_tickers:
+                        raise RuntimeError(
+                            "No unexpired markets available; bounded discovery backoff."
+                        )
+                    remaining = min(
+                        (close_times[t] - now_utc()).total_seconds() for t in cached_tickers
+                    )
+                    if remaining <= 0:
+                        next_discovery_at = 0.0
+                        raise RuntimeError("Market expired before adapter cycle.")
                     state = "STREAMING"
                     write_status()
                     adapter = adapter_factory(
@@ -325,8 +417,19 @@ def run_reconnecting_websocket_watch(
                         rest_client=client,
                         persist_every_deltas=persist_every_deltas,
                     )
+                    adapter_started_at = now_utc()
+                    remaining = min(
+                        (close_times[t] - adapter_started_at).total_seconds()
+                        for t in cached_tickers
+                    )
+                    if remaining <= 0:
+                        prune_expired()
+                        next_discovery_at = 0.0
+                        raise RuntimeError("Market expired during adapter setup.")
                     summary = async_runner(
-                        adapter.run(max_messages=None, max_seconds=stream_max_seconds)
+                        adapter.run(
+                            max_messages=None, max_seconds=min(stream_max_seconds, remaining)
+                        )
                     )
                 stream_cycles_completed += 1
                 messages_seen += summary.messages_seen
@@ -335,7 +438,7 @@ def run_reconnecting_websocket_watch(
                 sequence_recoveries += summary.sequence_recoveries
                 staged_files += len(summary.staged_files)
                 recent_errors.extend(str(error) for error in summary.errors)
-                completed_at = utc_now().isoformat()
+                completed_at = now_utc().isoformat()
                 if summary.messages_seen > 0:
                     last_message_at = completed_at
                 if summary.snapshots_seen > 0:

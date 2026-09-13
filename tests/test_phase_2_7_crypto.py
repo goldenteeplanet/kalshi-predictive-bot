@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
 from sqlalchemy import select
 
 from kalshi_predictor.config import Settings
@@ -316,6 +317,37 @@ def test_crypto_v2_adjusts_downward_for_positive_momentum_on_below_market(tmp_pa
         assert forecast is not None
         assert forecast.yes_probability == Decimal("0.41")
         assert forecast.feature_json["direction_detected"] == "BELOW"
+
+
+@pytest.mark.parametrize(
+    ("comparator", "momentum", "expected"),
+    [
+        ("AT_OR_ABOVE", "0.5", "0.49"),
+        ("AT_OR_ABOVE", "-0.5", "0.41"),
+        ("AT_OR_BELOW", "0.5", "0.41"),
+        ("AT_OR_BELOW", "-0.5", "0.49"),
+    ],
+)
+def test_crypto_v2_preserves_inclusive_component_momentum(
+    tmp_path, comparator, momentum, expected
+) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        snapshot = _seed_crypto_snapshot(session, title="BTC target price")
+        insert_crypto_market_link(
+            session,
+            ticker=snapshot.ticker,
+            symbol="BTC",
+            confidence="1.0",
+            reason="inclusive component regression",
+            raw_json={"components": [{"symbol": "BTC", "direction": comparator}]},
+        )
+        _seed_crypto_features(session, "BTC", momentum=momentum)
+
+        forecast = CryptoV2Forecaster(settings=_settings()).forecast(session, snapshot)
+
+        assert forecast is not None
+        assert forecast.yes_probability == Decimal(expected)
 
 
 def test_crypto_v2_uses_yes_bid_as_explicit_lower_bound_without_midpoint(tmp_path) -> None:

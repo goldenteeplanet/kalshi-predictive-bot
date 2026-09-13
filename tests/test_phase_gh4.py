@@ -7,6 +7,7 @@ from kalshi_predictor.phase_gh4 import (
     GH4_APPROVAL_TOKEN,
     build_gh3_soak_status,
     build_gh4_paper_activation_preflight,
+    build_source_reconnect_health,
     evaluate_paper_order_activation,
 )
 
@@ -305,3 +306,38 @@ def _write_inputs(
         "gh1_status_path": gh1_status_path,
         "scheduler_status_path": scheduler_status_path,
     }
+
+
+def test_weather_health_accepts_fresh_dedicated_owner_features() -> None:
+    features = {
+        "mode": "DEDICATED_RUNTIME_OWNER_REUSE",
+        "location_count": 2,
+        "fresh_location_count": 2,
+        "features_reused": 2,
+        "freshness_minutes": 15,
+        "oldest_latest_feature_at": (NOW - timedelta(minutes=5)).isoformat(),
+    }
+    payload = {
+        "generated_at": NOW.isoformat(),
+        "decision_refresh": {
+            "weather_features": [features],
+            "weather_forecasts": {"forecasts_inserted": 2},
+        },
+    }
+
+    def weather_status() -> dict:
+        health = build_source_reconnect_health(gh2_payload=payload, gh1_payload={}, now=NOW)
+        return next(row for row in health["sources"] if row["source"] == "NOAA weather")
+
+    assert weather_status()["status"] == "HEALTHY"
+    assert "2 fresh reused features" in weather_status()["detail"]
+    features["fresh_location_count"] = 1
+    assert weather_status()["status"] == "NEEDS_ATTENTION"
+    features["fresh_location_count"] = 2
+    features["oldest_latest_feature_at"] = (NOW - timedelta(minutes=16)).isoformat()
+    assert weather_status()["status"] == "NEEDS_ATTENTION"
+    features["oldest_latest_feature_at"] = (NOW + timedelta(minutes=1)).isoformat()
+    assert weather_status()["status"] == "NEEDS_ATTENTION"
+    features["oldest_latest_feature_at"] = (NOW - timedelta(minutes=5)).isoformat()
+    features["mode"] = "UNKNOWN"
+    assert weather_status()["status"] == "NEEDS_ATTENTION"

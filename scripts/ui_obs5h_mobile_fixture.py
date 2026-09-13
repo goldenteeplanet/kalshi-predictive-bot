@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 source = Path("reports/phase_ui_obs5h/ui_obs5c_normal.html")
 target = Path("reports/phase_ui_obs5h/ui_obs5h_mobile_390.html")
 html = source.read_text(encoding="utf-8")

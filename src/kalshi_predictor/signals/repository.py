@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.data.repositories import decode_json
@@ -45,6 +45,15 @@ def signal_marketplace(session: Session) -> dict[str, Any]:
             "signals": len(cards),
             "active_forecasts": sum(card["forecast_count"] for card in cards),
             "active_trades": sum(card["trade_count"] for card in cards),
+            "unique_historical_orders": int(
+                session.scalar(
+                    select(func.count(func.distinct(PaperOrder.id))).join(
+                        SignalTrade, SignalTrade.paper_order_id == PaperOrder.id
+                    )
+                )
+                or 0
+            ),
+            "mission_trades": None,
         },
     }
 
@@ -55,6 +64,9 @@ def signal_detail(session: Session, *, signal_name: str) -> dict[str, Any] | Non
     if signal is None:
         return None
     performance = _latest_performance_by_signal(session).get(signal.signal_name)
+    readiness = next(
+        (row for row in signal_status_rows(session) if row["signal_name"] == signal_name), None
+    )
     events = list(
         session.scalars(
             select(SignalEvent)
@@ -77,7 +89,7 @@ def signal_detail(session: Session, *, signal_name: str) -> dict[str, Any] | Non
     markets = _market_performance_rows(trades)
     return {
         "signal": signal,
-        "card": _signal_card(signal, performance),
+        "card": _signal_card(signal, performance, readiness),
         "metadata": decode_json(signal.metadata_json),
         "events": [_event_row(row) for row in events],
         "recent_trades": [_trade_row(row) for row in trades],
@@ -172,16 +184,13 @@ def _signal_card(
             signal.status,
         )
     )
-    status = (
-        readiness.get("status_label", performance_status)
-        if readiness and readiness.get("readiness_status") != "ACTIVE"
-        else performance_status
-    )
+    status = (readiness or {}).get("status_label", "Readiness unknown")
     return {
         "signal_name": signal.signal_name,
         "category": signal.category,
         "description": signal.description,
         "status": status,
+        "historical_performance_label": performance_status,
         "roi": performance.roi if performance else None,
         "win_rate": performance.win_rate if performance else None,
         "trade_count": performance.trade_count if performance else 0,
@@ -194,9 +203,15 @@ def _signal_card(
         "avg_opportunity_score": performance.avg_opportunity_score if performance else None,
         "readiness_status": (readiness or {}).get("readiness_status", "UNKNOWN"),
         "status_label": (readiness or {}).get("status_label", status),
-        "missing_data": (readiness or {}).get("missing_data", "none"),
-        "next_action": (readiness or {}).get("next_action", "No action needed."),
+        "missing_data": (readiness or {}).get("missing_data", "readiness evidence"),
+        "next_action": (readiness or {}).get(
+            "next_action", "Review signal data and model readiness."
+        ),
         "latest_signal": (readiness or {}).get("latest_signal", "none"),
+        "freshness_checked_at": (readiness or {}).get("freshness_checked_at"),
+        "model_readiness": "UNVERIFIED",
+        "evidence_type": "Historical attribution; heuristic score is not calibrated probability",
+        "performance_generated_at": performance.generated_at.isoformat() if performance else None,
         "skip_count": (readiness or {}).get("skip_count", 0),
         "skip_reason": (readiness or {}).get("skip_reason", "No skip logged yet."),
     }
@@ -208,11 +223,7 @@ def _leaderboard_row(
     readiness: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     performance_status = decode_json(row.raw_json).get("status", "Insufficient Data")
-    status = (
-        readiness.get("status_label", performance_status)
-        if readiness and readiness.get("readiness_status") != "ACTIVE"
-        else performance_status
-    )
+    status = (readiness or {}).get("status_label", "Readiness unknown")
     return {
         "rank": rank,
         "signal_name": row.signal_name,
@@ -224,10 +235,13 @@ def _leaderboard_row(
         "confidence_score": row.confidence_score,
         "brier_score": row.brier_score,
         "status": status,
+        "historical_performance_label": performance_status,
         "readiness_status": (readiness or {}).get("readiness_status", "UNKNOWN"),
         "status_label": (readiness or {}).get("status_label", status),
-        "missing_data": (readiness or {}).get("missing_data", "none"),
-        "next_action": (readiness or {}).get("next_action", "No action needed."),
+        "missing_data": (readiness or {}).get("missing_data", "readiness evidence"),
+        "next_action": (readiness or {}).get(
+            "next_action", "Review signal data and model readiness."
+        ),
         "latest_signal": (readiness or {}).get("latest_signal", "none"),
         "skip_count": (readiness or {}).get("skip_count", 0),
         "skip_reason": (readiness or {}).get("skip_reason", "No skip logged yet."),
@@ -295,6 +309,7 @@ def _recent_opportunities(session: Session, tickers: list[str]) -> list[dict[str
                     "model_name": row.forecast_model,
                     "score": row.opportunity_score,
                     "edge": row.estimated_edge,
+                    "ranked_at": row.ranked_at.isoformat(),
                 },
                 ticker=row.ticker,
                 ranking=row,
@@ -344,10 +359,16 @@ def _activity_for_signal(session: Session, signal_name: str) -> int:
 
 def _research_summary(signal: Signal, performance: SignalPerformance | None) -> str:
     if performance is None:
-        return f"{signal.signal_name} needs more forecast and paper-trade data."
+        return (
+            f"{signal.signal_name} has no historical performance snapshot; readiness is unverified."
+        )
     status = decode_json(performance.raw_json).get("status", signal.status)
     return (
-        f"{signal.signal_name} is currently {status}. ROI is {performance.roi or 'n/a'}, "
-        f"win rate is {performance.win_rate or 'n/a'}, and confidence is "
-        f"{performance.confidence_score or 'n/a'}."
+        f"{signal.signal_name}: historical label {status}, snapshot "
+        f"{performance.generated_at.isoformat()}. ROI is "
+        f"{performance.roi if performance.roi is not None else 'n/a'}, "
+        f"win rate is {performance.win_rate if performance.win_rate is not None else 'n/a'}, "
+        f"and heuristic score (not calibrated probability) is "
+        f"{performance.confidence_score if performance.confidence_score is not None else 'n/a'}. "
+        "This does not establish current model readiness or mission trades."
     )

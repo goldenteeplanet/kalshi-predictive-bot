@@ -15,6 +15,7 @@ from kalshi_predictor.weather.repository import (
     get_weather_forecasts,
     insert_weather_features,
     normalize_location_key,
+    weather_forecast_clock_consistent,
 )
 
 
@@ -45,6 +46,8 @@ def build_weather_features(
     inserted = 0
     generated_at = utc_now()
     for forecast in forecasts:
+        if not weather_forecast_clock_consistent(forecast):
+            continue
         features = calculate_weather_features(forecast, generated_at=generated_at)
         if active_settings.weather_v2_knyc_observation_enabled and location == "new_york":
             evidence = _knyc_observation_evidence(

@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import UTC
 from typing import Any
 
 from sqlalchemy import desc, func, select
@@ -46,11 +47,16 @@ from kalshi_predictor.signals.skip_log import (
     signal_skip_row,
     skip_count_for_signal,
 )
+from kalshi_predictor.utils.time import utc_now
 
 ACTIVE = "ACTIVE"
 NEEDS_DATA = "NEEDS_DATA"
 READY_NO_MARKETS = "READY_BUT_NO_MATCHING_MARKETS"
 NOT_REGISTERED = "NOT_REGISTERED"
+STALE = "STALE"
+UNKNOWN = "UNKNOWN"
+# Display freshness only; this never grants model or paper admission.
+DISPLAY_FRESHNESS_SECONDS = 900
 
 
 @dataclass(frozen=True)
@@ -74,11 +80,48 @@ def signal_status_rows(
 ) -> list[dict[str, Any]]:
     signals = {row.signal_name: row for row in ensure_builtin_signals(session)}
     rows = []
-    for definition in definitions or expected_signal_definitions():
+    selected = list(definitions) if definitions is not None else list(expected_signal_definitions())
+    if definitions is None:
+        known = {item.signal_name for item in selected}
+        selected.extend(
+            ExpectedSignal(
+                name,
+                name,
+                "Readiness evidence not configured",
+                "Review signal data and model readiness.",
+            )
+            for name in signals
+            if name not in known
+        )
+    now = utc_now()
+    for definition in selected:
         signal = signals.get(definition.signal_name)
         counts = _counts(session, definition.signal_name)
         latest_generated = _latest_generated_time(session, definition.signal_name)
         readiness = _readiness_for_signal(session, definition, bool(signal), counts)
+        if readiness["readiness_status"] == ACTIVE:
+            latest_utc = (
+                latest_generated.replace(tzinfo=UTC)
+                if latest_generated and latest_generated.tzinfo is None
+                else latest_generated
+            )
+            age = (now - latest_utc).total_seconds() if latest_utc else None
+            if age is None or age < 0:
+                readiness = _readiness(
+                    UNKNOWN,
+                    "Freshness cannot be verified.",
+                    "valid output timestamp",
+                    "FRESHNESS_UNKNOWN",
+                    {},
+                )
+            elif age > DISPLAY_FRESHNESS_SECONDS:
+                readiness = _readiness(
+                    STALE,
+                    "Only historical output is available.",
+                    "recent output",
+                    "STALE_OUTPUT",
+                    {},
+                )
         next_command = readiness.pop("next_command_override", definition.next_command)
         latest_skip = signal_skip_row(latest_skip_for_signal(session, definition.signal_name))
         if log_skips and readiness["readiness_status"] != ACTIVE:
@@ -105,6 +148,8 @@ def signal_status_rows(
                 "event_count": counts["event_count"],
                 "latest_generated_time": latest_generated.isoformat() if latest_generated else None,
                 "latest_signal": latest_generated.isoformat() if latest_generated else "none",
+                "freshness_checked_at": now.isoformat(),
+                "freshness_window_seconds": DISPLAY_FRESHNESS_SECONDS,
                 "required_data": definition.required_data,
                 "next_command": next_command,
                 "next_action": next_command,
@@ -182,7 +227,13 @@ def _readiness_for_signal(
         if _forecast_count_like(session, "meta%") == 0:
             return _needs("no meta model forecasts", "meta model forecasts", {})
         return _ready_no_markets("meta forecasts exist but this signal was not attributed")
-    return _ready_no_markets("ready but no matching markets")
+    return _readiness(
+        UNKNOWN,
+        "Readiness evidence is not configured.",
+        "readiness evidence",
+        "READINESS_UNKNOWN",
+        {},
+    )
 
 
 def _crypto_readiness(session: Session) -> dict[str, Any]:
@@ -304,7 +355,9 @@ def _readiness(
 
 def _status_label(status: str) -> str:
     return {
-        ACTIVE: "Active",
+        ACTIVE: "Recent output (model readiness unverified)",
+        STALE: "Stale output",
+        UNKNOWN: "Readiness unknown",
         NEEDS_DATA: "Needs data",
         READY_NO_MARKETS: "Ready but no matching markets",
         NOT_REGISTERED: "Not registered",

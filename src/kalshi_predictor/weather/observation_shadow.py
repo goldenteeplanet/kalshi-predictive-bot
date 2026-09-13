@@ -38,11 +38,15 @@ def evaluate_knyc_observation(
         "observation_temperature_f": (evidence or {}).get("observation_temperature_f"),
     }
     blocker = _validate(target_time, evidence)
-    if blocker:
+    if blocker or evidence is None:
         return ObservationShadowResult(
-            baseline_probability, None, False, False, blocker, provenance
+            baseline_probability, None, False, False, blocker or "KNYC_EVIDENCE_MISSING", provenance
         )
     observation = to_decimal(evidence.get("observation_temperature_f"))
+    if observation is None:
+        return ObservationShadowResult(
+            baseline_probability, None, False, False, "OBSERVATION_TEMPERATURE_MISSING", provenance
+        )
     signal = max(Decimal("-1"), min(Decimal("1"), (observation - raw_strike) / Decimal("20")))
     shadow = max(
         Decimal("0.01"), min(Decimal("0.99"), baseline_probability + signal * max_adjustment)

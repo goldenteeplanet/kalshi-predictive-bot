@@ -1388,7 +1388,7 @@ class Settings(BaseSettings):
         ):
             if value not in {1, 3, 5}:
                 raise ValueError(f"{name} must be one of 1, 3, or 5.")
-        for name, value in (
+        for name, optional_cap in (
             (
                 "DYNAMIC_POSITION_SIZING_EXTERNAL_RISK_CAP",
                 self.dynamic_position_sizing_external_risk_cap,
@@ -1399,7 +1399,7 @@ class Settings(BaseSettings):
                 self.dynamic_position_sizing_portfolio_cap,
             ),
         ):
-            if value is not None and value < 0:
+            if optional_cap is not None and optional_cap < 0:
                 raise ValueError(f"{name} cannot be negative.")
         self._validate_advanced_risk_engine()
         return self
@@ -1433,7 +1433,7 @@ class Settings(BaseSettings):
             if value not in {0, 1, 3, 5}:
                 raise ValueError(f"{name} must be one of 0, 1, 3, or 5.")
 
-        for name, value in (
+        for name, decimal_value in (
             ("ADVANCED_RISK_DEFAULT_ACCOUNT_EQUITY", self.advanced_risk_default_account_equity),
             (
                 "ADVANCED_RISK_MAX_TOTAL_OPEN_RISK_FRACTION",
@@ -1510,10 +1510,10 @@ class Settings(BaseSettings):
                 self.advanced_risk_gap_tail_buffer_per_contract,
             ),
         ):
-            if value < 0 or not value.is_finite():
+            if decimal_value < 0 or not decimal_value.is_finite():
                 raise ValueError(f"{name} must be finite and non-negative.")
 
-        for name, value in (
+        for name, optional_decimal in (
             ("ADVANCED_RISK_MAX_DAILY_LOSS_FRACTION", self.advanced_risk_max_daily_loss_fraction),
             (
                 "ADVANCED_RISK_MAX_DAILY_LOSS_FIXED_AMOUNT",
@@ -1532,7 +1532,9 @@ class Settings(BaseSettings):
                 self.advanced_risk_max_open_interest_participation_fraction,
             ),
         ):
-            if value is not None and (value < 0 or not value.is_finite()):
+            if optional_decimal is not None and (
+                optional_decimal < 0 or not optional_decimal.is_finite()
+            ):
                 raise ValueError(f"{name} must be finite and non-negative when set.")
 
         if (

@@ -66,12 +66,60 @@ def build_source_reconnect_health(
     decision = gh2_payload.get("decision_refresh") or {}
     weather_features = list(decision.get("weather_features") or [])
     weather_forecasts = decision.get("weather_forecasts") or {}
+    inserted_features = sum(int(row.get("features_inserted") or 0) for row in weather_features)
+    fresh_reused_features = 0
+    for row in weather_features:
+        locations = int(row.get("location_count") or 0)
+        oldest_at = _datetime(row.get("oldest_latest_feature_at"))
+        oldest_age = _age_minutes(row.get("oldest_latest_feature_at"), resolved_now)
+        freshness = min(int(row.get("freshness_minutes") or 0), decision_stale_minutes)
+        if (
+            row.get("mode") == "DEDICATED_RUNTIME_OWNER_REUSE"
+            and locations > 0
+            and int(row.get("fresh_location_count") or 0) == locations
+            and int(row.get("features_reused") or 0) >= locations
+            and oldest_at is not None
+            and oldest_at <= resolved_now
+            and oldest_age is not None
+            and 0 <= oldest_age <= freshness
+        ):
+            fresh_reused_features += locations
     weather_healthy = (
         decision_age is not None
         and decision_age <= decision_stale_minutes
-        and sum(int(row.get("features_inserted") or 0) for row in weather_features) > 0
+        and inserted_features + fresh_reused_features > 0
         and int(weather_forecasts.get("forecasts_inserted") or 0) > 0
     )
+    active_linking = gh2_payload.get("active_linking") or {}
+    catalog = active_linking.get("rollover_catalog") or {}
+    weather_gate = gh2_payload.get("weather_gate") or {}
+    decision_generated = _datetime(gh2_payload.get("generated_at"))
+    scope_counts = (
+        active_linking.get("weather_decision_candidates"),
+        weather_forecasts.get("snapshots_scanned"),
+        weather_forecasts.get("forecasts_inserted"),
+    )
+    no_weather_market_scope = (
+        decision_generated is not None
+        and decision_generated <= resolved_now
+        and decision_age is not None
+        and decision_age <= decision_stale_minutes
+        and weather_gate.get("status") == "NO_CURRENT_WEATHER_LINKS"
+        and all(type(count) is int and count == 0 for count in scope_counts)
+        and not weather_features
+        and not weather_healthy
+    )
+    weather_recovery = (
+        "Bounded weather refresh is producing current decisions."
+        if weather_healthy
+        else "Retry NOAA ingest and rebuild the current weather decision window."
+    )
+    if no_weather_market_scope:
+        weather_recovery = (
+            "Restore a fresh bounded active-market catalog, then link current weather markets. "
+            if catalog.get("status") == "STALE_NOT_IMPORTED"
+            else "Resolve the missing current weather-market links before forecasting. "
+        ) + "These decision counts do not measure NOAA ingestion."
 
     sources = [
         {
@@ -110,14 +158,16 @@ def build_source_reconnect_health(
             "status_kind": "healthy" if weather_healthy else "blocked",
             "age_minutes": decision_age,
             "detail": (
-                f"{sum(int(row.get('features_inserted') or 0) for row in weather_features)} "
-                f"features; {int(weather_forecasts.get('forecasts_inserted') or 0)} forecasts"
+                (
+                    "0 linked weather markets in this decision cycle; "
+                    if no_weather_market_scope
+                    else ""
+                )
+                + f"{inserted_features} new features; "
+                f"{fresh_reused_features} fresh reused features; "
+                f"{int(weather_forecasts.get('forecasts_inserted') or 0)} forecasts"
             ),
-            "recovery": (
-                "Bounded weather refresh is producing current decisions."
-                if weather_healthy
-                else "Retry NOAA ingest and rebuild the current weather decision window."
-            ),
+            "recovery": weather_recovery,
         },
     ]
     return {

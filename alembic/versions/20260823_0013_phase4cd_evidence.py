@@ -1,6 +1,7 @@
 """Canonical Phase 4C/4D research and shadow evidence tables."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260823_0013"

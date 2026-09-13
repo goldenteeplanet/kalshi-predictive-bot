@@ -342,6 +342,16 @@ main {
   font-weight: 700;
 }
 
+.report-unavailable {
+  padding: 9px 10px;
+  overflow-wrap: anywhere;
+}
+
+.report-unavailable small {
+  display: block;
+  color: #cbd5e1;
+}
+
 .cockpit-hero,
 .section-band,
 .panel {

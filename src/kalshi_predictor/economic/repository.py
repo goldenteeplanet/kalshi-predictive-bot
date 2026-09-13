@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import case, desc, select
@@ -88,11 +88,24 @@ def insert_economic_feature(
     return feature
 
 
-def get_latest_economic_feature(session: Session, event_key: str) -> EconomicFeature | None:
+def get_latest_economic_feature(
+    session: Session, event_key: str, *, as_of: datetime | None = None
+) -> EconomicFeature | None:
+    """Prefer populated scores, then recency, within optional local availability.
+
+    The cutoff does not establish provider publication or historical vintage truth.
+    """
+    statement = select(EconomicFeature).where(
+        EconomicFeature.event_key == normalize_event_key(event_key)
+    )
+    if as_of is not None:
+        as_of = _aware_cutoff(as_of)
+        statement = statement.where(
+            EconomicFeature.generated_at <= as_of,
+            EconomicFeature.created_at <= as_of,
+        )
     return session.scalar(
-        select(EconomicFeature)
-        .where(EconomicFeature.event_key == normalize_event_key(event_key))
-        .order_by(
+        statement.order_by(
             case((EconomicFeature.surprise_score.is_(None), 1), else_=0),
             desc(EconomicFeature.generated_at),
             desc(EconomicFeature.id),
@@ -128,10 +141,21 @@ def insert_economic_market_link(
 def get_latest_economic_link_for_ticker(
     session: Session,
     ticker: str,
+    *,
+    as_of: datetime | None = None,
 ) -> EconomicMarketLink | None:
+    """Select the most recent link known by the optional input cutoff."""
+    statement = select(EconomicMarketLink).where(EconomicMarketLink.ticker == ticker)
+    if as_of is not None:
+        as_of = _aware_cutoff(as_of)
+        statement = statement.where(EconomicMarketLink.detected_at <= as_of)
     return session.scalar(
-        select(EconomicMarketLink)
-        .where(EconomicMarketLink.ticker == ticker)
-        .order_by(desc(EconomicMarketLink.detected_at), desc(EconomicMarketLink.id))
+        statement.order_by(desc(EconomicMarketLink.detected_at), desc(EconomicMarketLink.id))
         .limit(1)
     )
+
+
+def _aware_cutoff(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("ECONOMIC_INPUT_CUTOFF_TIMEZONE_REQUIRED")
+    return value.astimezone(UTC)

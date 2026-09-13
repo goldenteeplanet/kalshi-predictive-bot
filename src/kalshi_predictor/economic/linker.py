@@ -15,7 +15,14 @@ from kalshi_predictor.economic.repository import (
 
 ECONOMIC_PATTERNS = {
     "cpi": (r"\bcpi\b", r"\binflation\b"),
-    "fed": (r"\bfed\b", r"\bfomc\b", r"\bfederal reserve\b", r"\brates?\b", r"\binterest rate\b"),
+    # A bare "rate" also occurs in unemployment and other unrelated outcomes.
+    "fed": (
+        r"\bfed\b",
+        r"\bfomc\b",
+        r"\bfederal reserve\b",
+        r"\binterest rates?\b",
+        r"\brate (?:cuts?|hikes?)\b",
+    ),
     "jobs": (r"\bunemployment\b", r"\bjobs?\b", r"\bpayrolls?\b"),
     "gdp": (r"\bgdp\b", r"\brecession\b"),
 }

@@ -46,7 +46,11 @@ def _render_signal_report(
         "# Signal Marketplace Report",
         "",
         f"- Generated at: {utc_now().isoformat()}",
-        "- Mode: PAPER / DEMO ONLY",
+        "- Evidence class: historical signal attribution; totals may overlap across signals.",
+        "- Mission trades: not established by this report.",
+        "- Model readiness: UNVERIFIED. Heuristic scores are not calibrated probabilities.",
+        "- Freshness: status uses a 15-minute output window; "
+        "generation time is not source freshness.",
         f"- Active expected signals: {len(active)}",
         f"- Inactive expected signals: {len(inactive)}",
         "",
@@ -66,7 +70,7 @@ def _render_signal_report(
         "",
         *_table(highest_roi[:10]),
         "",
-        "## Best Calibrated Signals",
+        "## Lowest Historical Brier Scores (Calibration Not Certified)",
         "",
         *_table(calibrated[:10]),
         "",
@@ -92,7 +96,7 @@ def _render_signal_report(
         "",
         "## Explorer",
         "",
-        "| Signal | Category | Models | Current Activity | Status |",
+        "| Signal | Category | Models | Historical Events (capped at 50) | Status |",
         "|---|---|---|---:|---|",
     ]
     if not explorer:
@@ -120,7 +124,7 @@ def _render_signal_report(
 
 def _table(rows: list[dict[str, Any]]) -> list[str]:
     lines = [
-        "| Rank | Signal | ROI | Win Rate | Forecasts | Trades | Confidence | "
+        "| Rank | Signal | ROI | Win Rate | Forecasts | Trade Attributions | Heuristic Score | "
         "Status | Missing Data |",
         "|---:|---|---:|---:|---:|---:|---:|---|---|",
     ]
@@ -145,7 +149,8 @@ def _table(rows: list[dict[str, Any]]) -> list[str]:
 
 def _readiness_table(rows: list[dict[str, Any]]) -> list[str]:
     lines = [
-        "| Signal | Status | Forecasts | Trades | Latest Signal | Missing Data | Next Action |",
+        "| Signal | Status | Forecasts | Trade Attributions | Latest Signal | "
+        "Missing Data | Next Action |",
         "|---|---|---:|---:|---|---|---|",
     ]
     if not rows:

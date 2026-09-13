@@ -1,0 +1,31 @@
+{
+  "account_override_evidence": null,
+  "archive_representation": "WEB_TOOL_EXTRACTED_FACTS_NOT_ORIGINAL_PDF",
+  "default_taker_multiplier": "1",
+  "effective_date": "2026-07-07",
+  "example_one_contract_fees": {
+    "0.01": "0.01",
+    "0.05": "0.01",
+    "0.10": "0.01",
+    "0.25": "0.02",
+    "0.50": "0.02",
+    "0.75": "0.02",
+    "0.95": "0.01",
+    "0.99": "0.01"
+  },
+  "formula_rounding_text": "fee + positionCost is rounded to a centicent",
+  "maker_rate": "0.0175",
+  "nonstandard_series_target_matches": [],
+  "original_pdf_download_status": "HTTP_429_NOT_ARCHIVED",
+  "recorded_at": "2026-09-12T23:24:17.868459+00:00",
+  "retrieved_at": null,
+  "rounding_status": "FEE_CONFLICT_FORMULA_VERSUS_EXAMPLES",
+  "source_url": "https://kalshi.com/docs/kalshi-fee-schedule.pdf",
+  "taker_rate": "0.07",
+  "target_series_reviewed": [
+    "KXBTC",
+    "KXETH",
+    "KXSOLE"
+  ],
+  "web_observation_time_note": "Read live through web tool during this documentation audit; exact retrieval timestamp not returned by web tool."
+}

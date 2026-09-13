@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import re
 import time
@@ -9,15 +10,17 @@ from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
+from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from kalshi_predictor.config import Settings
 from kalshi_predictor.data.locks import db_writer_monitor
 from kalshi_predictor.data.repositories import insert_market_snapshot
+from kalshi_predictor.ingest.public_book_stage import validate_public_stage
 from kalshi_predictor.kalshi.client import KalshiClient
+from kalshi_predictor.kalshi.data_environment import endpoint_environment, matched_environment
 from kalshi_predictor.kalshi.orderbook import LocalOrderbook, OrderbookSequenceGap
-from kalshi_predictor.opportunities.market_identity import kalshi_api_market_url
 from kalshi_predictor.utils.time import parse_datetime, utc_now
 
 DEFAULT_WS_URL = "wss://external-api-ws.demo.kalshi.co/trade-api/ws/v2"
@@ -71,6 +74,7 @@ class ReadOnlyOrderbookWebSocketAdapter:
         self.auth_headers = _validated_auth_headers(auth_headers)
         self.staging_dir = staging_dir
         self.rest_client = rest_client
+        self.environment = matched_environment(rest_client.base_url, ws_url)
         self.connector = connector or _default_connector
         self.ws_url = ws_url
         self.persist_every_deltas = max(1, persist_every_deltas)
@@ -166,14 +170,20 @@ class ReadOnlyOrderbookWebSocketAdapter:
         )
 
     def _stage(self, ticker: str, *, reason: str) -> Path:
+        environment = matched_environment(self.rest_client.base_url, self.ws_url)
+        if environment != self.environment:
+            raise ValueError("MARKET_DATA_ENVIRONMENT_CHANGED")
         market = dict(self.rest_client.get_market(ticker))
         market["source"] = "kalshi_rest_market_snapshot"
         market["source_observed_at"] = utc_now().isoformat()
-        market["kalshi_api_url"] = kalshi_api_market_url(ticker)
+        market["kalshi_api_url"] = self.rest_client.base_url.rstrip("/") + "/markets/" + ticker
         book = self.books[ticker]
         payload = {
             "category": "websocket_orderbook_snapshot",
             "version": "gh1_v1",
+            "source_environment": environment,
+            "rest_base_url": self.rest_client.base_url,
+            "websocket_url": self.ws_url,
             "staged_at": utc_now().isoformat(),
             "reason": reason,
             "ticker": ticker,
@@ -270,12 +280,46 @@ def drain_staged_websocket_orderbooks(
     files = sorted(staging_dir.glob("*.json")) if staging_dir.exists() else []
     inserted = 0
     committed_files: list[Path] = []
+    rejected_files: list[tuple[Path, str]] = []
     errors: list[str] = []
     with session_factory() as session:
         try:
             for path in files:
                 payload = json.loads(path.read_text(encoding="utf-8"))
                 if payload.get("category") != "websocket_orderbook_snapshot":
+                    continue
+                try:
+                    if payload.get("source_kind") == "PUBLIC_REST":
+                        validate_public_stage(payload, as_of=utc_now())
+                        environment = endpoint_environment(payload["rest_base_url"])
+                    else:
+                        environment = matched_environment(
+                            payload["rest_base_url"], payload["websocket_url"]
+                        )
+                    expected = endpoint_environment((settings or Settings()).kalshi_base_url)
+                    if payload.get("source_environment") != environment or environment != expected:
+                        raise ValueError("STAGED_MARKET_DATA_ENVIRONMENT_MISMATCH")
+                except (KeyError, TypeError, ValueError) as exc:
+                    permitted = {
+                        "PUBLIC_ORIGINAL_STALE",
+                        "PUBLIC_ORIGINAL_CHRONOLOGY",
+                        "PUBLIC_ORIGINAL_BINDING",
+                        "PUBLIC_ORIGINAL_CHANGED",
+                        "PUBLIC_MARKET_NOT_ACTIVE",
+                        "PUBLIC_BOOK_SCHEMA",
+                        "PUBLIC_STAGE_CLOCK",
+                        "PUBLIC_STAGE_IDENTITY",
+                        "PUBLIC_STAGE_TICKER",
+                        "MARKET_DATA_ENVIRONMENT_MISMATCH",
+                        "STAGED_MARKET_DATA_ENVIRONMENT_MISMATCH",
+                    }
+                    reason = (
+                        str(exc)
+                        if isinstance(exc, ValueError) and str(exc) in permitted
+                        else "UNVERIFIED_STAGED_MARKET_DATA_ENVIRONMENT"
+                    )
+                    errors.append(f"{path.name}: {reason}")
+                    rejected_files.append((path, reason))
                     continue
                 market = payload.get("market")
                 orderbook = payload.get("orderbook")
@@ -295,6 +339,25 @@ def drain_staged_websocket_orderbooks(
             session.rollback()
             raise
     archive_dir = staging_dir / "drained"
+    quarantined_files: list[str] = []
+    for path, reason in rejected_files:
+        destination_dir = staging_dir / "rejected" / uuid4().hex
+        destination_dir.mkdir(parents=True, exist_ok=False)
+        raw = path.read_bytes()
+        destination = destination_dir / path.name
+        (destination_dir / "reason.json").write_text(
+            json.dumps(
+                {
+                    "reason": reason,
+                    "original_name": path.name,
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "rejected_at": utc_now().isoformat(),
+                }
+            ),
+            encoding="utf-8",
+        )
+        path.rename(destination)
+        quarantined_files.append(str(destination))
     archived_files: list[str] = []
     if committed_files:
         archive_dir.mkdir(parents=True, exist_ok=True)
@@ -308,6 +371,7 @@ def drain_staged_websocket_orderbooks(
         "snapshots_inserted": inserted,
         "files_archived": len(archived_files),
         "archived_files": archived_files,
+        "quarantined_files": quarantined_files,
         "errors": errors,
         "writer_monitor": writer,
         "single_writer_session_count": 1,
