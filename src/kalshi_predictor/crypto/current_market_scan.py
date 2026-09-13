@@ -16,6 +16,10 @@ from urllib.parse import urlencode
 
 from kalshi_predictor.crypto.account_fee_evidence import FeeAuthorityOriginal
 from kalshi_predictor.crypto.cost_evidence import OriginalBook, _levels, _unique
+from kalshi_predictor.crypto.current_calibration_evidence import (
+    CurrentCalibrationOriginals,
+    assess_current_conditional_calibration,
+)
 from kalshi_predictor.crypto.current_research_intake import prepare_current_research_forecast
 from kalshi_predictor.crypto.public_paper_costs import (
     SERIES_HASHES,
@@ -271,6 +275,7 @@ def evaluate_paginated_current_research(
     fee_originals: dict[str, tuple[FeeAuthorityOriginal, ...]], assessed_at: datetime,
     research_inputs: dict[str, CurrentResearchInputs] | None = None,
     acquisition_errors: dict[str, str] | None = None, limit: int = PAGE_LIMIT,
+    calibration_originals: dict[str, CurrentCalibrationOriginals] | None = None,
 ) -> dict[str, Any]:
     """Current research diagnostics with original-recomputed forecasts and support bounds.
 
@@ -280,6 +285,11 @@ def evaluate_paginated_current_research(
     or guarded-paper eligibility. This function does not fetch, write or trade.
     """
     inputs = research_inputs or {}
+    calibration = calibration_originals or {}
+    if (len(calibration) > MAX_SCAN_BOOKS
+            or any(type(value) is not CurrentCalibrationOriginals for value in calibration.values())
+            or sum(value.byte_count() for value in calibration.values()) > 24_000_000):
+        raise ValueError('SCAN_CALIBRATION_ORIGINAL_BOUND_INVALID')
     if (assessed_at.utcoffset() is None or len(books) > MAX_SCAN_BOOKS
             or len(inputs) > MAX_SCAN_BOOKS
             or set(discovery_pages)-set(FAMILIES.values())):
@@ -291,6 +301,7 @@ def evaluate_paginated_current_research(
         'book_valid_independent_of_forecast', 'book_valid',
         'gross_positive', 'positive_after_fee', 'positive_after_snapshot_impact',
         'conservative_bounds_known', 'uncertainty_known', 'full_net_positive', 'full_net_gt_5c',
+        'conditional_uncertainty_supported',
         'risk_passing', 'paper_eligible',
     )}
     first_blocker_counts: dict[str, int] = {}
@@ -379,6 +390,7 @@ def evaluate_paginated_current_research(
                     'executable_price': None, 'fee': None, 'snapshot_impact': None,
                     'gross_edge': None, 'after_fee': None, 'after_execution': None,
                     'uncertainty': None, 'full_net_ev': None, 'conservative_bound': None,
+                    'conditional_calibration': None,
                     'net_lower_bound': None, 'net_upper_bound': None,
                     'book_source': ({'url': book.url, 'sha256': book.sha256,
                                      'received_at': book.received_at.isoformat()}
@@ -403,6 +415,19 @@ def evaluate_paginated_current_research(
                                                originals=fee_originals.get(series, ()),
                                                assessed_at=assessed_at)
                         row.update(executable_price=str(price), fee=fee, snapshot_impact=impact)
+                        if (prepared is not None and probability is not None
+                                and ticker in calibration):
+                            evidence = assess_current_conditional_calibration(
+                                originals=calibration[ticker], ticker=ticker,
+                                event_id=market.get('event_ticker', ''), series=series,
+                                model_version=prepared['model'], side=side,
+                                selected_probability=probability, executable_price=price,
+                                decision_at=assessed_at, book=book,
+                                fee_originals=fee_originals.get(series, ()))
+                            row['conditional_calibration'] = evidence
+                            blockers.extend(evidence['blockers'])
+                            if evidence['conditional_uncertainty_value'] is not None:
+                                stages['conditional_uncertainty_supported'].add(ticker)
                         blockers.extend(impact['blockers']+fee['blockers'])
                         if impact['value'] is not None:
                             stages['book_valid_independent_of_forecast'].add(ticker)
@@ -442,7 +467,7 @@ def evaluate_paginated_current_research(
                 market_rows.append(row)
             first = market_rows[0]['first_blocker']
             first_blocker_counts[first] = first_blocker_counts.get(first, 0)+1
-    if set(books)-recognized or set(inputs)-recognized:
+    if set(books)-recognized or set(inputs)-recognized or set(calibration)-recognized:
         raise ValueError('SCAN_BOOK_OR_INTAKE_OUTSIDE_VERIFIED_DISCOVERY')
     return {
         'version': 'PAGINATED_CURRENT_RESEARCH_V2', 'assessed_at': assessed_at.isoformat(),
