@@ -64,6 +64,9 @@ def signal_detail(session: Session, *, signal_name: str) -> dict[str, Any] | Non
     if signal is None:
         return None
     performance = _latest_performance_by_signal(session).get(signal.signal_name)
+    readiness = next(
+        (row for row in signal_status_rows(session) if row["signal_name"] == signal_name), None
+    )
     events = list(
         session.scalars(
             select(SignalEvent)
@@ -86,7 +89,7 @@ def signal_detail(session: Session, *, signal_name: str) -> dict[str, Any] | Non
     markets = _market_performance_rows(trades)
     return {
         "signal": signal,
-        "card": _signal_card(signal, performance),
+        "card": _signal_card(signal, performance, readiness),
         "metadata": decode_json(signal.metadata_json),
         "events": [_event_row(row) for row in events],
         "recent_trades": [_trade_row(row) for row in trades],
@@ -306,6 +309,7 @@ def _recent_opportunities(session: Session, tickers: list[str]) -> list[dict[str
                     "model_name": row.forecast_model,
                     "score": row.opportunity_score,
                     "edge": row.estimated_edge,
+                    "ranked_at": row.ranked_at.isoformat(),
                 },
                 ticker=row.ticker,
                 ranking=row,
@@ -355,10 +359,16 @@ def _activity_for_signal(session: Session, signal_name: str) -> int:
 
 def _research_summary(signal: Signal, performance: SignalPerformance | None) -> str:
     if performance is None:
-        return f"{signal.signal_name} needs more forecast and paper-trade data."
+        return (
+            f"{signal.signal_name} has no historical performance snapshot; readiness is unverified."
+        )
     status = decode_json(performance.raw_json).get("status", signal.status)
     return (
-        f"{signal.signal_name} is currently {status}. ROI is {performance.roi or 'n/a'}, "
-        f"win rate is {performance.win_rate or 'n/a'}, and confidence is "
-        f"{performance.confidence_score or 'n/a'}."
+        f"{signal.signal_name}: historical label {status}, snapshot "
+        f"{performance.generated_at.isoformat()}. ROI is "
+        f"{performance.roi if performance.roi is not None else 'n/a'}, "
+        f"win rate is {performance.win_rate if performance.win_rate is not None else 'n/a'}, "
+        f"and heuristic score (not calibrated probability) is "
+        f"{performance.confidence_score if performance.confidence_score is not None else 'n/a'}. "
+        "This does not establish current model readiness or mission trades."
     )

@@ -88,6 +88,12 @@ def test_signal_explorer_and_report_generation(tmp_path) -> None:
     assert any(row["signal_name"] == MARKET_DIVERGENCE_SIGNAL for row in rows)
     assert report.exists()
     assert "Signal Marketplace Report" in report.read_text(encoding="utf-8")
+    text = report.read_text(encoding="utf-8")
+    assert "Mission trades: not established" in text
+    assert "Model readiness: UNVERIFIED" in text
+    assert "Calibration Not Certified" in text
+    assert "Best Calibrated Signals" not in text
+    assert "Historical Events (capped at 50)" in text
 
 
 def test_signal_ui_pages_and_research_integration(tmp_path) -> None:
@@ -121,6 +127,13 @@ def test_signal_ui_pages_and_research_integration(tmp_path) -> None:
     assert "/signals/" in marketplace.text
     assert detail.status_code == 200
     assert "Market Divergence Signal" in detail.text
+    assert "historical label" in detail.text
+    assert "not calibrated probability" in detail.text
+    assert "Historical attributed opportunities" in detail.text
+    assert "Stored rankings, not current candidate admission" in detail.text
+    assert "Recent output (model readiness unverified)" in detail.text
+    assert " / ranked " in detail.text
+    assert " / created " in detail.text
 
 
 def _session_factory(tmp_path):

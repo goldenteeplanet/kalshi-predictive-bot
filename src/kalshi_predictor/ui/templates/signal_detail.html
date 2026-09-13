@@ -42,11 +42,12 @@
 
 <section class="grid two">
   <div class="section-band">
-    <h2>Recent Opportunities</h2>
+    <h2>Historical attributed opportunities</h2>
+    <p class="muted">Stored rankings, not current candidate admission.</p>
     <ul class="checks">
       {% for row in recent_opportunities %}
       <li>
-        {{ row.ticker }} / {{ row.model_name }} / score {{ row.score }} / edge {{ row.edge or 'n/a' }}
+        {{ row.ticker }} / {{ row.model_name }} / score {{ row.score }} / edge {{ row.edge or 'n/a' }} / ranked {{ row.ranked_at }}
         {% if row.kalshi_url_verified %}
         <a class="button" href="{{ row.kalshi_url }}" target="_blank" rel="noopener">Open on Kalshi</a>
         {% else %}
@@ -60,10 +61,10 @@
     </ul>
   </div>
   <div class="section-band">
-    <h2>Recent Trades</h2>
+    <h2>Historical attributed trades</h2>
     <ul class="checks">
       {% for row in recent_trades %}
-      <li>{{ row.ticker }} {{ row.side }} x{{ row.quantity }} edge {{ row.edge }} / {{ row.status }}</li>
+      <li>{{ row.ticker }} {{ row.side }} x{{ row.quantity }} edge {{ row.edge }} / {{ row.status }} / created {{ row.created_at }}</li>
       {% else %}
       <li>No recent paper trades attributed yet.</li>
       {% endfor %}
