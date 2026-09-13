@@ -163,3 +163,19 @@ def test_finite_probability_cannot_claim_infinite_loss():
     evaluation['rows'][0]['score']['log_loss'] = 'POSITIVE_INFINITY'
     with pytest.raises(ValueError, match='LOGLOSS_REQUIRED'):
         score_tournament(analysis, evaluation)
+
+
+def test_priced_rows_without_book_qualification_are_not_executable():
+    analysis, evaluation = inputs()
+    before = copy.deepcopy((analysis, evaluation))
+    result = score_tournament(analysis, evaluation)
+    assert sum(r['conditional_priced_side_n'] for r in result['leaderboard']) == 4
+    for row in result['leaderboard']:
+        assert row['executable_side_n'] is None
+        assert row['book_qualification_status'] == 'NOT_PRESENT_IN_RETAINED_INPUT'
+    result.update(cohort='Book qualification fixture', horizon='5-minute lead')
+    html = render_tournament(result)
+    assert 'Conditionally priced sides' in html
+    assert 'executable-side counts remain Unknown' in html
+    assert '<th>Executable sides</th>' not in html
+    assert (analysis, evaluation) == before
