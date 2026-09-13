@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 from datetime import datetime
-from decimal import Decimal, InvalidOperation, localcontext
+from decimal import (
+    ROUND_HALF_EVEN,
+    Context,
+    Decimal,
+    DivisionByZero,
+    InvalidOperation,
+    Overflow,
+    localcontext,
+)
 from html import escape
 from typing import Any
 
@@ -87,8 +95,10 @@ def _row(record: dict[str, Any]) -> dict[str, Any]:
             impact.get("execution_authority") is False,
         )
     )
-    with localcontext() as context:
-        context.prec = 28  # Captured scanner decimal arithmetic, independent of caller context.
+    # Reproduce default captured scanner arithmetic without inheriting caller traps/rounding.
+    with localcontext(Context(prec=28, rounding=ROUND_HALF_EVEN, Emin=-999999, Emax=999999,
+                              capitals=1, clamp=0, flags=[],
+                              traps=[InvalidOperation, DivisionByZero, Overflow])):
         forecast = record.get("forecast")
         if forecast is not None:
             if not isinstance(forecast, dict):

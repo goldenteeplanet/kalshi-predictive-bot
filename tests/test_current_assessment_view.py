@@ -1,6 +1,7 @@
 import copy
 import json
 from datetime import timedelta
+from decimal import ROUND_CEILING, Inexact, localcontext
 
 import pytest
 from fastapi import FastAPI
@@ -98,6 +99,19 @@ def test_tiny_finite_forecast_is_valid_and_side_complement_is_checked():
     row["forecast"]["probability_yes"] = "0.73273093467024886"
     result = latest_assessment_batch(envelopes(row), now=NOW)
     assert result["status"] == "INVALID_OR_AMBIGUOUS" and not result["rows"]
+
+
+def test_caller_decimal_rounding_traps_and_exponent_limits_do_not_change_capture_arithmetic():
+    row = record(side="YES", forecast_probability="1e-80", forecast={"probability_yes": "1e-80"},
+                 gross_edge="-0.64", after_fee="-0.66", after_execution="-0.66")
+    expected = latest_assessment_batch(envelopes(row), now=NOW)
+    with localcontext() as context:
+        context.prec = 3
+        context.rounding = ROUND_CEILING
+        context.traps[Inexact] = True
+        context.Emin = -9
+        context.Emax = 9
+        assert latest_assessment_batch(envelopes(row), now=NOW) == expected
 
 
 def test_html_limits_twenty_rows_without_changing_api_batch_or_ranking_on_edge():
