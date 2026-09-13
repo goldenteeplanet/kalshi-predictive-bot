@@ -94,14 +94,18 @@ def build_source_reconnect_health(
     catalog = active_linking.get("rollover_catalog") or {}
     weather_gate = gh2_payload.get("weather_gate") or {}
     decision_generated = _datetime(gh2_payload.get("generated_at"))
+    scope_counts = (
+        active_linking.get("weather_decision_candidates"),
+        weather_forecasts.get("snapshots_scanned"),
+        weather_forecasts.get("forecasts_inserted"),
+    )
     no_weather_market_scope = (
         decision_generated is not None
         and decision_generated <= resolved_now
         and decision_age is not None
         and decision_age <= decision_stale_minutes
         and weather_gate.get("status") == "NO_CURRENT_WEATHER_LINKS"
-        and active_linking.get("weather_decision_candidates") == 0
-        and weather_forecasts.get("snapshots_scanned") == 0
+        and all(type(count) is int and count == 0 for count in scope_counts)
         and not weather_features
         and not weather_healthy
     )

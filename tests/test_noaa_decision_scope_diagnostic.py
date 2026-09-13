@@ -71,3 +71,23 @@ def test_missing_scope_or_actual_forecast_work_preserves_default_diagnosis():
     payload = deepcopy(original)
     payload["decision_refresh"]["weather_forecasts"]["snapshots_scanned"] = 1
     assert "Retry NOAA" in row(payload)["recovery"]
+
+
+@pytest.mark.parametrize(
+    "key", ["weather_decision_candidates", "snapshots_scanned", "forecasts_inserted"]
+)
+@pytest.mark.parametrize("value", [False, None, 5])
+def test_bool_missing_or_positive_decisive_counts_do_not_assert_empty_scope(key, value):
+    payload = latest_evidence()
+    target = (
+        payload["active_linking"]
+        if key == "weather_decision_candidates"
+        else payload["decision_refresh"]["weather_forecasts"]
+    )
+    if value is None:
+        del target[key]
+    else:
+        target[key] = value
+    result = row(payload)
+    assert "0 linked weather markets" not in result["detail"]
+    assert "Retry NOAA" in result["recovery"]
