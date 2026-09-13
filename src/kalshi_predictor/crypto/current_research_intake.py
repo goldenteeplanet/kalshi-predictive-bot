@@ -53,9 +53,12 @@ function neither fetches nor persists, and creates no calibrated/model release.
     if not declared <= start <= requested <= as_of < end or (end-start).total_seconds() > 60:
         raise ValueError("CURRENT_RESEARCH_PROSPECTIVE_CLOCK")
     market = json.loads(target.market_original)["market"]
-    expiration = _time(market["expiration_time"])
+    # Research must be prospective to its observation, not gated by a payout
+    # deadline. Guarded paper separately requires the certified final bound in
+    # overnight_paper.timing; expected/close timestamps never satisfy that gate.
+    observation = _time(market["close_time"])
     if market.get("status") not in ("open", "active") or not (
-        0 < (expiration-as_of).total_seconds() <= 72*3600
+        0 < (observation-as_of).total_seconds() <= 72*3600
         and 0 <= (as_of-target.market_received_at).total_seconds() <= 300
     ):
         raise ValueError("CURRENT_RESEARCH_MARKET_FRESHNESS_OR_HORIZON")
@@ -74,6 +77,10 @@ function neither fetches nor persists, and creates no calibrated/model release.
         "calibrated": False, "rule_certified": False, "paper_eligible": False,
         "execution_authority": False, "database_writes": 0,
         "external_timestamp_attestation": False,
+        "research_horizon_basis": "ORIGINAL_BOUND_OBSERVATION_CLOSE",
+        "research_observation_time": observation.isoformat(),
+        "paper_horizon_verified": False,
+        "paper_horizon_blocker": "CERTIFIED_FINAL_SETTLEMENT_BOUND_REQUIRED",
     }
     record["research_forecast_id"] = digest(
         json.dumps(record, sort_keys=True, default=str).encode())

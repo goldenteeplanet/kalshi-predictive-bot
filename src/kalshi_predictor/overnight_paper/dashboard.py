@@ -23,6 +23,10 @@ from kalshi_predictor.overnight_paper.cf_preparation_record import (
     PREFIX as CF_PREPARATION_PREFIX,
 )
 from kalshi_predictor.overnight_paper.cf_preparation_record import preparation_cost_block_record
+from kalshi_predictor.overnight_paper.current_research_dashboard import (
+    current_research_snapshot,
+    empty_current_research,
+)
 from kalshi_predictor.overnight_paper.qualification import GATE_NAMES, decision_fingerprint
 from kalshi_predictor.overnight_paper.research_record import KIND, PREFIX, research_record
 from kalshi_predictor.overnight_paper.runtime_liveness import inspect_process
@@ -360,6 +364,7 @@ def snapshot(path: Path | None) -> dict:
         "runtime_watcher_last_status": None,
         "runtime_blocker_event": None,
         "runtime_current_monitor_verified": False,
+        "current_research": empty_current_research(),
     }
     if path is None or not path.is_file():
         result["blockers"] = ["ISOLATED_PAPER_DATABASE_NOT_CONFIGURED"]
@@ -372,6 +377,7 @@ def snapshot(path: Path | None) -> dict:
             if not {"overnight_shadow", "overnight_history", "paper_orders"}.issubset(tables):
                 raise ValueError("SPRINT_SCHEMA_MISSING")
             result["cf_preparation_block_count"] = 0
+            result["current_research"] = current_research_snapshot(db, now=datetime.now(UTC))
             result.update(_runtime_snapshot(db, path))
             result["historical_evaluated_events"] = db.execute(
                 "SELECT count(DISTINCT event_ticker) FROM overnight_history"
@@ -667,6 +673,18 @@ def render(payload: dict) -> str:
         f"<li>{escape(name)}: {escape('passed at decision time' if passed else 'blocked')}</li>"
         for name, passed in payload["qualification_gates"]
     )
+    current_research = payload.get("current_research") or empty_current_research()
+    research_metrics = "".join(
+        f"<article><h2>{escape(label)}</h2><p>"
+        f"{escape('Unavailable' if current_research.get(key) is None else current_research[key])}"
+        "</p></article>"
+        for key, label in (
+            ("scan_count", "Saved scans"), ("assessment_count", "Research assessments"),
+            ("prospective_shadow_count", "Prospective research shadows"),
+            ("evaluated_shadow_count", "Evaluated research shadows"),
+            ("latest_scan_at", "Latest saved scan"), ("latest_scan_freshness", "Scan freshness"),
+        )
+    )
     return (
         "<!doctype html><html lang='en'><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
@@ -685,6 +703,20 @@ def render(payload: dict) -> str:
         "<p><a href='/system/progress'>System progress</a></p>"
         f"<section>{metrics}</section><h2>Readiness blockers</h2>"
         f"<p>{escape(', '.join(payload['blockers']))}</p>"
+        "<h2>Current market research</h2>"
+        "<p>The funnel describes the latest saved scan only. Journal and shadow counts cover "
+        "the complete bounded research history. A recent scan does not prove a running scanner.</p>"
+        "<p>Full net EV remains unknown when calibrated uncertainty or another required cost "
+        "is missing. Research shadows are observations for evaluation, "
+        "not admitted paper trades.</p>"
+        f"<section>{research_metrics}</section>"
+        "<h3>Latest scan funnel and blockers</h3>"
+        f"<pre>{escape(json.dumps(current_research.get('latest_scan_funnel'), indent=2))}</pre>"
+        "<pre>"
+        f"{escape(json.dumps(current_research.get('latest_scan_first_blocker_counts'), indent=2))}"
+        "</pre>"
+        "<details><summary>Research evidence details</summary>"
+        f"<pre>{escape(json.dumps(current_research, indent=2))}</pre></details>"
         "<h2>Last recorded qualification</h2>"
         "<p>Historical decision evidence; current eligibility requires revalidation.</p>"
         f"<ul>{gates}</ul>"

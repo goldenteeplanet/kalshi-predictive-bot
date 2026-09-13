@@ -61,7 +61,7 @@ def test_original_intake_rejects_unusable_provenance(change):
         prepare_current_research_forecast(**r)
 
 
-def test_late_finality_not_replaced_by_earlier_expected_expiration():
+def test_late_finality_allows_prospective_research_but_never_paper_horizon():
     r = request()
     market = json.loads(r['target'].market_original)
     market['market'].update(
@@ -72,5 +72,8 @@ def test_late_finality_not_replaced_by_earlier_expected_expiration():
     p = json.loads(r['protocol_original'])
     p['target_sha256'] = target_binding(r['target'], as_of=NOW)
     r.update(protocol_original=encode(p), protocol_sha256=digest(encode(p)))
-    with pytest.raises(ValueError, match='HORIZON'):
-        prepare_current_research_forecast(**r)
+    result = prepare_current_research_forecast(**r)
+    assert result['research_horizon_basis'] == 'ORIGINAL_BOUND_OBSERVATION_CLOSE'
+    assert result['paper_horizon_verified'] is False
+    assert result['paper_eligible'] is False
+    assert result['paper_horizon_blocker'] == 'CERTIFIED_FINAL_SETTLEMENT_BOUND_REQUIRED'
