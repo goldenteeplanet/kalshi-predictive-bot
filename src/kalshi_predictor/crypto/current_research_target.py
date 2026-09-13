@@ -20,6 +20,11 @@ from kalshi_predictor.crypto.settlement_target import SettlementBenchmarkTarget,
 
 FAMILIES = {"BTC": "KXBTC", "ETH": "KXETH", "SOL": "KXSOLE", "XRP": "KXXRP", "DOGE": "KXDOGE"}
 RESEARCH_PLACES = {"BTC": 2, "ETH": 2, "SOL": 2, "XRP": 5, "DOGE": 7}
+TERMS_URLS = {
+    asset: "https://assets.kalshi.com/contract_terms/"
+    + ("DOGE.pdf" if asset == "DOGE" else "CRYPTO.pdf")
+    for asset in FAMILIES
+}
 
 
 def target_from_discovery(
@@ -41,6 +46,8 @@ def target_from_discovery(
     aware(rule_received_at)
     if asset not in FAMILIES:
         raise ValueError("SUPPORTED_RESEARCH_ASSET_REQUIRED")
+    if rule_url != TERMS_URLS[asset]:
+        raise ValueError("FAMILY_TERMS_URL_MISMATCH")
     if not 0 <= (as_of - market_received_at).total_seconds() <= 300:
         raise ValueError("FRESH_DISCOVERY_REQUIRED")
     if rule_received_at > as_of:
@@ -79,9 +86,13 @@ def target_from_discovery(
     primary = metadata.get("rules_primary")
     if not isinstance(primary, str):
         raise ValueError("BENCHMARK_RULE_TEXT_REQUIRED")
-    mentioned = set(re.findall(r"\b(?:BRTI|[A-Z]+USD_RTI)\b", primary))
-    if mentioned != {INDEX[asset]}:
+    mentioned = set(re.findall(r"\b(?:BRTI|ERTI|[A-Z]+USD_RTI)\b", primary))
+    eth_alias = (
+        asset == "ETH" and mentioned == {"ERTI"} and "Ethereum Real-Time Index (ERTI)" in primary
+    )
+    if mentioned != {INDEX[asset]} and not eth_alias:
         raise ValueError("MARKET_INDEX_MISMATCH")
+    operator: str | None
     if asset == "DOGE":
         # Existing exact grammar checks custom strikes, local event/close time,
         # primary rule bounds and absent top-level conflicting strikes.
@@ -148,6 +159,8 @@ def _bound(value) -> Decimal | None:
 
 def target_assumptions(target: SettlementBenchmarkTarget) -> dict:
     """Attach these explicit assumptions to the predeclared capture protocol."""
+    primary = _json(target.market_original)["market"].get("rules_primary", "")
+    eth_alias = target.symbol == "ETH" and "Ethereum Real-Time Index (ERTI)" in primary
     return dict(
         schema="current-research-target-assumptions-v1",
         status="DECLARED_UNCERTIFIED_COMPUTATIONAL_SCENARIO",
@@ -160,6 +173,14 @@ def target_assumptions(target: SettlementBenchmarkTarget) -> dict:
         comparator=target.comparator,
         precision_authority="RESEARCH_CHOICE_NOT_RULE_AUTHORITY",
         endpoint_authority="RESEARCH_CHOICE_NOT_RULE_AUTHORITY",
+        market_index_label="ERTI" if eth_alias else target.rules.index_id,
+        source_index=target.rules.index_id,
+        alias_status="UNVERIFIED" if eth_alias else "NO_ALIAS_USED",
+        alias_basis=(
+            "DECLARED_RESEARCH_INFERENCE_ETHEREUM_IDENTITY_NOT_PROVEN_INDEX_EQUIVALENCE"
+            if eth_alias
+            else None
+        ),
         discovery_dict_binding="DERIVED_ROW_REQUIRES_ORIGINAL_DISCOVERY_RECEIPT",
         finality="UNRESOLVED",
         rule_certified=False,

@@ -287,7 +287,8 @@ def evaluate_paginated_current_research(
     families = []
     rows = []
     stages: dict[str, set[str]] = {name: set() for name in (
-        'markets_scanned', 'forecastable', 'book_valid_independent_of_forecast', 'book_valid',
+        'markets_scanned', 'observation_horizon_eligible', 'forecastable',
+        'book_valid_independent_of_forecast', 'book_valid',
         'gross_positive', 'positive_after_fee', 'positive_after_snapshot_impact',
         'conservative_bounds_known', 'uncertainty_known', 'full_net_positive', 'full_net_gt_5c',
         'risk_passing', 'paper_eligible',
@@ -323,6 +324,8 @@ def evaluate_paginated_current_research(
             close_hours = _hours_until(market.get('close_time'), assessed_at)
             if close_hours is None or not 0 < close_hours <= 72:
                 common.append('OBSERVATION_CLOSE_NOT_WITHIN_72H')
+            else:
+                stages['observation_horizon_eligible'].add(ticker)
             if sighting['conflicting_sightings']:
                 common.append('CONFLICTING_DISCOVERY_SIGHTINGS')
             prepared = None
@@ -369,6 +372,8 @@ def evaluate_paginated_current_research(
                     'paper_horizon_verified': False,
                     'paper_horizon_blocker': 'CERTIFIED_FINAL_SETTLEMENT_BOUND_REQUIRED',
                     'rule_certified': False, 'calibrated': False, 'paper_eligible': False,
+                    'rule_status': 'RULE_NOT_CERTIFIED_BY_SCAN',
+                    'risk_status': 'NOT_EVALUATED_MISSING_QUALIFICATION_PREREQUISITES',
                     'scope': 'CURRENT_UNCALIBRATED_RESEARCH',
                     'forecast': prepared, 'forecast_probability': None,
                     'executable_price': None, 'fee': None, 'snapshot_impact': None,
@@ -444,7 +449,11 @@ def evaluate_paginated_current_research(
         'scope': 'BOUNDED_DISCOVERY_CURRENT_RESEARCH_NOT_PAPER_ADMISSION',
         'families': families, 'rows': rows,
         'funnel_count_unit': 'UNIQUE_MARKETS_WITH_AT_LEAST_ONE_PASSING_SIDE',
-        'funnel': {name: len(tickers) for name, tickers in stages.items()},
+        'funnel': {**{name: len(tickers) for name, tickers in stages.items()},
+                   'horizon_eligible': 0, 'forecast_ready': len(stages['forecastable']),
+                   'phase_3m_pass': 0, 'phase_3n_allow': 0},
+        'paper_horizon_policy': 'CERTIFIED_REVIEW_INCLUSIVE_FINAL_DEADLINE_WITHIN_72H',
+        'risk_evaluation_status': 'NOT_EVALUATED_MISSING_QUALIFICATION_PREREQUISITES',
         'first_blocker_counts': first_blocker_counts,
         'request_limits': {'pages_per_family': MAX_PAGES_PER_FAMILY,
                            'rows_per_page': limit, 'books_total': MAX_SCAN_BOOKS},

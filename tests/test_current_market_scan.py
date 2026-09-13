@@ -54,7 +54,7 @@ def test_market_book_costs_never_manufacture_forecasts_or_admission():
     assert report['full_net_scanner_operational'] is False
 
 
-def test_discovery_empty_unsupported_fee_and_pagination_are_distinct():
+def test_discovery_empty_reviewed_family_and_pagination_are_distinct():
     report = evaluate_current_preflight(
         discoveries={'KXSOLE': discovery(count=0), 'KXXRP': discovery('KXXRP', cursor='more')},
         books={}, fee_originals={}, assessed_at=NOW)
@@ -62,7 +62,7 @@ def test_discovery_empty_unsupported_fee_and_pagination_are_distinct():
     assert sol['discovery_status'] == 'EMPTY_PAGE'
     assert xrp['discovery_status'] == 'MARKETS_RETURNED'
     assert xrp['pagination_incomplete'] is True
-    assert xrp['fee_family_reviewed'] is False
+    assert xrp['fee_family_reviewed'] is True
     assert eth['discovery_status'] == doge['discovery_status'] == 'NOT_ACQUIRED'
 
 
@@ -191,6 +191,9 @@ def test_current_intake_is_recomputed_but_unknown_fee_never_becomes_zero():
     assert result['funnel']['conservative_bounds_known'] == 0
     assert result['funnel']['uncertainty_known'] == result['funnel']['full_net_positive'] == 0
     assert all(not row['paper_horizon_verified'] for row in result['rows'])
+    assert result['funnel']['observation_horizon_eligible'] == 1
+    assert result['funnel']['horizon_eligible'] == 0
+    assert result['funnel']['phase_3m_pass'] == result['funnel']['phase_3n_allow'] == 0
     json.dumps(result)
 
 

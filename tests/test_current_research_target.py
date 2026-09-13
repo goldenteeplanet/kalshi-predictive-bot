@@ -20,7 +20,9 @@ def build(market, asset="BTC", **changes):
         asset=asset,
         market_received_at=NOW,
         rule_original=b"test-rule-original",
-        rule_url=RULE_URL,
+        rule_url="https://assets.kalshi.com/contract_terms/DOGE.pdf"
+        if asset == "DOGE"
+        else RULE_URL,
         rule_received_at=NOW,
         as_of=NOW,
     )
@@ -105,3 +107,40 @@ def test_real_doge_original_all_strike_types_preserved_without_rule_promotion():
         assert target.rules.decimal_places == 7
         assert target_assumptions(target)["rule_certified"] is False
     assert counts == {"ABOVE": 2, "BELOW": 2, "RANGE_CLOSED": 89}
+
+
+def test_ethereum_alias_is_explicit_uncertified_research_scenario():
+    row = market(
+        ticker="KXETH-E-B100",
+        event_ticker="KXETH-E",
+        rules_primary="CF Benchmarks Ethereum Real-Time Index (ERTI)",
+    )
+    target = build(row, "ETH")
+    assumptions = target_assumptions(target)
+    assert target.rules.index_id == "ETHUSD_RTI"
+    assert assumptions["market_index_label"] == "ERTI"
+    assert assumptions["alias_status"] == "UNVERIFIED"
+    assert assumptions["rule_certified"] is False
+    assert assumptions["paper_eligible"] is False
+
+
+@pytest.mark.parametrize(
+    "primary",
+    ["ERTI", "Bitcoin Real-Time Index (ERTI)", "Ethereum Real-Time Index (ERTI) BTCUSD_RTI"],
+)
+def test_alias_requires_exact_ethereum_identity_without_conflicting_index(primary):
+    with pytest.raises(ValueError, match="MARKET_INDEX_MISMATCH"):
+        build(market(ticker="KXETH-E-B100", event_ticker="KXETH-E", rules_primary=primary), "ETH")
+
+
+def test_doge_rejects_generic_crypto_terms_attachment():
+    rows = json.loads((Path(__file__).parent / "fixtures/doge-markets-20260911.json").read_bytes())[
+        "markets"
+    ]
+    with pytest.raises(ValueError, match="FAMILY_TERMS_URL_MISMATCH"):
+        build(rows[0], "DOGE", rule_url=RULE_URL)
+
+
+def test_non_doge_rejects_doge_terms_attachment():
+    with pytest.raises(ValueError, match="FAMILY_TERMS_URL_MISMATCH"):
+        build(market(), rule_url="https://assets.kalshi.com/contract_terms/DOGE.pdf")

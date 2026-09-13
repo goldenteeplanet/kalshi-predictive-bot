@@ -378,7 +378,9 @@ def _compare(indexed: dict, scored: dict, clusters: list[list[str]]) -> list[dic
             output.append(dict(info, blocker="PREDECLARED_VALIDATION_CRITERIA_MISSING", methods=[]))
             continue
         split = _time(criteria["split_at"])
-        train, holdout, crossing = [], [], 0
+        train: list[list[str]] = []
+        holdout: list[list[str]] = []
+        crossing = 0
         selected = set(identities)
         for group in clusters:
             members = [i for i in group if i in selected]

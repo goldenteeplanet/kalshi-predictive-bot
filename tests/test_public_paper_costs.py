@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, localcontext
 from pathlib import Path
@@ -26,6 +27,37 @@ def authority():
         ('KXSOLE-fee-changes.json', 'https://external-api.kalshi.com/trade-api/v2/series/'
          'fee_changes?series_ticker=KXSOLE&show_historical=true'),
     ))
+
+
+@pytest.mark.parametrize('series', ['KXXRP', 'KXDOGE'])
+def test_new_reviewed_families_require_exact_originals_and_remain_paper_estimates(series):
+    root = Path(__file__).parent/'fixtures/public_paper_fees'
+    at = datetime(2026, 9, 13, 5, 18, tzinfo=UTC)
+    base = 'https://external-api.kalshi.com/trade-api/v2/series/'
+    originals = tuple(FeeAuthorityOriginal(url, (root/name).read_bytes(), at) for name, url in (
+        ('fee-schedule-reviewed-facts.json', SCHEDULE_URL),
+        (series+'-series.json', base+series),
+        (series+'-fee-changes.json', base+'fee_changes?series_ticker='+series+
+         '&show_historical=true'),
+    ))
+    fee = public_paper_fee(series=series, price=Decimal('.39'), originals=originals, assessed_at=at)
+    assert fee['value'] == '0.02'
+    assert fee['status'] == 'ESTIMATED_WITH_SUPPORT'
+    assert fee['exact_account_fee_certified'] is False
+    assert fee['execution_authority'] is False
+    changed = json.loads(originals[1].payload)
+    changed['series']['fee_multiplier'] = 2
+    overridden = originals[:1]+(FeeAuthorityOriginal(
+        originals[1].url, json.dumps(changed).encode(), at),)+originals[2:]
+    change_history = originals[:2]+(FeeAuthorityOriginal(
+        originals[2].url, b'{"series_fee_change_arr":[{"fee_multiplier":2}]}', at),)
+    for docs, price, assessed_at in (
+        (overridden, Decimal('.39'), at), (change_history, Decimal('.39'), at),
+        (originals, Decimal('.395'), at), (originals, Decimal('.39'), at+timedelta(days=2)),
+    ):
+        blocked = public_paper_fee(
+            series=series, price=price, originals=docs, assessed_at=assessed_at)
+        assert blocked['value'] is None and blocked['status'] == 'UNKNOWN'
 
 
 def book(no_levels=b'[["0.61","10"]]', at=AT):
