@@ -132,7 +132,9 @@ def score_tournament(analysis: dict[str, Any], evaluation: dict[str, Any]) -> di
                 infinite_log_loss_n=infinite_losses,
                 accuracy=sum((Decimal(v['score']['probability']) >= Decimal('.5'))
                              == bool(v['score']['outcome']) for v in unique.values()) / len(unique),
-                ece=None, executable_side_n=len(gross_values),
+                ece=None, executable_side_n=None,
+                conditional_priced_side_n=len(gross_values),
+                book_qualification_status='NOT_PRESENT_IN_RETAINED_INPUT',
                 fee_supported_side_n=len(after_values),
                 gross_thresholds_cents={str(c): sum(v > Decimal(c)/100 for v in gross_values)
                                         for c in (0, 1, 3, 5, 7, 10)},

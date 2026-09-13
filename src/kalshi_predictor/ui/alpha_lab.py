@@ -80,7 +80,7 @@ def render_tournament(report: dict[str, Any]) -> str:
     with localcontext(Context(prec=28, rounding=ROUND_HALF_EVEN)):
         for row in report['leaderboard']:
             count = row['fee_supported_side_n']
-            gross_n = row['executable_side_n']
+            gross_n = row['conditional_priced_side_n']
             def pct(n: int, total: int) -> str:
                 return f'{Decimal(n)*100/total:.2f}%' if total else 'Unknown'
             def cents(value: str | None) -> str:
@@ -98,9 +98,9 @@ def render_tournament(report: dict[str, Any]) -> str:
                       'Unknown' if row['mean_hypothetical_return'] is None else
                       f'{Decimal(row["mean_hypothetical_return"])*100:+.2f}%', row['status']]
             rows.append('<tr>' + ''.join(f'<td>{escape(str(v))}</td>' for v in values) + '</tr>')
-    headings = ('Model', 'Asset', 'Horizon', 'Endpoint hypothesis', 'Executable price band',
+    headings = ('Model', 'Asset', 'Horizon', 'Endpoint hypothesis', 'Captured ask price band',
                 'Forecast N', 'Event N', 'Dependency group N', 'Brier', 'Log loss', 'Accuracy',
-                'ECE', 'Executable sides', 'Fee-known sides', 'Gross positive %',
+                'ECE', 'Conditionally priced sides', 'Fee-supported sides', 'Gross positive %',
                 'After-fee positive %', 'After-fee >5c %', 'Mean after-fee edge',
                 'Best after-fee edge', 'Mean hypothetical return', 'Status')
     head = ''.join(f'<th>{escape(v)}</th>' for v in headings)
@@ -109,7 +109,9 @@ def render_tournament(report: dict[str, Any]) -> str:
         f'<p>{escape(str(report["cohort"]))}. Model forecasts: {report["model_forecasts"]}; '
         f'events: {report["event_n"]}; unavailable model/side rows: '
         f'{report["unavailable_model_side_rows"]}.</p>'
-        '<p>Historical captured books and supported fee estimates. These scores join '
+        '<p>Conditional estimates at historical asks. Original spread and depth qualification '
+        'is not present in these retained inputs; executable-side counts remain Unknown. '
+        'Positive estimated edge does not establish an executable opportunity. These scores join '
         'pinned retained outcome reports; this page does not replay provider originals. '
         'Endpoints, models and opposite sides share evidence. Forecasts may appear in '
         'multiple price bands; counts are not additive or independent sample sizes. '
