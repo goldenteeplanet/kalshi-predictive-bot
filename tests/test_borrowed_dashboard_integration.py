@@ -7,10 +7,11 @@ from datetime import timedelta
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from test_current_assessment_view import record
+from test_current_assessment_view import envelopes, record
 from test_current_research_dashboard import NOW, add_scan, database
 
 from kalshi_predictor.overnight_paper import dashboard, dashboard_scratch
+from kalshi_predictor.overnight_paper.alpha_analysis import captured_alpha_analysis
 from kalshi_predictor.overnight_paper.current_research_dashboard import current_research_snapshot
 from kalshi_predictor.overnight_paper.current_research_index import (
     borrowed_research_validation_session,
@@ -103,13 +104,27 @@ def test_actual_snapshot_routes_use_index_without_legacy_fallback(tmp_path, monk
     monkeypatch.setattr(legacy, 'read_current_records', forbidden)
     before = path.read_bytes()
     value = dashboard.snapshot(path)
-    assert value['current_research'] == expected
+    expected_alpha = captured_alpha_analysis(envelopes(record()), now=NOW + timedelta(hours=1))
+
+    def assert_projection(actual):
+        # Preserve exact parity for every pre-existing field, while validating
+        # the intentional additive projection against the original fixture.
+        batch = dict(actual['latest_assessment_batch'])
+        alpha = batch.pop('alpha_analysis')
+        assert {**actual, 'latest_assessment_batch': batch} == expected
+        assert alpha == expected_alpha
+        assert alpha['funnel']['gross_positive'] == 1
+        assert alpha['funnel']['after_fee_gt_5c'] == 1
+        assert alpha['freshness'] == 'STALE' and alpha['current_best_after_fee'] is None
+        assert alpha['full_net_ev'] is None and alpha['paper_eligible'] is False
+
+    assert_projection(value['current_research'])
     assert value['paper_mode'] == 'NOT_ACTIVE' and value['live_exchange'] == 'DISABLED'
     app = FastAPI()
     app.include_router(dashboard.create_router())
     monkeypatch.setenv('OVERNIGHT_PAPER_DB', str(path))
     with TestClient(app) as client:
-        assert client.get('/api/paper-live').json()['current_research'] == expected
+        assert_projection(client.get('/api/paper-live').json()['current_research'])
         assert 'Latest recorded assessment batch' in client.get('/paper-live').text
     assert path.read_bytes() == before
     assert not (tmp_path / 'kalshi-paper-research-view' / 'active').exists()

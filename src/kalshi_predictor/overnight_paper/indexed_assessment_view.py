@@ -11,7 +11,7 @@ from .current_research_index import ResearchValidationSession
 
 
 def indexed_latest_assessment_batch(
-    session: ResearchValidationSession, *, now: datetime,
+    session: ResearchValidationSession, *, now: datetime, include_alpha: bool = False,
 ) -> dict[str, Any]:
     """Reuse the deployed arithmetic oracle on at most 600 verified originals.
 
@@ -28,6 +28,10 @@ def indexed_latest_assessment_batch(
         return result
     records = [json.loads(session.read_original(key)) for key in ids]
     result = latest_assessment_batch(records, now=now)
+    if include_alpha:
+        from .alpha_analysis import captured_alpha_analysis
+
+        result['alpha_analysis'] = captured_alpha_analysis(records, now=now)
     # Enforce the shared lifetime after projection computation as well.
     _ = session.manifest
     return result

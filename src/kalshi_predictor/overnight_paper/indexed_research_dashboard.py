@@ -13,7 +13,7 @@ from .store import aware
 
 
 def indexed_current_research_snapshot(
-    session: ResearchValidationSession, *, now: datetime,
+    session: ResearchValidationSession, *, now: datetime, include_alpha: bool = False,
 ) -> dict[str, Any]:
     summary = session.dashboard_summary(now=now)
     at = aware(now.isoformat())
@@ -25,7 +25,8 @@ def indexed_current_research_snapshot(
         prospective_shadow_count=summary.prospective_shadow_count,
         evaluated_shadow_count=summary.evaluated_shadow_count,
         shadow_state_counts=dict(summary.shadow_state_counts),
-        latest_assessment_batch=indexed_latest_assessment_batch(session, now=at),
+        latest_assessment_batch=indexed_latest_assessment_batch(
+            session, now=at, include_alpha=include_alpha),
     )
     if summary.latest_scan_id is not None:
         envelope = json.loads(session.read_original(summary.latest_scan_id))
