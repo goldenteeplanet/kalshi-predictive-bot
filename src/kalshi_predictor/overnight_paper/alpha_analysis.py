@@ -14,6 +14,7 @@ from .store import aware
 
 ASSETS = ('BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'UNKNOWN')
 PROBABILITY_BANDS = ('0-10%', '10-25%', '25-40%', '40-60%', '60-75%', '75-90%', '90-100%')
+PRICE_BANDS = ('1-10c', '10-25c', '25-40c', '40-60c', '60-75c', '75-90c', '90-99c')
 
 
 def _funnel(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -28,6 +29,8 @@ def _funnel(rows: list[dict[str, Any]]) -> dict[str, Any]:
                                 for c in (1, 3, 5, 7, 10)},
         after_fee_known=len(after), after_fee_positive=sum(v > 0 for v in after),
         after_fee_gt_5c=sum(v > Decimal('.05') for v in after),
+        after_fee_thresholds_cents={str(c): sum(v > Decimal(c) / 100 for v in after)
+                                   for c in (0, 2, 5, 7, 10)},
         missing_forecast=sum(r['probability'] is None for r in rows),
         missing_executable_ask=sum(r['executable_price'] is None for r in rows),
         missing_supported_fee=sum(r['recorded_fee'] is None for r in rows),
@@ -38,6 +41,19 @@ def _funnel(rows: list[dict[str, Any]]) -> dict[str, Any]:
             and abs(Decimal(r['model_market_disagreement'])) >= Decimal(c) / 100 for r in rows)
             for c in (3, 5, 7, 10)},
     )
+
+
+def _price_band(value: str | None) -> str:
+    if value is None:
+        return 'UNKNOWN'
+    price = Decimal(value)
+    if price < Decimal('.01') or price > Decimal('.99'):
+        return 'OUTSIDE_DECLARED_BANDS'
+    for boundary, label in zip(('.10', '.25', '.40', '.60', '.75', '.90', '1'),
+                               PRICE_BANDS, strict=True):
+        if price < Decimal(boundary):
+            return label
+    raise ValueError('ALPHA_PRICE_BOUND')
 
 
 def _probability_band(value: str | None) -> str:
@@ -85,7 +101,9 @@ def captured_alpha_analysis(records: list[dict[str, Any]], *, now: datetime) -> 
         model_vs_market_performance=None, effective_independent_n=None,
         horizon_semantics='REMAINING_TIME_TO_OBSERVATION_NOT_MARKET_FAMILY',
         probability_band_semantics='LOWER_INCLUSIVE_UPPER_EXCLUSIVE_LAST_INCLUDES_ONE',
-        rows=[], by_asset={}, by_horizon={}, by_probability={}, funnel=None,
+        price_band_semantics=('EXECUTABLE_SIDE_ASK_LOWER_INCLUSIVE_UPPER_EXCLUSIVE_'
+                             'LAST_INCLUDES_99C'),
+        rows=[], by_asset={}, by_horizon={}, by_probability={}, by_price={}, funnel=None,
         best_captured_after_fee=None, best_captured_divergence=None,
         current_best_after_fee=None, current_best_divergence=None,
     )
@@ -100,9 +118,14 @@ def captured_alpha_analysis(records: list[dict[str, Any]], *, now: datetime) -> 
         for checked in batch['rows']:
             record = originals[(checked['ticker'], checked['side'])]
             row = dict(checked)
+            forecast = record.get('forecast')
+            model = forecast.get('model') if isinstance(forecast, dict) else None
             row.update(asset=record.get('asset') if record.get('asset') in ASSETS else 'UNKNOWN',
+                       model=(model if isinstance(model, str) and 0 < len(model) <= 200
+                              else 'UNKNOWN'),
                        horizon=_horizon(record.get('observation_close_hours')),
                        probability_band=_probability_band(row['probability']),
+                       price_band=_price_band(row['executable_price']),
                        market_midpoint=None, model_market_disagreement=None,
                        midpoint_evidence='MISSING_SAME_BOOK_TWO_SIDED_ASKS',
                        after_fee=None, trading_value='UNKNOWN')
@@ -134,8 +157,10 @@ def captured_alpha_analysis(records: list[dict[str, Any]], *, now: datetime) -> 
                         row['model_market_disagreement'] = str(Decimal(row['probability']) - mid)
         result['rows'] = rows
         for field, output in (('asset', 'by_asset'), ('horizon', 'by_horizon'),
-                              ('probability_band', 'by_probability')):
-            keys = ASSETS if field == 'asset' else sorted({r[field] for r in rows})
+                              ('probability_band', 'by_probability'), ('price_band', 'by_price')):
+            keys = (ASSETS if field == 'asset' else
+                    (*PRICE_BANDS, 'UNKNOWN', 'OUTSIDE_DECLARED_BANDS') if field == 'price_band'
+                    else sorted({r[field] for r in rows}))
             result[output] = {key: _funnel([r for r in rows if r[field] == key]) for key in keys}
         result['funnel'] = _funnel(rows)
         for metric, output in (('after_fee', 'after_fee'),
@@ -191,9 +216,13 @@ def render_alpha_analysis(current: dict[str, Any]) -> str:
                     ))
     counts = funnel.get('gross_thresholds_cents') or {}
     thresholds = ', '.join(f'&gt;{c}c: {text(counts.get(str(c)))}' for c in (1, 3, 5, 7, 10))
+    after_counts = funnel.get('after_fee_thresholds_cents') or {}
+    after_thresholds = ', '.join(f'&gt;{c}c: {text(after_counts.get(str(c)))}'
+                                for c in (0, 2, 5, 7, 10))
     tables = ''
     for key, label in (('by_asset', 'Alpha by asset'), ('by_horizon', 'Alpha by horizon'),
-                       ('by_probability', 'Alpha by probability')):
+                       ('by_probability', 'Alpha by probability'),
+                       ('by_price', 'Alpha by executable price')):
         body = ''.join('<tr>' + ''.join(f'<td>{text(value)}</td>' for value in (
             name, item['forecast_ready_sides'], item['gross_positive'],
             item['gross_thresholds_cents']['5'], item['after_fee_positive'],
@@ -207,7 +236,8 @@ def render_alpha_analysis(current: dict[str, Any]) -> str:
         f'<p>Status: {text(alpha.get("status"))}; captured at {text(alpha.get("assessed_at"))}; '
         f'freshness: {text(alpha.get("freshness"))}.</p><div class="metrics">{cards}</div>'
         f'<h3>Gross edge funnel</h3><p>{thresholds}</p>'
-        '<h3>After-fee edge funnel</h3><p>Recorded supported fee estimates only; execution '
+        f'<h3>After-fee edge funnel</h3><p>{after_thresholds}</p>'
+        '<p>Recorded supported fee estimates only; execution '
         'impact and calibrated uncertainty are not deducted in this funnel.</p>'
         '<p>Recent research captures below have unverified execution; they are not current '
         'executable opportunities.</p>'
