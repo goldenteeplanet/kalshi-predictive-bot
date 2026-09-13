@@ -1,0 +1,366 @@
+"""Complete-only disk indexed validation; existing aggregate limits still apply.
+
+This new API has no callers in production. It writes only an exclusively created
+scratch index, never the mission. The index contains references, not originals.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import sqlite3
+import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import UTC
+from pathlib import Path
+from typing import Any
+
+from .current_research_store import (
+    MAX_READ_BYTES,
+    MAX_RECORD_BYTES,
+    PREFIX,
+    _linked_shadow,
+    _read_envelope,
+)
+from .store import aware, digest
+
+
+def _validate_index_links(index: sqlite3.Connection) -> None:
+    bad_link = index.execute(
+        "SELECT c.id FROM records c LEFT JOIN records p "
+        "ON p.kind='PROSPECTIVE_SHADOW' AND p.semantic_id=c.parent "
+        "WHERE c.parent IS NOT NULL AND (p.id IS NULL OR p.at>=c.at) LIMIT 1"
+    ).fetchone()
+    if bad_link:
+        raise ValueError("INDEX_STRICT_PRIOR_SHADOW_REQUIRED")
+
+
+@dataclass(frozen=True)
+class ValidatedResearchIndex:
+    index_path: Path
+    index_sha256: str
+    original_manifest_sha256: str
+    record_count: int
+    payload_bytes: int
+    status: str = "COMPLETE_VALIDATED_SNAPSHOT"
+    validation_version: str = "CURRENT_RESEARCH_INDEX_V1"
+
+
+_SESSION_OWNER = object()
+
+
+class ResearchValidationSession:
+    """Complete validated snapshot access, valid only inside its owning context.
+
+    No connection or arbitrary SQL interface is exposed. Returned bytes are one
+    original journal envelope, never a currentness or source-authentication claim.
+    """
+
+    def __init__(
+        self, owner: object, source: sqlite3.Connection, index: sqlite3.Connection,
+        manifest: ValidatedResearchIndex, deadline: Callable[[], None],
+        file_identity: tuple[int, int],
+    ) -> None:
+        if owner is not _SESSION_OWNER:
+            raise ValueError("INDEX_OWNED_CONTEXT_REQUIRED")
+        self._source = source
+        self._index = index
+        self._manifest = manifest
+        self._deadline = deadline
+        self._file_identity = file_identity
+        self._closed = False
+
+    def _check(self) -> None:
+        if self._closed:
+            raise ValueError("INDEX_SESSION_CLOSED")
+        try:
+            self._deadline()
+            stat = self._manifest.index_path.lstat()
+            if self._manifest.index_path.is_symlink() or (stat.st_dev, stat.st_ino) != (
+                self._file_identity
+            ):
+                raise ValueError("INDEX_OWNERSHIP_CHANGED")
+        except BaseException:
+            self._close()
+            raise
+
+    def _close(self) -> None:
+        if not self._closed:
+            self._closed = True
+            try:
+                self._source.close()
+            finally:
+                self._index.close()
+
+    @property
+    def manifest(self) -> ValidatedResearchIndex:
+        self._check()
+        return self._manifest
+
+    def read_original(self, record_id: str) -> bytes:
+        """Read by validated ID from the same transaction; later appends are absent."""
+        self._check()
+        if type(record_id) is not str or not 0 < len(record_id) <= 160:
+            raise ValueError("INDEX_KEY_BOUND")
+        try:
+            raw, _ = self._read(record_id, linked=False)
+            self._check()
+            return raw.encode()
+        except BaseException:
+            self._close()
+            raise
+
+    def _read(self, key: str, *, linked: bool) -> tuple[str, dict[str, Any]]:
+        self._check()
+        expected = self._index.execute(
+            "SELECT at,kind,raw_sha,payload_sha,bytes,parent FROM records WHERE id=?", (key,)
+        ).fetchone()
+        if expected is None:
+            raise ValueError("INDEX_ID_NOT_IN_VALIDATED_SNAPSHOT")
+        at, kind, raw_sha, payload_sha, size, parent = expected
+        observed = self._source.execute(
+            "SELECT captured_at,length(CAST(payload AS BLOB)) "
+            "FROM overnight_sprint_cycles WHERE id=?", (key,)
+        ).fetchone()
+        if (observed is None or type(observed[1]) is not int
+                or not 0 < observed[1] <= MAX_RECORD_BYTES or observed[1] != size):
+            raise ValueError("INDEX_ORIGINAL_LENGTH_MISMATCH")
+        if aware(observed[0]).astimezone(UTC).isoformat() != at:
+            raise ValueError("INDEX_ORIGINAL_CLOCK_MISMATCH")
+        raw = self._source.execute(
+            "SELECT payload FROM overnight_sprint_cycles WHERE id=?", (key,)
+        ).fetchone()[0]
+        if not isinstance(raw, str) or hashlib.sha256(raw.encode()).hexdigest() != raw_sha:
+            raise ValueError("INDEX_ORIGINAL_HASH_MISMATCH")
+        envelope = _read_envelope(key, observed[0], raw)
+        if envelope['record_kind'] != kind or envelope['payload_sha256'] != payload_sha:
+            raise ValueError("INDEX_ORIGINAL_IDENTITY_MISMATCH")
+        if linked and (kind != 'PROSPECTIVE_SHADOW' or parent is not None):
+            raise ValueError("INDEX_PARENT_KIND_MISMATCH")
+        if parent is not None:
+            parent_key = PREFIX + 'prospective_shadow:' + digest({'identity': parent})
+            parent_raw, parent_envelope = self._read(parent_key, linked=True)
+            if (parent_envelope['record']['decision_id'] != parent
+                    or aware(parent_envelope['recorded_at']) >= aware(envelope['recorded_at'])):
+                raise ValueError("INDEX_STRICT_PRIOR_SHADOW_REQUIRED")
+            del parent_raw, parent_envelope
+        _linked_shadow(self._source, kind, envelope['record'])
+        self._check()
+        return raw, envelope
+
+
+@contextmanager
+def research_validation_session(
+    mission_path: Path,
+    index_path: Path,
+    *,
+    max_records: int = 10000,
+    max_bytes: int = MAX_READ_BYTES,
+    timeout_seconds: int = 30,
+) -> Iterator[ResearchValidationSession]:
+    """Replay one payload at a time in one read transaction, then publish index.
+
+    Extra read invariants: shadow/evaluation semantic identities are unique and
+    match envelope identity; observation (decision,state) pairs are unique;
+    parent journal time strictly precedes child time. Invalid legacy evidence
+    fails explicitly, never gets rewritten. No source authentication is implied.
+    """
+    if (
+        type(max_records) is not int
+        or not 1 <= max_records <= 10000
+        or type(max_bytes) is not int
+        or not 1 <= max_bytes <= MAX_READ_BYTES
+        or type(timeout_seconds) is not int
+        or not 1 <= timeout_seconds <= 60
+    ):
+        raise ValueError("INDEX_BOUNDS_INVALID")
+    mission_path = mission_path.resolve(strict=True)
+    index_path = index_path.absolute()
+    if index_path.exists() or index_path.is_symlink() or not index_path.parent.is_dir():
+        raise ValueError("INDEX_EXCLUSIVE_DESTINATION_REQUIRED")
+    if index_path.parent.resolve() != index_path.parent:
+        raise ValueError("INDEX_REAL_PARENT_REQUIRED")
+    started = time.monotonic()
+
+    def deadline() -> None:
+        if time.monotonic() - started >= timeout_seconds:
+            raise ValueError("INDEX_TIME_BOUND")
+
+    # Exclusive file creation defines cleanup ownership. Never remove a prior file.
+    with index_path.open("xb"):
+        pass
+    stat = index_path.lstat()
+    file_identity = (stat.st_dev, stat.st_ino)
+    index: sqlite3.Connection | None = None
+    source: sqlite3.Connection | None = None
+    session: ResearchValidationSession | None = None
+    complete = False
+    try:
+        index = sqlite3.connect(index_path, timeout=1)
+        index.execute("PRAGMA page_size=4096")
+        index.execute("PRAGMA journal_mode=DELETE")
+        index.execute("PRAGMA cache_size=-2048")
+        index.execute("PRAGMA temp_store=FILE")
+        index.execute("PRAGMA max_page_count=8192")
+        index.set_progress_handler(lambda: int(time.monotonic() - started >= timeout_seconds), 1000)
+        index.execute(
+            "CREATE TABLE records (id TEXT PRIMARY KEY, at TEXT NOT NULL, "
+            "kind TEXT NOT NULL, raw_sha TEXT NOT NULL, payload_sha TEXT NOT NULL, "
+            "bytes INTEGER NOT NULL, semantic_id TEXT, state TEXT, parent TEXT)"
+        )
+        index.execute("CREATE UNIQUE INDEX semantic ON records(kind,semantic_id,state)")
+        source = sqlite3.connect(mission_path.as_uri() + "?mode=ro", uri=True, timeout=1)
+        source.execute("PRAGMA query_only=ON")
+        source.execute("PRAGMA cache_size=-2048")
+        source.set_progress_handler(
+            lambda: int(time.monotonic() - started >= timeout_seconds), 1000
+        )
+        source.execute("BEGIN")
+        count, total = source.execute(
+            "SELECT count(*),coalesce(sum(length(CAST(payload AS BLOB))),0) "
+            "FROM overnight_sprint_cycles WHERE id LIKE ?",
+            (PREFIX + "%",),
+        ).fetchone()
+        if count > max_records or total > max_bytes:
+            raise ValueError("INDEX_AGGREGATE_BOUND_EXCEEDED")
+        manifest = hashlib.sha256()
+        observed_count = observed_bytes = 0
+        # Length-only cursor avoids fetching oversized payloads before rejecting.
+        cursor = source.execute(
+            "SELECT id,captured_at,length(CAST(payload AS BLOB)) "
+            "FROM overnight_sprint_cycles WHERE id LIKE ? ORDER BY captured_at,id",
+            (PREFIX + "%",),
+        )
+        for key, at, size in cursor:
+            deadline()
+            if not isinstance(size, int) or not 0 < size <= MAX_RECORD_BYTES:
+                raise ValueError("INDEX_RECORD_BOUND_EXCEEDED")
+            if not isinstance(key, str) or len(key) > 160:
+                raise ValueError("INDEX_KEY_BOUND")
+            raw = source.execute(
+                "SELECT payload FROM overnight_sprint_cycles WHERE id=?", (key,)
+            ).fetchone()[0]
+            envelope = _read_envelope(key, at, raw)
+            record, kind = envelope["record"], envelope["record_kind"]
+            if kind in ("SHADOW_OBSERVATION", "EVALUATION"):
+                identity = (
+                    record["decision_id"]
+                    if kind == "SHADOW_OBSERVATION"
+                    else record["decision"]["decision_id"]
+                )
+                parent_key = PREFIX + "prospective_shadow:" + digest({"identity": identity})
+                parent_size = source.execute(
+                    "SELECT length(CAST(payload AS BLOB)) FROM overnight_sprint_cycles WHERE id=?",
+                    (parent_key,),
+                ).fetchone()
+                if parent_size is None:
+                    raise ValueError("CURRENT_RESEARCH_PRIOR_SHADOW_REQUIRED")
+                if type(parent_size[0]) is not int or not 0 < parent_size[0] <= MAX_RECORD_BYTES:
+                    raise ValueError("INDEX_LINKED_RECORD_BOUND_EXCEEDED")
+            _linked_shadow(source, kind, record)
+            semantic, state, parent = None, None, None
+            if kind in ("PROSPECTIVE_SHADOW", "EVALUATION"):
+                semantic = (record if kind == "PROSPECTIVE_SHADOW" else record["decision"])[
+                    "decision_id"
+                ]
+                state = "IDENTITY"
+                if envelope["identity"] != semantic:
+                    raise ValueError("INDEX_SEMANTIC_IDENTITY_MISMATCH")
+            elif kind == "SHADOW_OBSERVATION":
+                semantic, state = record["decision_id"], record["state"]
+            if kind in ("SHADOW_OBSERVATION", "EVALUATION"):
+                parent = semantic
+            raw_sha = hashlib.sha256(raw.encode()).hexdigest()
+            index.execute(
+                "INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?)",
+                (
+                    key,
+                    aware(at).astimezone(UTC).isoformat(),
+                    kind,
+                    raw_sha,
+                    envelope["payload_sha256"],
+                    size,
+                    semantic,
+                    state,
+                    parent,
+                ),
+            )
+            manifest.update(json.dumps([key, at, raw_sha], separators=(",", ":")).encode() + b"\n")
+            observed_count += 1
+            observed_bytes += size
+            # No decoded payload list, shadow dictionary or original copy survives.
+            del raw, envelope, record
+        if (observed_count, observed_bytes) != (count, total):
+            raise ValueError("INDEX_SNAPSHOT_COVERAGE_MISMATCH")
+        _validate_index_links(index)
+        deadline()
+        index.execute(
+            "CREATE TABLE completion(status TEXT,records INTEGER,bytes INTEGER, "
+            "original_manifest_sha256 TEXT)"
+        )
+        index.execute(
+            "INSERT INTO completion VALUES(?,?,?,?)",
+            (
+                "COMPLETE_VALIDATED_SNAPSHOT",
+                count,
+                total,
+                manifest.hexdigest(),
+            ),
+        )
+        index.commit()
+        index.execute('PRAGMA query_only=ON')
+        index.execute('BEGIN')
+        index.execute('SELECT count(*) FROM records').fetchone()
+        deadline()
+        file_hash = hashlib.sha256()
+        with index_path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(65536), b""):
+                deadline()
+                file_hash.update(chunk)
+        manifest_result = ValidatedResearchIndex(
+            index_path,
+            file_hash.hexdigest(),
+            manifest.hexdigest(),
+            count,
+            total,
+        )
+        session = ResearchValidationSession(
+            _SESSION_OWNER, source, index, manifest_result, deadline, file_identity,
+        )
+        session._check()
+        complete = True
+        yield session
+        if not session._closed:
+            session._check()
+    except BaseException:
+        if source is not None:
+            source.close()
+        if index is not None:
+            index.close()
+        if not complete:
+            stat = index_path.lstat()
+            if index_path.is_symlink() or (stat.st_dev, stat.st_ino) != file_identity:
+                raise ValueError('INDEX_OWNERSHIP_CHANGED') from None
+            index_path.unlink()
+        raise
+    finally:
+        if session is not None:
+            session._close()
+        elif source is not None:
+            source.close()
+        if index is not None:
+            index.close()
+
+
+def validate_research_index(
+    mission_path: Path, index_path: Path, *, max_records: int = 10000,
+    max_bytes: int = MAX_READ_BYTES, timeout_seconds: int = 30,
+) -> ValidatedResearchIndex:
+    """Return the original closed-snapshot manifest API; no resumable session."""
+    with research_validation_session(
+        mission_path, index_path, max_records=max_records, max_bytes=max_bytes,
+        timeout_seconds=timeout_seconds,
+    ) as session:
+        return session.manifest
