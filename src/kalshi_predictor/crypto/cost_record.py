@@ -169,9 +169,14 @@ def replay_candidate_cost_record(
         "candidate_applicability": applicability,
         "uncertainty": assessment["uncertainty"] | {
             "value": None, "status": "UNKNOWN", "paper_support": False,
+            "method": "CANDIDATE_PROBABILITY_ERROR_UNVERIFIED",
+            "version": applicability["version"],
             "blockers": applicability["blockers"],
         },
         "full_net_ev": None, "full_net_ev_status": "FULL_NET_EV_UNKNOWN",
+        "qualification_status": "CALIBRATION_BLOCKED", "shortfall_to_five_cents": None,
         "clears_net_gate": False,
-        "blockers": list(dict.fromkeys(assessment["blockers"] + applicability["blockers"])),
+        "blockers": list(dict.fromkeys(
+            [b for b in assessment["blockers"] if b != "NET_EV_NOT_STRICTLY_ABOVE_FIVE_CENTS"]
+            + applicability["blockers"] + ["FULL_NET_EV_UNKNOWN"])),
     }

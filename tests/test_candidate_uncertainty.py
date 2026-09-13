@@ -92,9 +92,16 @@ def test_guarded_cost_replay_preserves_conditional_record_but_blocks_applicabili
     conditional = replay_cost_record(record, expected_decision=data['decision'])
     assert conditional['uncertainty']['paper_support'] is True
     assert conditional['full_net_ev'] is not None
+    assert conditional['shortfall_to_five_cents'] is not None
     result = replay_candidate_cost_record(record, expected_decision=data['decision'])
     assert result['conditional_assessment'] == conditional
     assert result['full_net_ev'] is result['uncertainty']['value'] is None
+    assert result['shortfall_to_five_cents'] is None
+    assert result['qualification_status'] == 'CALIBRATION_BLOCKED'
+    assert result['uncertainty']['method'] == 'CANDIDATE_PROBABILITY_ERROR_UNVERIFIED'
+    assert result['full_net_ev_status'] == 'FULL_NET_EV_UNKNOWN'
+    assert 'FULL_NET_EV_UNKNOWN' in result['blockers']
+    assert 'NET_EV_NOT_STRICTLY_ABOVE_FIVE_CENTS' not in result['blockers']
     assert result['clears_net_gate'] is result['uncertainty']['paper_support'] is False
     assert record == before
     record['assessment']['candidate_applicability'] = True
@@ -119,11 +126,12 @@ def test_scanner_and_assembler_use_candidate_boundary(monkeypatch):
     monkeypatch.setattr(calibration, 'REVIEWED_CALIBRATION_POLICIES', (policy,))
     args['calibration_originals'] = {ticker: bundle}
     rows = evaluate_paginated_current_research(**args)['rows']
-    for row in rows:
-        if row['candidate_uncertainty_applicability']:
-            assert not row['candidate_uncertainty_applicability']['candidate_applicability']
-            assert BLOCKER in row['blockers']
-            assert row['uncertainty'] is row['full_net_ev'] is None
+    applicable_rows = [row for row in rows if row['candidate_uncertainty_applicability']]
+    assert len(applicable_rows) == 2
+    for row in applicable_rows:
+        assert not row['candidate_uncertainty_applicability']['candidate_applicability']
+        assert BLOCKER in row['blockers']
+        assert row['uncertainty'] is row['full_net_ev'] is None
     paper, provenance = preparation()
     result = assemble_cf_research_candidate(paper_decision=paper, provenance_args=provenance)
     applicability = result.shadow_payload['candidate_uncertainty_applicability']
