@@ -90,6 +90,32 @@ def build_source_reconnect_health(
         and inserted_features + fresh_reused_features > 0
         and int(weather_forecasts.get("forecasts_inserted") or 0) > 0
     )
+    active_linking = gh2_payload.get("active_linking") or {}
+    catalog = active_linking.get("rollover_catalog") or {}
+    weather_gate = gh2_payload.get("weather_gate") or {}
+    decision_generated = _datetime(gh2_payload.get("generated_at"))
+    no_weather_market_scope = (
+        decision_generated is not None
+        and decision_generated <= resolved_now
+        and decision_age is not None
+        and decision_age <= decision_stale_minutes
+        and weather_gate.get("status") == "NO_CURRENT_WEATHER_LINKS"
+        and active_linking.get("weather_decision_candidates") == 0
+        and weather_forecasts.get("snapshots_scanned") == 0
+        and not weather_features
+        and not weather_healthy
+    )
+    weather_recovery = (
+        "Bounded weather refresh is producing current decisions."
+        if weather_healthy
+        else "Retry NOAA ingest and rebuild the current weather decision window."
+    )
+    if no_weather_market_scope:
+        weather_recovery = (
+            "Restore a fresh bounded active-market catalog, then link current weather markets. "
+            if catalog.get("status") == "STALE_NOT_IMPORTED"
+            else "Resolve the missing current weather-market links before forecasting. "
+        ) + "These decision counts do not measure NOAA ingestion."
 
     sources = [
         {
@@ -128,14 +154,16 @@ def build_source_reconnect_health(
             "status_kind": "healthy" if weather_healthy else "blocked",
             "age_minutes": decision_age,
             "detail": (
-                f"{inserted_features} new features; {fresh_reused_features} fresh reused features; "
+                (
+                    "0 linked weather markets in this decision cycle; "
+                    if no_weather_market_scope
+                    else ""
+                )
+                + f"{inserted_features} new features; "
+                f"{fresh_reused_features} fresh reused features; "
                 f"{int(weather_forecasts.get('forecasts_inserted') or 0)} forecasts"
             ),
-            "recovery": (
-                "Bounded weather refresh is producing current decisions."
-                if weather_healthy
-                else "Retry NOAA ingest and rebuild the current weather decision window."
-            ),
+            "recovery": weather_recovery,
         },
     ]
     return {
