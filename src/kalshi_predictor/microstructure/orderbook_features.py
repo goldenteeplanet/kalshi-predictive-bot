@@ -45,6 +45,7 @@ def parse_orderbook_depth(orderbook_json: dict[str, Any] | None) -> dict[str, An
     no_bid_depth = _depth(no_levels)
     imbalance = calculate_imbalance(yes_bid_depth, no_bid_depth)
     return {
+        "depth_semantics": "best_bid_quantity_v2",
         "yes_levels": yes_levels,
         "no_levels": no_levels,
         "yes_bid_depth": yes_bid_depth,

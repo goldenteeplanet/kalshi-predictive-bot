@@ -26,6 +26,7 @@ from kalshi_predictor.microstructure.orderbook_features import parse_orderbook_d
 )
 def test_top_depth_excludes_deeper_levels(book: dict) -> None:
     depth = parse_orderbook_depth(book)
+    assert depth["depth_semantics"] == "best_bid_quantity_v2"
     assert depth["top_of_book_depth"] == Decimal("5")
     assert depth["total_depth"] == Decimal("105")
     assert depth["yes_bid_depth"] == Decimal("102")
