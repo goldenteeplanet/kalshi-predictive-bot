@@ -1,0 +1,96 @@
+{
+  "allowed_normalizations": [
+    "import ordering/removal requires separate review",
+    "timezone.utc alias to UTC",
+    "planner source pin update",
+    "clock lambda to def"
+  ],
+  "files": [
+    {
+      "path": "development/capacity-ledger-v1/capacity_ledger.py",
+      "normalized_ast_equal": true,
+      "sha256": "67114f5ab782629cabb8351d85727122dc3ff2a0544f4194d48f07eb59eecd98"
+    },
+    {
+      "path": "development/capacity-ledger-v1/capacity_plan.py",
+      "normalized_ast_equal": true,
+      "sha256": "d657de722423e417dc0696bb97a3f2a6d31bb365733c8782835262b43873c64d"
+    },
+    {
+      "path": "development/capacity-ledger-v1/test_capacity_ledger.py",
+      "normalized_ast_equal": true,
+      "sha256": "fe3a9efb7aa2cce21d7e58f731162f3a35180667520bf98f905b1320cc94266a"
+    },
+    {
+      "path": "development/capacity-planner-v1/capacity_plan.py",
+      "normalized_ast_equal": true,
+      "sha256": "d657de722423e417dc0696bb97a3f2a6d31bb365733c8782835262b43873c64d"
+    },
+    {
+      "path": "development/capacity-planner-v1/test_capacity_plan.py",
+      "normalized_ast_equal": true,
+      "sha256": "5d66c1eb5760a1b501351cdda418e71193e876f99ea9461194bb5b78a28d162e"
+    },
+    {
+      "path": "development/deadline-admission-v1/absolute_cutoff.py",
+      "normalized_ast_equal": true,
+      "sha256": "6ae135696f6b90f533112a5f9ac7bf2881cadcff94f61b34c096ad46e8b6188c"
+    },
+    {
+      "path": "development/deadline-admission-v1/cloud_submit.py",
+      "normalized_ast_equal": true,
+      "sha256": "5f52b71ac9db2d2535a32f2b5ea88274b83e822b791f2ce7fc8725d6df9606cd"
+    },
+    {
+      "path": "development/deadline-admission-v1/deadline_admission.py",
+      "normalized_ast_equal": true,
+      "sha256": "9c121284602552ca872b1368e582a55f2d0c1ad565ecee0126237e755ff8f637"
+    },
+    {
+      "path": "development/deadline-admission-v1/integrated_suite.py",
+      "normalized_ast_equal": true,
+      "sha256": "eeed78bbb086dcfba45cd98d2d8002393ea5ab584929bec7452892bac5ebc48a"
+    },
+    {
+      "path": "development/deadline-admission-v1/owned_runtime.py",
+      "normalized_ast_equal": true,
+      "sha256": "7e55fc1994a66cf435c5d0a85270606391571221a2264cb4e8e97ae0d416947d"
+    },
+    {
+      "path": "development/deadline-admission-v1/test_deadline_admission.py",
+      "normalized_ast_equal": true,
+      "sha256": "60521bdc8c1657c0c6167f31ca57c527b6ccd15a09397a7fa3df09d99d21d5a2"
+    },
+    {
+      "path": "development/deadline-admission-v1/test_owned_runtime.py",
+      "normalized_ast_equal": true,
+      "sha256": "b47108e083a063885e72feae2bc2807ba6ab80b1eaf417d5b07c9544adaa3702"
+    },
+    {
+      "path": "development/deadline-admission-v1/worker_entry.py",
+      "normalized_ast_equal": true,
+      "sha256": "f8bbd91debf5d52a7f086bf4d95d6a75de28262e247f28e3fe8cd8836fc38f85"
+    },
+    {
+      "path": "development/durable-probe-v1/capacity_ledger.py",
+      "normalized_ast_equal": true,
+      "sha256": "67114f5ab782629cabb8351d85727122dc3ff2a0544f4194d48f07eb59eecd98"
+    },
+    {
+      "path": "development/durable-probe-v1/capacity_plan.py",
+      "normalized_ast_equal": true,
+      "sha256": "d657de722423e417dc0696bb97a3f2a6d31bb365733c8782835262b43873c64d"
+    },
+    {
+      "path": "development/durable-probe-v1/crash-probe.py",
+      "normalized_ast_equal": true,
+      "sha256": "bd0ee197be68e4a0f07755700a64be922504ff219a78604e29dd2284b6533ad0"
+    },
+    {
+      "path": "development/durable-probe-v1/verify-durable-probe.py",
+      "normalized_ast_equal": true,
+      "sha256": "79032d18b685637ea2233ec45abd55999c1ea7a797aa76b38a1b08e862044d87"
+    }
+  ],
+  "all_equal": true
+}
