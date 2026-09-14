@@ -30,3 +30,29 @@ jobs:
         shell: bash
         run: |
           find "$RUNNER_TEMP/alpha-ci-evidence" -type f \( -name '*.properties' -o -name '*.result' -o -name 'escaped-descendant.json' \) -print -exec cat {} \;
+
+
+  native-evidence-archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Run ten bounded archive cases and verify whole-cgroup cleanup
+        shell: bash
+        run: bash development/ci/run-evidence-archive-ci.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/alpha-evidence-archive-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Retain archive unit evidence in job log
+        if: always()
+        shell: bash
+        run: |
+          output="$RUNNER_TEMP/alpha-evidence-archive-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ -d "$output" ]]; then
+            find "$output" -maxdepth 1 -type f \( -name '*.properties' -o -name '*.result' -o -name '*.log' \) -print -exec cat {} \;
+          fi
+      - name: Preserve all archive evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-archive-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/alpha-evidence-archive-${{ github.run_id }}-${{ github.run_attempt }}/
+          if-no-files-found: error
+          retention-days: 30
