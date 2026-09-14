@@ -49,7 +49,7 @@ def parse_orderbook_depth(orderbook_json: dict[str, Any] | None) -> dict[str, An
         "no_levels": no_levels,
         "yes_bid_depth": yes_bid_depth,
         "no_bid_depth": no_bid_depth,
-        "top_of_book_depth": (yes_bid_depth or Decimal("0")) + (no_bid_depth or Decimal("0")),
+        "top_of_book_depth": _best_bid_depth(yes_levels) + _best_bid_depth(no_levels),
         "total_depth": (yes_bid_depth or Decimal("0")) + (no_bid_depth or Decimal("0")),
         "imbalance": imbalance,
     }
@@ -307,6 +307,29 @@ def _orderbook_container(orderbook_json: dict[str, Any]) -> dict[str, Any]:
         if isinstance(value, dict):
             return value
     return orderbook_json
+
+
+def _best_bid_depth(levels: list[Any]) -> Decimal:
+    """Sum quantity at the best bid on one side, independent of level order."""
+    best_price: Decimal | None = None
+    quantity = Decimal("0")
+    for level in levels:
+        if isinstance(level, dict):
+            price = to_decimal(level.get("price_dollars", level.get("price")))
+        elif isinstance(level, list | tuple) and len(level) > 1:
+            price = to_decimal(level[0])
+        else:
+            continue
+        if price is None or not price.is_finite():
+            continue
+        depth = _depth([level])
+        if depth is None:
+            continue
+        if best_price is None or price > best_price:
+            best_price, quantity = price, depth
+        elif price == best_price:
+            quantity += depth
+    return quantity
 
 
 def _depth(levels: list[Any]) -> Decimal | None:
