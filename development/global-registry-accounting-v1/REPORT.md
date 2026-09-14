@@ -1,0 +1,19 @@
+# Cross-epoch accounting V1 — UNTESTED
+
+Development-only increment for one externally supplied configuration and one SQLite file. No singleton registry, observer authentication, restore safety, allocation quota, dispatch, migration, release or parent/watcher authority transfer is implemented.
+
+Source SHA256: `08e2c891304ebcdd327a047ab022d724424825ec08cabdca0666d12b1e9c26d2`
+
+Test SHA256: `a6c63eb9119140da312658dfc93fc598b0a52c6be41656fb10e98bcc25e658c4`
+
+Every reservation and reconciliation result has launch_authorized=false and retry_authorized=false. Epochs share the sum of all full reservations, including RESERVED, START_INTENT, RUNNING, COMPLETED_CHARGED, FAILED_CHARGED and AMBIGUOUS. No release or epoch-close state transition API exists. The tests' retained-state changes use direct fixture SQL and do not establish an authorized operational transition protocol.
+
+The configured file stores immutable epoch metadata, unique reservation IDs and a globally unique supplied logical-work digest. Changing run/epoch labels cannot reuse that same digest. The digest itself is externally supplied: this module does not derive or authenticate canonical semantic work identity, and a caller changing the digest can bypass that semantic assumption. Filesystem, available bytes, observation/decision timestamps and configuration trust are also external synthetic values. Matching pins establish byte equality, not authoritative observation or a trusted current clock.
+
+An immediate transaction atomically commits a full reservation, immutable canonical receipt, optional new epoch and one generation increment. Reopening validates every bounded historical request, derives full page/phase bytes, checks row identity/work/epoch/metadata, contiguous generations and exact receipt bytes including prior charges and request hash. Historical time and capacity arithmetic must remain internally consistent. Reduced charges or altered receipt bytes refuse admission/readback. Coordinated malicious rewriting of the entire file, config or old valid restore is outside this internal-consistency proof; there is no external head anchor.
+
+Bounds are 64 reservation rows, 32 epochs, 8192-byte serialized input/receipt, 1 MiB database, one-second SQLite lock timeout and three-second cooperative progress/deadline checks. Configuration can lower applicable row/epoch/database limits. Full reservation remains 512 MiB per page per phase. Database page limits do not bound total journal/scratch bytes or RSS; native calls and filesystem races need external enforcement. Initial file creation is exclusive but does not claim authenticated custody or parent-directory power-loss durability. A failed creation is consumed and must not be reused.
+
+Fifteen authored cases cover reopen/exact-fit/no-launch readback, cross-epoch capacity, all retained states, attempt-label evasion, immutable epoch metadata, stale generation, stale/future/naive timestamps and filesystem mismatch, strict scalar/JSON/byte bounds, policy/source pins and exclusive creation, injected before/after-commit faults, database/unknown-state refusal, separate row and epoch caps, two actual spawned contenders synchronized by a barrier, and reduced-charge/receipt tampering. Fault callbacks are injected exceptions, not actual process death. The multiprocessing test uses two owned children only, bounded joins and cleanup, under a main guard; fixtures live beneath writable cwd `/output`, with source intended under readonly `/work`.
+
+No Python import, lint, formatting process, test execution, cloud mutation or provider call occurred during authoring. Root's independent review and one newly admitted cloud test/lint job are next. Old suites, historical dispatchers and previous cloud identities must not be replayed. Operational global registry readiness remains UNPROVEN.

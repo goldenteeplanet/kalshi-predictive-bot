@@ -20,12 +20,13 @@ cleanup() {
   fi
 }
 trap 'status=$?; cleanup || status=1; exit "$status"' EXIT
-for suite in capacity-planner-v1 capacity-ledger-v1 deadline-admission-v1; do
+for suite in capacity-planner-v1 capacity-ledger-v1 deadline-admission-v1 global-registry-accounting-v1; do
   output="$evidence/$suite"
   mkdir "$output"
   case "$suite" in
     capacity-planner-v1) expected_count=8; required=(capacity_plan.py test_capacity_plan.py) ;;
     capacity-ledger-v1) expected_count=11; required=(capacity_plan.py capacity_ledger.py test_capacity_ledger.py) ;;
+    global-registry-accounting-v1) expected_count=15; required=(registry_accounting.py test_global_registry.py) ;;
     deadline-admission-v1) expected_count=15; required=(deadline_admission.py owned_runtime.py worker_entry.py test_deadline_admission.py test_owned_runtime.py) ;;
   esac
   for name in "${required[@]}"; do

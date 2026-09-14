@@ -1,0 +1,2 @@
+# Preserve the exact consumed historical input bytes; CI does not execute it.
+job.input.json -text

@@ -1,0 +1,18 @@
+{
+  "schema": "ISOLATED_REGISTRY_ACCOUNTING_TEST_V1",
+  "declared_at": "2026-09-14T14:43:10+00:00",
+  "not_before": "2026-09-14T14:47:00+00:00",
+  "cutoff": "2026-09-14T14:53:00+00:00",
+  "expected_tests": 15,
+  "sources": {
+    "cutoff_registry.py": "01c234cd661603a9bdf345731843dc9f5c4cd7694ead562757e0b8e915ee5aa3",
+    "deadline_admission.py": "9c121284602552ca872b1368e582a55f2d0c1ad565ecee0126237e755ff8f637",
+    "owned_runtime.py": "7e55fc1994a66cf435c5d0a85270606391571221a2264cb4e8e97ae0d416947d",
+    "registry_accounting.py": "08e2c891304ebcdd327a047ab022d724424825ec08cabdca0666d12b1e9c26d2",
+    "run_registry_tests.py": "32f11e8a120f4fa25baa225a1da06cf2b4a46a4bd6554b524669e8e34227762e",
+    "run_registry.py": "0124cc8a2eefce95054492b34e0608ce22f463e7f530ce32d69ae21e19fc22e8",
+    "submit_registry.py": "c00f94b5f2b40c5f2591ea8b7e5cdfce583681648a7b0efbbf0b8ae2e4ca89bd",
+    "test_global_registry.py": "a6c63eb9119140da312658dfc93fc598b0a52c6be41656fb10e98bcc25e658c4",
+    "worker_entry.py": "f8bbd91debf5d52a7f086bf4d95d6a75de28262e247f28e3fe8cd8836fc38f85"
+  }
+}
