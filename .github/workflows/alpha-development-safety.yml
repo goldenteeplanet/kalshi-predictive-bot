@@ -1,0 +1,32 @@
+name: alpha-development-safety
+
+on:
+  push:
+    branches: [research/cloud-capacity-20260914]
+  pull_request:
+    paths:
+      - 'development/**'
+      - '.github/workflows/alpha-development-safety.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: alpha-development-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-development-suites:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Run bounded development suites and verify whole-cgroup cleanup
+        shell: bash
+        run: bash development/ci/run-native-ci.sh "$GITHUB_WORKSPACE" "$RUNNER_TEMP/alpha-ci-evidence"
+      - name: Retain native unit evidence in job log
+        if: always()
+        shell: bash
+        run: |
+          find "$RUNNER_TEMP/alpha-ci-evidence" -type f \( -name '*.properties' -o -name '*.result' -o -name 'escaped-descendant.json' \) -print -exec cat {} \;
