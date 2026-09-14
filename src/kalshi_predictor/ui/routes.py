@@ -158,6 +158,7 @@ from kalshi_predictor.ui.progress import (
 )
 from kalshi_predictor.ui.refresh_readiness import build_refresh_readiness_dashboard
 from kalshi_predictor.ui.report_files import ALLOWED_REPORTS, report_available, report_download_path
+from kalshi_predictor.ui.runtime_safety import create_runtime_safety_router
 from kalshi_predictor.ui.service import (
     REPORT_LINKS,
     DecisionUiService,
@@ -498,9 +499,14 @@ def create_router(
     resolved_settings = settings or get_settings()
     default_shell_context = load_shell_status_context(settings=resolved_settings)
     templates.env.globals["default_shell_context"] = default_shell_context
+    session_mode = "injected_unknown"
     if session_factory is None:
         engine = make_sqlite_read_only_engine() if resolved_settings.ui_read_only else init_db()
         session_factory = get_session_factory(engine)
+        session_mode = "read_only_sqlite" if resolved_settings.ui_read_only else "read_write"
+    router.include_router(
+        create_runtime_safety_router(resolved_settings, session_mode=session_mode)
+    )
 
     def get_session() -> Iterator[Session]:
         session = session_factory()
