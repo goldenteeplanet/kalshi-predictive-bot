@@ -1,0 +1,11 @@
+# Root review before execution
+
+Reviewed registry source08e2c891304ebcdd327a047ab022d724424825ec08cabdca0666d12b1e9c26d2 and tests a6c63eb9119140da312658dfc93fc598b0a52c6be41656fb10e98bcc25e658c4. Fifteen cases are new and have not been executed. This review accepts one configured-file accounting prototype, not a trusted global admission service.
+
+An early unexecuted draft trusted a stored charge without checking its retained request and receipt. The final source reconstructs each bounded request's full charge, checks row identity and epoch metadata, requires contiguous original generations, reproduces canonical immutable receipts and validates historical charge accumulation. The new tampering case refuses reduced charges and altered receipts. All retained states remain fully charged. No release or launch API is present.
+
+The two-process contention test uses real spawned children, a synchronization barrier, bounded joins and owner-only cleanup. Acknowledgement-loss cases inject Python exceptions; they are not process-death or power-loss proofs. Logical work keys, timestamps, space and authority labels are caller-supplied synthetic values. Every receipt denies launch, retry, singleton, authentication and restore guarantees. Consistency validation cannot authenticate a maliciously rewritten complete database or detect an old valid restore without external authority.
+
+Source is below32KiB, input/receipt limits8KiB, database1MiB,64rows/32epochs maximum. SQLite callbacks and path checks remain cooperative and subject to stated external writer/TOCTOU limitations. The actual test job adds256MiB memory,25% CPU,16tasks,60second maximum runtime,2second stop grace,5second safety, no network and isolated filesystem binds.
+
+The distinct controller uses the reviewed deadline helper, exclusive dispatch identity and a prearmed exact-unit absolute cutoff. Final config b22c5a3212efb57ca4058001e9bf10006a1f433aaedb0040aac7f1f330dfc616 pins all9sources and15tests. It permits start no earlier than14:47UTC and cuts off at14:53UTC. Independent controller review accepted exact source/count closure. Root must still observe old capture/watchers terminal and adequate resources immediately before the single launch. Historical jobs, source pins, campaign artifacts and consumed identities are not reused.

@@ -1,0 +1,18 @@
+{
+  "schema": "EXACT_DEVELOPMENT_DEADLINE_FIXTURE_V1",
+  "declared_at": "2026-09-14T14:03:43.7946755Z",
+  "not_before": "2026-09-14T14:03:43.7946755Z",
+  "cutoff": "2026-09-14T14:04:50+00:00",
+  "sources": {
+    "deadline_admission.py": "13583252402acb768e4f43f337e65a042645f40a1cb42e2782a9b7ed99afa1e8",
+    "test_deadline_admission.py": "4bb01e5813ec5b93e845e9e4d5c3cbca74eb734d82397b0ab3185b102402b94a",
+    "owned_runtime.py": "f39eacba4b64637a19e468c9cb7ffc39200610aca21f6d2801841c2ade2c2cc5",
+    "test_owned_runtime.py": "3c71f9d7e7fa058d7f8908f95c1491f49fc9716bbd9904c54740898c9d3db20e",
+    "worker_entry.py": "11744c9ff16ebeb3945ef61d26511809260a833933b7ec8e01ffc90e6455a017",
+    "integrated_suite.py": "dd2d6a6d9188190417f0f48aa86ac7007740e16ebbeda9b6784ba384aef778bd",
+    "absolute_cutoff.py": "4b6ac567d1523d9ebd610b3603ea758e29ac46f728a3eebdf8f168058f55c07e",
+    "cloud_submit.py": "b98b4f339a855654a748b8665d3307cfab3613b89b492e6f4a1f8e0c58162643"
+  },
+  "input": "Fifteen NEW fixtures; deliberate integrated acknowledgement-loss after actual systemd submission",
+  "on_uncertain": "IDENTITY_CONSUMED_NO_RELAUNCH"
+}

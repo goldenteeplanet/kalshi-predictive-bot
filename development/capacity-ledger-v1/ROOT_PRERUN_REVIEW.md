@@ -1,0 +1,7 @@
+# Independent root pre-run review
+
+Scoped static acceptance for one new isolated cloud fixture run. Reviewed ledger844411c17f0f35dfd139ea1f350457d8428b945c98969fdaf04b9f3fad0cbc2f, unchanged plannerb3f233b37b13433ae8bee010dcf8d05dfe630614d24caa392556926c12868c8a and final testeebefc6f5dda7c867a7480e877e257241a653ee38bf85dbee590c2b0a41dac11. Tests are still unexecuted at review. Final fixture uses temporary directories under writable cwd/output, source imports under/work.
+
+Reservation insertion, full charge, generation CAS and exact receipt commit in one immediate transaction. Duplicate identity/run-phase, policy drift, observation mismatch, stale generation/time, byte/row boundaries and insufficient arithmetic capacity refuse. Reconcile is read-only and explicitly grants no redispatch. Existing charges never release. SQLite progress/busy checks are cooperative; an external job deadline is required.
+
+No blocking static defect found within cooperating caller scope. One ledger binds one filesystem/epoch and cannot prove absence of omitted or parallel ledgers. Caller-supplied clock/source/observation pins are not independent authentication; returned authority flags remain false. Filesystem inode custody, journal-total resource bounds, OS quota, process fencing and real power-loss/directory-fsync guarantees remain absent. Injected ACK-loss is not a killed-process proof; actual two-process contention is a separate test. No production/candidate/source-policy mutation follows from acceptance.

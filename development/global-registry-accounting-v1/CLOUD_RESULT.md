@@ -1,0 +1,13 @@
+# Cross-epoch accounting: tests passed; wrapper failed conservatively
+
+One distinct cloud submission started at14:47:18UTC. All15new registry tests passed in2.812seconds, including actual two-process contention across epochs, exact full-charge accumulation and retained-request/receipt tampering refusal. The test child exited0. No completed market experiment or prior cloud job was rerun.
+
+The enclosing owned-runtime monitor reaped one descendant, PID1765191, and returned DESCENDANTS_TERMINATED at14:47:24.155410UTC after5.757112seconds. Its identity was not captured, so this report does not identify it as a multiprocessing resource tracker. The wrapper accepts onlyCOMPLETED and therefore exited1; the systemd unit result was exit-code. This is15passing tests with a failed wrapper, not an entirely successful cloud job.
+
+The entire owned cgroup was absent after completion. The exact owned cutoff service was then stopped, and both owned units were inactive by14:48:16UTC. Effective worker and controller receipts retain256MiB memory,25%CPU,16tasks,60second runtime,2second stop grace, no network, strict filesystem isolation and the14:53absolute cutoff. Work finished before the next14:50:30reconcile window. The cutoff was stopped after terminal/cgroup verification; this run does not claim a newly exercised cutoff kill.
+
+Root reviewed the new module and corrected an unexecuted stored-charge consistency defect before the single run. The exact executed module remains08e2c891304ebcdd327a047ab022d724424825ec08cabdca0666d12b1e9c26d2; tests a6c63eb9119140da312658dfc93fc598b0a52c6be41656fb10e98bcc25e658c4. Config b22c5a3212efb57ca4058001e9bf10006a1f433aaedb0040aac7f1f330dfc616 and all source/attempt/result originals remain unchanged. The consumed cloud dispatcher will not be retried or repinned.
+
+The next validation uses the existing independently reviewed native CI wrapper, extended by one15-case suite. It supplies systemd whole-cgroup cleanup and verifies cgroup absence directly. Hosted CI is a distinct required environment, not a retry of the consumed cloud identity. The earlier d5793e3 head is fully green (9881full tests passed,1skipped); new registry source is not covered by that old result until new CI completes.
+
+This prototype supplies accounting consistency for one configured file only. Caller-provided authority, logical work keys, clock and free-space values are not authenticated. External singleton fencing, global allocation protection, complete historical import and restore freshness remain unproved. Launch and retry authority remain false. Production, the five originals, campaign packets, mission caps and sole21:05procedure are unchanged.
