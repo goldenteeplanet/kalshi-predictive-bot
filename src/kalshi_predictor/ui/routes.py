@@ -157,6 +157,8 @@ from kalshi_predictor.ui.progress import (
     get_cached_progress_dashboard,
 )
 from kalshi_predictor.ui.refresh_readiness import build_refresh_readiness_dashboard
+from kalshi_predictor.ui.report_files import ALLOWED_REPORTS, report_available, report_download_path
+from kalshi_predictor.ui.runtime_safety import register_runtime_safety_route
 from kalshi_predictor.ui.service import (
     REPORT_LINKS,
     DecisionUiService,
@@ -185,6 +187,7 @@ from kalshi_predictor.workstation.repository import (
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+templates.env.globals["report_available"] = report_available
 logger = logging.getLogger(__name__)
 LINK_COVERAGE_SNAPSHOT_PATH = Path("reports/market_coverage/link_coverage.json")
 LINK_COVERAGE_REPORT_STALE_AFTER_SECONDS = 30 * 60
@@ -496,9 +499,12 @@ def create_router(
     resolved_settings = settings or get_settings()
     default_shell_context = load_shell_status_context(settings=resolved_settings)
     templates.env.globals["default_shell_context"] = default_shell_context
+    session_mode = "injected_unknown"
     if session_factory is None:
         engine = make_sqlite_read_only_engine() if resolved_settings.ui_read_only else init_db()
         session_factory = get_session_factory(engine)
+        session_mode = "read_only_sqlite" if resolved_settings.ui_read_only else "read_write"
+    register_runtime_safety_route(router, resolved_settings, session_mode=session_mode)
 
     def get_session() -> Iterator[Session]:
         session = session_factory()
@@ -899,12 +905,10 @@ def create_router(
                 {"status": "UNAVAILABLE", "generated_at": None, "detail": str(exc)},
                 status_code=503,
             )
-        context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
-        market = (
-            context.get("market_freshness")
-            if isinstance(context.get("market_freshness"), dict)
-            else {}
-        )
+        raw_context = payload.get("context")
+        context = raw_context if isinstance(raw_context, dict) else {}
+        raw_market = context.get("market_freshness")
+        market = raw_market if isinstance(raw_market, dict) else {}
         return JSONResponse(
             {
                 "status": "AVAILABLE",
@@ -2741,54 +2745,13 @@ def create_router(
         result = service.demo_execute(ticker, confirmation=confirmation)
         return jsonable_encoder(result)
 
-    @router.get("/reports/{report_name}")
+    @router.get("/reports/{report_name:path}")
     def report_file(report_name: str) -> FileResponse:
-        allowed = {
-            "opportunities.md",
-            "model_leaderboard.md",
-            "model_tournament.md",
-            "paper_trading.md",
-            "execution_report.md",
-            "autopilot_report.md",
-            "overnight_report.md",
-            "portfolio_summary.md",
-            "daily_briefing.md",
-            "analytics_report.md",
-            "best_payouts.md",
-            "research_report.md",
-            "signal_report.md",
-            "news_report.md",
-            "news_opportunities.md",
-            "news_backtest.md",
-            "sports_report.md",
-            "sports_opportunities.md",
-            "sports_backtest.md",
-            "learning_report.md",
-            "learning_diagnostics.md",
-            "learning_targets.md",
-            "self_evaluation_journal.md",
-            "self_evaluation_journal.json",
-            "database_report.md",
-            "system_readiness_remediation.md",
-            "market_memory_report.md",
-            "advanced_risk_report.md",
-            "institutional_dashboard.md",
-            "personal_trader_brief.md",
-            "model_readiness.md",
-            "model_confidence.md",
-            "control_center.md",
-            "microstructure_report.md",
-            "microstructure_opportunities.md",
-            "microstructure_backtest.md",
-            "meta_report.md",
-            "meta_evaluation.md",
-            "meta_opportunities.md",
-        }
-        if report_name not in allowed:
+        if report_name not in ALLOWED_REPORTS:
             raise HTTPException(status_code=404, detail="Unknown report.")
-        path = Path("reports") / report_name
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="Report has not been generated.")
+        path = report_download_path(report_name)
+        if path is None:
+            raise HTTPException(status_code=404, detail="Report is unavailable in this workspace.")
         return FileResponse(path)
 
     return router

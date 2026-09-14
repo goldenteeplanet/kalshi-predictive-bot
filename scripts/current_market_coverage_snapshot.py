@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, datetime
 import json
 import os
-from pathlib import Path
 import sqlite3
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 LINK_TABLES = {
@@ -22,7 +22,9 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-def refresh_current_snapshot(connection: sqlite3.Connection, base: dict[str, Any]) -> dict[str, Any]:
+def refresh_current_snapshot(
+    connection: sqlite3.Connection, base: dict[str, Any]
+) -> dict[str, Any]:
     now_value = utc_now().replace(tzinfo=None).isoformat(sep=" ")
     placeholders = ",".join("?" for _ in INACTIVE_STATUSES)
     connection.execute(
@@ -37,8 +39,7 @@ def refresh_current_snapshot(connection: sqlite3.Connection, base: dict[str, Any
         (*INACTIVE_STATUSES, now_value, now_value, now_value),
     )
     connection.execute(
-        "CREATE UNIQUE INDEX current_coverage_tickers_idx "
-        "ON current_coverage_tickers(ticker)"
+        "CREATE UNIQUE INDEX current_coverage_tickers_idx " "ON current_coverage_tickers(ticker)"
     )
     connection.execute(
         """
@@ -88,25 +89,32 @@ def refresh_current_snapshot(connection: sqlite3.Connection, base: dict[str, Any
             current_linked_markets=current_linked,
             current_unlinked_markets=current_unlinked,
             current_coverage_percent=(
-                f"{100 * current_linked / current_markets:.1f}%"
-                if current_markets else "n/a"
+                f"{100 * current_linked / current_markets:.1f}%" if current_markets else "n/a"
             ),
             current_status_label=(
-                "Connected" if current_markets and current_unlinked == 0
-                else "Partial" if current_markets else "No Current Markets"
+                "Connected"
+                if current_markets and current_unlinked == 0
+                else "Partial"
+                if current_markets
+                else "No Current Markets"
             ),
         )
     actionable = [r for r in rows if int(r.get("current_unlinked_markets") or 0) > 0]
     if actionable:
         top = max(actionable, key=lambda r: int(r["current_unlinked_markets"]))
         bottleneck = {
-            "category": top["category"], "status": "UNLINKED",
-            "message": f"{top['category']} has {top['current_unlinked_markets']} current parsed market(s) without a specialized link.",
+            "category": top["category"],
+            "status": "UNLINKED",
+            "message": (
+                f"{top['category']} has {top['current_unlinked_markets']} "
+                "current parsed market(s) without a specialized link."
+            ),
             "next_action": "Run the bounded current-family linker before the next refresh.",
         }
     else:
         bottleneck = {
-            "category": None, "status": "CONNECTED",
+            "category": None,
+            "status": "CONNECTED",
             "message": "Current parsed market coverage is complete for enabled link families.",
             "next_action": "No current-market link remediation is required.",
         }
@@ -120,13 +128,17 @@ def refresh_current_snapshot(connection: sqlite3.Connection, base: dict[str, Any
         if label in by_label:
             by_label[label]["value"] = value
         else:
-            cards.append({"label": label, "value": value,
-                          "definition": "Current indexed snapshot."})
+            cards.append(
+                {"label": label, "value": value, "definition": "Current indexed snapshot."}
+            )
     payload = dict(base)
     payload.update(
-        generated_at=utc_now().isoformat(), refresh_mode="CURRENT_ONLY_INDEXED",
+        generated_at=utc_now().isoformat(),
+        refresh_mode="CURRENT_ONLY_INDEXED",
         refresh_note="Current counts refreshed independently; historical totals remain cached.",
-        category_rows=rows, summary_cards=cards, bottleneck=bottleneck,
+        category_rows=rows,
+        summary_cards=cards,
+        bottleneck=bottleneck,
     )
     return payload
 
@@ -138,10 +150,12 @@ def main() -> None:
     parser.add_argument(
         "--database",
         type=Path,
-        default=Path(os.environ.get(
-            "KALSHI_COVERAGE_DATABASE",
-            "/home/james/kalshi-predictive-bot-data/kalshi_phase1.db",
-        )),
+        default=Path(
+            os.environ.get(
+                "KALSHI_COVERAGE_DATABASE",
+                "/home/james/kalshi-predictive-bot-data/kalshi_phase1.db",
+            )
+        ),
     )
     args = parser.parse_args()
     base = json.loads(args.base.read_text(encoding="utf-8"))

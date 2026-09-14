@@ -570,3 +570,84 @@ def _seed_ranked_market(
             "reason": "GH-2 candidate fixture.",
         },
     )
+
+
+def test_candidate_expiry_unknown_flags_cannot_grant_diagnostic_readiness():
+    now = datetime(2026, 9, 10, 23, tzinfo=UTC)
+    for flag in (True, False, None, "true", "false", 1):
+        raw = {"ticker": "NO-TICKER-TIME-GUESS", "active_market": flag,
+               "latest_snapshot_at": now.isoformat(), "best_price": "0.2",
+               "expected_value": "0.1"}
+        report = phase_gh2._build_candidate_diagnostics(
+            r5_payload={"best_ev_candidates": [raw]}, weather_rows=[], as_of=now)
+        row = report["rows"][0]
+        assert row["expired"] is None and row["expiry_status"] == "UNKNOWN"
+        assert "MARKET_EXPIRY_UNKNOWN" in row["failed_gates"]
+    raw.pop("active_market")
+    assert phase_gh2._candidate_expiry_diagnostic(raw, as_of=now)["expired"] is None
+
+
+def test_candidate_expiry_uses_actual_close_boundary_over_cached_flag():
+    now = datetime(2026, 9, 10, 23, tzinfo=UTC)
+    for offset, expected in ((-1, True), (0, True), (1, False)):
+        raw = {"close_time": (now + timedelta(seconds=offset)).isoformat(),
+               "active_market": True, "market_status": "active"}
+        result = phase_gh2._candidate_expiry_diagnostic(raw, as_of=now)
+        assert result["expired"] is expected
+        assert result["expiry_as_of"] == now.isoformat()
+    for bad in (None, "invalid", "2026-09-11T00:00:00", True, 123):
+        assert phase_gh2._candidate_expiry_diagnostic(
+            {"close_time": bad}, as_of=now)["expired"] is None
+    assert phase_gh2._candidate_expiry_diagnostic(
+        {"close_time": now.isoformat()}, as_of=now.replace(tzinfo=None))["expired"] is None
+
+
+def test_weather_diagnostic_unknown_window_does_not_claim_expiry():
+    result = phase_gh2._build_candidate_diagnostics(
+        r5_payload={}, weather_rows=[{"ticker": "WEATHER", "current_window_eligible": True}])
+    row = result["rows"][0]
+    assert row["expired"] is None
+    assert "MARKET_EXPIRY_UNKNOWN" in row["failed_gates"]
+
+
+def test_candidate_expiry_uses_selected_market_metadata(tmp_path):
+    now = utc_now()
+    factory = _session_factory(tmp_path)
+    with factory() as session:
+        _seed_ranked_market(session, ticker="REAL-CLOSED", captured_at=now,
+                            close_time=now, edge="0.1", score="70")
+        session.flush()
+        result = phase_gh2._build_candidate_diagnostics(
+            r5_payload={"best_ev_candidates": [{"ticker": "REAL-CLOSED", "active_market": True},
+                                                {"ticker": "MISSING", "active_market": True}]},
+            weather_rows=[], as_of=now, session=session)
+    closed, missing = result["rows"]
+    assert closed["expired"] is True and "MARKET_EXPIRED" in closed["failed_gates"]
+    assert missing["expired"] is None
+
+
+def test_today_expiry_cell_renders_unknown_without_truthiness():
+    from jinja2 import Environment
+
+    template = (Path(phase_gh2.__file__).parent / "ui/templates/today.html").read_text()
+    cell = next(line for line in template.splitlines() if "candidate.expired" in line)
+    render = Environment().from_string(cell)
+    for value, label in ((None, "Unknown"), (True, "Yes"), (False, "No"), ("false", "Unknown")):
+        assert f">{label}</td>" in render.render(candidate={"expired": value})
+    assert ">Unknown</td>" in render.render(candidate={})
+
+
+def test_resolved_expiry_cannot_turn_diagnostic_into_paper_ready(tmp_path):
+    now = utc_now()
+    factory = _session_factory(tmp_path)
+    with factory() as session:
+        _seed_ranked_market(session, ticker="REAL-FUTURE", captured_at=now,
+                            close_time=now + timedelta(hours=1), edge="0.1", score="70")
+        session.flush()
+        result = phase_gh2._build_candidate_diagnostics(
+            r5_payload={"best_ev_candidates": [{"ticker": "REAL-FUTURE", "active_market": True,
+                "latest_snapshot_at": now.isoformat(), "best_price": "0.2",
+                "expected_value": "0.1", "readiness_status": "PAPER_READY_CANDIDATE"}]},
+            weather_rows=[], as_of=now, session=session)
+    assert result["rows"][0]["expired"] is False
+    assert result["rows"][0]["failed_gates"] == ["DIAGNOSTIC_ONLY_NOT_QUALIFIED"]

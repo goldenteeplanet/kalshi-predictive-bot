@@ -13,7 +13,8 @@ from kalshi_predictor.system_readiness.remediation import (
 from kalshi_predictor.ui.app import create_app
 
 
-def test_system_remediation_is_paper_only_and_writes_report(tmp_path) -> None:
+def test_system_remediation_is_paper_only_and_writes_report(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
     session_factory = _session_factory(tmp_path)
     output_path = Path(tmp_path) / "remediation.md"
 
@@ -66,7 +67,8 @@ def test_system_remediation_blocks_live_environment(tmp_path) -> None:
     assert result["live_trading_authorized"] is False
 
 
-def test_system_remediation_cli_smoke(tmp_path) -> None:
+def test_system_remediation_cli_smoke(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
     get_settings.cache_clear()
     runner = CliRunner()
     output_path = Path(tmp_path) / "cli_remediation.md"

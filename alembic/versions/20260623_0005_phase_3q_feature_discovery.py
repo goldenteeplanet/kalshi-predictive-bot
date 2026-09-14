@@ -1,6 +1,7 @@
 """Phase 3Q auto feature discovery research tables."""
 
 from alembic import op
+
 from kalshi_predictor.data.schema import Base
 
 revision = "20260623_0005"

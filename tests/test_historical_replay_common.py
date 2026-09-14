@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 from kalshi_predictor import (
     phase3aa_r2,
     phase3aa_r3,
@@ -25,7 +27,10 @@ from kalshi_predictor.historical_replay_common import (
 )
 from kalshi_predictor.tournament import engine as tournament_engine
 from kalshi_predictor.weather import backtest as weather_backtest
-from kalshi_predictor.wrapper_inventory import build_wrapper_inventory
+from kalshi_predictor.wrapper_inventory import (
+    _historical_replay_duplicate_helpers,
+    build_wrapper_inventory,
+)
 
 
 @dataclass
@@ -88,6 +93,27 @@ def test_historical_replay_scan_has_no_exact_duplicates() -> None:
 
     assert payload["status"] == "READY"
     assert payload["historical_replay_duplicate_helpers"] == []
+
+
+@pytest.mark.parametrize("checkout", ["plain", "settlement-recovery"])
+def test_replay_scan_scope_does_not_depend_on_checkout_name(tmp_path, checkout) -> None:
+    root = tmp_path / checkout / "src" / "kalshi_predictor"
+    for folder, expression in (
+        ("backtest", "value * 2"),
+        ("unrelated", "value + 1"),
+        ("paper/backtest", "value - 1"),
+    ):
+        directory = root / folder
+        directory.mkdir(parents=True)
+        for filename in ("a.py", "b.py"):
+            (directory / filename).write_text(
+                f"def _helper(value):\n    return {expression}\n", encoding="utf-8"
+            )
+    groups = _historical_replay_duplicate_helpers(root)
+    assert len(groups) == 1
+    assert {member["module"] for member in groups[0]["members"]} == {
+        "backtest/a.py", "backtest/b.py"
+    }
 
 
 def test_replay_common_has_no_current_paper_or_gh2_importers() -> None:

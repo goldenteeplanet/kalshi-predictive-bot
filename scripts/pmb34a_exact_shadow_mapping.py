@@ -7,7 +7,6 @@ from kalshi_predictor.benchmarking.exact_shadow_mapping import (
     write_exact_shadow_field_mapping_preview,
 )
 
-
 parser = argparse.ArgumentParser(description="Run local PMB-34A exact source mapping preview")
 parser.add_argument(
     "--fixtures",

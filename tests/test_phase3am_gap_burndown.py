@@ -9,8 +9,8 @@ from sqlalchemy import select
 
 from kalshi_predictor.data.db import get_session_factory, init_db
 from kalshi_predictor.data.repositories import upsert_market, upsert_settlement
-from kalshi_predictor.data.schema import MarketLeg, PaperOrder, PaperPnl
-from kalshi_predictor.paper.models import BUY_YES, ORDER_FILLED
+from kalshi_predictor.data.schema import MarketLeg, PaperFill, PaperOrder, PaperPnl, PaperPosition
+from kalshi_predictor.paper.models import BUY_NO, BUY_YES, ORDER_FILLED
 from kalshi_predictor.phase3am import (
     build_phase3ay_due_settlement_diagnostic,
     build_phase3ay_settle_due_paper,
@@ -134,6 +134,85 @@ def test_settlement_diagnostic_rejects_sibling_and_fuzzy_title_matches(tmp_path)
     assert rows["KXSIB-26JUL04-A"]["safe_to_apply"] is False
     assert rows["KXFUZZY-26JUL04-A"]["primary_state"] == "AWAITING_EXACT_MARKET_SETTLEMENT"
     assert rows["KXFUZZY-26JUL04-A"]["safe_to_apply"] is False
+
+
+@pytest.mark.parametrize("second_side,expected", [(BUY_YES, "0.97"), (BUY_NO, "-0.03")])
+def test_two_orders_settle_as_one_aggregate_and_replay_does_not_duplicate(
+    tmp_path, second_side, expected
+) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        position = _seed_two_order_position(session, second_side=second_side)
+        session.commit()
+        payload = build_phase3ay_settle_due_paper(
+            session, exact_only=True, dry_run=False, apply=True, backup_first=True,
+            max_records=2, output_dir=tmp_path,
+        )
+        session.commit()
+        pnl = list(session.scalars(select(PaperPnl)))
+        assert len(pnl) == payload["summary"]["rows_applied"] == 1
+        assert Decimal(pnl[0].realized_pnl) == Decimal(expected)
+        assert Decimal(position.realized_pnl) == Decimal(expected)
+        assert pnl[0].yes_contracts == position.yes_contracts
+        assert pnl[0].no_contracts == position.no_contracts
+        assert len(payload["applied_rows"][0]["paper_trade_ids"]) == 2
+        replay = build_phase3ay_settle_due_paper(
+            session, exact_only=True, dry_run=False, apply=True, backup_first=True,
+            max_records=2, output_dir=tmp_path,
+        )
+        assert replay["summary"]["rows_applied"] == 0
+        assert len(list(session.scalars(select(PaperPnl)))) == 1
+
+
+@pytest.mark.parametrize("mismatch", [False, True])
+def test_incomplete_or_inconsistent_ticker_cannot_be_partially_settled(tmp_path, mismatch) -> None:
+    session_factory = _session_factory(tmp_path)
+    with session_factory() as session:
+        position = _seed_two_order_position(session)
+        if mismatch:
+            position.yes_contracts = 3
+        session.commit()
+        payload = build_phase3ay_settle_due_paper(
+            session, exact_only=True, dry_run=False, apply=True, backup_first=True,
+            max_records=2 if mismatch else 1, output_dir=tmp_path,
+        )
+        assert payload["summary"]["rows_applied"] == 0
+        assert payload["summary"]["safe_to_apply_count"] == 0
+        assert payload["backup_path"] is None
+        assert session.scalar(select(PaperPnl)) is None
+        assert Decimal(position.realized_pnl) == 0
+        assert payload["rows"][0]["blocker"] == (
+            "POSITION_QUANTITY_MISMATCH" if mismatch else "INCOMPLETE_TICKER_SETTLEMENT_GROUP"
+        )
+
+
+def _seed_two_order_position(session, *, second_side=BUY_YES):
+    ticker = "KXAGGREGATE-26JUL04-Y"
+    _seed_due_exact(session, ticker=ticker)
+    first = session.scalar(select(PaperOrder))
+    second = PaperOrder(**{
+        column.name: getattr(first, column.name)
+        for column in PaperOrder.__table__.columns if column.name != "id"
+    })
+    second.side = second_side
+    second.limit_price = second.market_price = "0.60"
+    session.add(second)
+    session.flush()
+    for order, price, fee in ((first, "0.40", "0.01"), (second, "0.60", "0.02")):
+        session.add(PaperFill(
+            paper_order_id=order.id, ticker=ticker, filled_at=utc_now(), side=order.side,
+            price=price, quantity=1, fee=fee, raw_fill_json="{}",
+        ))
+    position = PaperPosition(
+        ticker=ticker, yes_contracts=2 if second_side == BUY_YES else 1,
+        no_contracts=0 if second_side == BUY_YES else 1,
+        avg_yes_price="0.50" if second_side == BUY_YES else "0.40",
+        avg_no_price=None if second_side == BUY_YES else "0.60",
+        realized_pnl="0", updated_at=utc_now(),
+    )
+    session.add(position)
+    session.flush()
+    return position
 
 
 def test_settlement_diagnostic_rejects_ambiguous_outcomes_and_composites(tmp_path) -> None:

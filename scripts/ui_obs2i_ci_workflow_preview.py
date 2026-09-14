@@ -6,7 +6,6 @@ from pathlib import Path
 
 from kalshi_predictor.ui.notification_pipeline_workflow import write_workflow_preview
 
-
 parser = argparse.ArgumentParser(description="Certify the local UI-OBS-2I workflow preview")
 parser.add_argument("--project-root", type=Path, default=Path("."))
 parser.add_argument("--output-dir", type=Path, default=Path("reports/ui_obs2i"))

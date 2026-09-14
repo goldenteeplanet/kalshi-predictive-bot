@@ -155,25 +155,31 @@ def _candidate_eligibility(
                 return False, f"CRYPTO_FEATURE_{compatible.reason.upper()}"
         return True, "ELIGIBLE"
     if model == "weather_v2":
-        link = get_latest_weather_link_for_ticker(session, ticker)
-        if link is None:
+        input_cutoff = utc_now()
+        weather_link = get_latest_weather_link_for_ticker(session, ticker, as_of=input_cutoff)
+        if weather_link is None:
             return False, "NO_EXACT_WEATHER_LINK"
-        confidence = to_decimal(link.confidence)
+        confidence = to_decimal(weather_link.confidence)
         if confidence is None or confidence < active_settings.weather_v2_min_link_confidence:
             return False, "WEATHER_LINK_CONFIDENCE_TOO_LOW"
         location = (
-            link.location_key
-            if link.location_key != "unknown"
+            weather_link.location_key
+            if weather_link.location_key != "unknown"
             else active_settings.weather_v2_default_location_key
         )
-        features = get_latest_weather_features(session, location, target_time=link.target_time)
+        features = get_latest_weather_features(
+            session, location, target_time=weather_link.target_time, as_of=input_cutoff
+        )
         if features is None:
             return False, "NO_EXACT_WEATHER_FEATURE"
-        if _forecast_age_hours(features) > active_settings.weather_v2_max_forecast_age_hours:
+        source_age = _forecast_age_hours(features, as_of=input_cutoff)
+        if source_age < 0:
+            return False, "WEATHER_SOURCE_IN_FUTURE"
+        if source_age > active_settings.weather_v2_max_forecast_age_hours:
             return False, "WEATHER_FEATURE_STALE"
         if (
             _weather_adjustment(
-                link=link,
+                link=weather_link,
                 features=features,
                 max_adjustment=active_settings.weather_v2_max_adjustment,
             )

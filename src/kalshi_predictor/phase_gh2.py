@@ -569,6 +569,11 @@ def run_gh2_single_writer_decision_refresh(
             limit=candidate_limit,
             sticky=sticky_after,
         )
+        candidate_diagnostics = _build_candidate_diagnostics(
+            r5_payload=r5_payload,
+            weather_rows=list(weather_gate.get("weather_rows") or []),
+            session=session,
+        )
         paper_orders_after = _paper_order_count(session)
         mark_stage("commit_single_writer")
         session.commit()
@@ -636,10 +641,6 @@ def run_gh2_single_writer_decision_refresh(
         reset_reason=", ".join(cycle_failure_reasons) if cycle_failure_reasons else None,
         required_cycles=soak_cycles_required,
         soak_quality=soak_quality,
-    )
-    candidate_diagnostics = _build_candidate_diagnostics(
-        r5_payload=r5_payload,
-        weather_rows=list(weather_gate.get("weather_rows") or []),
     )
     payload = {
         "phase": "GH-2",
@@ -1133,12 +1134,45 @@ def _snapshot_recovery_candidates(
     return rows
 
 
+def _candidate_expiry_diagnostic(raw: dict[str, Any], *, as_of: datetime) -> dict[str, Any]:
+    """Report actual close-clock evidence only; cached active flags prove no expiry clock."""
+    close_raw = raw.get("close_time")
+    close_at = None
+    if isinstance(close_raw, datetime):
+        close_at = close_raw
+    elif isinstance(close_raw, str):
+        try:
+            close_at = datetime.fromisoformat(close_raw.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+    known = (
+        as_of.tzinfo is not None and as_of.utcoffset() is not None
+        and close_at is not None and close_at.tzinfo is not None
+        and close_at.utcoffset() is not None
+    )
+    expired = close_at <= as_of if known and close_at is not None else None
+    return {
+        "expired": expired,
+        "expiry_status": "UNKNOWN" if expired is None else "EXPIRED" if expired else "NOT_EXPIRED",
+        "expiry_reason": (
+            "ACTUAL_CLOSE_TIME_OR_AS_OF_MISSING_OR_INVALID"
+            if expired is None else "ACTUAL_CLOSE_TIME_COMPARED_WITH_DIAGNOSTIC_AS_OF"
+        ),
+        "expiry_as_of": as_of.isoformat(),
+        "market_close_time": close_at.isoformat() if known and close_at is not None else None,
+        "market_status": raw.get("market_status"),
+    }
+
+
 def _build_candidate_diagnostics(
     *,
     r5_payload: dict[str, Any],
     weather_rows: list[dict[str, Any]],
     limit_per_category: int = 12,
+    as_of: datetime | None = None,
+    session: Session | None = None,
 ) -> dict[str, Any]:
+    diagnostic_as_of = as_of or utc_now()
     crypto_rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for section in (
@@ -1153,6 +1187,11 @@ def _build_candidate_diagnostics(
             if not ticker or ticker in seen:
                 continue
             failed = _crypto_failed_gates(raw)
+            expiry = _candidate_expiry_diagnostic(raw, as_of=diagnostic_as_of)
+            if expiry["expired"] is None:
+                failed.append("MARKET_EXPIRY_UNKNOWN")
+            elif expiry["expired"]:
+                failed.append("MARKET_EXPIRED")
             if not failed:
                 continue
             seen.add(ticker)
@@ -1174,7 +1213,7 @@ def _build_candidate_diagnostics(
                     "liquidity": raw.get("liquidity_score") or raw.get("liquidity"),
                     "ranking_ready": not any("ranking" in gate.lower() for gate in failed),
                     "risk_ready": not any("risk" in gate.lower() for gate in failed),
-                    "expired": not bool(raw.get("active_market", True)),
+                    **expiry,
                     "failed_gates": failed,
                 }
             )
@@ -1186,6 +1225,11 @@ def _build_candidate_diagnostics(
     normalized_weather = []
     for raw in weather_rows[:limit_per_category]:
         failed = [str(item) for item in raw.get("failed_gates") or []]
+        expiry = _candidate_expiry_diagnostic(raw, as_of=diagnostic_as_of)
+        if expiry["expired"] is None:
+            failed.append("MARKET_EXPIRY_UNKNOWN")
+        elif expiry["expired"]:
+            failed.append("MARKET_EXPIRED")
         normalized_weather.append(
             {
                 "ticker": raw.get("ticker"),
@@ -1204,11 +1248,41 @@ def _build_candidate_diagnostics(
                     and raw.get("phase3m_nonzero_size")
                     and raw.get("phase3n_approved")
                 ),
-                "expired": not bool(raw.get("current_window_eligible")),
+                **expiry,
                 "failed_gates": failed or [str(raw.get("first_blocker") or "UNKNOWN")],
             }
         )
     rows = crypto_rows + normalized_weather
+    if session is not None and rows:
+        # Only selected diagnostic tickers; no history scan or ticker-derived clocks.
+        markets = {
+            market.ticker: market
+            for market in session.scalars(
+                select(Market).where(Market.ticker.in_([row["ticker"] for row in rows]))
+            )
+        }
+        for row in rows:
+            market = markets.get(row["ticker"])
+            expiry = _candidate_expiry_diagnostic(
+                {
+                    "close_time": (
+                        _aware(market.close_time) if market and market.close_time else None
+                    ),
+                    "market_status": market.status if market else None,
+                },
+                as_of=diagnostic_as_of,
+            )
+            row.update(expiry)
+            row["failed_gates"] = [
+                gate for gate in row["failed_gates"]
+                if gate not in {"MARKET_EXPIRY_UNKNOWN", "MARKET_EXPIRED"}
+            ]
+            if expiry["expired"] is None:
+                row["failed_gates"].append("MARKET_EXPIRY_UNKNOWN")
+            elif expiry["expired"]:
+                row["failed_gates"].append("MARKET_EXPIRED")
+            if not row["failed_gates"]:
+                row["failed_gates"].append("DIAGNOSTIC_ONLY_NOT_QUALIFIED")
     return {
         "row_count": len(rows),
         "crypto_rows": len(crypto_rows),

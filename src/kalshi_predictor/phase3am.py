@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import desc, func, or_, select, text
 from sqlalchemy.orm import Session
@@ -293,6 +293,27 @@ def build_phase3ay_settle_due_paper(
     ][:max_records]
     proposed_rows = [_settlement_proposal_row(session, row) for row in diagnostic["rows"]]
     proposed_ready = [row for row in proposed_rows if row.get("safe_to_apply")][:max_records]
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in proposed_ready:
+        groups.setdefault(row["exact_market_ticker"], []).append(row)
+    for ticker, group in list(groups.items()):
+        orders = list(session.scalars(select(PaperOrder).where(
+            PaperOrder.ticker == ticker, PaperOrder.status == ORDER_FILLED,
+        )))
+        blocker = None
+        if {order.id for order in orders} != {row["paper_trade_id"] for row in group}:
+            blocker = "INCOMPLETE_TICKER_SETTLEMENT_GROUP"
+        position = session.get(PaperPosition, ticker)
+        if position is not None and (
+            position.yes_contracts != sum(o.quantity for o in orders if o.side.upper() == BUY_YES)
+            or position.no_contracts != sum(o.quantity for o in orders if o.side.upper() == BUY_NO)
+        ):
+            blocker = "POSITION_QUANTITY_MISMATCH"
+        if blocker:
+            for row in group:
+                row.update(safe_to_apply=False, blocker=blocker)
+            del groups[ticker]
+    proposed_ready = [row for group in groups.values() for row in group]
     backup_path = None
     applied_rows: list[dict[str, Any]] = []
 
@@ -304,9 +325,13 @@ def build_phase3ay_settle_due_paper(
             db_url=db_url,
         )
         now = utc_now()
-        for row in proposed_ready:
-            _apply_paper_pnl_row(session, row, calculated_at=now)
-            applied = dict(row)
+        for group in groups.values():
+            _apply_paper_pnl_group(session, group, calculated_at=now)
+            applied = dict(group[0])
+            applied["paper_trade_ids"] = [row["paper_trade_id"] for row in group]
+            applied["realized_pnl"] = decimal_to_str(sum(
+                (Decimal(row["realized_pnl"]) for row in group), Decimal("0")
+            ))
             applied["applied"] = True
             applied_rows.append(applied)
         session.flush()
@@ -1214,7 +1239,7 @@ def _trade_financials(session: Session, row: dict[str, Any]) -> dict[str, Any]:
     payout = None
     realized = None
     roi = None
-    if outcome is not None and entry_price is not None:
+    if outcome is not None and entry_price is not None and cost is not None:
         payout = (
             outcome * order.quantity
             if order.side.upper() == BUY_YES
@@ -1248,7 +1273,8 @@ def _entry_price(session: Session, order: PaperOrder) -> Decimal | None:
         total_quantity = sum(fill.quantity for fill in fills)
         if total_quantity > 0:
             total_cost = sum(
-                (to_decimal(fill.price) or Decimal("0")) * fill.quantity for fill in fills
+                ((to_decimal(fill.price) or Decimal("0")) * fill.quantity for fill in fills),
+                Decimal("0"),
             )
             return total_cost / total_quantity
     return to_decimal(order.market_price) or to_decimal(order.limit_price)
@@ -1314,33 +1340,37 @@ def _settlement_proposal_row(session: Session, row: dict[str, Any]) -> dict[str,
     return proposal
 
 
-def _apply_paper_pnl_row(
+def _apply_paper_pnl_group(
     session: Session,
-    row: dict[str, Any],
+    rows: list[dict[str, Any]],
     *,
     calculated_at: datetime,
 ) -> None:
-    order = session.get(PaperOrder, row["paper_trade_id"])
-    settlement = session.get(Settlement, row["exact_market_ticker"])
-    if order is None or settlement is None:
+    ticker = rows[0]["exact_market_ticker"]
+    settlement = session.get(Settlement, ticker)
+    if settlement is None:
         raise RuntimeError("Cannot apply settlement without exact order and settlement rows.")
-    entry = to_decimal(row.get("entry_price")) or Decimal("0")
-    realized = to_decimal(row.get("realized_pnl")) or Decimal("0")
-    if order.side.upper() == BUY_YES:
-        yes_contracts = order.quantity
-        no_contracts = 0
-        avg_yes = entry
-        avg_no = None
-    elif order.side.upper() == BUY_NO:
-        yes_contracts = 0
-        no_contracts = order.quantity
-        avg_yes = None
-        avg_no = entry
-    else:
-        raise RuntimeError(f"Unsupported side for exact settlement apply: {order.side}")
+    yes_contracts = no_contracts = 0
+    yes_cost = no_cost = realized = Decimal("0")
+    for row in rows:
+        order = session.get(PaperOrder, row["paper_trade_id"])
+        if order is None or order.ticker != ticker:
+            raise RuntimeError("Exact settlement group identity changed.")
+        entry = Decimal(row["entry_price"])
+        realized += Decimal(row["realized_pnl"])
+        if order.side.upper() == BUY_YES:
+            yes_contracts += order.quantity
+            yes_cost += entry * order.quantity
+        elif order.side.upper() == BUY_NO:
+            no_contracts += order.quantity
+            no_cost += entry * order.quantity
+        else:
+            raise RuntimeError(f"Unsupported side for exact settlement apply: {order.side}")
+    avg_yes = yes_cost / yes_contracts if yes_contracts else None
+    avg_no = no_cost / no_contracts if no_contracts else None
     session.add(
         PaperPnl(
-            ticker=order.ticker,
+            ticker=ticker,
             calculated_at=calculated_at,
             yes_contracts=yes_contracts,
             no_contracts=no_contracts,
@@ -1353,7 +1383,7 @@ def _apply_paper_pnl_row(
             notes=SETTLED_PNL_NOTE,
         )
     )
-    position = session.get(PaperPosition, order.ticker)
+    position = session.get(PaperPosition, ticker)
     if position is not None:
         position.realized_pnl = decimal_to_str(realized) or "0"
         position.updated_at = calculated_at
@@ -1672,7 +1702,8 @@ def _latest_link_rows(
         .where(link_model.ticker.in_(tickers))
         .order_by(desc(order_column), desc(link_model.id))
     ):
-        links.setdefault(str(link.ticker), link)
+        typed_link = cast(EconomicMarketLink | NewsMarketLink, link)
+        links.setdefault(str(typed_link.ticker), typed_link)
     return links
 
 

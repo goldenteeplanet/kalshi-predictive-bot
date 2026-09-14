@@ -5,7 +5,6 @@ from pathlib import Path
 
 from kalshi_predictor.phase_prov3 import write_prov3_preview
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--database", type=Path, required=True)
 parser.add_argument("--prov2-report", type=Path,

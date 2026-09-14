@@ -6,7 +6,6 @@ from pathlib import Path
 
 from kalshi_predictor.ui.live_roadmap_status import build_live_roadmap_status
 
-
 source = Path("reports/phase_ui_obs5g/live_snapshot_4.json")
 payload = json.loads(source.read_text(encoding="utf-8"))
 reference = datetime.fromisoformat(payload["generated_at"].replace("Z", "+00:00"))

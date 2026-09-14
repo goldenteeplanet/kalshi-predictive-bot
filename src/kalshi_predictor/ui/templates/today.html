@@ -189,7 +189,7 @@
           <td>{{ candidate.liquidity_label }}</td>
           <td>{{ candidate.ranking_label }}</td>
           <td>{{ candidate.risk_label }}</td>
-          <td>{{ 'Yes' if candidate.expired else 'No' }}</td>
+          <td>{{ 'Yes' if candidate.expired is sameas true else 'No' if candidate.expired is sameas false else 'Unknown' }}</td>
           <td>{{ candidate.failed_gate_label }}</td>
         </tr>
       {% endfor %}
