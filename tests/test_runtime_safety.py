@@ -2,11 +2,11 @@ import os
 from unittest.mock import Mock
 
 import pytest
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 
 from kalshi_predictor.config import Settings
-from kalshi_predictor.ui.runtime_safety import create_runtime_safety_router
+from kalshi_predictor.ui.runtime_safety import register_runtime_safety_route
 
 
 def test_runtime_safety_uses_cached_flags_and_excludes_credentials(monkeypatch):
@@ -19,7 +19,9 @@ def test_runtime_safety_uses_cached_flags_and_excludes_credentials(monkeypatch):
         kalshi_private_key_path="PRIVATE_PATH_MUST_NOT_APPEAR",
     )
     app = FastAPI()
-    app.include_router(create_runtime_safety_router(settings, session_mode="injected_unknown"))
+    router = APIRouter()
+    register_runtime_safety_route(router, settings, session_mode="injected_unknown")
+    app.include_router(router)
     monkeypatch.setenv("UI_READ_ONLY", "false")
     with TestClient(app) as client:
         response = client.get("/api/runtime-safety")

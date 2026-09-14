@@ -8,8 +8,9 @@ from fastapi.responses import JSONResponse
 from kalshi_predictor.config import Settings
 
 
-def create_runtime_safety_router(settings: Settings, *, session_mode: str) -> APIRouter:
-    router = APIRouter()
+def register_runtime_safety_route(
+    router: APIRouter, settings: Settings, *, session_mode: str
+) -> None:
 
     @router.get("/api/runtime-safety")
     def runtime_safety() -> JSONResponse:
@@ -29,5 +30,3 @@ def create_runtime_safety_router(settings: Settings, *, session_mode: str) -> AP
             },
             headers={"Cache-Control": "no-store"},
         )
-
-    return router
